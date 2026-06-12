@@ -3,9 +3,14 @@ import Google from "next-auth/providers/google";
 
 import { getEnv } from "@/server/env";
 
-function getAuthSecret(): string {
-  const env = getEnv();
-
+/**
+ * Resolve NEXTAUTH_SECRET with fail-closed production runtime behavior.
+ * Exported for unit tests.
+ */
+export function resolveAuthSecret(
+  env: Pick<import("@/server/env").Env, "NODE_ENV" | "NEXTAUTH_SECRET">,
+  options?: { isProductionBuild?: boolean },
+): string {
   if (env.NEXTAUTH_SECRET) {
     return env.NEXTAUTH_SECRET;
   }
@@ -18,7 +23,22 @@ function getAuthSecret(): string {
     return "development-nextauth-secret-minimum-32";
   }
 
-  return "build-time-nextauth-secret-placeholder-32";
+  // Next.js build collects page data without runtime secrets — not used at runtime.
+  if (options?.isProductionBuild) {
+    return "build-time-nextauth-secret-placeholder-32";
+  }
+
+  throw new Error(
+    "NEXTAUTH_SECRET is required in production. Set it in your environment configuration.",
+  );
+}
+
+function getAuthSecret(): string {
+  const env = getEnv();
+
+  return resolveAuthSecret(env, {
+    isProductionBuild: process.env.NEXT_PHASE === "phase-production-build",
+  });
 }
 
 function getAuthProviders() {

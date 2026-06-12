@@ -136,8 +136,8 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `settings:read` | ✓ | ✓ | ✓ | ✓ |
 | `settings:update` | ✓ | ✓ | | |
 | `users:manage` | ✓ | ✓ | | |
-| `roles:manage` | ✓ | | | |
-| `billing:manage` | ✓ | | | |
+| `roles:manage` | ✓ | ✓ | | |
+| `billing:manage` | ✓ | ✓ | | |
 
 Phase 2 seeds the matrix above via `/server/permissions/roles.ts` (`DEFAULT_ROLE_DEFINITIONS`) on every new workspace. Unknown permission strings are rejected by `/server/permissions/permissions.ts`.
 

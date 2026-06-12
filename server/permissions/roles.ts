@@ -74,6 +74,8 @@ const ADMIN_PERMISSIONS = validatePermissions([
   "settings:read",
   "settings:update",
   "users:manage",
+  "roles:manage",
+  "billing:manage",
 ]);
 
 const AGENT_PERMISSIONS = validatePermissions([

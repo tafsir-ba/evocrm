@@ -19,7 +19,7 @@ requirePermission() — permission key allowlist enforcement
 withWorkspaceScope() — server-resolved workspaceId in queries
 ```
 
-`auth.config.ts` is Edge-safe (no Mongoose). Full auth callbacks with DB sync live in `/auth.ts` (Node runtime only).
+`auth.config.ts` is Edge-safe (no Mongoose). Full auth callbacks with DB sync live in `/auth.ts` (Node runtime only). Production runtime **requires** `NEXTAUTH_SECRET` — missing secret throws at startup (`resolveAuthSecret()` in `auth.config.ts`). Build-only placeholder is used only during `next build` page collection.
 
 ---
 

@@ -21,6 +21,13 @@ describe("default role permission sets", () => {
     expect(ownerPermissions).toContain("roles:manage");
   });
 
+  it("gives admin same operational permissions as owner for V1", () => {
+    const adminPermissions = getDefaultRolePermissions("admin");
+    expect(adminPermissions).toContain("roles:manage");
+    expect(adminPermissions).toContain("billing:manage");
+    expect(adminPermissions).toContain("users:manage");
+  });
+
   it("gives agent operational read/write without archive/manage", () => {
     const agentPermissions = getDefaultRolePermissions("agent");
     expect(agentPermissions).toContain("lead:update");
