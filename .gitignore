@@ -35,3 +35,8 @@ test-results/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
