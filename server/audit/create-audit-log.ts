@@ -7,14 +7,24 @@ import "server-only";
 export type AuditEntityType =
   | "workspace"
   | "membership"
+  | "role"
   | "lead"
   | "property"
   | "opportunity"
   | "activity"
   | "document"
   | "campaign"
+  | "campaign_step"
+  | "campaign_enrollment"
+  | "campaign_send"
   | "project"
-  | "settings";
+  | "dictionary"
+  | "dictionary_item"
+  | "tag"
+  | "settings"
+  | "integration"
+  | "integration_log"
+  | "billing";
 
 export type CreateAuditLogInput = {
   workspaceId: string;

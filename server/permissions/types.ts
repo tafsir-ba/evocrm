@@ -4,7 +4,7 @@ import "server-only";
  * Permission types — full implementation in Phase 2+.
  */
 
-export type MembershipStatus = "active" | "invited" | "removed";
+export type MembershipStatus = "active" | "invited" | "suspended" | "removed";
 
 export type WorkspaceMembership = {
   id: string;
