@@ -33,6 +33,12 @@ Do not weaken TypeScript strictness, disable lint rules broadly, or skip tests t
 
 ### Unit / service tests (Vitest)
 
+Phase 1 adds React component tests (Vitest + jsdom + Testing Library) for:
+
+- V1 navigation scope (allowed vs forbidden primary nav labels)
+- Core UI state components (empty, error, permission denied)
+- Domain display components that accept props (`KanbanColumn`, `Timeline`)
+
 - Zod schema validation (valid + invalid inputs)
 - Status transition logic (behavior-based, not label-based)
 - Cross-workspace relationship validation

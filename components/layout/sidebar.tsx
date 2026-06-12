@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import {
@@ -16,16 +16,18 @@ import {
   IconSettings,
 } from "@/lib/icons";
 import { workspaces } from "@/lib/mock-data";
+import { V1_NAV_ITEMS } from "@/lib/v1-navigation";
+import { MOCK_WORKSPACE_SLUG, workspaceNavPath } from "@/lib/workspace-paths";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", Icon: IconDashboard },
-  { href: "/pipeline", label: "Pipeline", Icon: IconPipeline },
-  { href: "/leads", label: "Leads", Icon: IconLeads },
-  { href: "/properties", label: "Properties", Icon: IconProperties },
-  { href: "/activities", label: "Activities", Icon: IconActivities },
-  { href: "/dripping", label: "Dripping", Icon: IconDripping },
-  { href: "/settings", label: "Settings", Icon: IconSettings },
-];
+const NAV_ICONS = {
+  dashboard: IconDashboard,
+  pipeline: IconPipeline,
+  leads: IconLeads,
+  properties: IconProperties,
+  activities: IconActivities,
+  dripping: IconDripping,
+  settings: IconSettings,
+} as const;
 
 export function Sidebar({
   onNavigate,
@@ -35,7 +37,11 @@ export function Sidebar({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
-  const activeWs = workspaces[0];
+  const params = useParams<{ workspaceSlug?: string }>();
+  const workspaceSlug = params.workspaceSlug ?? MOCK_WORKSPACE_SLUG;
+  const activeWs =
+    workspaces.find((workspace) => workspace.slug === workspaceSlug) ??
+    workspaces[0];
 
   return (
     <aside
@@ -44,9 +50,8 @@ export function Sidebar({
         collapsed ? "w-[68px]" : "w-[244px]",
       )}
     >
-      {/* Brand */}
       <Link
-        href="/dashboard"
+        href={workspaceNavPath(workspaceSlug, "dashboard")}
         onClick={onNavigate}
         className="flex items-center gap-2.5 h-[60px] px-4 border-b border-[var(--color-line)] focus-ring"
       >
@@ -68,7 +73,6 @@ export function Sidebar({
         )}
       </Link>
 
-      {/* Workspace selector */}
       {!collapsed && (
         <button
           type="button"
@@ -92,14 +96,15 @@ export function Sidebar({
         </button>
       )}
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ href, label, Icon }) => {
+      <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto" aria-label="Primary">
+        {V1_NAV_ITEMS.map(({ segment, label }) => {
+          const href = workspaceNavPath(workspaceSlug, segment);
+          const Icon = NAV_ICONS[segment];
           const isActive =
-            pathname === href || pathname?.startsWith(href + "/");
+            pathname === href || pathname?.startsWith(`${href}/`);
           return (
             <Link
-              key={href}
+              key={segment}
               href={href}
               onClick={onNavigate}
               className={cn(
@@ -129,7 +134,6 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Footer hint */}
       {!collapsed && (
         <div className="px-3 pb-3 pt-2 border-t border-[var(--color-line)]">
           <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3">

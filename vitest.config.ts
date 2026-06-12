@@ -3,8 +3,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    environment: "node",
-    include: ["tests/unit/**/*.test.ts"],
+    environment: "jsdom",
+    include: ["tests/unit/**/*.test.{ts,tsx}"],
     setupFiles: ["./tests/setup.ts"],
     globals: false,
     restoreMocks: true,
@@ -13,5 +13,8 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "."),
     },
+  },
+  esbuild: {
+    jsx: "automatic",
   },
 });

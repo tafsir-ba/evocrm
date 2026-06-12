@@ -7,13 +7,9 @@
  * in later phases. Do not treat this as canonical product taxonomy.
  */
 
-export type StatusTone =
-  | "neutral"
-  | "info"
-  | "success"
-  | "warn"
-  | "danger"
-  | "muted";
+import type { StatusTone } from "@/components/ui/badge";
+
+export type { StatusTone };
 
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Lost";
 export type PipelineStage =
@@ -57,7 +53,12 @@ export const teamUsers: User[] = [
 ];
 
 export const workspaces = [
-  { id: "ws1", name: "Geneva Office", slug: "geneva", initials: "GE" },
+  {
+    id: "ws1",
+    name: "Demo Workspace",
+    slug: "demo-workspace",
+    initials: "DW",
+  },
   { id: "ws2", name: "Lausanne Office", slug: "lausanne", initials: "LA" },
 ];
 

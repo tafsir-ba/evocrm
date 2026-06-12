@@ -234,6 +234,27 @@ Phase 0 has no product routes or domain models. Verify foundation only:
 
 ---
 
+## Phase 1 Design System + App Shell Checklist
+
+Phase 1 is UI-only with mock data. Verify shell and boundaries only:
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Workspace UI routes live under `/w/[workspaceSlug]/…` (e.g. `/w/demo-workspace/dashboard`)
+- [ ] Primary nav includes only: Dashboard, Pipeline, Leads, Properties, Activities, Dripping, Settings
+- [ ] No Contacts, Companies, Reports, Tasks, Documents, Integrations, or Client Portal in primary nav
+- [ ] Login page exists at `/login` (UI only — no real auth)
+- [ ] Placeholder list + detail pages for leads, properties, opportunities
+- [ ] Reusable UI primitives under `/components/ui/` contain no business taxonomy maps
+- [ ] Domain display components (`kanban-column`, `timeline`, `file-list`, etc.) receive data via props
+- [ ] Mock data centralized in `/lib/mock-data.ts` with Phase 1 comments
+- [ ] Loading, empty, error, forbidden, and no-workspace states exist (see `/w/demo-workspace/states`)
+- [ ] No product API routes or Mongoose product models added
+- [ ] Vitest covers nav scope and key component rendering
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

@@ -88,7 +88,7 @@ export default function LoginPage() {
 
           {/* Primary auth: Google */}
           <Link
-            href="/dashboard"
+            href="/w/demo-workspace/dashboard"
             className="mt-7 w-full h-11 inline-flex items-center justify-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-white hover:bg-[var(--color-canvas)] focus-ring text-[14px] font-medium text-[var(--color-ink)] transition-colors"
           >
             <IconGoogle size={18} />
@@ -105,7 +105,7 @@ export default function LoginPage() {
           </div>
 
           {/* Email / password (visual only) */}
-          <form className="space-y-3.5" action="/dashboard">
+          <form className="space-y-3.5" action="/w/demo-workspace/dashboard">
             <div className="space-y-1.5">
               <Label htmlFor="email">Work email</Label>
               <Input

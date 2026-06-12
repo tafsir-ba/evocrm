@@ -1,12 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Phase 0 smoke test — verifies the placeholder app renders.
- * Full E2E flows are added in later phases.
+ * Phase 1 smoke test — verifies root redirect and dashboard shell render.
  */
-test("home page shows foundation placeholder", async ({ page }) => {
+test("home redirects to workspace dashboard", async ({ page }) => {
   await page.goto("/");
-  await expect(
-    page.getByText("Real Estate CRM foundation ready."),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/w\/demo-workspace\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 });

@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
+export { Textarea } from "@/components/ui/textarea";
+export { Select } from "@/components/ui/select";
 
 const baseField =
   "w-full bg-white border border-[var(--color-line)] rounded-md text-[13.5px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] " +
@@ -46,39 +48,6 @@ export function Input({
         </div>
       )}
     </div>
-  );
-}
-
-type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
-export function Textarea({ className, ...rest }: TextareaProps) {
-  return (
-    <textarea
-      {...rest}
-      className={cn(baseField, "py-2 px-3 min-h-[88px] leading-relaxed", className)}
-    />
-  );
-}
-
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & { fieldSize?: "sm" | "md" };
-export function Select({ className, fieldSize = "md", children, ...rest }: SelectProps) {
-  const h = fieldSize === "sm" ? "h-8" : "h-10";
-  return (
-    <select
-      {...rest}
-      className={cn(
-        baseField,
-        h,
-        "appearance-none pr-9 pl-3 bg-no-repeat",
-        "bg-[length:14px_14px] bg-[right_0.65rem_center]",
-        className,
-      )}
-      style={{
-        backgroundImage:
-          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>\")",
-      }}
-    >
-      {children}
-    </select>
   );
 }
 

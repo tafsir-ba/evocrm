@@ -1,6 +1,12 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
-import type { StatusTone } from "@/lib/mock-data";
+export type StatusTone =
+  | "neutral"
+  | "info"
+  | "success"
+  | "warn"
+  | "danger"
+  | "muted";
 
 const TONES: Record<StatusTone, string> = {
   neutral:
@@ -48,41 +54,3 @@ export function Badge({
   );
 }
 
-/** Status-aware badge: maps a domain string to a tone */
-const STATUS_MAP: Record<string, StatusTone> = {
-  // Leads
-  New: "info",
-  Contacted: "warn",
-  Qualified: "success",
-  Lost: "muted",
-  // Properties
-  Available: "success",
-  Reserved: "warn",
-  Sold: "danger",
-  "Off-market": "muted",
-  // Activities
-  Upcoming: "info",
-  Done: "success",
-  Pending: "warn",
-  Overdue: "danger",
-  // Campaigns
-  Active: "success",
-  Scheduled: "info",
-  Paused: "warn",
-  Draft: "muted",
-};
-
-export function StatusBadge({
-  status,
-  size = "md",
-}: {
-  status: string;
-  size?: "sm" | "md";
-}) {
-  const tone = STATUS_MAP[status] ?? "neutral";
-  return (
-    <Badge tone={tone} dot size={size}>
-      {status}
-    </Badge>
-  );
-}
