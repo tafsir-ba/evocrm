@@ -4,15 +4,28 @@ Security is foundational. Every phase must uphold these requirements.
 
 ---
 
-## Phase 0 Foundation
+## Phase 2 Foundation (implemented)
 
-Auth, workspace, and permission helpers exist as **fail-closed stubs** (`INTERNAL_ERROR` when invoked). They must not silently allow access or accept client-provided `workspaceId`. Real enforcement begins in Phase 2.
+Phase 2 implements real auth, workspace resolution, membership checks, and permission enforcement:
+
+```txt
+Auth.js v5 (next-auth@5) with Google provider
+JWT session strategy (no OAuth tokens stored on User model)
+Middleware protects /w/*, /workspaces/*, and workspace APIs
+requireAuth() syncs User record on each authenticated request
+resolveWorkspace(slug) — server-side slug lookup
+requireMembership() — active membership only
+requirePermission() — permission key allowlist enforcement
+withWorkspaceScope() — server-resolved workspaceId in queries
+```
+
+`auth.config.ts` is Edge-safe (no Mongoose). Full auth callbacks with DB sync live in `/auth.ts` (Node runtime only).
 
 ---
 
 ## Authentication
 
-- Use **Auth.js / NextAuth** with **Google provider** for V1.
+- Use **Auth.js / NextAuth v5** with **Google provider** for V1.
 - Session must be validated on every protected API route.
 - Unauthenticated requests return `401` / `UNAUTHENTICATED`.
 - No anonymous access to workspace data.

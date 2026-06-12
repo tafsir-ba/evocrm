@@ -4,7 +4,7 @@ Evohome CRM — real estate workspace SaaS (V1).
 
 ## Status
 
-Phase 1 QA-patched and approved for Phase 2: design system, app shell, workspace routes (`/w/[workspaceSlug]/…`), locked V1 primary navigation, mock-data placeholder pages, and reusable UI state patterns. Real auth, workspace resolution, and permissions arrive in Phase 2.
+Phase 2 complete: Google auth (Auth.js v5), workspace creation/selection, membership + role permissions, permission-aware navigation, and protected routes. Phase 1 UI shell remains with mock-data placeholder pages for CRM modules. Next: Phase 3 — Dictionaries / Tags / Statuses.
 
 ## Documentation
 

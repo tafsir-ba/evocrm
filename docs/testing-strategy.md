@@ -61,6 +61,8 @@ Phase 1 adds React component tests (Vitest + jsdom + Testing Library) for:
 
 Critical flows only — not every edge case. Run against a test workspace with seeded data.
 
+Phase 2 note: full Google OAuth cannot run in CI without credentials. E2E smoke verifies unauthenticated redirect to `/login`. Auth/workspace/permission logic is covered by Vitest unit tests with mocked repositories.
+
 ---
 
 ## Minimum Critical Test Themes

@@ -299,15 +299,86 @@ PATCH  /api/workspaces/[workspaceSlug]/projects/[projectId]
 DELETE /api/workspaces/[workspaceSlug]/projects/[projectId]  # archive (soft)
 ```
 
-### Workspace bootstrap (non-slug or pre-slug)
+### Workspace bootstrap (Phase 2 — implemented)
 
 ```txt
+GET    /api/me
 GET    /api/workspaces
 POST   /api/workspaces
-GET    /api/workspaces/by-slug/[workspaceSlug]
+GET    /api/workspaces/[workspaceSlug]/context
 ```
 
-Exact bootstrap routes finalized in Phase 2.
+#### `GET /api/me`
+
+Returns authenticated user context. Unauthenticated → `401` / `UNAUTHENTICATED`.
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "...",
+      "email": "user@example.com",
+      "name": "User Name",
+      "image": "..."
+    }
+  }
+}
+```
+
+#### `GET /api/workspaces`
+
+Returns workspaces where the authenticated user has `membership.status = active`.
+
+```json
+{
+  "data": {
+    "workspaces": [
+      {
+        "id": "...",
+        "name": "EvoHome CRM",
+        "slug": "evohome-crm",
+        "type": "agency",
+        "timezone": "UTC",
+        "defaultCurrency": "USD"
+      }
+    ]
+  }
+}
+```
+
+#### `POST /api/workspaces`
+
+Creates a workspace for the authenticated user. Server generates slug, seeds default roles, and creates an active Owner membership for the creator. Does not accept `createdBy`, `workspaceId`, or role assignments from the client.
+
+Request body (Zod-validated):
+
+```json
+{
+  "name": "EvoHome CRM",
+  "type": "agency",
+  "timezone": "UTC",
+  "defaultCurrency": "USD"
+}
+```
+
+#### `GET /api/workspaces/[workspaceSlug]/context`
+
+Returns workspace shell context: workspace, membership role + permissions, and permission-filtered V1 navigation.
+
+```json
+{
+  "data": {
+    "workspace": { "id": "...", "name": "...", "slug": "...", "timezone": "UTC", "defaultCurrency": "USD" },
+    "membership": {
+      "status": "active",
+      "role": { "name": "Owner", "key": "owner", "permissions": ["dashboard:read"] }
+    },
+    "navigation": [
+      { "label": "Dashboard", "href": "/w/evohome-crm/dashboard", "permission": "dashboard:read", "segment": "dashboard" }
+    ]
+  }
+}
+```
 
 ---
 

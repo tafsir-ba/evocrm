@@ -1,15 +1,25 @@
 import "server-only";
 
-import { AppError } from "@/server/errors";
+import { auth } from "@/auth";
 
 import type { AppSession } from "./types";
 
 /**
  * Resolve the current authenticated session.
- * Implemented in Phase 2 (Auth.js / NextAuth).
  */
 export async function getSession(): Promise<AppSession | null> {
-  throw new AppError("INTERNAL_ERROR", "Auth is not implemented yet.", {
-    expose: false,
-  });
+  const session = await auth();
+
+  if (!session?.user?.email || !session.user.id) {
+    return null;
+  }
+
+  return {
+    user: {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      image: session.user.image,
+    },
+  };
 }

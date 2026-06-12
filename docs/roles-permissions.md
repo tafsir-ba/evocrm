@@ -114,9 +114,9 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `lead:read` | ✓ | ✓ | ✓ | ✓ |
 | `lead:update` | ✓ | ✓ | ✓ | |
 | `lead:archive` | ✓ | ✓ | | |
-| `property:create` | ✓ | ✓ | ✓ | |
+| `property:create` | ✓ | ✓ | | |
 | `property:read` | ✓ | ✓ | ✓ | ✓ |
-| `property:update` | ✓ | ✓ | ✓ | |
+| `property:update` | ✓ | ✓ | | |
 | `property:archive` | ✓ | ✓ | | |
 | `opportunity:create` | ✓ | ✓ | ✓ | |
 | `opportunity:read` | ✓ | ✓ | ✓ | ✓ |
@@ -139,7 +139,7 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `roles:manage` | ✓ | | | |
 | `billing:manage` | ✓ | | | |
 
-Exact matrix may be refined during Phase 2 implementation; changes require doc updates.
+Phase 2 seeds the matrix above via `/server/permissions/roles.ts` (`DEFAULT_ROLE_DEFINITIONS`) on every new workspace. Unknown permission strings are rejected by `/server/permissions/permissions.ts`.
 
 ---
 
@@ -159,7 +159,7 @@ Every API route must:
 UI hides an action but backend still allows unauthorized mutation
 ```
 
-### Enforcement helper pattern (Phase 2+)
+### Enforcement helper pattern (Phase 2 — implemented)
 
 ```ts
 await requirePermission({

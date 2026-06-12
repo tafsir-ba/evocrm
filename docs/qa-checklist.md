@@ -226,7 +226,7 @@ Phase 0 has no product routes or domain models. Verify foundation only:
 - [ ] API helpers match `/docs/api-contracts.md` (`successResponse`, `paginatedResponse`, `errorResponse`)
 - [ ] `AppError` + `handleRouteError` mask `expose: false` internal messages
 - [ ] `withWorkspaceScope()` tested; server-resolved `workspaceId` only
-- [ ] Auth/workspace/permission stubs fail closed (no silent access)
+- [x] Phase 2: Auth/workspace/permission enforcement implemented (stubs replaced)
 - [ ] No product modules, domain models, or non-V1 nav
 - [ ] `.env.example` present; no committed secrets
 

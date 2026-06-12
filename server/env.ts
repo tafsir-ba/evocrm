@@ -52,8 +52,22 @@ export type Env = z.infer<typeof envSchema>;
 
 export type EnvInput = Record<string, string | undefined>;
 
+function withBuildDefaults(input: EnvInput): EnvInput {
+  if (process.env.NEXT_PHASE !== "phase-production-build") {
+    return input;
+  }
+
+  return {
+    NODE_ENV: input.NODE_ENV ?? "production",
+    NEXT_PUBLIC_APP_URL:
+      input.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    MONGODB_URI: input.MONGODB_URI ?? "mongodb://localhost:27017/evocrm",
+    ...input,
+  };
+}
+
 export function parseEnv(input: EnvInput = process.env): Env {
-  const result = envSchema.safeParse(input);
+  const result = envSchema.safeParse(withBuildDefaults(input));
 
   if (!result.success) {
     const message = result.error.issues

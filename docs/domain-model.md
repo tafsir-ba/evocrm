@@ -107,6 +107,8 @@ Archived records should not appear in active lists by default. Active records us
 
 Global identity. Not workspace-owned.
 
+**Phase 2:** Mongoose model at `/models/user.ts`. Email normalized (lowercase, unique). OAuth secrets are not stored on the User model.
+
 | Field | Description |
 |-------|-------------|
 | `email` | Primary login identifier |
@@ -121,6 +123,8 @@ Global identity. Not workspace-owned.
 ### Workspace
 
 Top-level tenant boundary.
+
+**Phase 2:** Mongoose model at `/models/workspace.ts`. `slug` unique and URL-safe; `createdBy` immutable.
 
 | Field | Description |
 |-------|-------------|
@@ -138,6 +142,8 @@ Top-level tenant boundary.
 ### Membership
 
 Links a User to a Workspace with a Role.
+
+**Phase 2:** Mongoose model at `/models/membership.ts`. Unique index on `userId + workspaceId`.
 
 | Field | Description |
 |-------|-------------|
@@ -157,6 +163,8 @@ Links a User to a Workspace with a Role.
 ### Role
 
 Workspace-scoped role with permission keys.
+
+**Phase 2:** Mongoose model at `/models/role.ts`. Unique index on `workspaceId + key`. System roles (`isSystem: true`) cannot be deleted.
 
 | Field | Description |
 |-------|-------------|

@@ -1,10 +1,11 @@
 "use client";
 
+import { signOut } from "next-auth/react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { currentUser } from "@/lib/mock-data";
 import {
   IconBell,
   IconChevronDown,
@@ -14,6 +15,9 @@ import {
   IconUser,
   IconSettings,
 } from "@/lib/icons";
+import { workspaceNavPath } from "@/lib/workspace-paths";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export function Topbar({
   onOpenMobileNav,
@@ -21,6 +25,17 @@ export function Topbar({
   onOpenMobileNav?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, workspace, navigation } = useWorkspaceShell();
+  const canAccessSettings = navigation.some((item) => item.segment === "settings");
+
+  const displayName = user.name ?? user.email;
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "U";
+
   return (
     <header className="h-[60px] bg-white border-b border-[var(--color-line)] flex items-center gap-3 px-4 lg:px-6 sticky top-0 z-30">
       <button
@@ -55,9 +70,16 @@ export function Topbar({
           onClick={() => setMenuOpen((v) => !v)}
           className="inline-flex items-center gap-2 h-9 pl-1 pr-2 rounded-md hover:bg-[var(--color-muted)] focus-ring"
         >
-          <Avatar user={currentUser} size={26} />
+          <Avatar
+            user={{
+              id: user.id,
+              name: displayName,
+              initials,
+            }}
+            size={26}
+          />
           <span className="hidden sm:inline text-[13px] font-medium text-[var(--color-ink)] max-w-[120px] truncate">
-            {currentUser.name}
+            {displayName}
           </span>
           <IconChevronDown size={14} className="text-[var(--color-ink-muted)]" />
         </button>
@@ -75,16 +97,27 @@ export function Topbar({
             >
               <div className="px-2.5 py-2 border-b border-[var(--color-line)] mb-1">
                 <p className="text-[13px] font-semibold text-[var(--color-ink)]">
-                  {currentUser.name}
+                  {displayName}
                 </p>
                 <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
-                  {currentUser.email}
+                  {user.email}
                 </p>
               </div>
               <MenuItem icon={<IconUser size={15} />}>My profile</MenuItem>
-              <MenuItem icon={<IconSettings size={15} />}>Workspace settings</MenuItem>
+              {canAccessSettings && (
+                <MenuItem
+                  icon={<IconSettings size={15} />}
+                  href={workspaceNavPath(workspace.slug, "settings")}
+                >
+                  Workspace settings
+                </MenuItem>
+              )}
               <div className="my-1 border-t border-[var(--color-line)]" />
-              <MenuItem icon={<IconLogout size={15} />} tone="danger">
+              <MenuItem
+                icon={<IconLogout size={15} />}
+                tone="danger"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
                 Sign out
               </MenuItem>
             </div>
@@ -99,20 +132,33 @@ function MenuItem({
   icon,
   children,
   tone = "default",
+  href,
+  onClick,
 }: {
   icon?: React.ReactNode;
   children: React.ReactNode;
   tone?: "default" | "danger";
+  href?: string;
+  onClick?: () => void;
 }) {
+  const className = cn(
+    "w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13px] hover:bg-[var(--color-muted)] focus-ring",
+    tone === "danger"
+      ? "text-[var(--color-danger-fg)]"
+      : "text-[var(--color-ink-soft)]",
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {icon}
+        {children}
+      </Link>
+    );
+  }
+
   return (
-    <button
-      className={cn(
-        "w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13px] hover:bg-[var(--color-muted)] focus-ring",
-        tone === "danger"
-          ? "text-[var(--color-danger-fg)]"
-          : "text-[var(--color-ink-soft)]",
-      )}
-    >
+    <button type="button" onClick={onClick} className={className}>
       {icon}
       {children}
     </button>

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 
-import { cn } from "@/lib/utils";
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import {
   IconActivities,
   IconChevronDown,
@@ -15,9 +15,9 @@ import {
   IconProperties,
   IconSettings,
 } from "@/lib/icons";
-import { workspaces } from "@/lib/mock-data";
-import { V1_NAV_ITEMS } from "@/lib/v1-navigation";
-import { MOCK_WORKSPACE_SLUG, workspaceNavPath } from "@/lib/workspace-paths";
+import { workspaceNavPath } from "@/lib/workspace-paths";
+import type { V1NavSegment } from "@/lib/v1-navigation";
+import { cn } from "@/lib/utils";
 
 const NAV_ICONS = {
   dashboard: IconDashboard,
@@ -37,11 +37,7 @@ export function Sidebar({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
-  const params = useParams<{ workspaceSlug?: string }>();
-  const workspaceSlug = params.workspaceSlug ?? MOCK_WORKSPACE_SLUG;
-  const activeWs =
-    workspaces.find((workspace) => workspace.slug === workspaceSlug) ??
-    workspaces[0];
+  const { workspace, navigation, workspaces } = useWorkspaceShell();
 
   return (
     <aside
@@ -51,7 +47,7 @@ export function Sidebar({
       )}
     >
       <Link
-        href={workspaceNavPath(workspaceSlug, "dashboard")}
+        href={workspaceNavPath(workspace.slug, "dashboard")}
         onClick={onNavigate}
         className="flex items-center gap-2.5 h-[60px] px-4 border-b border-[var(--color-line)] focus-ring"
       >
@@ -74,32 +70,34 @@ export function Sidebar({
       </Link>
 
       {!collapsed && (
-        <button
-          type="button"
-          className="mx-3 mt-3 mb-2 px-2.5 py-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] flex items-center gap-2 text-left hover:bg-white transition-colors focus-ring"
-        >
-          <span
-            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[11px] font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #1e3a8a, #2563eb)" }}
+        <div className="mx-3 mt-3 mb-2 relative group">
+          <Link
+            href="/workspaces"
+            onClick={onNavigate}
+            className="w-full px-2.5 py-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] flex items-center gap-2 text-left hover:bg-white transition-colors focus-ring"
           >
-            {activeWs.initials}
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-[12.5px] font-semibold truncate text-[var(--color-ink)]">
-              {activeWs.name}
+            <span
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[11px] font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #1e3a8a, #2563eb)" }}
+            >
+              {workspace.initials}
             </span>
-            <span className="block text-[11px] text-[var(--color-ink-faint)] truncate">
-              Workspace
+            <span className="flex-1 min-w-0">
+              <span className="block text-[12.5px] font-semibold truncate text-[var(--color-ink)]">
+                {workspace.name}
+              </span>
+              <span className="block text-[11px] text-[var(--color-ink-faint)] truncate">
+                {workspaces.length} workspace{workspaces.length === 1 ? "" : "s"}
+              </span>
             </span>
-          </span>
-          <IconChevronDown size={14} className="text-[var(--color-ink-muted)]" />
-        </button>
+            <IconChevronDown size={14} className="text-[var(--color-ink-muted)]" />
+          </Link>
+        </div>
       )}
 
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto" aria-label="Primary">
-        {V1_NAV_ITEMS.map(({ segment, label }) => {
-          const href = workspaceNavPath(workspaceSlug, segment);
-          const Icon = NAV_ICONS[segment];
+        {navigation.map(({ segment, label, href }) => {
+          const Icon = NAV_ICONS[segment as V1NavSegment];
           const isActive =
             pathname === href || pathname?.startsWith(`${href}/`);
           return (
@@ -133,20 +131,6 @@ export function Sidebar({
           );
         })}
       </nav>
-
-      {!collapsed && (
-        <div className="px-3 pb-3 pt-2 border-t border-[var(--color-line)]">
-          <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3">
-            <p className="text-[12px] font-semibold text-[var(--color-ink)]">
-              Phase 1 preview
-            </p>
-            <p className="text-[11.5px] text-[var(--color-ink-muted)] mt-1 leading-snug">
-              All data shown is mock. Real values will load from your workspace
-              dictionaries.
-            </p>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

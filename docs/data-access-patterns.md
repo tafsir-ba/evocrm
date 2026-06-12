@@ -31,6 +31,8 @@ Lead.findOne(
 
 `withWorkspaceScope()` lives at `/server/workspaces/with-workspace-scope.ts`. Pass only server-resolved `workspaceId` — never from the client body.
 
+Phase 2 repositories live under `/server/repositories/` (`users`, `workspaces`, `memberships`, `roles`). Route handlers call services; services call repositories. Mongoose models live under `/models/`.
+
 ### List queries
 
 ```ts

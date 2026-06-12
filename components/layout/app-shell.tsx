@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+
+import { PermissionDenied } from "@/components/ui/permission-denied";
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
+import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
-import { MobileNav } from "./mobile-nav";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { permissionDenied } = useWorkspaceShell();
 
   return (
     <div className="min-h-screen flex bg-[var(--color-canvas)]">
@@ -20,7 +24,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0">
+          {permissionDenied ? (
+            <PermissionDenied
+              title="Permission denied"
+              description="You do not have access to this module in this workspace."
+            />
+          ) : (
+            children
+          )}
+        </main>
       </div>
     </div>
   );

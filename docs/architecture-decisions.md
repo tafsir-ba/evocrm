@@ -248,10 +248,17 @@ Phase 0 scaffolds a **root-level** Next.js App Router layout. Do **not** use a `
 | API responses | `/server/api/responses.ts` |
 | Application errors | `/server/errors.ts` |
 | Request validation | `/server/validation/request.ts` |
-| Auth stubs | `/server/auth/` |
-| Workspace resolution stub | `/server/workspaces/resolve-workspace.ts` |
+| Auth.js config (Edge-safe) | `/auth.config.ts` |
+| Auth.js handlers + DB callbacks | `/auth.ts` |
+| Auth session/guards | `/server/auth/` |
+| Workspace resolution | `/server/workspaces/resolve-workspace.ts` |
+| Workspace page access guard | `/server/workspaces/require-workspace-page-access.ts` |
 | Workspace scope helper | `/server/workspaces/with-workspace-scope.ts` |
-| Permission stubs | `/server/permissions/` |
+| Permissions + default roles | `/server/permissions/` |
+| Repositories | `/server/repositories/` |
+| Services | `/server/services/` |
+| Mongoose models | `/models/` |
+| Route middleware | `/middleware.ts` |
 | Audit stub | `/server/audit/create-audit-log.ts` |
 | Seed scaffold | `/server/seed/` |
 | Unit tests | `/tests/unit/` |

@@ -60,7 +60,7 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 | `GOOGLE_CLIENT_ID` | Phase 2 | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Phase 2 | Google OAuth client secret |
 
-Phase 0 and Phase 1 must boot without these configured.
+Phase 0 and Phase 1 must boot without these configured. Phase 2 auth requires `NEXTAUTH_SECRET` and Google OAuth credentials at runtime; development uses a fallback secret when unset. Production deployments must set all four auth variables.
 
 ---
 
