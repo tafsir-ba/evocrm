@@ -5,7 +5,7 @@ import { getAuthConfig } from "@/auth.config";
 
 const { auth } = NextAuth(getAuthConfig());
 
-const PUBLIC_PATHS = ["/login", "/api/auth"];
+const PUBLIC_PATHS = ["/login", "/signup", "/api/auth"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -35,7 +35,7 @@ export default auth((request) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isLoggedIn && pathname === "/login") {
+  if (isLoggedIn && (pathname === "/login" || pathname === "/signup")) {
     return NextResponse.redirect(new URL("/workspaces", request.url));
   }
 

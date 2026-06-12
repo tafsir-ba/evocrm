@@ -1,5 +1,7 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
+const authProviders = ["google", "credentials"] as const;
+
 const userSchema = new Schema(
   {
     email: {
@@ -13,10 +15,14 @@ const userSchema = new Schema(
     image: { type: String },
     authProvider: {
       type: String,
-      enum: ["google"],
+      enum: authProviders,
       required: true,
-      default: "google",
     },
+    passwordHash: {
+      type: String,
+      select: false,
+    },
+    emailVerifiedAt: { type: Date },
   },
   { timestamps: true },
 );
@@ -24,6 +30,8 @@ const userSchema = new Schema(
 export type UserDocument = InferSchemaType<typeof userSchema> & {
   _id: mongoose.Types.ObjectId;
 };
+
+export type AuthProvider = (typeof authProviders)[number];
 
 export const UserModel =
   (mongoose.models.User as mongoose.Model<UserDocument>) ??

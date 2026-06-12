@@ -1,27 +1,27 @@
 import "server-only";
 
 import { AppError } from "@/server/errors";
-import { syncUserFromProviderProfile } from "@/server/services/users";
+import { findUserById } from "@/server/repositories/users";
 
 import { getSession } from "./session";
 import type { AppSession } from "./types";
 
 /**
  * Require an authenticated session for API routes and server actions.
- * Ensures the user exists in the database (sync from provider profile).
+ * Resolves the DB user by session user ID (works for Google and credentials).
  */
 export async function requireAuth(): Promise<AppSession> {
   const session = await getSession();
 
-  if (!session) {
+  if (!session?.user?.id) {
     throw new AppError("UNAUTHENTICATED", "Authentication required.");
   }
 
-  const user = await syncUserFromProviderProfile({
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
+  const user = await findUserById(session.user.id);
+
+  if (!user) {
+    throw new AppError("UNAUTHENTICATED", "Authentication required.");
+  }
 
   return {
     user: {

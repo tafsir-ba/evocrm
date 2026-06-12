@@ -26,6 +26,7 @@ withWorkspaceScope() — server-resolved workspaceId in queries
 ## Authentication
 
 - Use **Auth.js / NextAuth v5** with **Google provider** for V1.
+- **Phase 2A:** Credentials provider for email/password (QA/staging). Passwords hashed with **bcryptjs** (12 rounds). `passwordHash` never exposed via API/repositories. Login errors do not reveal whether email exists.
 - Session must be validated on every protected API route.
 - Unauthenticated requests return `401` / `UNAUTHENTICATED`.
 - No anonymous access to workspace data.

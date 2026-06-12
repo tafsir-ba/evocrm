@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CredentialsLoginForm } from "@/components/auth/credentials-login-form";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { IconLogo } from "@/lib/icons";
 
@@ -11,6 +12,7 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackUrl } = await searchParams;
+  const redirectTo = callbackUrl ?? "/workspaces";
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -86,13 +88,29 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Welcome back
           </h1>
           <p className="text-[13.5px] text-[var(--color-ink-muted)] mt-1.5">
-            Sign in with your Google account to access your workspace.
+            Use Google or email/password to access your workspace.
           </p>
 
-          <GoogleSignInButton callbackUrl={callbackUrl ?? "/workspaces"} />
+          <GoogleSignInButton callbackUrl={redirectTo} />
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-[var(--color-line)]" />
+            <span className="text-[11.5px] uppercase tracking-[0.14em] text-[var(--color-ink-faint)] font-semibold">
+              Or with email
+            </span>
+            <div className="flex-1 h-px bg-[var(--color-line)]" />
+          </div>
+
+          <CredentialsLoginForm callbackUrl={redirectTo} />
 
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-6 text-center">
-            Email and password sign-in is not available in V1.
+            New to EvoHome?{" "}
+            <Link
+              href="/signup"
+              className="text-[var(--color-brand-700)] hover:underline focus-ring rounded"
+            >
+              Create an account
+            </Link>
           </p>
 
           <p className="text-[11.5px] text-[var(--color-ink-faint)] mt-10 text-center">

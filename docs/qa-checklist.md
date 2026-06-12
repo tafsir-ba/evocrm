@@ -227,6 +227,7 @@ Phase 0 has no product routes or domain models. Verify foundation only:
 - [ ] `AppError` + `handleRouteError` mask `expose: false` internal messages
 - [ ] `withWorkspaceScope()` tested; server-resolved `workspaceId` only
 - [x] Phase 2: Auth/workspace/permission enforcement implemented (stubs replaced)
+- [x] Phase 2A: Email/password auth (bcrypt, Credentials provider, `/signup`, `POST /api/auth/signup`) — no bypass, Google auth preserved
 - [ ] No product modules, domain models, or non-V1 nav
 - [ ] `.env.example` present; no committed secrets
 

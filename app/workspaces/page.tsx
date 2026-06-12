@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { auth } from "@/auth";
-import { syncUserFromProviderProfile } from "@/server/services/users";
+import { findUserById } from "@/server/repositories/users";
 import {
   getWorkspaceInitials,
   listActiveWorkspacesForUser,
@@ -16,15 +16,15 @@ export const metadata = { title: "Workspaces — EvoHome CRM" };
 export default async function WorkspacesPage() {
   const session = await auth();
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     redirect("/login");
   }
 
-  const user = await syncUserFromProviderProfile({
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
+  const user = await findUserById(session.user.id);
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const workspaces = await listActiveWorkspacesForUser(user.id);
 

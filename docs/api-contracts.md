@@ -361,6 +361,37 @@ Request body (Zod-validated):
 }
 ```
 
+#### `POST /api/auth/signup` (Phase 2A)
+
+Creates a credentials-based user account. Does not create a workspace.
+
+Request body (Zod-validated):
+
+```json
+{
+  "name": "QA User",
+  "email": "qa@example.com",
+  "password": "long-secure-password",
+  "confirmPassword": "long-secure-password"
+}
+```
+
+Success `201`:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "...",
+      "email": "qa@example.com",
+      "name": "QA User"
+    }
+  }
+}
+```
+
+Errors: `VALIDATION_ERROR`, `CONFLICT` (duplicate email or existing Google account), `INTERNAL_ERROR`. Response never includes `passwordHash`.
+
 #### `GET /api/workspaces/[workspaceSlug]/context`
 
 Returns workspace shell context: workspace, membership role + permissions, and permission-filtered V1 navigation.

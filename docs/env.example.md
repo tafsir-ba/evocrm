@@ -62,6 +62,23 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 
 Phase 0 and Phase 1 must boot without these configured. Phase 2 auth requires `NEXTAUTH_SECRET` and Google OAuth credentials at **production runtime** — the app fails closed if `NEXTAUTH_SECRET` is missing when `NODE_ENV=production`. Development and test may use local fallbacks. Production builds use a build-only placeholder during `next build` page collection; that placeholder is never used at runtime.
 
+### Google Cloud Console — required OAuth settings
+
+Auth.js (NextAuth v5) uses a **fixed callback path**. The redirect URI in Google Cloud must match **exactly** — not the legacy `/api/auth/google/callback` pattern used by some other frameworks.
+
+| Setting | Production (`crm.evo-home.ch`) | Local dev |
+|---------|-------------------------------|-----------|
+| **Authorized JavaScript origins** | `https://crm.evo-home.ch` | `http://localhost:3000` |
+| **Authorized redirect URIs** | `https://crm.evo-home.ch/api/auth/callback/google` | `http://localhost:3000/api/auth/callback/google` |
+
+`NEXTAUTH_URL` must match the site origin (no trailing slash):
+
+```txt
+NEXTAUTH_URL=https://crm.evo-home.ch
+```
+
+Common error: `Error 400: redirect_uri_mismatch` when Google has `/api/auth/google/callback` but the app sends `/api/auth/callback/google`.
+
 ---
 
 ## File Storage (DigitalOcean Spaces)

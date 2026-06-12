@@ -5,21 +5,21 @@ import {
   listActiveWorkspacesForUser,
   resolveFirstWorkspaceSlugForUser,
 } from "@/server/services/workspaces";
-import { syncUserFromProviderProfile } from "@/server/services/users";
+import { findUserById } from "@/server/repositories/users";
 import { workspaceNavPath } from "@/lib/workspace-paths";
 
 export default async function HomePage() {
   const session = await auth();
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     redirect("/login");
   }
 
-  const user = await syncUserFromProviderProfile({
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
+  const user = await findUserById(session.user.id);
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const workspaces = await listActiveWorkspacesForUser(user.id);
 

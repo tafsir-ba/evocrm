@@ -63,6 +63,8 @@ Critical flows only — not every edge case. Run against a test workspace with s
 
 Phase 2 note: full Google OAuth cannot run in CI without credentials. E2E smoke verifies unauthenticated redirect to `/login`. Auth/workspace/permission logic is covered by Vitest unit tests with mocked repositories.
 
+Phase 2A adds unit tests for credentials signup/login (`credentials-auth.test.ts`, `auth-signup-api.test.ts`, `auth-validation.test.ts`) and login/signup UI component tests.
+
 ---
 
 ## Minimum Critical Test Themes
