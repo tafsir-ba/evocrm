@@ -5,10 +5,10 @@ import "server-only";
  *
  * Future phases will add:
  * - demo workspace and memberships
- * - dictionary seeds (statuses, sources, types)
  * - sample leads/properties for E2E
  *
- * Do not add V1 product seed data in Phase 0.
+ * Default dictionaries are seeded via ensureDefaultDictionaries() in
+ * /server/services/default-dictionaries.ts (workspace creation + context load).
  */
 
 export type SeedOptions = {

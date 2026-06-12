@@ -17,32 +17,39 @@ import {
   IconUser,
 } from "@/lib/icons";
 import {
-  settingsDictionaries,
   settingsProjects,
   settingsRoles,
-  settingsTags,
   settingsUsers,
-  workspaces,
 } from "@/lib/mock-data";
+import { listDictionariesForWorkspace } from "@/server/services/dictionaries";
+import { listTagsForWorkspace } from "@/server/services/tags";
+import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
 type Params = Promise<{ workspaceSlug: string }>;
 
 export const metadata = { title: "Settings — EvoHome CRM" };
 
 const SECTIONS = [
-  { key: "workspace", label: "Workspace", desc: "Name, locale, currency and branding", Icon: IconBuilding },
-  { key: "users", label: "Users", desc: "Members, invitations and access", Icon: IconUser },
-  { key: "roles", label: "Roles", desc: "Permission policies and capabilities", Icon: IconShieldUser },
-  { key: "dictionaries", label: "Dictionaries", desc: "Statuses, sources, activity types", Icon: IconHash },
-  { key: "tags", label: "Tags", desc: "Reusable labels for leads and properties", Icon: IconTag },
-  { key: "projects", label: "Projects", desc: "Lightweight property groupings", Icon: IconFolder },
-  { key: "billing", label: "Billing", desc: "Plan, invoices and payment method", Icon: IconCreditCard },
+  { key: "workspace", label: "Workspace", desc: "Name, locale, currency and branding", Icon: IconBuilding, href: null },
+  { key: "users", label: "Users", desc: "Members, invitations and access", Icon: IconUser, href: null },
+  { key: "roles", label: "Roles", desc: "Permission policies and capabilities", Icon: IconShieldUser, href: null },
+  { key: "dictionaries", label: "Dictionaries", desc: "Statuses, sources, activity types", Icon: IconHash, href: "dictionaries" },
+  { key: "tags", label: "Tags", desc: "Reusable labels for leads and properties", Icon: IconTag, href: "tags" },
+  { key: "projects", label: "Projects", desc: "Lightweight property groupings", Icon: IconFolder, href: null },
+  { key: "billing", label: "Billing", desc: "Plan, invoices and payment method", Icon: IconCreditCard, href: null },
 ];
 
 export default async function SettingsPage({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
-  const workspace =
-    workspaces.find((item) => item.slug === workspaceSlug) ?? workspaces[0];
+  const access = await requireWorkspacePageAccess(workspaceSlug);
+  const workspace = access.context.workspace;
+
+  const dictionaries = access.permissionDenied
+    ? []
+    : await listDictionariesForWorkspace(workspace.id);
+  const tags = access.permissionDenied
+    ? []
+    : await listTagsForWorkspace(workspace.id);
 
   return (
     <PageContainer>
@@ -53,10 +60,12 @@ export default async function SettingsPage({ params }: { params: Params }) {
 
       {/* Section grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-        {SECTIONS.map(({ key, label, desc, Icon }) => (
+        {SECTIONS.map(({ key, label, desc, Icon, href }) => {
+          const cardHref = href ? `/w/${workspaceSlug}/settings/${href}` : `#${key}`;
+          return (
           <Link
             key={key}
-            href={`#${key}`}
+            href={cardHref}
             className="group rounded-xl border border-[var(--color-line)] bg-white p-4 hover:border-[var(--color-brand-300)] hover:shadow-[var(--shadow-sm)] transition-all flex items-start gap-3 focus-ring"
           >
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--color-brand-50)] text-[var(--color-brand-600)] shrink-0">
@@ -75,7 +84,8 @@ export default async function SettingsPage({ params }: { params: Params }) {
               className="text-[var(--color-ink-faint)] group-hover:text-[var(--color-brand-600)] mt-1.5 shrink-0"
             />
           </Link>
-        ))}
+          );
+        })}
       </div>
 
       {/* Workspace */}
@@ -84,10 +94,9 @@ export default async function SettingsPage({ params }: { params: Params }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <Info label="Workspace name" value={workspace.name} />
             <Info label="Slug" value={workspace.slug} />
-            <Info label="Default currency" value="CHF" />
-            <Info label="Default locale" value="English (Switzerland)" />
-            <Info label="Time zone" value="Europe/Zurich" />
-            <Info label="Plan" value="Growth · monthly" />
+            <Info label="Default currency" value={workspace.defaultCurrency} />
+            <Info label="Time zone" value={workspace.timezone} />
+            <Info label="Plan" value="Growth · monthly (placeholder)" />
           </div>
         </Card>
       </SectionAnchor>
@@ -150,10 +159,19 @@ export default async function SettingsPage({ params }: { params: Params }) {
       </SectionAnchor>
 
       {/* Dictionaries */}
-      <SectionAnchor id="dictionaries" title="Dictionaries" description="Editable lookup lists used across the product.">
+      <SectionAnchor
+        id="dictionaries"
+        title="Dictionaries"
+        description="Editable lookup lists used across the product."
+        action={
+          <Link href={`/w/${workspaceSlug}/settings/dictionaries`}>
+            <Button size="sm">Manage</Button>
+          </Link>
+        }
+      >
         <Card padded={false}>
           <ul className="divide-y divide-[var(--color-line)]">
-            {settingsDictionaries.map((d) => (
+            {dictionaries.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-canvas)]">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--color-muted)] text-[var(--color-ink-muted)]">
@@ -161,10 +179,9 @@ export default async function SettingsPage({ params }: { params: Params }) {
                   </span>
                   <div>
                     <p className="text-[13.5px] font-medium text-[var(--color-ink)]">{d.name}</p>
-                    <p className="text-[12px] text-[var(--color-ink-muted)] tabular">{d.count} entries</p>
+                    <p className="text-[12px] text-[var(--color-ink-muted)] tabular">{d.itemCount} entries</p>
                   </div>
                 </div>
-                <Button size="sm" variant="secondary">Manage</Button>
               </li>
             ))}
           </ul>
@@ -172,19 +189,28 @@ export default async function SettingsPage({ params }: { params: Params }) {
       </SectionAnchor>
 
       {/* Tags */}
-      <SectionAnchor id="tags" title="Tags">
+      <SectionAnchor
+        id="tags"
+        title="Tags"
+        action={
+          <Link href={`/w/${workspaceSlug}/settings/tags`}>
+            <Button size="sm">Manage</Button>
+          </Link>
+        }
+      >
         <Card>
           <div className="flex flex-wrap items-center gap-2">
-            {settingsTags.map((t) => (
+            {tags.map((t) => (
               <span
                 key={t.id}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--color-line)] bg-white"
               >
-                <Badge tone={t.tone} size="sm">{t.name}</Badge>
-                <span className="text-[11.5px] text-[var(--color-ink-muted)] tabular">{t.used} used</span>
+                <StatusBadge label={t.name} color={t.color} size="sm" />
               </span>
             ))}
-            <Button size="sm" variant="outline">+ Add tag</Button>
+            {tags.length === 0 && (
+              <p className="text-[12.5px] text-[var(--color-ink-muted)]">No tags yet.</p>
+            )}
           </div>
         </Card>
       </SectionAnchor>

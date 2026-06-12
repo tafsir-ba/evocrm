@@ -14,6 +14,10 @@ vi.mock("@/server/services/roles", () => ({
   findOwnerRole: vi.fn(),
 }));
 
+vi.mock("@/server/services/default-dictionaries", () => ({
+  ensureDefaultDictionaries: vi.fn(),
+}));
+
 vi.mock("@/server/services/memberships", () => ({
   createOwnerMembership: vi.fn(),
 }));
@@ -25,6 +29,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { slugExists } from "@/server/repositories/workspaces";
 import { createOwnerMembership } from "@/server/services/memberships";
 import { seedDefaultRolesForWorkspace } from "@/server/services/roles";
+import { ensureDefaultDictionaries } from "@/server/services/default-dictionaries";
 import { createWorkspaceForUser } from "@/server/services/workspaces";
 
 describe("workspace service", () => {
@@ -85,5 +90,6 @@ describe("workspace service", () => {
       workspaceId: "ws-1",
       roleId: "role-owner",
     });
+    expect(ensureDefaultDictionaries).toHaveBeenCalledWith("ws-1", "user-1");
   });
 });

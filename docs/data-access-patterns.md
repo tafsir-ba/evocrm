@@ -234,11 +234,21 @@ Recommended MongoDB indexes:
 { workspaceId: 1, nextSendAt: 1 }          // CampaignEnrollment — cron queries
 ```
 
-### Tags
+### Dictionaries (Phase 3)
 
 ```txt
+{ workspaceId: 1, type: 1 }                 // Dictionary — unique compound
+{ workspaceId: 1, type: 1, key: 1 }         // DictionaryItem — unique compound
+{ workspaceId: 1, dictionaryId: 1 }         // DictionaryItem
+{ workspaceId: 1, type: 1, isActive: 1, order: 1 }  // DictionaryItem list queries
+```
+
+### Tags (Phase 3)
+
+```txt
+{ workspaceId: 1, nameNormalized: 1 }       // unique partial (archivedAt: null)
+{ workspaceId: 1, entityTypes: 1 }
 { workspaceId: 1, archivedAt: 1 }
-{ workspaceId: 1, name: 1 }
 ```
 
 ### Membership

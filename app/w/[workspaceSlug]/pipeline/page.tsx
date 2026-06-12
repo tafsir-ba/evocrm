@@ -9,7 +9,7 @@ import { opportunities } from "@/lib/mock-data";
 import { workspacePath } from "@/lib/workspace-paths";
 import type { PipelineStage } from "@/lib/mock-data";
 
-/** Phase 1 mock pipeline stages — real stages come from workspace dictionaries in Phase 3. */
+/** Phase 1 mock pipeline stages — opportunity stages will load from workspace dictionaries in Phase 6. */
 const MOCK_PIPELINE_STAGES: { key: PipelineStage; tone: string }[] = [
   { key: "New", tone: "#3b82f6" },
   { key: "Qualified", tone: "#0891b2" },

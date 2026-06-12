@@ -266,18 +266,33 @@ POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enroll
 GET    /api/workspaces/[workspaceSlug]/dashboard/summary
 ```
 
-### Dictionaries / Tags
+### Dictionaries / Tags (Phase 3 — implemented)
 
 ```txt
 GET    /api/workspaces/[workspaceSlug]/dictionaries
-GET    /api/workspaces/[workspaceSlug]/dictionaries/[type]/items
-PATCH  /api/workspaces/[workspaceSlug]/dictionaries/[type]/items/[itemId]
+GET    /api/workspaces/[workspaceSlug]/dictionaries/[dictionaryId]
+PATCH  /api/workspaces/[workspaceSlug]/dictionaries/[dictionaryId]
+
+GET    /api/workspaces/[workspaceSlug]/dictionary-items
+POST   /api/workspaces/[workspaceSlug]/dictionary-items
+PATCH  /api/workspaces/[workspaceSlug]/dictionary-items/[itemId]
+DELETE /api/workspaces/[workspaceSlug]/dictionary-items/[itemId]  # inactivate (soft)
 
 GET    /api/workspaces/[workspaceSlug]/tags
 POST   /api/workspaces/[workspaceSlug]/tags
 PATCH  /api/workspaces/[workspaceSlug]/tags/[tagId]
 DELETE /api/workspaces/[workspaceSlug]/tags/[tagId]  # archive (soft)
 ```
+
+**Permissions:** `settings:read` for GET; `settings:update` for mutations.
+
+**Dictionary item list defaults:** active items only, ordered by `order` ascending. Pass `includeInactive=true` to include inactive items.
+
+**Dictionary types (allowlist):** `lead_status`, `property_status`, `opportunity_status`, `activity_status`, `activity_type`, `lead_source`, `property_type`, `lost_reason`.
+
+**Tag entity types (allowlist):** `lead`, `property`, `opportunity`.
+
+**Default seeding:** `ensureDefaultDictionaries(workspaceId)` runs on workspace creation and when loading workspace context (idempotent backfill for existing workspaces).
 
 ### Settings / Workspace / Users
 

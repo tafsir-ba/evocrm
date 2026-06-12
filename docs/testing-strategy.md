@@ -124,7 +124,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 |-------|---------------|
 | 0 | Tooling runs; unit tests for API helpers, errors, env, validation, `withWorkspaceScope()`; Playwright scaffold |
 | 2 | Auth session, workspace resolution, permission checks, membership status |
-| 3 | Dictionary seeding, behavior field on status items |
+| 3 | Dictionary seeding, behavior field on status items, tag archive, settings UI, API permission gates |
 | 3.5 | Project CRUD, workspace isolation, archive via DELETE |
 | 4 | Lead CRUD, workspace isolation, archive via DELETE |
 | 5 | Property CRUD, projectId validation |

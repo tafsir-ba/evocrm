@@ -257,6 +257,7 @@ Phase 0 scaffolds a **root-level** Next.js App Router layout. Do **not** use a `
 | Permissions + default roles | `/server/permissions/` |
 | Repositories | `/server/repositories/` |
 | Services | `/server/services/` |
+| Dictionary constants / seeds | `/server/dictionaries/constants.ts`, `/server/services/default-dictionaries.ts` |
 | Mongoose models | `/models/` |
 | Route middleware | `/middleware.ts` |
 | Audit stub | `/server/audit/create-audit-log.ts` |

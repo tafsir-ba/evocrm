@@ -23,6 +23,29 @@ withWorkspaceScope() — server-resolved workspaceId in queries
 
 ---
 
+## Phase 3 Dictionaries / Tags (implemented)
+
+Dictionary and tag APIs enforce workspace isolation and permissions:
+
+```txt
+settings:read  — list dictionaries, dictionary items, tags
+settings:update — create/update/inactivate dictionary items; create/update/archive tags
+```
+
+System dictionary items:
+
+- Cannot be inactivated via DELETE or PATCH (`isActive: false`)
+- Cannot have `behavior` or `defaultProbability` changed via PATCH
+- Terminal opportunity behaviors are protected from corruption
+
+Tags use `archivedAt` soft-archive (never hard-deleted in V1). Case-insensitive name uniqueness per workspace via `nameNormalized`.
+
+Default dictionaries seed idempotently on workspace creation and workspace context load (`ensureDefaultDictionaries`).
+
+Status business logic must use dictionary item `behavior`, never `label` text.
+
+---
+
 ## Authentication
 
 - Use **Auth.js / NextAuth v5** with **Google provider** for V1.

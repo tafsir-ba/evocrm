@@ -23,6 +23,7 @@ import {
   findOwnerRole,
   seedDefaultRolesForWorkspace,
 } from "@/server/services/roles";
+import { ensureDefaultDictionaries } from "@/server/services/default-dictionaries";
 
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -104,6 +105,8 @@ export async function createWorkspaceForUser(
     roleId: ownerRole.id,
   });
 
+  await ensureDefaultDictionaries(workspace.id, userId);
+
   await createAuditLog({
     workspaceId: workspace.id,
     actorId: userId,
@@ -164,6 +167,8 @@ export async function getWorkspaceContext(
       expose: false,
     });
   }
+
+  await ensureDefaultDictionaries(workspace.id);
 
   const navigation = buildPermissionAwareNavigation(
     workspace.slug,
