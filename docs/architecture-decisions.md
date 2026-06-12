@@ -235,31 +235,47 @@ Protected by `CRON_SECRET`. Never send from frontend or page views.
 
 ---
 
-## Suggested Project Structure (Phase 0+)
+## Approved Project Structure (Phase 0+)
+
+Phase 0 scaffolds a **root-level** Next.js App Router layout. Do **not** use a `src/` wrapper — the contract below is the source of truth.
 
 ```txt
-src/
-  app/
-    w/[workspaceSlug]/          # Workspace UI routes
-    api/
-      workspaces/[workspaceSlug]/  # Workspace-scoped APIs
-      cron/                       # Protected cron endpoints
-      auth/                       # Auth.js routes
-  components/
-    ui/                           # Generic primitives
-    [feature]/                    # Feature components (data from API)
-  lib/
-    auth/                         # Auth helpers
-    permissions/                  # Permission checks
-    workspace/                    # Workspace resolution
-    validation/                   # Zod schemas
-  models/                         # Mongoose models
-  repositories/                   # Data access
+/app
+  w/[workspaceSlug]/            # Workspace UI routes
+  api/
+    workspaces/[workspaceSlug]/ # Workspace-scoped APIs
+    cron/                         # Protected cron endpoints
+    auth/                         # Auth.js routes
+/components
+  ui/                             # Generic primitives (Button, Input, Table, …)
+  layout/                         # App shell, nav, page chrome
+  domain/                         # Feature components (data from API only)
+/server
+  auth/                           # Session helpers, auth guards
+  db/                             # MongoDB connection, Mongoose setup
   services/                       # Business logic
-  types/                          # Shared TypeScript types
+  repositories/                   # Data access (workspace-scoped queries)
+  validation/                     # Zod schemas
+  permissions/                    # Permission checks
+  audit/                          # Audit log writers
+/models                           # Mongoose model definitions
+/lib                              # Shared utilities (non-server-only helpers)
+/docs                             # Architecture and product contract
+/tests                            # Vitest unit/integration tests
 ```
 
-Exact folder layout may be refined in Phase 0 but must preserve route/service/repository separation.
+### Layer mapping
+
+| Layer | Location |
+|-------|----------|
+| Thin API routes | `/app/api/...` |
+| Services | `/server/services/` |
+| Repositories | `/server/repositories/` |
+| Models | `/models/` |
+| Zod schemas | `/server/validation/` |
+| Permission checks | `/server/permissions/` |
+
+Subfolders may be added within these roots, but must preserve route → service → repository separation. Do not move business logic into `/components` or route handlers.
 
 ---
 

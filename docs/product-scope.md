@@ -221,6 +221,7 @@ If a feature is necessary but not listed in the current phase, document it as a 
 | 1 | Design System + App Shell |
 | 2 | Auth / Workspace / Users / Membership / Base Permissions |
 | 3 | Dictionaries / Tags / Statuses |
+| 3.5 | Projects |
 | 4 | Leads |
 | 5 | Properties |
 | 6 | Opportunities / Pipeline |

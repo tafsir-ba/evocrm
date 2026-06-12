@@ -189,6 +189,7 @@ Before requesting Codex review:
 | Phase -1 complete | Architecture contract frozen (docs only) |
 | Phase 0 complete | Repo scaffold, tooling, CI commands |
 | Phase 2 complete | Auth + workspace + permissions foundation |
+| Phase 3.5 complete | Projects CRUD (Settings-managed grouping) |
 | MVP feature complete | Phases 1–10 on dev |
 | Beta | Phase 13 on main |
 | V1 GA | Beta stable + billing (Phase 11) as scoped |

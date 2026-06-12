@@ -224,6 +224,13 @@ Workspace-scoped labels attachable to entities.
 | `entityTypes[]` | `lead`, `property`, `opportunity` |
 | `createdAt` | |
 | `updatedAt` | |
+| `archivedAt` | V1 soft-archive; same convention as other workspace entities |
+
+**Archive behavior:**
+
+- Archived tags are excluded from selectors and tag-management lists by default (`archivedAt: null`).
+- Records that already reference an archived tag may continue to render that tag label on read — historical references are preserved.
+- Tags are never hard-deleted in V1.
 
 ---
 

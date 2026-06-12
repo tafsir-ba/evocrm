@@ -52,9 +52,16 @@ Unauthenticated requests return `401` with code `UNAUTHENTICATED`.
 
 `201 Created` with `{ "data": {} }` body.
 
-### Archive / soft-delete
+### Archive / soft-delete (V1 convention)
 
-`200 OK` with the updated resource (or minimal archive confirmation):
+**`DELETE` on a resource means archive in V1.** It does not hard-delete user-facing records.
+
+| Rule | Detail |
+|------|--------|
+| HTTP method | `DELETE /api/workspaces/[workspaceSlug]/…/[id]` |
+| Behavior | Sets `archivedAt` (and `status` where applicable, e.g. Document) |
+| Hard delete | Not used for V1 user-facing entities |
+| Response | `200 OK` with `{ "data": … }` — do not use `204` |
 
 ```json
 {
@@ -65,7 +72,7 @@ Unauthenticated requests return `401` with code `UNAUTHENTICATED`.
 }
 ```
 
-Use this shape for all `POST …/archive` endpoints. Do not use `204` for archives — keep responses consistent with the `{ "data": … }` contract.
+Do **not** use separate `POST …/archive` endpoints. All phase briefs and implementations must use `DELETE` for archive.
 
 ---
 
@@ -161,7 +168,7 @@ GET    /api/workspaces/[workspaceSlug]/leads
 POST   /api/workspaces/[workspaceSlug]/leads
 GET    /api/workspaces/[workspaceSlug]/leads/[leadId]
 PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]
-POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/archive
+DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
 ```
 
 ### Properties
@@ -171,7 +178,7 @@ GET    /api/workspaces/[workspaceSlug]/properties
 POST   /api/workspaces/[workspaceSlug]/properties
 GET    /api/workspaces/[workspaceSlug]/properties/[propertyId]
 PATCH  /api/workspaces/[workspaceSlug]/properties/[propertyId]
-POST   /api/workspaces/[workspaceSlug]/properties/[propertyId]/archive
+DELETE /api/workspaces/[workspaceSlug]/properties/[propertyId]  # archive (soft)
 ```
 
 ### Opportunities
@@ -181,7 +188,7 @@ GET    /api/workspaces/[workspaceSlug]/opportunities
 POST   /api/workspaces/[workspaceSlug]/opportunities
 GET    /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]
 PATCH  /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]
-POST   /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]/archive
+DELETE /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]  # archive (soft)
 PATCH  /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]/status
 ```
 
@@ -192,7 +199,7 @@ GET    /api/workspaces/[workspaceSlug]/activities
 POST   /api/workspaces/[workspaceSlug]/activities
 GET    /api/workspaces/[workspaceSlug]/activities/[activityId]
 PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]
-POST   /api/workspaces/[workspaceSlug]/activities/[activityId]/archive
+DELETE /api/workspaces/[workspaceSlug]/activities/[activityId]  # archive (soft)
 ```
 
 ### Documents
@@ -200,15 +207,30 @@ POST   /api/workspaces/[workspaceSlug]/activities/[activityId]/archive
 ```txt
 GET    /api/workspaces/[workspaceSlug]/documents
 POST   /api/workspaces/[workspaceSlug]/documents/upload-url
-POST   /api/workspaces/[workspaceSlug]/documents
+POST   /api/workspaces/[workspaceSlug]/documents/confirm
 GET    /api/workspaces/[workspaceSlug]/documents/[documentId]
 POST   /api/workspaces/[workspaceSlug]/documents/[documentId]/signed-url
-POST   /api/workspaces/[workspaceSlug]/documents/[documentId]/archive
+DELETE /api/workspaces/[workspaceSlug]/documents/[documentId]  # archive (soft)
 ```
 
-Upload flow: request presigned upload URL → client uploads to Spaces → confirm/create Document record.
+#### Canonical V1 upload flow (presigned direct-to-Spaces)
 
-Download flow: request signed download URL after permission check.
+V1 uses **presigned direct upload**, not backend multipart proxy. Do not implement an alternative multipart-through-backend path unless explicitly approved in a future revision.
+
+```txt
+1. Client: POST /documents/upload-url
+   Body: { linkedEntityType, linkedEntityId, fileName, mimeType, fileSize }
+2. Server: authenticate, resolve workspace, check document:create,
+           validate linked entity (same workspace), MIME allowlist, max size,
+           sanitize fileName → return short-lived signed upload URL + storageKey + uploadId
+3. Client: PUT file directly to Spaces using signed URL
+4. Client: POST /documents/confirm
+   Body: { uploadId, storageKey, … }
+5. Server: verify object exists in bucket, create Document record with status active
+6. Client: use POST /documents/[documentId]/signed-url for download (never permanent public URL)
+```
+
+Download flow: `POST /documents/[documentId]/signed-url` after `document:read` permission check.
 
 ### Campaigns (Dripping)
 
@@ -217,7 +239,7 @@ GET    /api/workspaces/[workspaceSlug]/campaigns
 POST   /api/workspaces/[workspaceSlug]/campaigns
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
-POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/archive
+DELETE /api/workspaces/[workspaceSlug]/campaigns/[campaignId]  # archive (soft)
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps
 POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps/[stepId]
@@ -240,6 +262,7 @@ PATCH  /api/workspaces/[workspaceSlug]/dictionaries/[type]/items/[itemId]
 GET    /api/workspaces/[workspaceSlug]/tags
 POST   /api/workspaces/[workspaceSlug]/tags
 PATCH  /api/workspaces/[workspaceSlug]/tags/[tagId]
+DELETE /api/workspaces/[workspaceSlug]/tags/[tagId]  # archive (soft)
 ```
 
 ### Settings / Workspace / Users
@@ -259,7 +282,7 @@ PATCH  /api/workspaces/[workspaceSlug]/roles/[roleId]
 GET    /api/workspaces/[workspaceSlug]/projects
 POST   /api/workspaces/[workspaceSlug]/projects
 PATCH  /api/workspaces/[workspaceSlug]/projects/[projectId]
-POST   /api/workspaces/[workspaceSlug]/projects/[projectId]/archive
+DELETE /api/workspaces/[workspaceSlug]/projects/[projectId]  # archive (soft)
 ```
 
 ### Workspace bootstrap (non-slug or pre-slug)

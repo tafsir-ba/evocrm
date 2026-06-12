@@ -81,7 +81,7 @@ error states (E2E where UI exists)
 Full flow to implement by Phase 13:
 
 ```txt
-1. login (Google — may use test auth bypass in CI)
+1. login (Google — may use test auth bypass in CI; see safety rules below)
 2. create/select workspace
 3. create project
 4. create lead
@@ -97,6 +97,15 @@ Full flow to implement by Phase 13:
 
 Implement incrementally per phase. Each phase adds tests for its scope.
 
+### Test auth bypass — safety rules
+
+If CI uses a test auth bypass instead of real Google OAuth:
+
+- Must exist **only** when `NODE_ENV === "test"` (or an equivalent explicit test flag).
+- Must be **impossible to enable in production** — guard at module load; fail closed if misconfigured.
+- Must not weaken server-side permission or workspace checks — bypass authenticates a test user only.
+- Must be documented in test setup; never exposed as a public route in non-test builds.
+
 ---
 
 ## Phase-Specific Test Expectations
@@ -106,7 +115,8 @@ Implement incrementally per phase. Each phase adds tests for its scope.
 | 0 | Tooling runs; smoke test that app builds |
 | 2 | Auth session, workspace resolution, permission checks, membership status |
 | 3 | Dictionary seeding, behavior field on status items |
-| 4 | Lead CRUD, workspace isolation, archive |
+| 3.5 | Project CRUD, workspace isolation, archive via DELETE |
+| 4 | Lead CRUD, workspace isolation, archive via DELETE |
 | 5 | Property CRUD, projectId validation |
 | 6 | Opportunity CRUD, pipeline status transitions via behavior |
 | 7 | Activity CRUD, due date, complete/cancel via behavior |

@@ -199,11 +199,11 @@ Audit logs are workspace-scoped and append-only.
 
 ## Destructive Actions
 
-V1 default is **archive**, not hard delete.
+V1 default is **archive**, not hard delete. **`DELETE` on a resource means archive** — sets `archivedAt` (and `status` where applicable). See `/docs/api-contracts.md`.
 
 | Action | Safeguard |
 |--------|-----------|
-| Archive record | Requires `*:archive` permission |
+| Archive record (`DELETE`) | Requires `*:archive` permission; returns `200` + `{ data }`, never `204` |
 | Remove member | Cannot remove last owner; requires `users:manage` |
 | Owner transfer | Explicit action only |
 | Campaign pause | Stops future sends |

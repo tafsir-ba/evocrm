@@ -229,6 +229,13 @@ Recommended MongoDB indexes:
 { workspaceId: 1, nextSendAt: 1 }          // CampaignEnrollment — cron queries
 ```
 
+### Tags
+
+```txt
+{ workspaceId: 1, archivedAt: 1 }
+{ workspaceId: 1, name: 1 }
+```
+
 ### Membership
 
 ```txt
