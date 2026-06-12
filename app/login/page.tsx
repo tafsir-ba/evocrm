@@ -8,7 +8,6 @@ export const metadata = { title: "Sign in — EvoHome CRM" };
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-white">
-      {/* Visual panel (hidden on mobile) */}
       <aside className="hidden lg:flex flex-col justify-between relative w-[44%] xl:w-[48%] overflow-hidden border-r border-[var(--color-line)]">
         <div className="absolute inset-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -55,10 +54,8 @@ export default function LoginPage() {
         </div>
       </aside>
 
-      {/* Form panel */}
       <section className="flex-1 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-[400px]">
-          {/* Mobile brand */}
           <Link
             href="/"
             className="lg:hidden inline-flex items-center gap-2.5 mb-8"
@@ -86,16 +83,28 @@ export default function LoginPage() {
             Sign in to your EvoHome workspace.
           </p>
 
-          {/* Primary auth: Google */}
-          <Link
-            href="/w/demo-workspace/dashboard"
-            className="mt-7 w-full h-11 inline-flex items-center justify-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-white hover:bg-[var(--color-canvas)] focus-ring text-[14px] font-medium text-[var(--color-ink)] transition-colors"
+          <div
+            role="note"
+            className="mt-5 rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-bg)] px-3.5 py-3 text-[12.5px] text-[var(--color-info-fg)] leading-relaxed"
+          >
+            Design preview only — controls are disabled. Real Google authentication
+            and email sign-in are implemented in Phase 2.
+          </div>
+
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title="Authentication arrives in Phase 2"
+            className="mt-5 w-full h-11 inline-flex items-center justify-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-muted)] text-[14px] font-medium text-[var(--color-ink-muted)] cursor-not-allowed opacity-80"
           >
             <IconGoogle size={18} />
             Continue with Google
-          </Link>
+            <span className="text-[11px] font-semibold uppercase tracking-wide">
+              Phase 2
+            </span>
+          </button>
 
-          {/* Divider */}
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-[var(--color-line)]" />
             <span className="text-[11.5px] uppercase tracking-[0.14em] text-[var(--color-ink-faint)] font-semibold">
@@ -104,8 +113,7 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-[var(--color-line)]" />
           </div>
 
-          {/* Email / password (visual only) */}
-          <form className="space-y-3.5" action="/w/demo-workspace/dashboard">
+          <fieldset disabled className="space-y-3.5 border-0 p-0 m-0 min-w-0">
             <div className="space-y-1.5">
               <Label htmlFor="email">Work email</Label>
               <Input
@@ -113,18 +121,16 @@ export default function LoginPage() {
                 type="email"
                 placeholder="you@company.com"
                 autoComplete="email"
+                disabled
               />
             </div>
             <div className="space-y-1.5">
               <Label
                 htmlFor="password"
                 hint={
-                  <Link
-                    href="#"
-                    className="text-[var(--color-brand-700)] hover:underline"
-                  >
+                  <span className="text-[var(--color-ink-faint)]">
                     Forgot password?
-                  </Link>
+                  </span>
                 }
               >
                 Password
@@ -135,30 +141,29 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 autoComplete="current-password"
                 trailingIcon={<IconEye size={15} />}
+                disabled
               />
             </div>
 
-            <label className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-soft)] cursor-pointer select-none">
+            <label className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-faint)] select-none">
               <input
                 type="checkbox"
+                disabled
                 className="w-3.5 h-3.5 accent-[var(--color-brand-600)] rounded"
               />
               Remember me on this device
             </label>
 
-            <Button type="submit" size="lg" fullWidth>
+            <Button type="button" size="lg" fullWidth disabled>
               Sign in
             </Button>
-          </form>
+          </fieldset>
 
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-6 text-center">
             New to EvoHome?{" "}
-            <Link
-              href="#"
-              className="text-[var(--color-brand-700)] font-medium hover:underline"
-            >
-              Request workspace access
-            </Link>
+            <span className="text-[var(--color-ink-faint)]">
+              Request workspace access (Phase 2)
+            </span>
           </p>
 
           <p className="text-[11.5px] text-[var(--color-ink-faint)] mt-10 text-center">

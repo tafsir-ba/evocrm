@@ -241,7 +241,8 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] `npm run typecheck`, `lint`, `test`, `build` pass
 - [ ] Workspace UI routes live under `/w/[workspaceSlug]/…` (e.g. `/w/demo-workspace/dashboard`)
 - [ ] Primary nav includes only: Dashboard, Pipeline, Leads, Properties, Activities, Dripping, Settings
-- [ ] No Contacts, Companies, Reports, Tasks, Documents, Integrations, or Client Portal in primary nav
+- [ ] No forbidden labels in primary nav (see `FORBIDDEN_PRIMARY_NAV_LABELS` in `lib/v1-navigation.ts`)
+- [ ] `/w/[workspaceSlug]/states` documented as internal QA-only (not V1 primary nav)
 - [ ] Login page exists at `/login` (UI only — no real auth)
 - [ ] Placeholder list + detail pages for leads, properties, opportunities
 - [ ] Reusable UI primitives under `/components/ui/` contain no business taxonomy maps

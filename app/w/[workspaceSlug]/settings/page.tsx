@@ -211,25 +211,22 @@ export default async function SettingsPage({ params }: { params: Params }) {
         </Card>
       </SectionAnchor>
 
-      {/* Billing */}
+      {/* Billing — Phase 11 placeholder only */}
       <SectionAnchor id="billing" title="Billing">
         <Card>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <p className="text-[14px] font-semibold text-[var(--color-ink)]">
-                Growth plan · monthly
+                Billing shell
               </p>
-              <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
-                Next invoice on Jun 30, 2024 · CHF 248.00
+              <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5 leading-relaxed">
+                Stripe integration arrives in Phase 11. No live subscription is
+                configured.
               </p>
             </div>
-            <Button variant="secondary" size="sm">Manage subscription</Button>
-          </div>
-          <div className="border-t border-[var(--color-line)] my-4" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Info label="Payment method" value="Visa •••• 4242" />
-            <Info label="Billing email" value="finance@evohome.example" />
-            <Info label="Currency" value="CHF" />
+            <Button variant="secondary" size="sm" disabled>
+              Coming in Phase 11
+            </Button>
           </div>
         </Card>
       </SectionAnchor>

@@ -260,6 +260,7 @@ Phase 0 scaffolds a **root-level** Next.js App Router layout. Do **not** use a `
 ```txt
 /app
   w/[workspaceSlug]/            # Workspace UI routes
+  w/[workspaceSlug]/states/     # Internal QA-only UI state showcase (not primary nav)
   api/
     workspaces/[workspaceSlug]/ # Workspace-scoped APIs
     cron/                         # Protected cron endpoints

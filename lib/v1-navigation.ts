@@ -12,6 +12,7 @@ export const V1_NAV_ITEMS = [
   { segment: "settings", label: "Settings" },
 ] as const;
 
+/** Labels that must never appear as primary sidebar navigation (Settings subsections allowed). */
 export const FORBIDDEN_PRIMARY_NAV_LABELS = [
   "Contacts",
   "Companies",
@@ -20,6 +21,14 @@ export const FORBIDDEN_PRIMARY_NAV_LABELS = [
   "Documents",
   "Integrations",
   "Client Portal",
+  "Projects",
+  "Opportunities",
+  "Calendar",
+  "Automations",
+  "Marketing",
+  "Billing",
+  "Users",
+  "Roles",
 ] as const;
 
 export type V1NavSegment = (typeof V1_NAV_ITEMS)[number]["segment"];

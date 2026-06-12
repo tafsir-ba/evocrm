@@ -14,11 +14,28 @@ import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
 import { ComponentShowcase } from "@/components/states/component-showcase";
 
-export const metadata = { title: "UI states — EvoHome CRM" };
+export const metadata = {
+  title: "UI states — EvoHome CRM",
+  robots: { index: false, follow: false },
+};
 
+/**
+ * Internal QA/dev route — not part of locked V1 primary navigation.
+ * Safe to remove or gate behind a dev flag before production beta.
+ */
 export default function StatesShowcase() {
   return (
     <PageContainer>
+      <div
+        role="note"
+        className="mb-5 rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] px-4 py-3 text-[12.5px] text-[var(--color-ink-muted)]"
+      >
+        Internal development route only — not production navigation. Visit{" "}
+        <code className="text-[12px] text-[var(--color-ink-soft)]">
+          /w/demo-workspace/states
+        </code>{" "}
+        for component/state QA. Remove or gate before beta.
+      </div>
       <PageHeader
         title="Reusable UI states"
         description="State patterns used across every list, detail and dashboard view. Empty · loading · error · forbidden · not found · no workspace."
@@ -55,7 +72,7 @@ export default function StatesShowcase() {
           title="No leads yet"
           description="When prospects enter through forms, portals or referrals, they'll show up here."
           primaryAction={{ label: "Add lead" }}
-          secondaryAction={{ label: "Import CSV" }}
+          secondaryAction={{ label: "View examples" }}
         />
         <ErrorState
           title="Something went wrong"

@@ -54,12 +54,11 @@
   --radius-lg: 10px;
   --radius-xl: 14px;
 
-  /* Fonts */
+  /* Fonts — system stack avoids build-time Google Font fetches (Phase 1) */
   --font-sans:
-    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display:
-    "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 

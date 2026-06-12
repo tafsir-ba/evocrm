@@ -24,4 +24,24 @@ describe("V1 navigation scope", () => {
       expect(labels).not.toContain(forbidden);
     }
   });
+
+  it("guards against the full forbidden primary nav list", () => {
+    expect(FORBIDDEN_PRIMARY_NAV_LABELS).toEqual([
+      "Contacts",
+      "Companies",
+      "Reports",
+      "Tasks",
+      "Documents",
+      "Integrations",
+      "Client Portal",
+      "Projects",
+      "Opportunities",
+      "Calendar",
+      "Automations",
+      "Marketing",
+      "Billing",
+      "Users",
+      "Roles",
+    ]);
+  });
 });
