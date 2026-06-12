@@ -76,6 +76,20 @@ Do **not** use separate `POST …/archive` endpoints. All phase briefs and imple
 
 ---
 
+## Response Helpers (Phase 0)
+
+Server route handlers should use typed helpers from `/server/api/responses.ts`:
+
+```txt
+successResponse(data)
+paginatedResponse(data, pagination)
+errorResponse(code, message, { details? })
+```
+
+Application errors: `/server/errors.ts` (`AppError`, `serializeUnknownError`).
+
+---
+
 ## Error Response Shape
 
 ```json

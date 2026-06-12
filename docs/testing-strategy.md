@@ -112,7 +112,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 
 | Phase | Minimum tests |
 |-------|---------------|
-| 0 | Tooling runs; smoke test that app builds |
+| 0 | Tooling runs; unit tests for API helpers, errors, env, validation, `withWorkspaceScope()`; Playwright scaffold |
 | 2 | Auth session, workspace resolution, permission checks, membership status |
 | 3 | Dictionary seeding, behavior field on status items |
 | 3.5 | Project CRUD, workspace isolation, archive via DELETE |

@@ -4,7 +4,7 @@ Evohome CRM — real estate workspace SaaS (V1).
 
 ## Status
 
-Phase -1 complete and QA-patched: product and architecture contract frozen. Approved for Phase 0 (Foundation). No application code yet.
+Phase 0 complete: technical foundation scaffolded (Next.js, TypeScript strict, Tailwind, Vitest, Playwright scaffold, MongoDB utility, env validation, API helpers, auth/workspace stubs). Ready for Phase 1 (Design System + App Shell).
 
 ## Documentation
 

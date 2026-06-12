@@ -239,6 +239,24 @@ Protected by `CRON_SECRET`. Never send from frontend or page views.
 
 Phase 0 scaffolds a **root-level** Next.js App Router layout. Do **not** use a `src/` wrapper — the contract below is the source of truth.
 
+### Phase 0 implementation map
+
+| Concern | Location |
+|---------|----------|
+| Environment validation | `/server/env.ts` |
+| MongoDB connection | `/server/db/mongoose.ts` |
+| API responses | `/server/api/responses.ts` |
+| Application errors | `/server/errors.ts` |
+| Request validation | `/server/validation/request.ts` |
+| Auth stubs | `/server/auth/` |
+| Workspace resolution stub | `/server/workspaces/resolve-workspace.ts` |
+| Workspace scope helper | `/server/workspaces/with-workspace-scope.ts` |
+| Permission stubs | `/server/permissions/` |
+| Audit stub | `/server/audit/create-audit-log.ts` |
+| Seed scaffold | `/server/seed/` |
+| Unit tests | `/tests/unit/` |
+| E2E scaffold | `/tests/e2e/` |
+
 ```txt
 /app
   w/[workspaceSlug]/            # Workspace UI routes

@@ -4,6 +4,12 @@ Security is foundational. Every phase must uphold these requirements.
 
 ---
 
+## Phase 0 Foundation
+
+Auth, workspace, and permission helpers exist as **fail-closed stubs** (`INTERNAL_ERROR` when invoked). They must not silently allow access or accept client-provided `workspaceId`. Real enforcement begins in Phase 2.
+
+---
+
 ## Authentication
 
 - Use **Auth.js / NextAuth** with **Google provider** for V1.

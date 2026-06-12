@@ -215,6 +215,25 @@ Merge to dev: APPROVED | REJECTED
 
 ---
 
+## Phase 0 Foundation Checklist
+
+Phase 0 has no product routes or domain models. Verify foundation only:
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Strict TypeScript enabled (`strict`, `noImplicitAny`, `strictNullChecks`)
+- [ ] Env validation in `/server/env.ts` requires only `NODE_ENV`, `MONGODB_URI`, `NEXT_PUBLIC_APP_URL`
+- [ ] MongoDB connection helper caches dev connections (`/server/db/mongoose.ts`)
+- [ ] API helpers match `/docs/api-contracts.md` (`successResponse`, `paginatedResponse`, `errorResponse`)
+- [ ] `AppError` + `handleRouteError` mask `expose: false` internal messages
+- [ ] `withWorkspaceScope()` tested; server-resolved `workspaceId` only
+- [ ] Auth/workspace/permission stubs fail closed (no silent access)
+- [ ] No product modules, domain models, or non-V1 nav
+- [ ] `.env.example` present; no committed secrets
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

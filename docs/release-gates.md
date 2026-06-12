@@ -4,6 +4,21 @@ Merge and release rules for phased development.
 
 ---
 
+## Phase 0 Gate (foundation)
+
+Phase 0 merges when all of the following pass with no product modules implemented:
+
+```txt
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
+
+Foundation utilities required: env validation, MongoDB connection helper, API response/error helpers, Zod request validation, auth/workspace/permission stubs, `withWorkspaceScope()`, audit stub, seed scaffold.
+
+---
+
 ## Branch Strategy
 
 ```txt

@@ -22,11 +22,14 @@ Unless immediately followed by strict workspace verification on the returned doc
 ### Preferred pattern
 
 ```ts
-Lead.findOne({
-  _id: id,
-  workspaceId,
-})
+Lead.findOne(
+  withWorkspaceScope(workspaceId, {
+    _id: id,
+  }),
+)
 ```
+
+`withWorkspaceScope()` lives at `/server/workspaces/with-workspace-scope.ts`. Pass only server-resolved `workspaceId` — never from the client body.
 
 ### List queries
 
