@@ -1,0 +1,216 @@
+import "server-only";
+
+import { createAuditLog } from "@/server/audit/create-audit-log";
+import { AppError } from "@/server/errors";
+import { findMembership } from "@/server/repositories/memberships";
+import {
+  archiveProject,
+  createProject,
+  findProjectById,
+  findProjectByReference,
+  findProjects,
+  updateProject,
+  type ProjectListFilter,
+  type ProjectRecord,
+} from "@/server/repositories/projects";
+import type { CreateProjectInput, UpdateProjectInput } from "@/server/validation/projects";
+
+async function validateOptionalWorkspaceMember(
+  workspaceId: string,
+  userId: string | null | undefined,
+  fieldLabel: string,
+): Promise<void> {
+  if (!userId) {
+    return;
+  }
+
+  const membership = await findMembership(userId, workspaceId);
+
+  if (!membership || membership.status !== "active") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      `${fieldLabel} must refer to an active workspace member.`,
+    );
+  }
+}
+
+function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
+  return {
+    name: project.name,
+    reference: project.reference,
+    address: project.address,
+    city: project.city,
+    country: project.country,
+    description: project.description,
+    ownerId: project.ownerId,
+    assignedTo: project.assignedTo,
+  };
+}
+
+export async function listProjectsForWorkspace(
+  workspaceId: string,
+  filter: ProjectListFilter = {},
+): Promise<ProjectRecord[]> {
+  return findProjects(workspaceId, filter);
+}
+
+export async function getProjectForWorkspace(
+  workspaceId: string,
+  projectId: string,
+): Promise<ProjectRecord> {
+  const project = await findProjectById(workspaceId, projectId);
+
+  if (!project) {
+    throw new AppError("NOT_FOUND", "Project not found.");
+  }
+
+  return project;
+}
+
+export async function createProjectForWorkspace(
+  workspaceId: string,
+  actorId: string,
+  input: CreateProjectInput,
+): Promise<ProjectRecord> {
+  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assigned to");
+
+  if (input.reference) {
+    const duplicate = await findProjectByReference(workspaceId, input.reference);
+
+    if (duplicate) {
+      throw new AppError("CONFLICT", "A project with this reference already exists.");
+    }
+  }
+
+  const project = await createProject({
+    workspaceId,
+    createdBy: actorId,
+    name: input.name,
+    reference: input.reference ?? null,
+    address: input.address ?? null,
+    city: input.city ?? null,
+    country: input.country ?? null,
+    description: input.description ?? null,
+    ownerId: input.ownerId ?? null,
+    assignedTo: input.assignedTo ?? null,
+  });
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "project.created",
+    entityType: "project",
+    entityId: project.id,
+    after: projectSnapshot(project),
+  });
+
+  return project;
+}
+
+export async function updateProjectForWorkspace(
+  workspaceId: string,
+  projectId: string,
+  actorId: string,
+  input: UpdateProjectInput,
+): Promise<ProjectRecord> {
+  const existing = await findProjectById(workspaceId, projectId);
+
+  if (!existing || existing.archivedAt) {
+    throw new AppError("NOT_FOUND", "Project not found.");
+  }
+
+  if (input.ownerId !== undefined) {
+    await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+  }
+  if (input.assignedTo !== undefined) {
+    await validateOptionalWorkspaceMember(
+      workspaceId,
+      input.assignedTo,
+      "Assigned to",
+    );
+  }
+
+  if (input.reference) {
+    const duplicate = await findProjectByReference(workspaceId, input.reference);
+
+    if (duplicate && duplicate.id !== projectId) {
+      throw new AppError("CONFLICT", "A project with this reference already exists.");
+    }
+  }
+
+  const updatePayload: Parameters<typeof updateProject>[2] = {};
+
+  if (input.name !== undefined) {
+    updatePayload.name = input.name.trim();
+  }
+  if (input.reference !== undefined) {
+    updatePayload.reference = input.reference?.trim() || null;
+  }
+  if (input.address !== undefined) {
+    updatePayload.address = input.address?.trim() || null;
+  }
+  if (input.city !== undefined) {
+    updatePayload.city = input.city?.trim() || null;
+  }
+  if (input.country !== undefined) {
+    updatePayload.country = input.country?.trim() || null;
+  }
+  if (input.description !== undefined) {
+    updatePayload.description = input.description?.trim() || null;
+  }
+  if (input.ownerId !== undefined) {
+    updatePayload.ownerId = input.ownerId;
+  }
+  if (input.assignedTo !== undefined) {
+    updatePayload.assignedTo = input.assignedTo;
+  }
+
+  const updated = await updateProject(workspaceId, projectId, updatePayload);
+
+  if (!updated) {
+    throw new AppError("NOT_FOUND", "Project not found.");
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "project.updated",
+    entityType: "project",
+    entityId: projectId,
+    before: projectSnapshot(existing),
+    after: projectSnapshot(updated),
+  });
+
+  return updated;
+}
+
+export async function archiveProjectForWorkspace(
+  workspaceId: string,
+  projectId: string,
+  actorId: string,
+): Promise<ProjectRecord> {
+  const existing = await findProjectById(workspaceId, projectId);
+
+  if (!existing || existing.archivedAt) {
+    throw new AppError("NOT_FOUND", "Project not found.");
+  }
+
+  const archived = await archiveProject(workspaceId, projectId);
+
+  if (!archived) {
+    throw new AppError("NOT_FOUND", "Project not found.");
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "project.archived",
+    entityType: "project",
+    entityId: projectId,
+    before: { archivedAt: null },
+    after: { archivedAt: archived.archivedAt },
+  });
+
+  return archived;
+}

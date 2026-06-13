@@ -257,6 +257,26 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 3.5 Projects Checklist
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Project model at `/models/project.ts` with required fields and indexes
+- [ ] Project APIs workspace-scoped under `/api/workspaces/[workspaceSlug]/projects`
+- [ ] `settings:read` enforced for GET; `settings:update` for mutations
+- [ ] `workspaceId` and `createdBy` server-controlled; not accepted from client
+- [ ] Reference uniqueness workspace-scoped (includes archived)
+- [ ] Archive via `DELETE` sets `archivedAt`; no hard delete
+- [ ] Archived projects excluded from default list; `includeArchived=true` for management UI
+- [ ] Settings → Projects UI at `/w/[workspaceSlug]/settings/projects`
+- [ ] Projects **not** in primary navigation
+- [ ] Project selector foundation at `/components/domain/project-selector.tsx` (props only, no fetch)
+- [ ] No `project_status` dictionary added; no Company model
+- [ ] Unit tests for service, repository, API permissions, workspace isolation
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

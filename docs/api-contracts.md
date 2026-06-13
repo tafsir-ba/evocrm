@@ -312,9 +312,30 @@ PATCH  /api/workspaces/[workspaceSlug]/roles/[roleId]
 
 GET    /api/workspaces/[workspaceSlug]/projects
 POST   /api/workspaces/[workspaceSlug]/projects
+GET    /api/workspaces/[workspaceSlug]/projects/[projectId]
 PATCH  /api/workspaces/[workspaceSlug]/projects/[projectId]
 DELETE /api/workspaces/[workspaceSlug]/projects/[projectId]  # archive (soft)
 ```
+
+**Permissions:** `settings:read` for GET; `settings:update` for POST/PATCH/DELETE.
+
+**Project list defaults:** active projects only (`archivedAt: null`). Pass `includeArchived=true` to include archived projects in Settings management UI.
+
+**Project search:** optional `search` query matches name, reference, or city (case-insensitive).
+
+**Project reference uniqueness:** `reference` is unique per workspace across all projects (including archived). Partial unique index applies only when `reference` is set.
+
+**Project status:** `statusId` exists on the model but is unused in V1 UI. Active/archived is determined by `archivedAt` only — no `project_status` dictionary type was added.
+
+**Project archive:** `DELETE` sets `archivedAt`; projects are never hard-deleted. Archived projects are excluded from default lists and future property selectors.
+
+**Server-controlled fields:** `workspaceId`, `createdBy`, `createdAt`, `updatedAt`, `archivedAt` are never accepted from client input.
+
+**Member validation:** optional `ownerId` and `assignedTo` must refer to active workspace members when provided.
+
+**Future property forms:** may read active projects with `property:create` / `property:update` in Phase 5; Settings management uses `settings:read` / `settings:update`.
+
+**Project selector foundation:** `/components/domain/project-selector.tsx` receives projects via props for Phase 5 property forms — does not fetch data directly.
 
 ### Workspace bootstrap (Phase 2 — implemented)
 

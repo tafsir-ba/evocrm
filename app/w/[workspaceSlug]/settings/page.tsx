@@ -17,11 +17,11 @@ import {
   IconUser,
 } from "@/lib/icons";
 import {
-  settingsProjects,
   settingsRoles,
   settingsUsers,
 } from "@/lib/mock-data";
 import { listDictionariesForWorkspace } from "@/server/services/dictionaries";
+import { listProjectsForWorkspace } from "@/server/services/projects";
 import { listTagsForWorkspace } from "@/server/services/tags";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
@@ -35,7 +35,7 @@ const SECTIONS = [
   { key: "roles", label: "Roles", desc: "Permission policies and capabilities", Icon: IconShieldUser, href: null },
   { key: "dictionaries", label: "Dictionaries", desc: "Statuses, sources, activity types", Icon: IconHash, href: "dictionaries" },
   { key: "tags", label: "Tags", desc: "Reusable labels for leads and properties", Icon: IconTag, href: "tags" },
-  { key: "projects", label: "Projects", desc: "Lightweight property groupings", Icon: IconFolder, href: null },
+  { key: "projects", label: "Projects", desc: "Lightweight property groupings", Icon: IconFolder, href: "projects" },
   { key: "billing", label: "Billing", desc: "Plan, invoices and payment method", Icon: IconCreditCard, href: null },
 ];
 
@@ -50,6 +50,9 @@ export default async function SettingsPage({ params }: { params: Params }) {
   const tags = access.permissionDenied
     ? []
     : await listTagsForWorkspace(workspace.id);
+  const projects = access.permissionDenied
+    ? []
+    : await listProjectsForWorkspace(workspace.id);
 
   return (
     <PageContainer>
@@ -216,10 +219,19 @@ export default async function SettingsPage({ params }: { params: Params }) {
       </SectionAnchor>
 
       {/* Projects */}
-      <SectionAnchor id="projects" title="Projects" description="Lightweight property groupings managed in Settings.">
+      <SectionAnchor
+        id="projects"
+        title="Projects"
+        description="Lightweight property groupings managed in Settings."
+        action={
+          <Link href={`/w/${workspaceSlug}/settings/projects`}>
+            <Button size="sm">Manage</Button>
+          </Link>
+        }
+      >
         <Card padded={false}>
           <ul className="divide-y divide-[var(--color-line)]">
-            {settingsProjects.map((p) => (
+            {projects.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-canvas)]">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--color-brand-50)] text-[var(--color-brand-600)]">
@@ -227,12 +239,21 @@ export default async function SettingsPage({ params }: { params: Params }) {
                   </span>
                   <div>
                     <p className="text-[13.5px] font-medium text-[var(--color-ink)]">{p.name}</p>
-                    <p className="text-[12px] text-[var(--color-ink-muted)]">{p.city} · {p.properties} properties</p>
+                    <p className="text-[12px] text-[var(--color-ink-muted)]">
+                      {[p.city, p.country].filter(Boolean).join(" · ") || "No location"}
+                    </p>
                   </div>
                 </div>
-                <Badge tone="info" size="sm">Active</Badge>
+                <Badge tone={p.archivedAt ? "muted" : "info"} size="sm">
+                  {p.archivedAt ? "Archived" : "Active"}
+                </Badge>
               </li>
             ))}
+            {projects.length === 0 && (
+              <li className="px-5 py-4 text-[12.5px] text-[var(--color-ink-muted)]">
+                No projects yet.
+              </li>
+            )}
           </ul>
         </Card>
       </SectionAnchor>

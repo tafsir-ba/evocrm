@@ -271,7 +271,18 @@ Optional real estate development or property grouping.
 | `updatedAt` | |
 | `archivedAt` | |
 
-Managed primarily through Settings in V1.
+Managed primarily through Settings in V1. **Not** a primary navigation module.
+
+**Phase 3.5:** Mongoose model at `/models/project.ts`.
+
+| Rule | Detail |
+|------|--------|
+| Navigation | Settings → Projects only; never primary nav |
+| Status | Active when `archivedAt` is null; archived when set. `statusId` optional and unused in V1 UI (no `project_status` dictionary) |
+| Archive | `DELETE` sets `archivedAt`; never hard-deleted |
+| Reference | Unique per workspace when provided (includes archived projects) |
+| `createdBy` | Set server-side from authenticated user; immutable |
+| `ownerId` / `assignedTo` | Optional; must be active workspace members when provided |
 
 ---
 

@@ -251,6 +251,16 @@ Recommended MongoDB indexes:
 { workspaceId: 1, archivedAt: 1 }
 ```
 
+### Projects (Phase 3.5)
+
+```txt
+{ workspaceId: 1 }
+{ workspaceId: 1, archivedAt: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, assignedTo: 1 }
+{ workspaceId: 1, reference: 1 }            // unique partial (reference exists)
+```
+
 ### Membership
 
 ```txt

@@ -46,6 +46,27 @@ Status business logic must use dictionary item `behavior`, never `label` text.
 
 ---
 
+## Phase 3.5 Projects (implemented)
+
+Project APIs enforce workspace isolation and Settings permissions:
+
+```txt
+settings:read  — list/view projects
+settings:update — create/update/archive projects
+```
+
+Projects use `archivedAt` soft-archive (never hard-deleted in V1). Reference uniqueness is workspace-scoped across all projects including archived.
+
+`workspaceId` and `createdBy` are server-controlled. All project lookups use `{ workspaceId, _id }` — never `findById` without workspace verification.
+
+Projects appear only under Settings (`/w/[workspaceSlug]/settings/projects`). They must not appear in primary navigation.
+
+No `project_status` dictionary type was added. Active/archived state is determined by `archivedAt` only.
+
+Optional `ownerId` and `assignedTo` are validated against active workspace membership when provided.
+
+---
+
 ## Authentication
 
 - Use **Auth.js / NextAuth v5** with **Google provider** for V1.
