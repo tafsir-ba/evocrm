@@ -328,6 +328,29 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 7 Activities Checklist
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Activity model at `/models/activity.ts` with required fields and indexes
+- [ ] Activity APIs workspace-scoped under `/api/workspaces/[workspaceSlug]/activities`
+- [ ] Complete/cancel endpoints at `…/complete` and `…/cancel`
+- [ ] `activity:read` / `activity:create` / `activity:update` / `activity:archive` enforced server-side
+- [ ] `workspaceId`, `createdBy`, `archivedAt`, `completedAt`, `cancelledAt` server-controlled
+- [ ] At least one linked entity required; opportunity-linked activities derive lead/property
+- [ ] `typeId` validated as same-workspace `activity_type`; `statusId` as `activity_status`
+- [ ] Status behavior drives completion/cancellation timestamps (not label text)
+- [ ] Overdue/upcoming exclude completed, cancelled, archived, and no-due-date activities
+- [ ] Archive via `DELETE` sets `archivedAt`; no hard delete
+- [ ] Activities list UI at `/w/[workspaceSlug]/activities` with search, filters, views, pagination
+- [ ] Lead/Property/Opportunity detail Activities tabs show real activities and timeline
+- [ ] Type/status options from backend dictionaries (not hardcoded canonical workflow logic)
+- [ ] Tasks is not primary navigation; Activities remains the follow-up module
+- [ ] Unit tests for validation, repository, service, API permissions, status behavior
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

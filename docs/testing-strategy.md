@@ -129,7 +129,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 | 4 | Lead CRUD, workspace isolation, archive via DELETE (`tests/unit/leads-{service,api,repository,validation}.test.ts`) |
 | 5 | Property CRUD, workspace isolation, archive via DELETE, reference uniqueness, project/dictionary/tag validation (`tests/unit/properties-{service,api,repository,validation}.test.ts`) |
 | 6 | Opportunity CRUD, pipeline status transitions via behavior (`tests/unit/opportunities-{service,api,repository,validation}.test.ts`, `pipeline-service.test.ts`) |
-| 7 | Activity CRUD, due date, complete/cancel via behavior |
+| 7 | Activity CRUD, due date, complete/cancel via behavior (`tests/unit/activities-{service,api,repository,validation}.test.ts`) |
 | 8 | Document upload auth, signed URL permission gate |
 | 9 | Dashboard aggregation workspace-scoped |
 | 10 | Campaign enroll, send skip rules, unsubscribe |

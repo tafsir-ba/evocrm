@@ -9,3 +9,4 @@ export { ProjectModel, type ProjectDocument } from "./project";
 export { LeadModel, type LeadDocument } from "./lead";
 export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";
+export { ActivityModel, type ActivityDocument } from "./activity";

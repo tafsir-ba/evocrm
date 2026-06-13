@@ -33,6 +33,10 @@ export default async function OpportunityDetailPage({ params }: { params: Params
         opportunityId={opportunityId}
         canUpdate={hasPermission(permissions, "opportunity:update")}
         canArchive={hasPermission(permissions, "opportunity:archive")}
+        canReadActivities={hasPermission(permissions, "activity:read")}
+        canCreateActivity={hasPermission(permissions, "activity:create")}
+        canUpdateActivity={hasPermission(permissions, "activity:update")}
+        canArchiveActivity={hasPermission(permissions, "activity:archive")}
       />
     </PageContainer>
   );

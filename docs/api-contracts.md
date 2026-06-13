@@ -227,7 +227,7 @@ DELETE /api/workspaces/[workspaceSlug]/properties/[propertyId]  # archive (soft)
 
 **DELETE** sets `archivedAt`; does not hard-delete.
 
-UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[propertyId]`. Status/type options from dictionary APIs (`property_status`, `property_type`); tags from tags API with `entityType=property`; projects from projects API (active only). Media/Files/Opportunities/Activities/Notes tabs are placeholders only.
+UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[propertyId]`. Status/type options from dictionary APIs (`property_status`, `property_type`); tags from tags API with `entityType=property`; projects from projects API (active only). **Phase 7:** Activities tab loads real workspace-scoped activities via `GET /activities?propertyId=…`. Media/Files/Notes tabs remain placeholders.
 
 ### Opportunities
 
@@ -260,9 +260,11 @@ GET    /api/workspaces/[workspaceSlug]/pipeline
 
 **GET /pipeline** returns backend-driven columns from active `opportunity_status` dictionary items (ordered), grouped opportunities, per-stage `count`/`valueTotal`, and `totals.activeValue` (open behavior only — excludes won/lost).
 
-UI routes: `/w/[workspaceSlug]/pipeline`, `/w/[workspaceSlug]/opportunities/[opportunityId]`. Opportunities appear on Lead/Property detail tabs; Opportunities is **not** a primary nav item. Activities/Files/Documents/Notes timeline tabs remain placeholders.
+UI routes: `/w/[workspaceSlug]/pipeline`, `/w/[workspaceSlug]/opportunities/[opportunityId]`. Opportunities appear on Lead/Property detail tabs; Opportunities is **not** a primary nav item. **Phase 7:** Activities tab loads real activities via `GET /activities?opportunityId=…`. Files/Documents/Notes timeline tabs remain placeholders.
 
 ### Activities
+
+**Phase 7:** Mongoose model at `/models/activity.ts`. All queries workspace-scoped. At least one of `opportunityId`, `leadId`, or `propertyId` required. When `opportunityId` is set, `leadId`/`propertyId` are derived from the opportunity (client values ignored). `typeId` validated as same-workspace `activity_type`; `statusId` as same-workspace `activity_status`. Status side effects use `DictionaryItem.behavior` (`pending`, `completed`, `cancelled`) — never label text. `assignedTo` defaults to current user on create when omitted. `completedAt`/`cancelledAt` are server-controlled via status behavior or complete/cancel endpoints.
 
 ```txt
 GET    /api/workspaces/[workspaceSlug]/activities
@@ -270,7 +272,15 @@ POST   /api/workspaces/[workspaceSlug]/activities
 GET    /api/workspaces/[workspaceSlug]/activities/[activityId]
 PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]
 DELETE /api/workspaces/[workspaceSlug]/activities/[activityId]  # archive (soft)
+PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]/complete
+PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]/cancel
 ```
+
+**GET /activities** requires `activity:read`. Supports pagination, `search` (title/description/outcome), filters (`typeId`, `statusId`, `assignedTo`, `ownerId`, `leadId`, `propertyId`, `opportunityId`, date ranges, `includeArchived`), and `view` (`all`, `mine`, `upcoming`, `overdue`). Overdue: `dueDate < now`, pending behavior, not archived. Upcoming: `dueDate >= now`, pending behavior, not archived. Activities without `dueDate` are excluded from overdue/upcoming views.
+
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `archivedAt`, `completedAt`, `cancelledAt`. **PATCH …/complete** and **PATCH …/cancel** require `activity:update` and resolve target status by `activity_status` behavior.
+
+UI routes: `/w/[workspaceSlug]/activities`. Entity detail Activities tabs filter by `leadId`, `propertyId`, or `opportunityId`. Tasks are an activity type — not a separate module.
 
 ### Documents
 

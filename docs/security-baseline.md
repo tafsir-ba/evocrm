@@ -90,7 +90,34 @@ Leads appear in primary navigation (`/w/[workspaceSlug]/leads`). No separate Con
 
 `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) lists active workspace members for lead assignment pickers in create/edit UI.
 
-Opportunities section on lead detail is implemented in Phase 6. Activities, timeline Notes, and Files tabs remain placeholders.
+Opportunities section on lead detail is implemented in Phase 6. **Phase 7:** Activities tab loads real workspace-scoped activities. Timeline Notes and Files tabs remain placeholders.
+
+---
+
+## Phase 7 Activities / Timeline (implemented)
+
+Activity APIs enforce workspace isolation and activity permissions:
+
+```txt
+activity:read    — list/view activities, entity detail timelines
+activity:create  — create activities and timeline notes (type Note)
+activity:update  — edit activities; complete/cancel/reschedule
+activity:archive — archive activities (DELETE)
+```
+
+`workspaceId`, `createdBy`, `archivedAt`, `completedAt`, and `cancelledAt` are server-controlled. Client body must not set them.
+
+At least one of `opportunityId`, `leadId`, or `propertyId` is required. When `opportunityId` is set, `leadId`/`propertyId` are derived from the opportunity. Linked entities must be same-workspace and non-archived.
+
+`typeId` must reference same-workspace `activity_type`. `statusId` must reference same-workspace `activity_status`. Complete/cancel behavior uses `DictionaryItem.behavior` only — never label text.
+
+Overdue/upcoming views exclude completed, cancelled, and archived activities. Activities without `dueDate` are excluded from overdue/upcoming views.
+
+Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived activities excluded from default list.
+
+Activities appear in primary navigation (`/w/[workspaceSlug]/activities`). Tasks are an activity type — not a separate nav module. Calendar is not primary nav.
+
+Entity detail Activities tabs on Lead, Property, and Opportunity load filtered activity lists. Global create without a linked entity is documented as a V1 limitation — create from entity detail pages.
 
 ---
 
@@ -119,7 +146,7 @@ Pipeline is primary nav (`/w/[workspaceSlug]/pipeline`). Opportunity detail at `
 
 `GET /pipeline` returns backend-driven columns from active `opportunity_status` dictionary items. Active pipeline value (`totals.activeValue`) includes only `open` behavior opportunities.
 
-Activities, Files, Documents, and timeline Notes tabs on opportunity detail are placeholders only in Phase 6.
+Activities, Files, Documents, and timeline Notes tabs on opportunity detail: **Phase 7** Activities tab is implemented; Files/Documents/Notes remain placeholders.
 
 ---
 
@@ -148,7 +175,7 @@ Properties appear in primary navigation (`/w/[workspaceSlug]/properties`). Proje
 
 Media/gallery on property detail is placeholder only — no file upload or image URL storage in Phase 5.
 
-Opportunities section on property detail is implemented in Phase 6. Activities, Files, and Notes tabs remain placeholders.
+Opportunities section on property detail is implemented in Phase 6. **Phase 7:** Activities tab implemented. Files and Notes tabs remain placeholders.
 
 ---
 

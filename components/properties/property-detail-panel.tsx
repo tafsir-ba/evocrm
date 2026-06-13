@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
+import { ActivitiesSection } from "@/components/activities/activities-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -95,6 +96,10 @@ type PropertyDetailPanelProps = {
   canArchive: boolean;
   canReadOpportunities: boolean;
   canCreateOpportunity: boolean;
+  canReadActivities: boolean;
+  canCreateActivity: boolean;
+  canUpdateActivity: boolean;
+  canArchiveActivity: boolean;
 };
 
 function formatPrice(price: number | null, currency: string): string {
@@ -129,6 +134,10 @@ export function PropertyDetailPanel({
   canArchive,
   canReadOpportunities,
   canCreateOpportunity,
+  canReadActivities,
+  canCreateActivity,
+  canUpdateActivity,
+  canArchiveActivity,
 }: PropertyDetailPanelProps) {
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -642,14 +651,15 @@ export function PropertyDetailPanel({
                 key: "acts",
                 label: "Activities",
                 content: (
-                  <div className="px-5 pb-5">
-                    <StateView
-                      variant="empty"
-                      compact
-                      title="No activities yet"
-                      description="Follow-up tasks and calls will appear here in a later phase."
-                    />
-                  </div>
+                  <ActivitiesSection
+                    workspaceSlug={workspaceSlug}
+                    propertyId={propertyId}
+                    canRead={canReadActivities}
+                    canCreate={canCreateActivity}
+                    canUpdate={canUpdateActivity}
+                    canArchive={canArchiveActivity}
+                    compact
+                  />
                 ),
               },
             ]}

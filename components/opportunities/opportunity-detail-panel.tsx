@@ -7,6 +7,7 @@ import { MemberSelector, type MemberSelectorMember } from "@/components/domain/m
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { LostReasonModal } from "@/components/opportunities/lost-reason-modal";
+import { ActivitiesSection } from "@/components/activities/activities-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { StateView } from "@/components/states/state-view";
 import { Avatar, AvatarWithName } from "@/components/ui/avatar";
@@ -81,6 +82,10 @@ type OpportunityDetailPanelProps = {
   opportunityId: string;
   canUpdate: boolean;
   canArchive: boolean;
+  canReadActivities: boolean;
+  canCreateActivity: boolean;
+  canUpdateActivity: boolean;
+  canArchiveActivity: boolean;
 };
 
 export function OpportunityDetailPanel({
@@ -88,6 +93,10 @@ export function OpportunityDetailPanel({
   opportunityId,
   canUpdate,
   canArchive,
+  canReadActivities,
+  canCreateActivity,
+  canUpdateActivity,
+  canArchiveActivity,
 }: OpportunityDetailPanelProps) {
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
   const [stages, setStages] = useState<DictionaryItem[]>([]);
@@ -617,14 +626,15 @@ export function OpportunityDetailPanel({
                 key: "activities",
                 label: "Activities",
                 content: (
-                  <div className="px-5 pb-5">
-                    <StateView
-                      variant="empty"
-                      compact
-                      title="Activities coming soon"
-                      description="Follow-up tasks and calls will appear here in Phase 7."
-                    />
-                  </div>
+                  <ActivitiesSection
+                    workspaceSlug={workspaceSlug}
+                    opportunityId={opportunityId}
+                    canRead={canReadActivities}
+                    canCreate={canCreateActivity}
+                    canUpdate={canUpdateActivity}
+                    canArchive={canArchiveActivity}
+                    compact
+                  />
                 ),
               },
               {

@@ -256,12 +256,23 @@ All opportunity queries use `{ workspaceId, _id }` — never `Opportunity.findBy
 
 ### Activities
 
+**Phase 7:** Model at `/models/activity.ts`. Repository/service at `/server/repositories/activities.ts`, `/server/services/activities.ts`, `/server/services/activity-status.ts`.
+
 ```txt
+{ workspaceId: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, archivedAt: 1 }
 { workspaceId: 1, dueDate: 1 }
 { workspaceId: 1, statusId: 1 }
 { workspaceId: 1, assignedTo: 1 }
 { workspaceId: 1, opportunityId: 1 }
+{ workspaceId: 1, leadId: 1, createdAt: -1 }
+{ workspaceId: 1, propertyId: 1, createdAt: -1 }
+{ workspaceId: 1, assignedTo: 1, dueDate: 1, archivedAt: 1 }
+{ workspaceId: 1, statusId: 1, dueDate: 1, archivedAt: 1 }
 ```
+
+All activity queries use `{ workspaceId, _id }` — never `Activity.findById` without workspace verification. Overdue/upcoming filters exclude completed, cancelled, and archived activities.
 
 ### Documents
 

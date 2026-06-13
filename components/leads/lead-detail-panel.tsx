@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
+import { ActivitiesSection } from "@/components/activities/activities-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
@@ -80,6 +81,10 @@ type LeadDetailPanelProps = {
   canArchive: boolean;
   canReadOpportunities: boolean;
   canCreateOpportunity: boolean;
+  canReadActivities: boolean;
+  canCreateActivity: boolean;
+  canUpdateActivity: boolean;
+  canArchiveActivity: boolean;
 };
 
 export function LeadDetailPanel({
@@ -90,6 +95,10 @@ export function LeadDetailPanel({
   canArchive,
   canReadOpportunities,
   canCreateOpportunity,
+  canReadActivities,
+  canCreateActivity,
+  canUpdateActivity,
+  canArchiveActivity,
 }: LeadDetailPanelProps) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -511,14 +520,15 @@ export function LeadDetailPanel({
                   key: "acts",
                   label: "Activities",
                   content: (
-                    <div className="px-5 pb-5">
-                      <StateView
-                        variant="empty"
-                        compact
-                        title="No activities yet"
-                        description="Follow-up tasks and calls will appear here in a later phase."
-                      />
-                    </div>
+                    <ActivitiesSection
+                      workspaceSlug={workspaceSlug}
+                      leadId={leadId}
+                      canRead={canReadActivities}
+                      canCreate={canCreateActivity}
+                      canUpdate={canUpdateActivity}
+                      canArchive={canArchiveActivity}
+                      compact
+                    />
                   ),
                 },
                 {

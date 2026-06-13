@@ -106,6 +106,24 @@ export async function findDictionaryItemByTypeAndKey(
   return document ? toDictionaryItemRecord(document) : null;
 }
 
+export async function findDictionaryItemByTypeAndBehavior(
+  workspaceId: string,
+  type: DictionaryType,
+  behavior: string,
+): Promise<DictionaryItemRecord | null> {
+  await connectDb();
+  const document = await DictionaryItemModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      type,
+      behavior,
+      isActive: true,
+    }),
+  )
+    .sort({ isDefault: -1, order: 1 })
+    .lean<DictionaryItemDocument>();
+  return document ? toDictionaryItemRecord(document) : null;
+}
+
 export async function findActiveDictionaryItemByTypeAndLabel(
   workspaceId: string,
   type: DictionaryType,
