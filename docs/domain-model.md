@@ -360,6 +360,8 @@ Supply-side record (listing/unit).
 | `updatedAt` | |
 | `archivedAt` | |
 
+**Phase 5:** Mongoose model at `/models/property.ts`. `reference` unique per workspace when set (partial unique index includes archived properties). `statusId` validated as same-workspace `property_status` dictionary item; `typeId` as `property_type`. `projectId` validated as same-workspace non-archived Project. `tags[]` validated as same-workspace tags with `entityTypes` including `property`. `currency` defaults from `workspace.defaultCurrency` when omitted on create. `price` stored as number; formatted for display only in UI. `floor` is `number` in V1. Archive via `DELETE` sets `archivedAt`. Media/gallery is placeholder only — no image URLs stored. Opportunities/Activities/Files/Notes tabs on property detail are placeholders only in Phase 5.
+
 ---
 
 ### Opportunity

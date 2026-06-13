@@ -204,6 +204,8 @@ UI routes: `/w/[workspaceSlug]/leads`, `/w/[workspaceSlug]/leads/[leadId]`. Stat
 
 ### Properties
 
+**Phase 5 — implemented.** Workspace-scoped under `/api/workspaces/[workspaceSlug]/properties`.
+
 ```txt
 GET    /api/workspaces/[workspaceSlug]/properties
 POST   /api/workspaces/[workspaceSlug]/properties
@@ -211,6 +213,21 @@ GET    /api/workspaces/[workspaceSlug]/properties/[propertyId]
 PATCH  /api/workspaces/[workspaceSlug]/properties/[propertyId]
 DELETE /api/workspaces/[workspaceSlug]/properties/[propertyId]  # archive (soft)
 ```
+
+| Method | Permission |
+|--------|------------|
+| GET list/detail | `property:read` |
+| POST create | `property:create` |
+| PATCH update | `property:update` |
+| DELETE archive | `property:archive` |
+
+**GET list** returns paginated `{ data: PropertyListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `typeId`, `projectId`, `assignedTo`, `ownerId`, `tagId`, `city`, `country`, `minPrice`, `maxPrice`, `createdFrom`, `createdTo`, `includeArchived`.
+
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `archivedAt`. Duplicate `reference` per workspace returns `409 CONFLICT` (includes archived properties). `currency` defaults from `workspace.defaultCurrency` when omitted on create.
+
+**DELETE** sets `archivedAt`; does not hard-delete.
+
+UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[propertyId]`. Status/type options from dictionary APIs (`property_status`, `property_type`); tags from tags API with `entityType=property`; projects from projects API (active only). Media/Files/Opportunities/Activities/Notes tabs are placeholders only.
 
 ### Opportunities
 
@@ -354,9 +371,9 @@ DELETE /api/workspaces/[workspaceSlug]/projects/[projectId]  # archive (soft)
 
 **Member validation:** optional `ownerId` and `assignedTo` must refer to active workspace members when provided.
 
-**Future property forms:** may read active projects with `property:create` / `property:update` in Phase 5; Settings management uses `settings:read` / `settings:update`.
+**Future property forms:** Property create/edit forms read active projects via `GET /projects` (`settings:read`). Settings management uses `settings:read` / `settings:update`.
 
-**Project selector foundation:** `/components/domain/project-selector.tsx` receives projects via props for Phase 5 property forms — does not fetch data directly.
+**Project selector foundation:** `/components/domain/project-selector.tsx` receives projects via props for property forms — does not fetch data directly.
 
 ### Workspace bootstrap (Phase 2 — implemented)
 

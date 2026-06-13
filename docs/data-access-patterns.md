@@ -207,12 +207,25 @@ Duplicate phone: service returns warning metadata only; no hard block in V1.
 
 ### Properties
 
+**Phase 5 — implemented** at `/models/property.ts`, `/server/repositories/properties.ts`.
+
 ```txt
-{ workspaceId: 1, reference: 1 }
+{ workspaceId: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, updatedAt: -1 }
+{ workspaceId: 1, archivedAt: 1 }
 { workspaceId: 1, statusId: 1 }
+{ workspaceId: 1, typeId: 1 }
 { workspaceId: 1, projectId: 1 }
 { workspaceId: 1, assignedTo: 1 }
+{ workspaceId: 1, ownerId: 1 }
+{ workspaceId: 1, city: 1 }
+{ workspaceId: 1, country: 1 }
+{ workspaceId: 1, tags: 1 }
+{ workspaceId: 1, reference: 1 }  // partial unique when reference exists (includes archived)
 ```
+
+Duplicate reference: enforced in service + partial unique index on `{ workspaceId, reference }` when reference is set. Archived properties retain reference uniqueness.
 
 ### Opportunities
 

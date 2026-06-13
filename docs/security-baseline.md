@@ -94,6 +94,35 @@ Opportunities, Activities, timeline Notes, and Files tabs on lead detail are pla
 
 ---
 
+## Phase 5 Properties (implemented)
+
+Property APIs enforce workspace isolation and property permissions:
+
+```txt
+property:read    — list/view properties
+property:create  — create properties
+property:update  — edit properties, status/type/project/tags/assignment
+property:archive — archive properties (DELETE)
+```
+
+`workspaceId`, `createdBy`, and `archivedAt` are server-controlled. Client body must not set them.
+
+Duplicate `reference` per workspace returns `409 CONFLICT` (includes archived properties).
+
+`statusId` must reference same-workspace active `property_status` dictionary item (existing inactive status preserved on update). `typeId` must reference `property_type`. `projectId` must reference same-workspace non-archived Project. Tags must belong to workspace and include `property` in `entityTypes`.
+
+`currency` defaults from `workspace.defaultCurrency` when omitted on create. `price` stored as number.
+
+Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived properties excluded from default list.
+
+Properties appear in primary navigation (`/w/[workspaceSlug]/properties`). Projects remain Settings-managed only — not primary nav.
+
+Media/gallery on property detail is placeholder only — no file upload or image URL storage in Phase 5.
+
+Opportunities, Activities, Files, and Notes tabs on property detail are placeholders only in Phase 5.
+
+---
+
 ## Authentication
 
 - Use **Auth.js / NextAuth v5** with **Google provider** for V1.

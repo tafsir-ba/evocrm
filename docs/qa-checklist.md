@@ -302,6 +302,32 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 5 Properties Checklist
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Property model at `/models/property.ts` with required fields and indexes
+- [ ] Property APIs workspace-scoped under `/api/workspaces/[workspaceSlug]/properties`
+- [ ] `property:read` / `property:create` / `property:update` / `property:archive` enforced server-side
+- [ ] `workspaceId`, `createdBy`, `archivedAt` server-controlled
+- [ ] Duplicate reference blocked per workspace (includes archived)
+- [ ] `currency` defaults from workspace when missing on create
+- [ ] `statusId` validated as same-workspace `property_status`; `typeId` as `property_type`
+- [ ] `projectId` validated as same-workspace non-archived Project
+- [ ] Tags validated as same-workspace with `entityTypes` including `property`
+- [ ] Archive via `DELETE` sets `archivedAt`; no hard delete
+- [ ] Archived properties excluded from default list; `includeArchived=true` supported
+- [ ] Property list UI at `/w/[workspaceSlug]/properties` with search, filters, pagination, create drawer
+- [ ] Property detail UI at `/w/[workspaceSlug]/properties/[propertyId]` with edit drawer and placeholder tabs
+- [ ] Status/type/project/tag options from backend APIs (not hardcoded canonical arrays)
+- [ ] Missing image/media placeholder on list and detail
+- [ ] Projects do not appear in primary navigation
+- [ ] Opportunities/Activities/Files/Media/Notes tabs are placeholders only
+- [ ] Unit tests for service, repository, API permissions, validation, workspace isolation
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

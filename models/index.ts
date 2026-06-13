@@ -7,3 +7,4 @@ export { DictionaryItemModel, type DictionaryItemDocument } from "./dictionary-i
 export { TagModel, type TagDocument } from "./tag";
 export { ProjectModel, type ProjectDocument } from "./project";
 export { LeadModel, type LeadDocument } from "./lead";
+export { PropertyModel, type PropertyDocument } from "./property";
