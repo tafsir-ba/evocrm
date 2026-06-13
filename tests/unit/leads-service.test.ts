@@ -215,6 +215,35 @@ describe("lead service", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
+  it("passes assignedTo to createLead when member is active", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "m2",
+      userId: "user-2",
+      workspaceId: "ws-1",
+      roleId: "role-2",
+      status: "active",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(createLead).mockResolvedValue({
+      ...baseLead,
+      assignedTo: "user-2",
+    });
+
+    await createLeadForWorkspace("ws-1", "user-1", {
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "status-1",
+      assignedTo: "user-2",
+    });
+
+    expect(createLead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignedTo: "user-2",
+      }),
+    );
+  });
+
   it("derives fullName when name changes on update", async () => {
     vi.mocked(findLeadById).mockResolvedValue(baseLead);
     vi.mocked(updateLead).mockResolvedValue({

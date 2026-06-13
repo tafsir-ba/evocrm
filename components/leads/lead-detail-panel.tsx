@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
@@ -67,6 +68,7 @@ type LeadFormState = {
   preferredAreas: string;
   notes: string;
   tagIds: string[];
+  assignedTo: string;
 };
 
 type LeadDetailPanelProps = {
@@ -90,6 +92,7 @@ export function LeadDetailPanel({
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
+  const [members, setMembers] = useState<MemberSelectorMember[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<LeadFormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -130,15 +133,17 @@ export function LeadDetailPanel({
 
   const loadOptions = useCallback(async () => {
     try {
-      const [statusRes, sourceRes, tagsRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes, membersRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
+        fetch(`${apiBase}/members`),
       ]);
-      const [statusPayload, sourcePayload, tagsPayload] = await Promise.all([
+      const [statusPayload, sourcePayload, tagsPayload, membersPayload] = await Promise.all([
         statusRes.json(),
         sourceRes.json(),
         tagsRes.json(),
+        membersRes.json(),
       ]);
       if (statusRes.ok) {
         setStatuses(statusPayload.data.items as DictionaryItem[]);
@@ -148,6 +153,9 @@ export function LeadDetailPanel({
       }
       if (tagsRes.ok) {
         setTags(tagsPayload.data.tags as TagSelectorTag[]);
+      }
+      if (membersRes.ok) {
+        setMembers(membersPayload.data.members as MemberSelectorMember[]);
       }
     } catch {
       // Non-blocking.
@@ -179,6 +187,7 @@ export function LeadDetailPanel({
       preferredAreas: lead.preferredAreas.join(", "),
       notes: lead.notes ?? "",
       tagIds: lead.tags,
+      assignedTo: lead.assignedUser?.id ?? "",
     });
     setDrawerOpen(true);
   }
@@ -223,6 +232,7 @@ export function LeadDetailPanel({
           : [],
         notes: form.notes.trim() || null,
         tags: form.tagIds,
+        assignedTo: form.assignedTo || null,
       };
 
       const response = await fetch(`${apiBase}/leads/${leadId}`, {
@@ -648,6 +658,20 @@ export function LeadDetailPanel({
                   ))}
                 </Select>
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-assignedTo">Assigned to</Label>
+              <MemberSelector
+                members={members}
+                selectedUserId={form.assignedTo || null}
+                onChange={(userId) =>
+                  setForm((current) =>
+                    current ? { ...current, assignedTo: userId ?? "" } : current,
+                  )
+                }
+                placeholder="Unassigned"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

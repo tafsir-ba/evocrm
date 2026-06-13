@@ -295,6 +295,7 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] Status/source/tag options from backend dictionaries/tags APIs (not hardcoded canonical arrays)
 - [ ] No Contacts module; Leads remains primary people module
 - [ ] Opportunities/Activities/Files/timeline Notes tabs are placeholders only
+- [ ] Lead create/edit drawers include assigned-to selector backed by `GET /members`
 - [ ] Unit tests for service, repository, API permissions, validation, workspace isolation
 
 **Rating:** Fully aligned / Partially aligned / Missing / deviating

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
@@ -51,6 +52,7 @@ type LeadFormState = {
   preferredAreas: string;
   notes: string;
   tagIds: string[];
+  assignedTo: string;
 };
 
 const emptyForm: LeadFormState = {
@@ -67,6 +69,7 @@ const emptyForm: LeadFormState = {
   preferredAreas: "",
   notes: "",
   tagIds: [],
+  assignedTo: "",
 };
 
 type LeadsPanelProps = {
@@ -94,6 +97,7 @@ export function LeadsPanel({
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
+  const [members, setMembers] = useState<MemberSelectorMember[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<LeadFormState>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,16 +109,18 @@ export function LeadsPanel({
 
   const loadOptions = useCallback(async () => {
     try {
-      const [statusRes, sourceRes, tagsRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes, membersRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
+        fetch(`${apiBase}/members`),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload] = await Promise.all([
+      const [statusPayload, sourcePayload, tagsPayload, membersPayload] = await Promise.all([
         statusRes.json(),
         sourceRes.json(),
         tagsRes.json(),
+        membersRes.json(),
       ]);
 
       if (statusRes.ok) {
@@ -125,6 +131,9 @@ export function LeadsPanel({
       }
       if (tagsRes.ok) {
         setTags(tagsPayload.data.tags as TagSelectorTag[]);
+      }
+      if (membersRes.ok) {
+        setMembers(membersPayload.data.members as MemberSelectorMember[]);
       }
     } catch {
       // Options are non-blocking for list view.
@@ -226,6 +235,7 @@ export function LeadsPanel({
           : undefined,
         notes: form.notes.trim() || undefined,
         tags: form.tagIds.length > 0 ? form.tagIds : undefined,
+        assignedTo: form.assignedTo || undefined,
       };
 
       const response = await fetch(`${apiBase}/leads`, {
@@ -616,6 +626,21 @@ export function LeadsPanel({
                 ))}
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="assignedTo">Assigned to</Label>
+            <MemberSelector
+              members={members}
+              selectedUserId={form.assignedTo || null}
+              onChange={(userId) =>
+                setForm((current) => ({
+                  ...current,
+                  assignedTo: userId ?? "",
+                }))
+              }
+              placeholder="Unassigned"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

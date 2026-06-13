@@ -51,6 +51,18 @@ export async function findActiveMembershipsForUser(
   return documents.map(toMembershipRecord);
 }
 
+export async function findActiveMembershipsForWorkspace(
+  workspaceId: string,
+): Promise<MembershipRecord[]> {
+  await connectDb();
+  const documents = await MembershipModel.find({
+    workspaceId,
+    status: "active",
+  }).lean<MembershipDocument[]>();
+
+  return documents.map(toMembershipRecord);
+}
+
 export async function createMembership(input: {
   userId: string;
   workspaceId: string;

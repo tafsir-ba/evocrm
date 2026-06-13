@@ -323,7 +323,11 @@ GET    /api/workspaces/[workspaceSlug]/members
 POST   /api/workspaces/[workspaceSlug]/members/invite
 PATCH  /api/workspaces/[workspaceSlug]/members/[membershipId]
 POST   /api/workspaces/[workspaceSlug]/members/[membershipId]/remove
+```
 
+**Phase 4 — `GET /members` implemented** for lead assignment pickers. Returns active workspace members `{ userId, name, email }`. Requires `settings:read`. Invite/remove/management routes remain future phase.
+
+```txt
 GET    /api/workspaces/[workspaceSlug]/roles
 PATCH  /api/workspaces/[workspaceSlug]/roles/[roleId]
 

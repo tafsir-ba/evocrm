@@ -88,6 +88,8 @@ Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived leads exclu
 
 Leads appear in primary navigation (`/w/[workspaceSlug]/leads`). No separate Contacts module.
 
+`GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) lists active workspace members for lead assignment pickers in create/edit UI.
+
 Opportunities, Activities, timeline Notes, and Files tabs on lead detail are placeholders only in Phase 4.
 
 ---
