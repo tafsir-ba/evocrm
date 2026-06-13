@@ -229,13 +229,30 @@ Duplicate reference: enforced in service + partial unique index on `{ workspaceI
 
 ### Opportunities
 
+**Phase 6 — implemented** at `/models/opportunity.ts`, `/server/repositories/opportunities.ts`, `/server/services/opportunities.ts`, `/server/services/pipeline.ts`.
+
 ```txt
+{ workspaceId: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, updatedAt: -1 }
+{ workspaceId: 1, archivedAt: 1 }
 { workspaceId: 1, statusId: 1 }
 { workspaceId: 1, leadId: 1 }
 { workspaceId: 1, propertyId: 1 }
 { workspaceId: 1, assignedTo: 1 }
+{ workspaceId: 1, ownerId: 1 }
 { workspaceId: 1, expectedCloseDate: 1 }
+{ workspaceId: 1, closedAt: 1 }
+{ workspaceId: 1, wonAt: 1 }
+{ workspaceId: 1, lostAt: 1 }
+{ workspaceId: 1, tags: 1 }
+{ workspaceId: 1, statusId: 1, archivedAt: 1 }
+{ workspaceId: 1, leadId: 1, archivedAt: 1 }
+{ workspaceId: 1, propertyId: 1, archivedAt: 1 }
+{ workspaceId: 1, assignedTo: 1, statusId: 1 }
 ```
+
+All opportunity queries use `{ workspaceId, _id }` — never `Opportunity.findById` without workspace verification. Pipeline grouping is backend-calculated via `GET /pipeline`; active pipeline value includes only `open` behavior opportunities.
 
 ### Activities
 

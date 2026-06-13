@@ -90,7 +90,36 @@ Leads appear in primary navigation (`/w/[workspaceSlug]/leads`). No separate Con
 
 `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) lists active workspace members for lead assignment pickers in create/edit UI.
 
-Opportunities, Activities, timeline Notes, and Files tabs on lead detail are placeholders only in Phase 4.
+Opportunities section on lead detail is implemented in Phase 6. Activities, timeline Notes, and Files tabs remain placeholders.
+
+---
+
+## Phase 6 Opportunities / Pipeline (implemented)
+
+Opportunity APIs enforce workspace isolation and opportunity permissions:
+
+```txt
+opportunity:read    — list/view opportunities, pipeline, entity detail sections
+opportunity:create  — create opportunities
+opportunity:update  — edit opportunities, stage moves (PATCH …/stage)
+opportunity:archive — archive opportunities (DELETE)
+```
+
+`workspaceId`, `createdBy`, `archivedAt`, `closedAt`, `wonAt`, and `lostAt` are server-controlled. Client body must not set them.
+
+`leadId` and `propertyId` must reference same-workspace non-archived Lead/Property. `statusId` must reference same-workspace `opportunity_status`. Won/lost behavior uses `DictionaryItem.behavior` only — never label text. `terminal_lost` requires `lostReasonId` (same-workspace `lost_reason`). Moving to `open` clears terminal fields.
+
+`probability` defaults from status `defaultProbability` on create and stage change. `currency` defaults: request → property.currency → workspace.defaultCurrency.
+
+Tags must belong to workspace and include `opportunity` in `entityTypes`.
+
+Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived opportunities excluded from default list and pipeline.
+
+Pipeline is primary nav (`/w/[workspaceSlug]/pipeline`). Opportunity detail at `/w/[workspaceSlug]/opportunities/[opportunityId]`. **Opportunities is not primary nav.**
+
+`GET /pipeline` returns backend-driven columns from active `opportunity_status` dictionary items. Active pipeline value (`totals.activeValue`) includes only `open` behavior opportunities.
+
+Activities, Files, Documents, and timeline Notes tabs on opportunity detail are placeholders only in Phase 6.
 
 ---
 
@@ -119,7 +148,7 @@ Properties appear in primary navigation (`/w/[workspaceSlug]/properties`). Proje
 
 Media/gallery on property detail is placeholder only — no file upload or image URL storage in Phase 5.
 
-Opportunities, Activities, Files, and Notes tabs on property detail are placeholders only in Phase 5.
+Opportunities section on property detail is implemented in Phase 6. Activities, Files, and Notes tabs remain placeholders.
 
 ---
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
@@ -74,15 +75,21 @@ type LeadFormState = {
 type LeadDetailPanelProps = {
   workspaceSlug: string;
   leadId: string;
+  defaultCurrency: string;
   canUpdate: boolean;
   canArchive: boolean;
+  canReadOpportunities: boolean;
+  canCreateOpportunity: boolean;
 };
 
 export function LeadDetailPanel({
   workspaceSlug,
   leadId,
+  defaultCurrency,
   canUpdate,
   canArchive,
+  canReadOpportunities,
+  canCreateOpportunity,
 }: LeadDetailPanelProps) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -491,14 +498,13 @@ export function LeadDetailPanel({
                   key: "opps",
                   label: "Opportunities",
                   content: (
-                    <div className="px-5 pb-5">
-                      <StateView
-                        variant="empty"
-                        compact
-                        title="No opportunities linked"
-                        description="When this lead is qualified for a property, an opportunity will appear here."
-                      />
-                    </div>
+                    <OpportunitiesSection
+                      workspaceSlug={workspaceSlug}
+                      defaultCurrency={defaultCurrency}
+                      leadId={leadId}
+                      canRead={canReadOpportunities}
+                      canCreate={canCreateOpportunity}
+                    />
                   ),
                 },
                 {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -92,6 +93,8 @@ type PropertyDetailPanelProps = {
   defaultCurrency: string;
   canUpdate: boolean;
   canArchive: boolean;
+  canReadOpportunities: boolean;
+  canCreateOpportunity: boolean;
 };
 
 function formatPrice(price: number | null, currency: string): string {
@@ -124,6 +127,8 @@ export function PropertyDetailPanel({
   defaultCurrency,
   canUpdate,
   canArchive,
+  canReadOpportunities,
+  canCreateOpportunity,
 }: PropertyDetailPanelProps) {
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -624,14 +629,13 @@ export function PropertyDetailPanel({
                 key: "opps",
                 label: "Opportunities",
                 content: (
-                  <div className="px-5 pb-5">
-                    <StateView
-                      variant="empty"
-                      compact
-                      title="No opportunities linked"
-                      description="When a lead is matched to this property, opportunities will appear here in Phase 6."
-                    />
-                  </div>
+                  <OpportunitiesSection
+                    workspaceSlug={workspaceSlug}
+                    defaultCurrency={defaultCurrency}
+                    propertyId={propertyId}
+                    canRead={canReadOpportunities}
+                    canCreate={canCreateOpportunity}
+                  />
                 ),
               },
               {

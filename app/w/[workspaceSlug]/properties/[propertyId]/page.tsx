@@ -34,6 +34,8 @@ export default async function PropertyDetailPage({ params }: { params: Params })
         defaultCurrency={access.context.workspace.defaultCurrency}
         canUpdate={hasPermission(permissions, "property:update")}
         canArchive={hasPermission(permissions, "property:archive")}
+        canReadOpportunities={hasPermission(permissions, "opportunity:read")}
+        canCreateOpportunity={hasPermission(permissions, "opportunity:create")}
       />
     </PageContainer>
   );

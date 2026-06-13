@@ -207,6 +207,7 @@ Before requesting Codex review:
 | Phase 3.5 complete | Projects CRUD (Settings-managed grouping) |
 | Phase 4 complete | Leads CRUD (demand capture, dictionary-backed status/source) |
 | Phase 5 complete | Properties CRUD (supply capture, dictionary-backed status/type, project linking) |
+| Phase 6 complete | Opportunities CRUD + Pipeline (lead/property linking, behavior-based stages, backend pipeline totals) |
 | MVP feature complete | Phases 1–10 on dev |
 | Beta | Phase 13 on main |
 | V1 GA | Beta stable + billing (Phase 11) as scoped |

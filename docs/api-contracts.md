@@ -231,14 +231,36 @@ UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[prop
 
 ### Opportunities
 
+**Phase 6 — implemented.** Workspace-scoped under `/api/workspaces/[workspaceSlug]/opportunities`.
+
 ```txt
 GET    /api/workspaces/[workspaceSlug]/opportunities
 POST   /api/workspaces/[workspaceSlug]/opportunities
 GET    /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]
 PATCH  /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]
 DELETE /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]  # archive (soft)
-PATCH  /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]/status
+PATCH  /api/workspaces/[workspaceSlug]/opportunities/[opportunityId]/stage
+GET    /api/workspaces/[workspaceSlug]/pipeline
 ```
+
+| Method | Permission |
+|--------|------------|
+| GET list/detail/pipeline | `opportunity:read` |
+| POST create | `opportunity:create` |
+| PATCH update/stage | `opportunity:update` |
+| DELETE archive | `opportunity:archive` |
+
+**GET list** returns paginated `{ data: OpportunityListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `leadId`, `propertyId`, `assignedTo`, `ownerId`, `tagId`, `behavior` (`open` \| `terminal_won` \| `terminal_lost`), `expectedCloseFrom`, `expectedCloseTo`, `createdFrom`, `createdTo`, `closedFrom`, `closedTo`, `includeArchived`.
+
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `archivedAt`, `closedAt`, `wonAt`, `lostAt`. `leadId` and `propertyId` must be same-workspace non-archived records. `statusId` must be same-workspace `opportunity_status`. `lostReasonId` required when status behavior is `terminal_lost`. `currency` defaults: request → property.currency → workspace.defaultCurrency. `probability` defaults from status `defaultProbability` and updates on stage change.
+
+**PATCH …/stage** is the preferred pipeline movement endpoint. Requires `lostReasonId` when target status behavior is `terminal_lost`.
+
+**DELETE** sets `archivedAt`; does not hard-delete.
+
+**GET /pipeline** returns backend-driven columns from active `opportunity_status` dictionary items (ordered), grouped opportunities, per-stage `count`/`valueTotal`, and `totals.activeValue` (open behavior only — excludes won/lost).
+
+UI routes: `/w/[workspaceSlug]/pipeline`, `/w/[workspaceSlug]/opportunities/[opportunityId]`. Opportunities appear on Lead/Property detail tabs; Opportunities is **not** a primary nav item. Activities/Files/Documents/Notes timeline tabs remain placeholders.
 
 ### Activities
 

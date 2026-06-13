@@ -31,8 +31,11 @@ export default async function LeadDetailPage({ params }: { params: Params }) {
       <LeadDetailPanel
         workspaceSlug={workspaceSlug}
         leadId={leadId}
+        defaultCurrency={access.context.workspace.defaultCurrency}
         canUpdate={hasPermission(permissions, "lead:update")}
         canArchive={hasPermission(permissions, "lead:archive")}
+        canReadOpportunities={hasPermission(permissions, "opportunity:read")}
+        canCreateOpportunity={hasPermission(permissions, "opportunity:create")}
       />
     </PageContainer>
   );

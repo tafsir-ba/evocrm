@@ -394,6 +394,8 @@ Connects a Lead to a Property through the sales pipeline.
 
 Shown in Pipeline nav and entity detail pages. No separate Opportunities primary nav in V1.
 
+**Phase 6:** Mongoose model at `/models/opportunity.ts`. `leadId` and `propertyId` validated as same-workspace non-archived Lead/Property. `statusId` validated as same-workspace `opportunity_status`; won/lost behavior uses `DictionaryItem.behavior` (`open`, `terminal_won`, `terminal_lost`), never label text. `terminal_won` sets `wonAt`/`closedAt`, clears lost fields, sets `probability` to status default (100). `terminal_lost` requires `lostReasonId` (same-workspace `lost_reason`), sets `lostAt`/`closedAt`, clears won fields, sets `probability` to 0. Moving back to `open` clears terminal fields. `probability` defaults from status `defaultProbability` on create and stage change. `currency` defaults: request → property.currency → workspace.defaultCurrency. `tags[]` validated as same-workspace tags with `entityTypes` including `opportunity`. Archive via `DELETE` sets `archivedAt`. Pipeline columns and totals are backend-calculated (`GET /pipeline`); active pipeline value includes only `open` behavior opportunities.
+
 ---
 
 ### Activity
