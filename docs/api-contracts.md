@@ -177,6 +177,8 @@ Endpoints below are the V1 contract. Implementation happens in later phases.
 
 ### Leads
 
+**Phase 4 — implemented.** Workspace-scoped under `/api/workspaces/[workspaceSlug]/leads`.
+
 ```txt
 GET    /api/workspaces/[workspaceSlug]/leads
 POST   /api/workspaces/[workspaceSlug]/leads
@@ -184,6 +186,21 @@ GET    /api/workspaces/[workspaceSlug]/leads/[leadId]
 PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]
 DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
 ```
+
+| Method | Permission |
+|--------|------------|
+| GET list/detail | `lead:read` |
+| POST create | `lead:create` |
+| PATCH update | `lead:update` |
+| DELETE archive | `lead:archive` |
+
+**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `createdFrom`, `createdTo`, `includeArchived`.
+
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
+
+**DELETE** sets `archivedAt`; does not hard-delete.
+
+UI routes: `/w/[workspaceSlug]/leads`, `/w/[workspaceSlug]/leads/[leadId]`. Status/source options from dictionary APIs; tags from tags API with `entityType=lead`.
 
 ### Properties
 

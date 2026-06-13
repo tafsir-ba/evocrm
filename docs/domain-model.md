@@ -323,6 +323,8 @@ Demand-side record (buyer/inquirer).
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
 
+**Phase 4:** Mongoose model at `/models/lead.ts`. `fullName` derived server-side from `firstName` + `lastName`. `emailNormalized` unique per workspace for non-archived leads with email (partial unique index + service check). `phoneNormalized` stored for search; duplicate phone warns but does not block. `statusId` validated as same-workspace `lead_status` dictionary item; `sourceId` as `lead_source`. `tags[]` validated as same-workspace tags with `entityTypes` including `lead`. Archive via `DELETE` sets `archivedAt`. `Lead.notes` is a static internal field — not the future Activity type Note timeline.
+
 ---
 
 ### Property

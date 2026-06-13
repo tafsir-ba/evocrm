@@ -126,7 +126,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 | 2 | Auth session, workspace resolution, permission checks, membership status |
 | 3 | Dictionary seeding, behavior field on status items, tag archive, settings UI, API permission gates |
 | 3.5 | Project CRUD, workspace isolation, archive via DELETE (`tests/unit/projects-{service,api,repository}.test.ts`, `project-selector.test.tsx`, `projects-panel.test.tsx`) |
-| 4 | Lead CRUD, workspace isolation, archive via DELETE |
+| 4 | Lead CRUD, workspace isolation, archive via DELETE (`tests/unit/leads-{service,api,repository,validation}.test.ts`) |
 | 5 | Property CRUD, projectId validation |
 | 6 | Opportunity CRUD, pipeline status transitions via behavior |
 | 7 | Activity CRUD, due date, complete/cancel via behavior |

@@ -67,6 +67,31 @@ Optional `ownerId` and `assignedTo` are validated against active workspace membe
 
 ---
 
+## Phase 4 Leads (implemented)
+
+Lead APIs enforce workspace isolation and lead permissions:
+
+```txt
+lead:read    — list/view leads
+lead:create  — create leads
+lead:update  — edit leads, status/source/tags/assignment/notes
+lead:archive — archive leads (DELETE)
+```
+
+`workspaceId`, `createdBy`, `fullName`, `emailNormalized`, and `phoneNormalized` are server-controlled. Client body must not set them.
+
+Duplicate active email per workspace returns `409 CONFLICT`. Duplicate phone returns non-blocking `warnings: ["duplicate_phone"]` on create/update.
+
+`statusId` must reference same-workspace active `lead_status` dictionary item (existing inactive status preserved on update). `sourceId` must reference `lead_source`. Tags must belong to workspace and include `lead` in `entityTypes`.
+
+Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived leads excluded from default list.
+
+Leads appear in primary navigation (`/w/[workspaceSlug]/leads`). No separate Contacts module.
+
+Opportunities, Activities, timeline Notes, and Files tabs on lead detail are placeholders only in Phase 4.
+
+---
+
 ## Authentication
 
 - Use **Auth.js / NextAuth v5** with **Google provider** for V1.

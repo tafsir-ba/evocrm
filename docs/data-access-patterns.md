@@ -184,12 +184,26 @@ Recommended MongoDB indexes:
 
 ### Leads
 
+**Phase 4 — implemented** at `/models/lead.ts`, `/server/repositories/leads.ts`.
+
 ```txt
-{ workspaceId: 1, emailNormalized: 1 }
+{ workspaceId: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, updatedAt: -1 }
+{ workspaceId: 1, archivedAt: 1 }
 { workspaceId: 1, statusId: 1 }
+{ workspaceId: 1, sourceId: 1 }
 { workspaceId: 1, assignedTo: 1 }
-{ workspaceId: 1, fullName: "text", email: "text" }  // if text search
+{ workspaceId: 1, ownerId: 1 }
+{ workspaceId: 1, phoneNormalized: 1 }
+{ workspaceId: 1, fullName: 1 }
+{ workspaceId: 1, tags: 1 }
+{ workspaceId: 1, emailNormalized: 1 }  // partial unique when emailNormalized exists and archivedAt is null
 ```
+
+Duplicate email: enforced in service + partial unique index on `{ workspaceId, emailNormalized }` for non-archived leads. Archived leads do not block re-creating an active lead with the same email.
+
+Duplicate phone: service returns warning metadata only; no hard block in V1.
 
 ### Properties
 

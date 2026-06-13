@@ -277,6 +277,30 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 4 Leads Checklist
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Lead model at `/models/lead.ts` with required fields and indexes
+- [ ] Lead APIs workspace-scoped under `/api/workspaces/[workspaceSlug]/leads`
+- [ ] `lead:read` / `lead:create` / `lead:update` / `lead:archive` enforced server-side
+- [ ] `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized` server-controlled
+- [ ] Duplicate active email blocked per workspace; archived email does not block re-create
+- [ ] Duplicate phone warns via response metadata; does not block
+- [ ] `statusId` validated as same-workspace `lead_status`; `sourceId` as `lead_source`
+- [ ] Tags validated as same-workspace with `entityTypes` including `lead`
+- [ ] Archive via `DELETE` sets `archivedAt`; no hard delete
+- [ ] Archived leads excluded from default list; `includeArchived=true` supported
+- [ ] Lead list UI at `/w/[workspaceSlug]/leads` with search, filters, pagination, create drawer
+- [ ] Lead detail UI at `/w/[workspaceSlug]/leads/[leadId]` with edit drawer and placeholder tabs
+- [ ] Status/source/tag options from backend dictionaries/tags APIs (not hardcoded canonical arrays)
+- [ ] No Contacts module; Leads remains primary people module
+- [ ] Opportunities/Activities/Files/timeline Notes tabs are placeholders only
+- [ ] Unit tests for service, repository, API permissions, validation, workspace isolation
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.
