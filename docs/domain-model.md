@@ -426,7 +426,7 @@ Follow-up action (call, visit, task, email, etc.).
 
 At least one of `opportunityId`, `leadId`, or `propertyId` should be set. All links must be workspace-consistent.
 
-**Phase 7:** Mongoose model at `/models/activity.ts`. When `opportunityId` is provided, `leadId` and `propertyId` are derived from the opportunity. `typeId`/`statusId` validated against same-workspace dictionary items. Status behavior drives `completedAt`/`cancelledAt`. Archive via `DELETE` sets `archivedAt`. `assignedTo` defaults to current user on create when omitted. Overdue/upcoming list views use backend filters with workspace UTC timestamps for due-date comparison (display formatting may use `Workspace.timezone` in UI). Activity type `Note` is the timeline note mechanism — no separate Notes module.
+**Phase 7:** Mongoose model at `/models/activity.ts`. When `opportunityId` is provided, `leadId` and `propertyId` are derived from the opportunity. `typeId`/`statusId` validated against same-workspace dictionary items. Status behavior drives `completedAt`/`cancelledAt`. Archive via `DELETE` sets `archivedAt`. `assignedTo` defaults to current user on create when omitted. Activity UI formats and interprets due/next-action datetime inputs using `Workspace.timezone` (display via `Intl.DateTimeFormat` with `timeZone`; form inputs round-trip in workspace timezone before saving UTC ISO). Overdue/upcoming list filters use server UTC instants against pending statuses. Activity type `Note` is the timeline note mechanism — no separate Notes module.
 
 ---
 

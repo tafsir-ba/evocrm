@@ -31,6 +31,7 @@ export default async function OpportunityDetailPage({ params }: { params: Params
       <OpportunityDetailPanel
         workspaceSlug={workspaceSlug}
         opportunityId={opportunityId}
+        workspaceTimezone={access.context.workspace.timezone}
         canUpdate={hasPermission(permissions, "opportunity:update")}
         canArchive={hasPermission(permissions, "opportunity:archive")}
         canReadActivities={hasPermission(permissions, "activity:read")}

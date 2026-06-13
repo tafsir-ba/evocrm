@@ -27,9 +27,11 @@ export default async function ActivitiesPage({ params }: { params: Params }) {
     <PageContainer>
       <ActivitiesPanel
         workspaceSlug={workspaceSlug}
+        workspaceTimezone={access.context.workspace.timezone}
         canCreate={hasPermission(permissions, "activity:create")}
         canUpdate={hasPermission(permissions, "activity:update")}
         canArchive={hasPermission(permissions, "activity:archive")}
+        allowGlobalCreate={false}
       />
     </PageContainer>
   );

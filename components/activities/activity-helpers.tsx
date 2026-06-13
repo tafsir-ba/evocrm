@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { formatDateTimeInWorkspaceTimezone } from "@/lib/workspace-datetime";
 import {
   IconCalendar,
   IconCheck,
@@ -28,23 +29,11 @@ export function activityTypeIcon(key: string | undefined, size = 14): ReactNode 
   }
 }
 
-export function formatActivityDateTime(value: string | Date | null | undefined): string {
-  if (!value) {
-    return "—";
-  }
-
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+export function formatActivityDateTime(
+  value: string | Date | null | undefined,
+  workspaceTimezone?: string,
+): string {
+  return formatDateTimeInWorkspaceTimezone(value, workspaceTimezone);
 }
 
 export function formatRelatedSummary(activity: {

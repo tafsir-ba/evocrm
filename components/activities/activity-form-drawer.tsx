@@ -6,6 +6,10 @@ import { MemberSelector, type MemberSelectorMember } from "@/components/domain/m
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import {
+  fromDatetimeLocalInWorkspaceTimezone,
+  toDatetimeLocalInWorkspaceTimezone,
+} from "@/lib/workspace-datetime";
 
 type DictionaryItem = {
   id: string;
@@ -26,6 +30,7 @@ type ActivityFormDrawerProps = {
   open: boolean;
   onClose: () => void;
   workspaceSlug: string;
+  workspaceTimezone: string;
   context?: ActivityFormContext;
   activityId?: string;
   onSaved: () => void;
@@ -53,24 +58,11 @@ const emptyForm: FormState = {
   outcome: "",
 };
 
-function toDatetimeLocalValue(value: string | null | undefined): string {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 export function ActivityFormDrawer({
   open,
   onClose,
   workspaceSlug,
+  workspaceTimezone,
   context,
   activityId,
   onSaved,
@@ -186,8 +178,11 @@ export function ActivityFormDrawer({
           statusId: activity.statusId,
           title: activity.title,
           description: activity.description ?? "",
-          dueDate: toDatetimeLocalValue(activity.dueDate),
-          nextActionDate: toDatetimeLocalValue(activity.nextActionDate),
+          dueDate: toDatetimeLocalInWorkspaceTimezone(activity.dueDate, workspaceTimezone),
+          nextActionDate: toDatetimeLocalInWorkspaceTimezone(
+            activity.nextActionDate,
+            workspaceTimezone,
+          ),
           assignedTo: activity.assignedTo ?? "",
           outcome: activity.outcome ?? "",
         });
@@ -199,7 +194,7 @@ export function ActivityFormDrawer({
     }
 
     void loadActivity();
-  }, [activityId, apiBase, defaultStatusId, defaultTypeId, open]);
+  }, [activityId, apiBase, defaultStatusId, defaultTypeId, open, workspaceTimezone]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -212,10 +207,11 @@ export function ActivityFormDrawer({
         statusId: form.statusId,
         title: form.title,
         description: form.description.trim() || undefined,
-        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
-        nextActionDate: form.nextActionDate
-          ? new Date(form.nextActionDate).toISOString()
-          : undefined,
+        dueDate: fromDatetimeLocalInWorkspaceTimezone(form.dueDate, workspaceTimezone),
+        nextActionDate: fromDatetimeLocalInWorkspaceTimezone(
+          form.nextActionDate,
+          workspaceTimezone,
+        ),
         assignedTo: form.assignedTo || undefined,
         outcome: form.outcome.trim() || undefined,
       };
@@ -264,12 +260,17 @@ export function ActivityFormDrawer({
         <p className="text-[13px] text-[var(--color-ink-muted)]">Loading…</p>
       ) : (
         <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-          {!isEdit && !context?.leadId && !context?.propertyId && !context?.opportunityId && (
+          {!isEdit && !hasLinkContext && (
             <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
-              Create activities from a Lead, Property, or Opportunity detail page to link
-              them automatically. Global create without a linked record is not supported in V1.
+              Open this form from a Lead, Property, or Opportunity detail page to link the
+              activity automatically.
             </p>
           )}
+
+          <p className="text-[12px] text-[var(--color-ink-muted)]">
+            Due dates use workspace timezone ({workspaceTimezone}). Date/time inputs are
+            interpreted in that timezone before saving.
+          </p>
 
           <div>
             <Label htmlFor="activity-type" required>

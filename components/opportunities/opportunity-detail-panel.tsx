@@ -80,6 +80,7 @@ type OpportunityDetail = {
 type OpportunityDetailPanelProps = {
   workspaceSlug: string;
   opportunityId: string;
+  workspaceTimezone: string;
   canUpdate: boolean;
   canArchive: boolean;
   canReadActivities: boolean;
@@ -91,6 +92,7 @@ type OpportunityDetailPanelProps = {
 export function OpportunityDetailPanel({
   workspaceSlug,
   opportunityId,
+  workspaceTimezone,
   canUpdate,
   canArchive,
   canReadActivities,
@@ -628,6 +630,7 @@ export function OpportunityDetailPanel({
                 content: (
                   <ActivitiesSection
                     workspaceSlug={workspaceSlug}
+                    workspaceTimezone={workspaceTimezone}
                     opportunityId={opportunityId}
                     canRead={canReadActivities}
                     canCreate={canCreateActivity}

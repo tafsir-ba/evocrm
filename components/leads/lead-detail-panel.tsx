@@ -77,6 +77,7 @@ type LeadDetailPanelProps = {
   workspaceSlug: string;
   leadId: string;
   defaultCurrency: string;
+  workspaceTimezone: string;
   canUpdate: boolean;
   canArchive: boolean;
   canReadOpportunities: boolean;
@@ -91,6 +92,7 @@ export function LeadDetailPanel({
   workspaceSlug,
   leadId,
   defaultCurrency,
+  workspaceTimezone,
   canUpdate,
   canArchive,
   canReadOpportunities,
@@ -522,6 +524,7 @@ export function LeadDetailPanel({
                   content: (
                     <ActivitiesSection
                       workspaceSlug={workspaceSlug}
+                      workspaceTimezone={workspaceTimezone}
                       leadId={leadId}
                       canRead={canReadActivities}
                       canCreate={canCreateActivity}

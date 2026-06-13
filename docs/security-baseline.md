@@ -117,7 +117,9 @@ Archive via `DELETE` sets `archivedAt`; never hard-deleted. Archived activities 
 
 Activities appear in primary navigation (`/w/[workspaceSlug]/activities`). Tasks are an activity type — not a separate nav module. Calendar is not primary nav.
 
-Entity detail Activities tabs on Lead, Property, and Opportunity load filtered activity lists. Global create without a linked entity is documented as a V1 limitation — create from entity detail pages.
+Entity detail Activities tabs on Lead, Property, and Opportunity load filtered activity lists and support create. Global `/activities` lists/edits/archives but does not expose a create CTA in V1 — helper copy directs users to entity detail pages.
+
+Activity due/next-action datetimes are displayed and edited in `Workspace.timezone` (UTC stored server-side).
 
 ---
 

@@ -37,6 +37,7 @@ type ActivityListItem = {
 
 type ActivitiesSectionProps = {
   workspaceSlug: string;
+  workspaceTimezone: string;
   leadId?: string;
   propertyId?: string;
   opportunityId?: string;
@@ -49,6 +50,7 @@ type ActivitiesSectionProps = {
 
 export function ActivitiesSection({
   workspaceSlug,
+  workspaceTimezone,
   leadId,
   propertyId,
   opportunityId,
@@ -265,7 +267,7 @@ export function ActivitiesSection({
                     <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5 truncate">
                       {formatRelatedSummary(activity)} ·{" "}
                       {activity.dueDate
-                        ? formatActivityDateTime(activity.dueDate)
+                        ? formatActivityDateTime(activity.dueDate, workspaceTimezone)
                         : "No due date"}
                     </p>
                   </div>
@@ -330,11 +332,11 @@ export function ActivitiesSection({
           <Timeline
             items={activities.map((activity) => {
               const dateLabel = activity.completedAt
-                ? `Completed ${formatActivityDateTime(activity.completedAt)}`
+                ? `Completed ${formatActivityDateTime(activity.completedAt, workspaceTimezone)}`
                 : activity.cancelledAt
-                  ? `Cancelled ${formatActivityDateTime(activity.cancelledAt)}`
+                  ? `Cancelled ${formatActivityDateTime(activity.cancelledAt, workspaceTimezone)}`
                   : activity.dueDate
-                    ? `Due ${formatActivityDateTime(activity.dueDate)}`
+                    ? `Due ${formatActivityDateTime(activity.dueDate, workspaceTimezone)}`
                     : "No due date";
 
               return {
@@ -415,6 +417,7 @@ export function ActivitiesSection({
           setEditId(null);
         }}
         workspaceSlug={workspaceSlug}
+        workspaceTimezone={workspaceTimezone}
         context={{ leadId, propertyId, opportunityId }}
         activityId={editId ?? undefined}
         onSaved={() => void loadActivities()}

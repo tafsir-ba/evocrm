@@ -92,6 +92,7 @@ type PropertyDetailPanelProps = {
   workspaceSlug: string;
   propertyId: string;
   defaultCurrency: string;
+  workspaceTimezone: string;
   canUpdate: boolean;
   canArchive: boolean;
   canReadOpportunities: boolean;
@@ -130,6 +131,7 @@ export function PropertyDetailPanel({
   workspaceSlug,
   propertyId,
   defaultCurrency,
+  workspaceTimezone,
   canUpdate,
   canArchive,
   canReadOpportunities,
@@ -653,6 +655,7 @@ export function PropertyDetailPanel({
                 content: (
                   <ActivitiesSection
                     workspaceSlug={workspaceSlug}
+                    workspaceTimezone={workspaceTimezone}
                     propertyId={propertyId}
                     canRead={canReadActivities}
                     canCreate={canCreateActivity}

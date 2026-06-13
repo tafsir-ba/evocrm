@@ -52,18 +52,22 @@ type ActivityListItem = {
 
 type ActivitiesPanelProps = {
   workspaceSlug: string;
+  workspaceTimezone: string;
   canCreate: boolean;
   canUpdate: boolean;
   canArchive: boolean;
+  allowGlobalCreate?: boolean;
 };
 
 type ViewKey = "all" | "mine" | "upcoming" | "overdue";
 
 export function ActivitiesPanel({
   workspaceSlug,
+  workspaceTimezone,
   canCreate,
   canUpdate,
   canArchive,
+  allowGlobalCreate = false,
 }: ActivitiesPanelProps) {
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -293,7 +297,7 @@ export function ActivitiesPanel({
               <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5 truncate">
                 {formatRelatedSummary(activity)} ·{" "}
                 {activity.dueDate
-                  ? formatActivityDateTime(activity.dueDate)
+                  ? formatActivityDateTime(activity.dueDate, workspaceTimezone)
                   : "No due date"}
               </p>
               {activity.outcome && (
@@ -394,7 +398,7 @@ export function ActivitiesPanel({
           </Badge>
         }
         actions={
-          canCreate ? (
+          canCreate && allowGlobalCreate ? (
             <Button
               leadingIcon={<IconPlus size={14} />}
               onClick={() => {
@@ -407,6 +411,13 @@ export function ActivitiesPanel({
           ) : undefined
         }
       />
+
+      {canCreate && !allowGlobalCreate && (
+        <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+          Create activities from a Lead, Property, or Opportunity detail page. Dates are
+          shown in workspace timezone ({workspaceTimezone}).
+        </div>
+      )}
 
       <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
         <Input
@@ -526,6 +537,7 @@ export function ActivitiesPanel({
           setEditId(null);
         }}
         workspaceSlug={workspaceSlug}
+        workspaceTimezone={workspaceTimezone}
         activityId={editId ?? undefined}
         onSaved={() => void loadActivities()}
       />

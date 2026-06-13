@@ -32,6 +32,7 @@ export default async function LeadDetailPage({ params }: { params: Params }) {
         workspaceSlug={workspaceSlug}
         leadId={leadId}
         defaultCurrency={access.context.workspace.defaultCurrency}
+        workspaceTimezone={access.context.workspace.timezone}
         canUpdate={hasPermission(permissions, "lead:update")}
         canArchive={hasPermission(permissions, "lead:archive")}
         canReadOpportunities={hasPermission(permissions, "opportunity:read")}

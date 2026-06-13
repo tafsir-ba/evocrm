@@ -280,7 +280,7 @@ PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]/cancel
 
 **POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `archivedAt`, `completedAt`, `cancelledAt`. **PATCH …/complete** and **PATCH …/cancel** require `activity:update` and resolve target status by `activity_status` behavior.
 
-UI routes: `/w/[workspaceSlug]/activities`. Entity detail Activities tabs filter by `leadId`, `propertyId`, or `opportunityId`. Tasks are an activity type — not a separate module.
+UI routes: `/w/[workspaceSlug]/activities`. Entity detail Activities tabs filter by `leadId`, `propertyId`, or `opportunityId` and support create. The global Activities page lists/filters/edits/archives but does **not** expose a global create CTA in V1 — creation is from Lead/Property/Opportunity detail pages (helper copy on `/activities`). Activity due/next-action dates are displayed and edited in `Workspace.timezone` via `lib/workspace-datetime.ts` (`Intl.DateTimeFormat` with `timeZone`; datetime-local inputs round-trip in workspace timezone before UTC ISO storage). Overdue/upcoming list filters remain server UTC instants against pending statuses. Tasks are an activity type — not a separate module.
 
 ### Documents
 

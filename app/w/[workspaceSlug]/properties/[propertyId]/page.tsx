@@ -32,6 +32,7 @@ export default async function PropertyDetailPage({ params }: { params: Params })
         workspaceSlug={workspaceSlug}
         propertyId={propertyId}
         defaultCurrency={access.context.workspace.defaultCurrency}
+        workspaceTimezone={access.context.workspace.timezone}
         canUpdate={hasPermission(permissions, "property:update")}
         canArchive={hasPermission(permissions, "property:archive")}
         canReadOpportunities={hasPermission(permissions, "opportunity:read")}
