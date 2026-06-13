@@ -274,12 +274,19 @@ All opportunity queries use `{ workspaceId, _id }` — never `Opportunity.findBy
 
 All activity queries use `{ workspaceId, _id }` — never `Activity.findById` without workspace verification. Overdue/upcoming filters exclude completed, cancelled, and archived activities.
 
-### Documents
+### Documents (Phase 8)
 
 ```txt
-{ workspaceId: 1, linkedEntityType: 1, linkedEntityId: 1 }
+{ workspaceId: 1 }
+{ workspaceId: 1, createdAt: -1 }
+{ workspaceId: 1, archivedAt: 1 }
 { workspaceId: 1, status: 1 }
+{ workspaceId: 1, uploadedBy: 1 }
+{ workspaceId: 1, linkedEntityType: 1, linkedEntityId: 1 }
+{ workspaceId: 1, storageKey: 1 }           // unique compound
 ```
+
+All document queries use `{ workspaceId, _id }` — never `Document.findById` without workspace verification. Active lists exclude `status=archived` and `status=failed` by default.
 
 ### Campaigns
 

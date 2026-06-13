@@ -434,25 +434,33 @@ At least one of `opportunityId`, `leadId`, or `propertyId` should be set. All li
 
 File attached to a workspace entity.
 
+**Phase 8:** Mongoose model at `/models/document.ts`. Presigned direct-to-Spaces upload (not backend multipart proxy). `uploadedBy` is server-controlled and immutable. `bucket` and `storageKey` are server-controlled — no permanent public URLs stored. Access via short-lived signed URLs (10-minute TTL) after auth + `document:read` + linked-entity read permission.
+
 | Field | Description |
 |-------|-------------|
 | `workspaceId` | |
 | `linkedEntityType` | `lead`, `property`, `opportunity`, `campaign` |
 | `linkedEntityId` | |
-| `ownerId` | |
+| `ownerId` | Optional accountable owner |
 | `uploadedBy` | Immutable |
-| `fileName` | |
-| `mimeType` | |
-| `fileSize` | |
+| `fileName` | Sanitized on upload |
+| `mimeType` | Allowlist enforced |
+| `fileSize` | Max 25 MB |
 | `bucket` | Storage bucket |
 | `storageKey` | Object key — no permanent public URL |
-| `visibility` | `private`, `workspace` |
+| `visibility` | `private`, `workspace` — both require authenticated workspace access in V1 |
 | `status` | `active`, `archived`, `failed` |
 | `createdAt` | |
 | `updatedAt` | |
 | `archivedAt` | |
 
-Access via signed URLs on demand after auth + permission checks.
+**Linked entities (Phase 8):** `lead`, `property`, `opportunity` fully supported. `campaign` accepted at model level but upload rejected until Phase 10.
+
+**Storage key pattern:** `workspaces/{workspaceId}/{linkedEntityType}/{linkedEntityId}/{uuid}/{sanitizedFileName}`
+
+**Archive:** `DELETE` sets `status=archived` and `archivedAt`; DB record retained; storage object not deleted in V1.
+
+Documents are embedded under Lead/Property/Opportunity detail Files tabs — **not** primary navigation.
 
 ---
 

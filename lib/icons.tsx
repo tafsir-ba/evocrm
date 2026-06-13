@@ -48,6 +48,9 @@ export function IconBed(p: IconProps) { return (<svg {...base(p)}><path d="M3 18
 export function IconBath(p: IconProps) { return (<svg {...base(p)}><path d="M3 13h18v3a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-3ZM6 13V6a2 2 0 0 1 2-2h1M9 6h3"/></svg>); }
 export function IconRuler(p: IconProps) { return (<svg {...base(p)}><path d="m3 17 14-14 4 4L7 21l-4-4Z"/><path d="m7 7 2 2M10 10l2 2M13 13l2 2"/></svg>); }
 export function IconFile(p: IconProps) { return (<svg {...base(p)}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></svg>); }
+export function IconUpload(p: IconProps) { return (<svg {...base(p)}><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 20h16"/></svg>); }
+export function IconDownload(p: IconProps) { return (<svg {...base(p)}><path d="M12 4v12M8 12l4 4 4-4"/><path d="M4 20h16"/></svg>); }
+export function IconTrash(p: IconProps) { return (<svg {...base(p)}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M10 11v6M14 11v6M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>); }
 export function IconNote(p: IconProps) { return (<svg {...base(p)}><path d="M5 4h10l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M8 10h6M8 14h8M8 18h5"/></svg>); }
 export function IconImage(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 19 6-7 5 6 3-3 2 2"/></svg>); }
 export function IconAlert(p: IconProps) { return (<svg {...base(p)}><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v5M12 18.5h0"/></svg>); }

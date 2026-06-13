@@ -282,7 +282,7 @@ PATCH  /api/workspaces/[workspaceSlug]/activities/[activityId]/cancel
 
 UI routes: `/w/[workspaceSlug]/activities`. Entity detail Activities tabs filter by `leadId`, `propertyId`, or `opportunityId` and support create. The global Activities page lists/filters/edits/archives but does **not** expose a global create CTA in V1 — creation is from Lead/Property/Opportunity detail pages (helper copy on `/activities`). Activity due/next-action dates are displayed and edited in `Workspace.timezone` via `lib/workspace-datetime.ts` (`Intl.DateTimeFormat` with `timeZone`; datetime-local inputs round-trip in workspace timezone before UTC ISO storage). Overdue/upcoming list filters remain server UTC instants against pending statuses. Tasks are an activity type — not a separate module.
 
-### Documents
+### Documents (Phase 8 — implemented)
 
 ```txt
 GET    /api/workspaces/[workspaceSlug]/documents
@@ -292,6 +292,20 @@ GET    /api/workspaces/[workspaceSlug]/documents/[documentId]
 POST   /api/workspaces/[workspaceSlug]/documents/[documentId]/signed-url
 DELETE /api/workspaces/[workspaceSlug]/documents/[documentId]  # archive (soft)
 ```
+
+**Permissions:**
+
+| Action | Permission | Also requires |
+|--------|------------|---------------|
+| List / view / signed URL | `document:read` | Linked entity read (`lead:read`, `property:read`, or `opportunity:read`) |
+| Upload URL / confirm | `document:create` | Linked entity read |
+| Archive | `document:archive` | Linked entity read |
+
+**List query:** `linkedEntityType` + `linkedEntityId` are **required**. Active documents only by default; `includeArchived=true` includes archived but never `failed`.
+
+**File validation:** MIME allowlist (pdf, jpeg, png, webp, doc/docx, xls/xlsx, plain text). Max size 25 MB. Filename sanitized server-side.
+
+**Rejected client fields:** `workspaceId`, `uploadedBy`, `bucket`, `storageKey`, `status`, `archivedAt`.
 
 #### Canonical V1 upload flow (presigned direct-to-Spaces)
 
@@ -310,7 +324,11 @@ V1 uses **presigned direct upload**, not backend multipart proxy. Do not impleme
 6. Client: use POST /documents/[documentId]/signed-url for download (never permanent public URL)
 ```
 
-Download flow: `POST /documents/[documentId]/signed-url` after `document:read` permission check.
+Download flow: `POST /documents/[documentId]/signed-url` after `document:read` + linked-entity read permission check. Signed URL TTL: **10 minutes**.
+
+**Campaign limitation:** `linkedEntityType=campaign` returns `VALIDATION_ERROR` until Phase 10.
+
+UI: Documents embedded under Lead/Property/Opportunity detail **Files** tabs via `DocumentsSection`. Documents is **not** primary navigation.
 
 ### Campaigns (Dripping)
 

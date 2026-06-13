@@ -148,7 +148,7 @@ Pipeline is primary nav (`/w/[workspaceSlug]/pipeline`). Opportunity detail at `
 
 `GET /pipeline` returns backend-driven columns from active `opportunity_status` dictionary items. Active pipeline value (`totals.activeValue`) includes only `open` behavior opportunities.
 
-Activities, Files, Documents, and timeline Notes tabs on opportunity detail: **Phase 7** Activities tab is implemented; Files/Documents/Notes remain placeholders.
+Activities, Files, and timeline Notes tabs on opportunity detail: **Phase 7** Activities tab is implemented; **Phase 8** Files tab is implemented (document upload/list/archive via presigned Spaces URLs). Generated contract Documents tab and Notes remain placeholders.
 
 ---
 
@@ -271,7 +271,7 @@ linked entity check
 | Check | Rule |
 |-------|------|
 | MIME type | Allowlist per use case (pdf, images, common office) |
-| File size | Max size enforced server-side (e.g. 25MB) |
+| File size | Max **25 MB** enforced server-side |
 | Filename | Sanitize; strip path traversal |
 | Linked entity | Must exist in same workspace |
 | Permission | `document:create` before upload URL issued |

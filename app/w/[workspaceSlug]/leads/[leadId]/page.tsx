@@ -41,6 +41,9 @@ export default async function LeadDetailPage({ params }: { params: Params }) {
         canCreateActivity={hasPermission(permissions, "activity:create")}
         canUpdateActivity={hasPermission(permissions, "activity:update")}
         canArchiveActivity={hasPermission(permissions, "activity:archive")}
+        canReadDocuments={hasPermission(permissions, "document:read")}
+        canCreateDocument={hasPermission(permissions, "document:create")}
+        canArchiveDocument={hasPermission(permissions, "document:archive")}
       />
     </PageContainer>
   );

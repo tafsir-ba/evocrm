@@ -10,3 +10,4 @@ export { LeadModel, type LeadDocument } from "./lead";
 export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";
 export { ActivityModel, type ActivityDocument } from "./activity";
+export { DocumentModel, type DocumentDocument } from "./document";

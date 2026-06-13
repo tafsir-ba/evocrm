@@ -80,9 +80,9 @@ Permissions are string keys stored on `Role.permissions[]`.
 
 | Key | Description |
 |-----|-------------|
-| `document:create` | Upload documents |
-| `document:read` | View/download documents |
-| `document:archive` | Archive documents |
+| `document:create` | Upload documents (presigned URL flow) — also requires linked entity read |
+| `document:read` | View/download documents via signed URLs — also requires linked entity read |
+| `document:archive` | Archive documents — also requires linked entity read |
 
 ### Campaigns (Dripping)
 

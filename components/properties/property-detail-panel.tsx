@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { ActivitiesSection } from "@/components/activities/activities-section";
+import { DocumentsSection } from "@/components/documents/documents-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -101,6 +102,9 @@ type PropertyDetailPanelProps = {
   canCreateActivity: boolean;
   canUpdateActivity: boolean;
   canArchiveActivity: boolean;
+  canReadDocuments: boolean;
+  canCreateDocument: boolean;
+  canArchiveDocument: boolean;
 };
 
 function formatPrice(price: number | null, currency: string): string {
@@ -140,6 +144,9 @@ export function PropertyDetailPanel({
   canCreateActivity,
   canUpdateActivity,
   canArchiveActivity,
+  canReadDocuments,
+  canCreateDocument,
+  canArchiveDocument,
 }: PropertyDetailPanelProps) {
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -612,14 +619,14 @@ export function PropertyDetailPanel({
                 key: "files",
                 label: "Files",
                 content: (
-                  <div className="px-5 pb-5">
-                    <StateView
-                      variant="empty"
-                      compact
-                      title="No files attached"
-                      description="Floor plans, contracts and brochures will live here. Document handling comes online in a later phase."
-                    />
-                  </div>
+                  <DocumentsSection
+                    workspaceSlug={workspaceSlug}
+                    linkedEntityType="property"
+                    linkedEntityId={propertyId}
+                    canRead={canReadDocuments}
+                    canCreate={canCreateDocument}
+                    canArchive={canArchiveDocument}
+                  />
                 ),
               },
               {

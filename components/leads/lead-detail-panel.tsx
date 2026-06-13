@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { ActivitiesSection } from "@/components/activities/activities-section";
+import { DocumentsSection } from "@/components/documents/documents-section";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
@@ -86,6 +87,9 @@ type LeadDetailPanelProps = {
   canCreateActivity: boolean;
   canUpdateActivity: boolean;
   canArchiveActivity: boolean;
+  canReadDocuments: boolean;
+  canCreateDocument: boolean;
+  canArchiveDocument: boolean;
 };
 
 export function LeadDetailPanel({
@@ -101,6 +105,9 @@ export function LeadDetailPanel({
   canCreateActivity,
   canUpdateActivity,
   canArchiveActivity,
+  canReadDocuments,
+  canCreateDocument,
+  canArchiveDocument,
 }: LeadDetailPanelProps) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -552,14 +559,14 @@ export function LeadDetailPanel({
                   key: "files",
                   label: "Files",
                   content: (
-                    <div className="px-5 pb-5">
-                      <StateView
-                        variant="empty"
-                        compact
-                        title="No files yet"
-                        description="Documents attached to this lead will appear here in a later phase."
-                      />
-                    </div>
+                    <DocumentsSection
+                      workspaceSlug={workspaceSlug}
+                      linkedEntityType="lead"
+                      linkedEntityId={leadId}
+                      canRead={canReadDocuments}
+                      canCreate={canCreateDocument}
+                      canArchive={canArchiveDocument}
+                    />
                   ),
                 },
               ]}
