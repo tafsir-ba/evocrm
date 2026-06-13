@@ -7,18 +7,7 @@ import { KanbanCard } from "@/components/domain/kanban-card";
 import { IconPlus } from "@/lib/icons";
 import { opportunities } from "@/lib/mock-data";
 import { workspacePath } from "@/lib/workspace-paths";
-import type { PipelineStage } from "@/lib/mock-data";
-
-/** Phase 1 mock pipeline stages — opportunity stages will load from workspace dictionaries in Phase 6. */
-const MOCK_PIPELINE_STAGES: { key: PipelineStage; tone: string }[] = [
-  { key: "New", tone: "#3b82f6" },
-  { key: "Qualified", tone: "#0891b2" },
-  { key: "Visit", tone: "#7c3aed" },
-  { key: "Offer", tone: "#f59e0b" },
-  { key: "Negotiation", tone: "#ea580c" },
-  { key: "Won", tone: "#16a34a" },
-  { key: "Lost", tone: "#94a3b8" },
-];
+import { getOpportunityStatusStagesForSlug } from "@/server/dictionaries/opportunity-stages";
 
 type Params = Promise<{ workspaceSlug: string }>;
 
@@ -26,17 +15,22 @@ export const metadata = { title: "Pipeline — EvoHome CRM" };
 
 export default async function PipelinePage({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
+  const stages = await getOpportunityStatusStagesForSlug(workspaceSlug);
 
-  const byStage = MOCK_PIPELINE_STAGES.map((stage) => ({
-    ...stage,
-    items: opportunities.filter((opportunity) => opportunity.stage === stage.key),
+  const byStage = stages.map((stage) => ({
+    id: stage.id,
+    key: stage.key,
+    label: stage.label,
+    color: stage.color,
+    behavior: stage.behavior,
+    items: opportunities.filter((opportunity) => opportunity.stage === stage.label),
   }));
 
   return (
     <PageContainer className="pb-0">
       <PageHeader
         title="Pipeline"
-        description="Drag opportunities through your sales stages. Stages and dictionaries are workspace-managed."
+        description="Drag opportunities through your sales stages. Column headers load from workspace opportunity status dictionaries."
         actions={
           <Button leadingIcon={<IconPlus size={14} />}>New opportunity</Button>
         }
@@ -66,10 +60,10 @@ export default async function PipelinePage({ params }: { params: Params }) {
 
             return (
               <KanbanColumn
-                key={col.key}
-                title={col.key}
+                key={col.id}
+                title={col.label}
                 count={col.items.length}
-                accentColor={col.tone}
+                accentColor={col.color}
                 summary={
                   <>
                     Total{" "}

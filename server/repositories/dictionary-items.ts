@@ -106,6 +106,23 @@ export async function findDictionaryItemByTypeAndKey(
   return document ? toDictionaryItemRecord(document) : null;
 }
 
+export async function findActiveDictionaryItemByTypeAndLabel(
+  workspaceId: string,
+  type: DictionaryType,
+  label: string,
+): Promise<DictionaryItemRecord | null> {
+  await connectDb();
+  const normalized = label.trim().toLowerCase();
+  const document = await DictionaryItemModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      type,
+      isActive: true,
+      label: { $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    }),
+  ).lean<DictionaryItemDocument>();
+  return document ? toDictionaryItemRecord(document) : null;
+}
+
 export async function createDictionaryItem(input: {
   workspaceId: string;
   dictionaryId: string;

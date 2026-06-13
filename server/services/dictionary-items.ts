@@ -10,6 +10,7 @@ import {
 import {
   clearDefaultForDictionaryType,
   createDictionaryItem,
+  findActiveDictionaryItemByTypeAndLabel,
   findDictionaryItemById,
   findDictionaryItemByTypeAndKey,
   findDictionaryItems,
@@ -133,6 +134,16 @@ export async function createDictionaryItemForWorkspace(
     throw new AppError("CONFLICT", "Dictionary item key already exists.");
   }
 
+  const duplicateLabel = await findActiveDictionaryItemByTypeAndLabel(
+    workspaceId,
+    input.type,
+    input.label,
+  );
+
+  if (duplicateLabel) {
+    throw new AppError("CONFLICT", "An active dictionary item with this label already exists.");
+  }
+
   const maxOrder = await getMaxOrderForDictionary(workspaceId, dictionary.id);
   const order = input.order ?? maxOrder + 1;
 
@@ -188,6 +199,21 @@ export async function updateDictionaryItemForWorkspace(
 
   if (input.behavior !== undefined) {
     assertBehaviorAllowed(existing.type, input.behavior);
+  }
+
+  if (input.label !== undefined && input.label !== existing.label) {
+    const duplicateLabel = await findActiveDictionaryItemByTypeAndLabel(
+      workspaceId,
+      existing.type,
+      input.label,
+    );
+
+    if (duplicateLabel && duplicateLabel.id !== itemId) {
+      throw new AppError(
+        "CONFLICT",
+        "An active dictionary item with this label already exists.",
+      );
+    }
   }
 
   if (input.isDefault) {

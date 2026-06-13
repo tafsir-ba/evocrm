@@ -31,6 +31,7 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#3B82F6");
   const [entityTypes, setEntityTypes] = useState<TagEntityType[]>(["lead"]);
@@ -66,12 +67,28 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
     void loadTags();
   }, [loadTags]);
 
+  function resetForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setName("");
+    setColor("#3B82F6");
+    setEntityTypes(["lead"]);
+  }
+
   function toggleEntityType(type: TagEntityType) {
     setEntityTypes((current) =>
       current.includes(type)
         ? current.filter((value) => value !== type)
         : [...current, type],
     );
+  }
+
+  function startEdit(tag: TagRecord) {
+    setShowForm(false);
+    setEditingId(tag.id);
+    setName(tag.name);
+    setColor(tag.color);
+    setEntityTypes(tag.entityTypes);
   }
 
   async function createTag() {
@@ -87,8 +104,24 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
       return;
     }
 
-    setShowForm(false);
-    setName("");
+    resetForm();
+    await loadTags();
+  }
+
+  async function saveTag(tagId: string) {
+    const response = await fetch(`${apiBase}/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color, entityTypes }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.error?.message ?? "Failed to update tag.");
+      return;
+    }
+
+    resetForm();
     await loadTags();
   }
 
@@ -99,6 +132,10 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
     if (!response.ok) {
       setError(payload.error?.message ?? "Failed to archive tag.");
       return;
+    }
+
+    if (editingId === tagId) {
+      resetForm();
     }
 
     await loadTags();
@@ -129,7 +166,17 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
             Workspace tags
           </p>
           {canUpdate && (
-            <Button size="sm" onClick={() => setShowForm((value) => !value)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (showForm) {
+                  resetForm();
+                } else {
+                  setEditingId(null);
+                  setShowForm(true);
+                }
+              }}
+            >
               {showForm ? "Cancel" : "+ Add tag"}
             </Button>
           )}
@@ -144,6 +191,7 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
 
       {canUpdate && showForm && (
         <Card>
+          <p className="text-[13px] font-medium text-[var(--color-ink)] mb-3">New tag</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-[12px] text-[var(--color-ink-muted)]">Name</label>
@@ -185,17 +233,54 @@ export function TagsPanel({ workspaceSlug, canUpdate }: TagsPanelProps) {
         <Card padded={false}>
           <ul className="divide-y divide-[var(--color-line)]">
             {tags.map((tag) => (
-              <li
-                key={tag.id}
-                className="flex items-center justify-between gap-3 px-5 py-3"
-              >
-                <TagSelector tags={[tag]} readOnly />
-                <span className="text-[11px] text-[var(--color-ink-muted)]">
-                  {tag.entityTypes.join(", ")}
-                </span>
-                <Button size="sm" variant="outline" onClick={() => void archiveTag(tag.id)}>
-                  Archive
-                </Button>
+              <li key={tag.id} className="px-5 py-3">
+                {editingId === tag.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input value={name} onChange={(event) => setName(event.target.value)} />
+                      <Input
+                        value={color}
+                        onChange={(event) => setColor(event.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {TAG_ENTITY_TYPES.map((type) => (
+                        <label key={type} className="flex items-center gap-1.5 text-[12px]">
+                          <input
+                            type="checkbox"
+                            checked={entityTypes.includes(type)}
+                            onChange={() => toggleEntityType(type)}
+                          />
+                          {type}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => void saveTag(tag.id)} disabled={!name || entityTypes.length === 0}>
+                        Save
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={resetForm}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <TagSelector tags={[tag]} readOnly />
+                    <span className="text-[11px] text-[var(--color-ink-muted)]">
+                      {tag.entityTypes.join(", ")}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => startEdit(tag)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void archiveTag(tag.id)}>
+                        Archive
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

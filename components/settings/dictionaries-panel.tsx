@@ -12,6 +12,14 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DICTIONARY_TYPE_LABELS } from "@/lib/dictionary-constants";
 import type { DictionaryType } from "@/lib/dictionary-constants";
+import {
+  ACTIVITY_STATUS_BEHAVIORS,
+  OPPORTUNITY_STATUS_BEHAVIORS,
+  dictionaryTypeRequiresBehavior,
+  slugifyDictionaryKey,
+  type ActivityStatusBehavior,
+  type OpportunityStatusBehavior,
+} from "@/lib/dictionary-form-helpers";
 
 type DictionarySummary = {
   id: string;
@@ -60,9 +68,15 @@ export function DictionariesPanel({
   const [newLabel, setNewLabel] = useState("");
   const [newKey, setNewKey] = useState("");
   const [newColor, setNewColor] = useState("#3B82F6");
+  const [newBehavior, setNewBehavior] = useState("");
+  const [newDefaultProbability, setNewDefaultProbability] = useState("");
+  const [keyManuallyEdited, setKeyManuallyEdited] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const selectedDictionary = dictionaries.find((d) => d.type === selectedType);
+  const requiresBehavior = selectedType
+    ? dictionaryTypeRequiresBehavior(selectedType)
+    : false;
 
   const loadDictionaries = useCallback(async () => {
     setLoading(true);
@@ -125,6 +139,28 @@ export function DictionariesPanel({
     void loadItems();
   }, [loadItems]);
 
+  useEffect(() => {
+    if (!keyManuallyEdited && newLabel) {
+      setNewKey(slugifyDictionaryKey(newLabel));
+    }
+  }, [newLabel, keyManuallyEdited]);
+
+  useEffect(() => {
+    setNewBehavior("");
+    setNewDefaultProbability("");
+    setKeyManuallyEdited(false);
+  }, [selectedType]);
+
+  function resetCreateForm() {
+    setShowCreateForm(false);
+    setNewLabel("");
+    setNewKey("");
+    setNewColor("#3B82F6");
+    setNewBehavior("");
+    setNewDefaultProbability("");
+    setKeyManuallyEdited(false);
+  }
+
   async function saveItem(itemId: string) {
     const response = await fetch(`${apiBase}/dictionary-items/${itemId}`, {
       method: "PATCH",
@@ -161,31 +197,45 @@ export function DictionariesPanel({
   async function createItem() {
     if (!selectedDictionary || !selectedType) return;
 
+    const payload: Record<string, unknown> = {
+      dictionaryId: selectedDictionary.id,
+      type: selectedType,
+      label: newLabel,
+      key: newKey,
+      color: newColor,
+    };
+
+    if (selectedType === "opportunity_status") {
+      payload.behavior = newBehavior;
+      if (newDefaultProbability.trim()) {
+        payload.defaultProbability = Number(newDefaultProbability);
+      }
+    }
+
+    if (selectedType === "activity_status") {
+      payload.behavior = newBehavior;
+    }
+
     const response = await fetch(`${apiBase}/dictionary-items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        dictionaryId: selectedDictionary.id,
-        type: selectedType,
-        label: newLabel,
-        key: newKey,
-        color: newColor,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const payload = await response.json();
+    const body = await response.json();
     if (!response.ok) {
-      setError(payload.error?.message ?? "Failed to create item.");
+      setError(body.error?.message ?? "Failed to create item.");
       return;
     }
 
-    setShowCreateForm(false);
-    setNewLabel("");
-    setNewKey("");
-    setNewColor("#3B82F6");
+    resetCreateForm();
     await loadDictionaries();
     await loadItems();
   }
+
+  const canSubmitCreate =
+    Boolean(newLabel && newKey && newColor) &&
+    (!requiresBehavior || Boolean(newBehavior));
 
   if (forbidden) {
     return <PermissionDenied title="Dictionaries unavailable" />;
@@ -236,7 +286,16 @@ export function DictionariesPanel({
           </p>
           <div className="flex items-center gap-3">
             {canUpdate && selectedDictionary && (
-              <Button size="sm" onClick={() => setShowCreateForm((value) => !value)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (showCreateForm) {
+                    resetCreateForm();
+                  } else {
+                    setShowCreateForm(true);
+                  }
+                }}
+              >
                 {showCreateForm ? "Cancel" : "+ Add item"}
               </Button>
             )}
@@ -252,29 +311,84 @@ export function DictionariesPanel({
         </div>
 
         {canUpdate && showCreateForm && selectedDictionary && selectedType && (
-          <div className="px-5 py-4 border-b border-[var(--color-line)] grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Input
-              placeholder="Label"
-              value={newLabel}
-              onChange={(event) => setNewLabel(event.target.value)}
-            />
-            <Input
-              placeholder="key_snake_case"
-              value={newKey}
-              onChange={(event) => setNewKey(event.target.value)}
-              className="font-mono"
-            />
-            <Input
-              placeholder="#3B82F6"
-              value={newColor}
-              onChange={(event) => setNewColor(event.target.value)}
-              className="font-mono"
-            />
-            <Button
-              size="sm"
-              onClick={() => void createItem()}
-              disabled={!newLabel || !newKey || !newColor}
-            >
+          <div className="px-5 py-4 border-b border-[var(--color-line)] space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input
+                placeholder="Label"
+                value={newLabel}
+                onChange={(event) => setNewLabel(event.target.value)}
+              />
+              <Input
+                placeholder="key (auto-generated)"
+                value={newKey}
+                onChange={(event) => {
+                  setKeyManuallyEdited(true);
+                  setNewKey(event.target.value);
+                }}
+                className="font-mono"
+              />
+              <Input
+                placeholder="#3B82F6"
+                value={newColor}
+                onChange={(event) => setNewColor(event.target.value)}
+                className="font-mono"
+              />
+            </div>
+
+            {selectedType === "opportunity_status" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="text-[12px] text-[var(--color-ink-muted)]">
+                  Behavior (required)
+                  <select
+                    className="mt-1 w-full rounded-md border border-[var(--color-line)] px-3 py-2 text-[13px] bg-white"
+                    value={newBehavior}
+                    onChange={(event) =>
+                      setNewBehavior(event.target.value as OpportunityStatusBehavior)
+                    }
+                  >
+                    <option value="">Select behavior…</option>
+                    {OPPORTUNITY_STATUS_BEHAVIORS.map((behavior) => (
+                      <option key={behavior} value={behavior}>
+                        {behavior}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[12px] text-[var(--color-ink-muted)]">
+                  Default probability (0–100)
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={newDefaultProbability}
+                    onChange={(event) => setNewDefaultProbability(event.target.value)}
+                    className="mt-1"
+                  />
+                </label>
+              </div>
+            )}
+
+            {selectedType === "activity_status" && (
+              <label className="text-[12px] text-[var(--color-ink-muted)] block max-w-sm">
+                Behavior (required)
+                <select
+                  className="mt-1 w-full rounded-md border border-[var(--color-line)] px-3 py-2 text-[13px] bg-white"
+                  value={newBehavior}
+                  onChange={(event) =>
+                    setNewBehavior(event.target.value as ActivityStatusBehavior)
+                  }
+                >
+                  <option value="">Select behavior…</option>
+                  {ACTIVITY_STATUS_BEHAVIORS.map((behavior) => (
+                    <option key={behavior} value={behavior}>
+                      {behavior}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <Button size="sm" onClick={() => void createItem()} disabled={!canSubmitCreate}>
               Create item
             </Button>
           </div>

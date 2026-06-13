@@ -9,6 +9,9 @@ import { Avatar, AvatarWithName } from "@/components/ui/avatar";
 import { Tabs } from "@/components/ui/tabs";
 import { StateView } from "@/components/states/state-view";
 import {
+  isTerminalOpportunityBehavior,
+} from "@/lib/dictionary-form-helpers";
+import {
   IconCalendar,
   IconCheck,
   IconClock,
@@ -17,18 +20,9 @@ import {
 } from "@/lib/icons";
 import { activities, opportunities, leads, properties } from "@/lib/mock-data";
 import { workspacePath } from "@/lib/workspace-paths";
+import { getOpportunityStatusStagesForSlug } from "@/server/dictionaries/opportunity-stages";
 
 type Params = Promise<{ workspaceSlug: string; opportunityId: string }>;
-
-/** Phase 1 mock stage progression labels only. */
-const MOCK_STAGE_LABELS = [
-  "New",
-  "Qualified",
-  "Visit",
-  "Offer",
-  "Negotiation",
-  "Won/Lost",
-];
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { opportunityId } = await params;
@@ -43,11 +37,10 @@ export default async function OpportunityDetailPage({ params }: { params: Params
 
   const lead = leads.find((l) => l.name === op.leadName) ?? leads[0];
   const prop = properties.find((p) => p.title === op.propertyName) ?? properties[0];
-
-  const currentStageIndex = (() => {
-    if (op.stage === "Won" || op.stage === "Lost") return 5;
-    return MOCK_STAGE_LABELS.indexOf(op.stage);
-  })();
+  const stages = await getOpportunityStatusStagesForSlug(workspaceSlug);
+  const currentStageItem = stages.find((stage) => stage.label === op.stage);
+  const currentStageIndex = stages.findIndex((stage) => stage.label === op.stage);
+  const isTerminal = isTerminalOpportunityBehavior(currentStageItem?.behavior);
 
   return (
     <PageContainer>
@@ -59,7 +52,15 @@ export default async function OpportunityDetailPage({ params }: { params: Params
         title={
           <span className="flex items-center gap-2 flex-wrap">
             {op.leadName} — {op.propertyName}
-            <Badge tone="info">{op.stage}</Badge>
+            {currentStageItem ? (
+              <StatusBadge
+                label={currentStageItem.label}
+                color={currentStageItem.color}
+                behavior={currentStageItem.behavior}
+              />
+            ) : (
+              <Badge tone="info">{op.stage}</Badge>
+            )}
           </span>
         }
         description={`Opportunity ${op.id} · Expected close ${op.expectedClose}`}
@@ -73,7 +74,9 @@ export default async function OpportunityDetailPage({ params }: { params: Params
             <Button variant="secondary" leadingIcon={<IconNote size={14} />}>
               Add note
             </Button>
-            <Button leadingIcon={<IconCheck size={14} />}>Mark as won</Button>
+            {!isTerminal && (
+              <Button leadingIcon={<IconCheck size={14} />}>Mark as won</Button>
+            )}
           </>
         }
       />
@@ -144,12 +147,12 @@ export default async function OpportunityDetailPage({ params }: { params: Params
           <CardHeader title="Pipeline stage" subtitle="Current progression" />
           <ol className="relative pl-5">
             <span className="absolute left-1.5 top-2 bottom-2 w-px bg-[var(--color-line)]" />
-            {MOCK_STAGE_LABELS.map((stage, i) => {
+            {stages.map((stage, i) => {
               const isCurrent = i === currentStageIndex;
-              const isPast = i < currentStageIndex;
+              const isPast = currentStageIndex >= 0 && i < currentStageIndex;
               return (
                 <li
-                  key={stage}
+                  key={stage.id}
                   className={`relative mb-3 last:mb-0 ${
                     isCurrent
                       ? "px-3 py-2 -mx-3 rounded-lg bg-[var(--color-brand-50)] border border-[var(--color-brand-100)]"
@@ -164,7 +167,7 @@ export default async function OpportunityDetailPage({ params }: { params: Params
                       background: isPast
                         ? "var(--color-success-fg)"
                         : isCurrent
-                          ? "var(--color-brand-600)"
+                          ? stage.color
                           : "var(--color-line-strong)",
                     }}
                   />
@@ -178,7 +181,7 @@ export default async function OpportunityDetailPage({ params }: { params: Params
                             : "text-[var(--color-ink-muted)]"
                       }`}
                     >
-                      {stage}
+                      {stage.label}
                     </p>
                     {isCurrent && (
                       <span className="text-[11px] font-medium text-[var(--color-brand-700)]">

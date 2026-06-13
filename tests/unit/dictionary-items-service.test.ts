@@ -16,6 +16,7 @@ vi.mock("@/server/repositories/dictionaries", () => ({
 
 vi.mock("@/server/repositories/dictionary-items", () => ({
   findDictionaryItemByTypeAndKey: vi.fn(),
+  findActiveDictionaryItemByTypeAndLabel: vi.fn(),
   getMaxOrderForDictionary: vi.fn(),
   clearDefaultForDictionaryType: vi.fn(),
   createDictionaryItem: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findDictionaryById } from "@/server/repositories/dictionaries";
 import {
   createDictionaryItem,
+  findActiveDictionaryItemByTypeAndLabel,
   findDictionaryItemById,
   findDictionaryItemByTypeAndKey,
   getMaxOrderForDictionary,
@@ -40,6 +42,7 @@ import {
 describe("dictionary item service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(findActiveDictionaryItemByTypeAndLabel).mockResolvedValue(null);
   });
 
   it("rejects invalid behavior for opportunity status", async () => {
@@ -88,6 +91,151 @@ describe("dictionary item service", () => {
         behavior: "open",
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("creates opportunity status with required behavior", async () => {
+    vi.mocked(findDictionaryById).mockResolvedValue({
+      id: "dict-1",
+      workspaceId: "ws-1",
+      type: "opportunity_status",
+      name: "Opportunity status",
+      isSystem: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findDictionaryItemByTypeAndKey).mockResolvedValue(null);
+    vi.mocked(getMaxOrderForDictionary).mockResolvedValue(6);
+    vi.mocked(createDictionaryItem).mockResolvedValue({
+      id: "item-2",
+      workspaceId: "ws-1",
+      dictionaryId: "dict-1",
+      type: "opportunity_status",
+      label: "Custom stage",
+      key: "custom_stage",
+      color: "#3B82F6",
+      order: 7,
+      isDefault: false,
+      isActive: true,
+      isSystem: false,
+      behavior: "open",
+      defaultProbability: 15,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const item = await createDictionaryItemForWorkspace("ws-1", "user-1", {
+      dictionaryId: "dict-1",
+      type: "opportunity_status",
+      label: "Custom stage",
+      key: "custom_stage",
+      color: "#3B82F6",
+      behavior: "open",
+      defaultProbability: 15,
+    });
+
+    expect(item.behavior).toBe("open");
+  });
+
+  it("rejects opportunity status without behavior", async () => {
+    vi.mocked(findDictionaryById).mockResolvedValue({
+      id: "dict-1",
+      workspaceId: "ws-1",
+      type: "opportunity_status",
+      name: "Opportunity status",
+      isSystem: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findDictionaryItemByTypeAndKey).mockResolvedValue(null);
+
+    await expect(
+      createDictionaryItemForWorkspace("ws-1", "user-1", {
+        dictionaryId: "dict-1",
+        type: "opportunity_status",
+        label: "Custom stage",
+        key: "custom_stage",
+        color: "#3B82F6",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("creates activity status with required behavior", async () => {
+    vi.mocked(findDictionaryById).mockResolvedValue({
+      id: "dict-1",
+      workspaceId: "ws-1",
+      type: "activity_status",
+      name: "Activity status",
+      isSystem: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findDictionaryItemByTypeAndKey).mockResolvedValue(null);
+    vi.mocked(getMaxOrderForDictionary).mockResolvedValue(2);
+    vi.mocked(createDictionaryItem).mockResolvedValue({
+      id: "item-3",
+      workspaceId: "ws-1",
+      dictionaryId: "dict-1",
+      type: "activity_status",
+      label: "Deferred",
+      key: "deferred",
+      color: "#6B7280",
+      order: 3,
+      isDefault: false,
+      isActive: true,
+      isSystem: false,
+      behavior: "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const item = await createDictionaryItemForWorkspace("ws-1", "user-1", {
+      dictionaryId: "dict-1",
+      type: "activity_status",
+      label: "Deferred",
+      key: "deferred",
+      color: "#6B7280",
+      behavior: "pending",
+    });
+
+    expect(item.behavior).toBe("pending");
+  });
+
+  it("rejects duplicate active labels per dictionary type", async () => {
+    vi.mocked(findDictionaryById).mockResolvedValue({
+      id: "dict-1",
+      workspaceId: "ws-1",
+      type: "lead_source",
+      name: "Lead source",
+      isSystem: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findDictionaryItemByTypeAndKey).mockResolvedValue(null);
+    vi.mocked(findActiveDictionaryItemByTypeAndLabel).mockResolvedValue({
+      id: "existing",
+      workspaceId: "ws-1",
+      dictionaryId: "dict-1",
+      type: "lead_source",
+      label: "Partner",
+      key: "partner",
+      color: "#3B82F6",
+      order: 1,
+      isDefault: false,
+      isActive: true,
+      isSystem: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await expect(
+      createDictionaryItemForWorkspace("ws-1", "user-1", {
+        dictionaryId: "dict-1",
+        type: "lead_source",
+        label: "Partner",
+        key: "partner_2",
+        color: "#3B82F6",
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("creates dictionary item with valid data", async () => {

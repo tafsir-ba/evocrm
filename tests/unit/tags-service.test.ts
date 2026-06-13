@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   archiveTagForWorkspace,
   createTagForWorkspace,
+  updateTagForWorkspace,
 } from "@/server/services/tags";
 
 vi.mock("@/server/repositories/tags", () => ({
@@ -22,6 +23,7 @@ import {
   createTag,
   findActiveTagByNormalizedName,
   findTagById,
+  updateTag,
 } from "@/server/repositories/tags";
 
 describe("tag service", () => {
@@ -70,6 +72,39 @@ describe("tag service", () => {
         entityTypes: ["lead"],
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("updates tag name, color, and entity types", async () => {
+    vi.mocked(findTagById).mockResolvedValue({
+      id: "tag-1",
+      workspaceId: "ws-1",
+      name: "Investor",
+      color: "#3B82F6",
+      entityTypes: ["lead"],
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findActiveTagByNormalizedName).mockResolvedValue(null);
+    vi.mocked(updateTag).mockResolvedValue({
+      id: "tag-1",
+      workspaceId: "ws-1",
+      name: "VIP Investor",
+      color: "#10B981",
+      entityTypes: ["lead", "opportunity"],
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const tag = await updateTagForWorkspace("ws-1", "tag-1", "user-1", {
+      name: "VIP Investor",
+      color: "#10B981",
+      entityTypes: ["lead", "opportunity"],
+    });
+
+    expect(tag.name).toBe("VIP Investor");
+    expect(tag.entityTypes).toEqual(["lead", "opportunity"]);
   });
 
   it("archives tags with archivedAt", async () => {

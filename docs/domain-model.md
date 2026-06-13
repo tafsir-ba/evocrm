@@ -220,6 +220,12 @@ Individual option within a dictionary.
 
 **Critical:** Business logic must use `behavior` and `key`, never `label`.
 
+**Uniqueness (Phase 3):**
+
+- `key` is unique per workspace + dictionary type (stable machine identifier).
+- Active `label` is also unique per workspace + dictionary type (case-insensitive). Duplicate active labels are rejected with `CONFLICT`.
+- Inactive items may retain historical labels; reactivation must not collide with another active label.
+
 ---
 
 ### Tag

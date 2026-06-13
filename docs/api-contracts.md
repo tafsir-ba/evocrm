@@ -288,6 +288,8 @@ DELETE /api/workspaces/[workspaceSlug]/tags/[tagId]  # archive (soft)
 
 **Dictionary item list defaults:** active items only, ordered by `order` ascending. Pass `includeInactive=true` to include inactive items.
 
+**Dictionary item uniqueness:** `key` is unique per workspace/type. Active `label` is also unique per workspace/type (case-insensitive).
+
 **Dictionary types (allowlist):** `lead_status`, `property_status`, `opportunity_status`, `activity_status`, `activity_type`, `lead_source`, `property_type`, `lost_reason`.
 
 **Tag entity types (allowlist):** `lead`, `property`, `opportunity`.
