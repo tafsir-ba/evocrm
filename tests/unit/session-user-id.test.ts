@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isCanonicalSessionUserId } from "@/lib/session-user-id";
+import {
+  isCanonicalSessionUserId,
+  STALE_SESSION_RECOVERY_PATH,
+} from "@/lib/session-user-id";
 
 describe("isCanonicalSessionUserId", () => {
   it("accepts MongoDB ObjectId strings", () => {
@@ -13,5 +16,9 @@ describe("isCanonicalSessionUserId", () => {
     );
     expect(isCanonicalSessionUserId("")).toBe(false);
     expect(isCanonicalSessionUserId(undefined)).toBe(false);
+  });
+
+  it("uses an app-owned stale-session recovery path", () => {
+    expect(STALE_SESSION_RECOVERY_PATH).toBe("/auth/session-expired");
   });
 });

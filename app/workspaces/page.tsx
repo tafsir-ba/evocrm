@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { auth } from "@/auth";
 import {
   isCanonicalSessionUserId,
-  SIGN_OUT_TO_LOGIN_PATH,
+  STALE_SESSION_RECOVERY_PATH,
 } from "@/lib/session-user-id";
 import { findUserById } from "@/server/repositories/users";
 import {
@@ -21,13 +21,13 @@ export default async function WorkspacesPage() {
   const session = await auth();
 
   if (!session?.user?.id || !isCanonicalSessionUserId(session.user.id)) {
-    redirect(SIGN_OUT_TO_LOGIN_PATH);
+    redirect(STALE_SESSION_RECOVERY_PATH);
   }
 
   const user = await findUserById(session.user.id);
 
   if (!user) {
-    redirect(SIGN_OUT_TO_LOGIN_PATH);
+    redirect(STALE_SESSION_RECOVERY_PATH);
   }
 
   const workspaces = await listActiveWorkspacesForUser(user.id);

@@ -7,4 +7,4 @@ export function isCanonicalSessionUserId(
   return typeof userId === "string" && OBJECT_ID_PATTERN.test(userId);
 }
 
-export const SIGN_OUT_TO_LOGIN_PATH = "/api/auth/signout?callbackUrl=%2Flogin";
+export const STALE_SESSION_RECOVERY_PATH = "/auth/session-expired";
