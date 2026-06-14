@@ -11,7 +11,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const { workspaceSlug } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      ["settings:read", "settings:update"],
+      "settings:update",
     );
 
     const exportBundle = await exportWorkspaceData({

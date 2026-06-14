@@ -109,7 +109,7 @@ Behavior expectations by module for beta QA.
 
 | Edge case | Expected behavior |
 |-----------|-------------------|
-| Export without settings:read | `403 PERMISSION_DENIED` |
+| Export without settings:update | `403 PERMISSION_DENIED` (settings:read alone is insufficient) |
 | Large workspace | Synchronous JSON; may be slow — monitor |
 
 ---

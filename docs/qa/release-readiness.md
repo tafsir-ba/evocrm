@@ -2,7 +2,7 @@
 
 **Status: Ready with accepted risks**
 
-Date: 2026-06-14
+Date: 2026-06-14 (updated after P1 export patch)
 
 ---
 

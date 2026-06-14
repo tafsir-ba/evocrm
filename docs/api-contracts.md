@@ -778,7 +778,7 @@ Workspace-scoped backup/export for admins:
 GET /api/workspaces/[workspaceSlug]/export
 ```
 
-- Requires active membership and `settings:read` or `settings:update`
+- Requires active membership and `settings:update` (admin-level; viewers/agents with `settings:read` only cannot export)
 - Returns JSON bundle `{ data: { export: { … } } }`
 - Includes metadata for all major workspace entities
 - Excludes: raw API keys, `apiKeyHash`, `credentialsEncrypted`, `storageKey`, signed URLs, file binaries

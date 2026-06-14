@@ -42,9 +42,9 @@ describe("workspace export sanitization", () => {
       workspaceId: "ws-1",
       linkedEntityType: "lead",
       linkedEntityId: "lead-1",
-      filename: "contract.pdf",
+      fileName: "contract.pdf",
       mimeType: "application/pdf",
-      sizeBytes: 1024,
+      fileSize: 1024,
       status: "active",
       uploadedBy: "user-1",
       storageKey: "private/key",
@@ -56,7 +56,8 @@ describe("workspace export sanitization", () => {
 
     expect(result).not.toHaveProperty("storageKey");
     expect(result).not.toHaveProperty("bucket");
-    expect(result.filename).toBe("contract.pdf");
+    expect(result.fileName).toBe("contract.pdf");
+    expect(result.fileSize).toBe(1024);
   });
 
   it("sanitizes export collections", () => {

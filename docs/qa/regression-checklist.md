@@ -39,7 +39,7 @@ Manual and automated regression for beta. Each item: role, steps, expected resul
 | Role | Steps | Expected | Automation |
 |------|-------|----------|------------|
 | Owner | GET settings | 200 | settings API tests |
-| Owner | GET export | JSON bundle, no secrets | Manual + export sanitize tests |
+| Owner/Admin | GET export | JSON bundle, no secrets; requires settings:update | export-api.test.ts |
 | Viewer | PATCH settings | 403 | Manual |
 
 ---

@@ -45,4 +45,5 @@ _None at Phase 13 gate._
 | FIX-002 | Backup/export | `GET /api/workspaces/[workspaceSlug]/export` workspace-scoped JSON export |
 | FIX-003 | Production config | `validateProductionEnv()` fail-fast on missing required vars |
 | FIX-004 | Error handling | `handleRouteError` logs non-exposed errors via `captureError` |
-| FIX-005 | Website webhook | Rate limiting verified (60 req/min per API key hash or IP) |
+| FIX-006 | Export permission | Restricted to `settings:update` only (viewers/agents cannot bulk export) |
+| FIX-007 | Export document metadata | Uses model fields `fileName` and `fileSize` |

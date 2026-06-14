@@ -145,7 +145,7 @@ Default dictionaries seed automatically on workspace creation via `ensureDefault
 
 ```txt
 [ ] MongoDB provider backups enabled
-[ ] Admin runbook: GET /api/workspaces/{slug}/export (settings:read)
+[ ] Admin runbook: GET /api/workspaces/{slug}/export (settings:update)
 [ ] Export excludes API keys, storage keys, signed URLs
 ```
 

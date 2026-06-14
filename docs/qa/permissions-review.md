@@ -34,8 +34,8 @@ Server-side enforcement review for all V1 permission keys.
 | `campaign:read` | Campaign GET/list | campaigns routes |
 | `campaign:update` | Campaign PATCH, steps, enrollments | campaign sub-routes |
 | `campaign:archive` | Campaign DELETE | campaigns `[campaignId]/route.ts` |
-| `settings:read` | Settings GET, export, integrations list | settings/export/integrations routes |
-| `settings:update` | Settings PATCH, integrations mutate | settings/integrations routes |
+| `settings:read` | Settings GET, integrations list | settings/integrations routes |
+| `settings:update` | Settings PATCH, integrations mutate, workspace export | settings/integrations/export routes |
 | `users:manage` | Memberships CRUD, reassignment | members routes |
 | `roles:manage` | Roles CRUD | roles routes |
 | `billing:manage` | Billing shell | billing route |
@@ -90,7 +90,7 @@ _None._
 [ ] Agent can create lead but not manage roles (403 on roles route)
 [ ] Owner can manage users and roles
 [ ] Inactive member direct URL returns forbidden/redirect
-[ ] settings:read can export; viewer without settings:read cannot
+[ ] settings:update can export; viewer/agent with settings:read only cannot
 ```
 
 Automated coverage: `tests/unit/require-permission.test.ts`, per-API permission tests.
