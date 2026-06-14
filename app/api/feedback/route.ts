@@ -1,12 +1,16 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import { requireAuth } from "@/server/auth/require-auth";
+import { assertFeedbackContentLength } from "@/server/feedback/request-guards";
 import { AppError } from "@/server/errors";
+import { assertFeedbackRateLimitPreflight } from "@/server/security/feedback-rate-limit";
 import { submitFeedbackForUser } from "@/server/services/feedback";
 import { feedbackSubmitFieldsSchema } from "@/server/validation/feedback";
 
 export async function POST(request: Request) {
   try {
     const session = await requireAuth();
+    assertFeedbackContentLength(request);
+    assertFeedbackRateLimitPreflight(session.user.id);
     const formData = await request.formData();
 
     const fieldsResult = feedbackSubmitFieldsSchema.safeParse({

@@ -798,11 +798,13 @@ POST /api/feedback
 ```
 
 - Authenticated multipart form (`category`, `body`, `page_url`, `user_agent`, `project_id`, `workspace_slug`, `screenshots[]`)
+- **Pre-parse guards** (before `request.formData()`): `Content-Length` must not exceed **55 MB** (`5 × 10 MB screenshots + 5 MB form overhead`) → `VALIDATION_ERROR`; feedback rate limit (**10 / user / hour**) → `RATE_LIMITED` (429)
 - `user_id`, `user_email`, and `workspaceId` are server-derived — never accepted from the client body
 - `workspace_slug` is validated via `resolveWorkspace` + active `requireMembership`
 - `project_id` is optional; invalid or cross-workspace IDs are ignored (stored as `null`)
+- `page_url` is optional; only `http`/`https` URLs whose origin matches `NEXT_PUBLIC_APP_URL` are stored — otherwise stored as `null` (admin UI renders untrusted legacy values as plain text, not clickable links)
 - At least one of non-empty `body` or `screenshots` required
-- Rate limit: **10 submissions / user / hour** → `RATE_LIMITED` (429)
+- Rate limit is enforced again in the service after parsing (defense-in-depth; single increment per successful submission)
 - Screenshot limits: max 5 files, 10 MB each, PNG/JPEG/WEBP (MIME with extension fallback)
 - Response: `{ data: { ok: true, id } }`
 

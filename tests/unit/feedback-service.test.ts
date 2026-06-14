@@ -41,6 +41,12 @@ vi.mock("@/server/storage/spaces", () => ({
   getObjectBuffer: vi.fn(),
 }));
 
+vi.mock("@/server/env", () => ({
+  getEnv: vi.fn(() => ({
+    NEXT_PUBLIC_APP_URL: "https://app.example",
+  })),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
@@ -136,6 +142,29 @@ describe("feedback service", () => {
       }),
     );
     expect(result).toEqual({ id: "fb-1" });
+  });
+
+  it("stores null page_url when the submitted URL is untrusted", async () => {
+    vi.mocked(createFeedback).mockResolvedValue({
+      ...baseRecord,
+      pageUrl: null,
+    });
+
+    await submitFeedbackForUser({
+      userId: "user-1",
+      userEmail: "reporter@example.com",
+      fields: {
+        category: "bug",
+        body: "Broken button",
+        workspaceSlug: "demo",
+        pageUrl: "javascript:alert(1)",
+      },
+      screenshots: [],
+    });
+
+    expect(createFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ pageUrl: null }),
+    );
   });
 
   it("blocks empty submissions", async () => {

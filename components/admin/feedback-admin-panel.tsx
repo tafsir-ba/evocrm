@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import {
   FEEDBACK_CATEGORIES,
   getFeedbackCategoryLabel,
+  isTrustedFeedbackPageUrl,
   type FeedbackCategory,
 } from "@/lib/feedback";
 import { IconImage, IconMore } from "@/lib/icons";
@@ -450,14 +451,23 @@ export function FeedbackAdminPanel() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
                   Page URL
                 </p>
-                <a
-                  href={selected.pageUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-all text-[13px] text-[var(--color-brand-700)]"
-                >
-                  {selected.pageUrl}
-                </a>
+                {isTrustedFeedbackPageUrl(
+                  selected.pageUrl,
+                  process.env.NEXT_PUBLIC_APP_URL ?? "",
+                ) ? (
+                  <a
+                    href={selected.pageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-[13px] text-[var(--color-brand-700)]"
+                  >
+                    {selected.pageUrl}
+                  </a>
+                ) : (
+                  <p className="break-all text-[13px] text-[var(--color-ink-muted)]">
+                    {selected.pageUrl}
+                  </p>
+                )}
               </div>
             )}
             {selected.userAgent && (

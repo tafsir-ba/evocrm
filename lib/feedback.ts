@@ -123,3 +123,20 @@ export function getFeedbackCategoryLabel(category: FeedbackCategory): string {
       return category;
   }
 }
+
+export function isTrustedFeedbackPageUrl(
+  pageUrl: string,
+  appUrl: string,
+): boolean {
+  try {
+    const parsed = new URL(pageUrl);
+    const allowedOrigin = new URL(appUrl).origin;
+
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      parsed.origin === allowedOrigin
+    );
+  } catch {
+    return false;
+  }
+}

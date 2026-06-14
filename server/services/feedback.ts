@@ -4,16 +4,17 @@ import { randomUUID } from "node:crypto";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { getEnv } from "@/server/env";
 import {
   ALLOWED_FEEDBACK_IMAGE_TYPES,
   MAX_FEEDBACK_BODY_CHARS,
-  MAX_FEEDBACK_PAGE_URL_CHARS,
   MAX_FEEDBACK_SCREENSHOT_BYTES,
   MAX_FEEDBACK_SCREENSHOTS,
   MAX_FEEDBACK_USER_AGENT_CHARS,
   type FeedbackCategory,
   type FeedbackStatus,
 } from "@/server/feedback/constants";
+import { normalizeFeedbackPageUrl } from "@/server/feedback/page-url";
 import {
   countOpenFeedback,
   createFeedback,
@@ -303,7 +304,10 @@ export async function submitFeedbackForUser(input: {
       category: input.fields.category,
       body,
       projectId,
-      pageUrl: truncateText(input.fields.pageUrl, MAX_FEEDBACK_PAGE_URL_CHARS),
+      pageUrl: normalizeFeedbackPageUrl(
+        input.fields.pageUrl,
+        getEnv().NEXT_PUBLIC_APP_URL,
+      ),
       userAgent: truncateText(input.fields.userAgent, MAX_FEEDBACK_USER_AGENT_CHARS),
       screenshots,
     });

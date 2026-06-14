@@ -152,7 +152,10 @@ CampaignSend
 AuditLog
 Integration
 IntegrationLog
+Feedback
 ```
+
+`Feedback` is **platform telemetry** (Phase 14) — not a workspace CRM sales entity and not primary navigation. Reports are triaged cross-workspace by the platform admin only.
 
 ### Optional / Delayed Entities
 
@@ -198,6 +201,19 @@ Advanced billing UI
 ```
 
 If a feature is necessary but not listed in the current phase, document it as a question or limitation. Do not silently add it.
+
+---
+
+## Platform Telemetry (Phase 14)
+
+In-app feedback and the platform admin console are **operator/product telemetry**, not CRM workspace modules:
+
+```txt
+Feedback widget — floating on workspace shell (authenticated reporters)
+Platform admin — /admin (tafsir@evo-home.ch only)
+```
+
+Do not add Feedback or Platform admin to locked V1 primary navigation.
 
 ---
 

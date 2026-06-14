@@ -18,6 +18,38 @@ export function getFeedbackRateLimitKey(userId: string): string {
   return `feedback:${userId}`;
 }
 
+export function peekFeedbackRateLimit(userId: string): {
+  allowed: boolean;
+  retryAfterSeconds: number;
+} {
+  const key = getFeedbackRateLimitKey(userId);
+  const now = Date.now();
+  const existing = buckets.get(key);
+
+  if (!existing || now >= existing.resetAt) {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  if (existing.count >= FEEDBACK_RATE_LIMIT.maxRequests) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+    };
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function assertFeedbackRateLimitPreflight(userId: string): void {
+  const result = peekFeedbackRateLimit(userId);
+
+  if (!result.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many submissions — try again later.", {
+      details: { retryAfterSeconds: result.retryAfterSeconds },
+    });
+  }
+}
+
 export function checkFeedbackRateLimit(userId: string): {
   allowed: boolean;
   retryAfterSeconds: number;

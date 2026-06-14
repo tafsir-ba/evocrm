@@ -15,6 +15,10 @@ vi.mock("@/server/services/feedback", () => ({
   deleteFeedbackForAdmin: vi.fn(),
 }));
 
+vi.mock("@/server/security/feedback-rate-limit", () => ({
+  assertFeedbackRateLimitPreflight: vi.fn(),
+}));
+
 import { POST as submitFeedback } from "@/app/api/feedback/route";
 import {
   DELETE as deleteFeedback,
@@ -23,6 +27,8 @@ import {
 import { GET as listFeedback } from "@/app/api/admin/feedback/route";
 import { requireAuth } from "@/server/auth/require-auth";
 import { requirePlatformAdmin } from "@/server/auth/require-platform-admin";
+import { MAX_FEEDBACK_REQUEST_BYTES } from "@/server/feedback/constants";
+import { assertFeedbackRateLimitPreflight } from "@/server/security/feedback-rate-limit";
 import {
   deleteFeedbackForAdmin,
   listFeedbackForAdmin,
@@ -53,12 +59,54 @@ describe("feedback API", () => {
     formData.set("user_agent", "Mozilla/5.0");
 
     const response = await submitFeedback({
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-length" ? "1024" : null,
+      },
       formData: async () => formData,
     } as unknown as Request);
 
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.data).toEqual({ ok: true, id: "fb-1" });
+    expect(assertFeedbackRateLimitPreflight).toHaveBeenCalledWith("user-1");
+  });
+
+  it("rejects oversized uploads before multipart parsing", async () => {
+    const formDataSpy = vi.fn();
+
+    const response = await submitFeedback({
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-length"
+            ? String(MAX_FEEDBACK_REQUEST_BYTES + 1)
+            : null,
+      },
+      formData: formDataSpy,
+    } as unknown as Request);
+
+    expect(response.status).toBe(400);
+    expect(formDataSpy).not.toHaveBeenCalled();
+    expect(submitFeedbackForUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects rate-limited users before multipart parsing", async () => {
+    vi.mocked(assertFeedbackRateLimitPreflight).mockImplementation(() => {
+      throw new AppError("RATE_LIMITED", "Too many submissions — try again later.");
+    });
+    const formDataSpy = vi.fn();
+
+    const response = await submitFeedback({
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-length" ? "1024" : null,
+      },
+      formData: formDataSpy,
+    } as unknown as Request);
+
+    expect(response.status).toBe(429);
+    expect(formDataSpy).not.toHaveBeenCalled();
+    expect(submitFeedbackForUser).not.toHaveBeenCalled();
   });
 
   it("lists feedback for platform admins", async () => {

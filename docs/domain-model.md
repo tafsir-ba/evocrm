@@ -53,7 +53,10 @@ CampaignSend
 AuditLog
 Integration
 IntegrationLog
+Feedback
 ```
+
+`Feedback` is platform telemetry (Phase 14), not workspace CRM domain data.
 
 ### Optional / Delayed Entities
 
@@ -615,6 +618,30 @@ Inbound/outbound integration event log.
 | `payloadSummary` | Non-sensitive summary only |
 | `error` | |
 | `createdAt` | |
+
+---
+
+### Feedback
+
+Platform product telemetry — **not** a workspace CRM sales entity and **not** primary navigation.
+
+**Phase 14:** Mongoose model at `/models/feedback.ts`. Authenticated users submit from the workspace shell floating widget. `workspaceId` is server-derived from `workspace_slug` + membership; reporters cannot spoof user identity. Platform admin (`tafsir@evo-home.ch`) triages across all workspaces at `/admin/feedback`. Screenshots stored under isolated `feedback/` storage prefix; admin streams via authenticated routes only.
+
+| Field | Description |
+|-------|-------------|
+| `userId` | Reporter (server-derived from session) |
+| `userEmail` | Reporter email snapshot |
+| `workspaceId` | Originating workspace (nullable) |
+| `category` | `bug`, `idea`, `other` |
+| `body` | Message text |
+| `pageUrl` | Same-origin `http`/`https` URL only; untrusted input stored as `null` |
+| `userAgent` | Browser user agent snapshot |
+| `screenshots` | Server-validated image metadata (`storageKey`, `filename`, `sizeBytes`, `contentType`) |
+| `status` | `open`, `resolved` |
+| `resolvedAt` / `resolvedBy` | Set on resolve; cleared on reopen |
+| `projectId` | Optional; validated against workspace, ignored if invalid/archived |
+
+Admin mutations (`resolve`, `reopen`, `delete`) write `feedback.*` audit entries against the originating workspace.
 
 ---
 

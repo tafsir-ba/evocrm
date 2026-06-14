@@ -446,6 +446,24 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 14 — In-App Feedback + Platform Admin
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Floating feedback widget on authenticated workspace shell only (not primary V1 nav)
+- [ ] `POST /api/feedback` enforces auth, `Content-Length` cap, and rate limit **before** `request.formData()`
+- [ ] Screenshot MIME/count/size validation remains in service (defense-in-depth)
+- [ ] `page_url` restricted to same-origin `http`/`https`; untrusted values stored as `null`
+- [ ] Admin panel renders only trusted `page_url` values as clickable links
+- [ ] Platform admin gated server-side to `tafsir@evo-home.ch` (`requirePlatformAdmin`)
+- [ ] Admin resolve/reopen/delete writes `feedback.*` audit entries
+- [ ] Screenshots stored under `feedback/` prefix; admin streaming route auth-gated
+- [ ] `Feedback` documented in product/domain model as platform telemetry (not CRM entity)
+- [ ] No scope creep (V1 primary nav unchanged)
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.
 
 See `/docs/release-gates.md` for merge rules.
