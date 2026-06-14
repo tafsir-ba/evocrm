@@ -139,22 +139,26 @@ export async function upsertUserFromProvider(input: {
   const existing = await UserModel.findOne({ email }).lean<UserDocument>();
 
   if (existing) {
-    const document = await UserModel.findOneAndUpdate(
-      { email },
-      {
-        $set: {
-          ...(input.name ? { name: input.name } : {}),
-          ...(input.image ? { image: input.image } : {}),
+    try {
+      const document = await UserModel.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            ...(input.name ? { name: input.name } : {}),
+            ...(input.image ? { image: input.image } : {}),
+          },
         },
-      },
-      { new: true, runValidators: true },
-    ).lean<UserDocument>();
+        { new: true, runValidators: true },
+      ).lean<UserDocument>();
 
-    if (!document) {
-      throw new AppError("NOT_FOUND", "User not found.");
+      if (document) {
+        return toUserRecord(document);
+      }
+    } catch (error) {
+      console.error("[auth] Google profile update failed, using existing user:", error);
     }
 
-    return toUserRecord(document);
+    return toUserRecord(existing as UserDocument);
   }
 
   const document = await UserModel.findOneAndUpdate(

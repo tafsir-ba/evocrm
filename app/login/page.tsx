@@ -7,12 +7,24 @@ import { IconLogo } from "@/lib/icons";
 export const metadata = { title: "Sign in — EvoHome CRM" };
 
 type LoginPageProps = {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+};
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  AccessDenied:
+    "Google sign-in could not be completed. Try again or use email and password.",
+  Configuration: "Sign-in is temporarily unavailable. Please try again later.",
+  OAuthSignin: "Could not start Google sign-in. Please try again.",
+  OAuthCallback: "Google sign-in was interrupted. Please try again.",
+  Default: "Sign-in failed. Please try again.",
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, error } = await searchParams;
   const redirectTo = callbackUrl ?? "/workspaces";
+  const authErrorMessage = error
+    ? (AUTH_ERROR_MESSAGES[error] ?? AUTH_ERROR_MESSAGES.Default)
+    : null;
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -90,6 +102,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p className="text-[13.5px] text-[var(--color-ink-muted)] mt-1.5">
             Use Google or email/password to access your workspace.
           </p>
+
+          {authErrorMessage && (
+            <p
+              role="alert"
+              className="mt-4 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-3 py-2 text-[13px] text-[var(--color-danger-fg)]"
+            >
+              {authErrorMessage}
+            </p>
+          )}
 
           <GoogleSignInButton callbackUrl={redirectTo} />
 

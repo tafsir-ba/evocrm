@@ -2,9 +2,9 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 import { getAuthConfig } from "@/auth.config";
+import { resolveGoogleSignInUserId } from "@/server/auth/google-sign-in";
 import { resolveJwtSub } from "@/server/auth/resolve-jwt-sub";
 import { verifyCredentialsLogin } from "@/server/services/credentials-auth";
-import { syncUserFromProviderProfile } from "@/server/services/users";
 import { credentialsLoginSchema } from "@/server/validation/auth";
 
 const authConfig = getAuthConfig();
@@ -50,13 +50,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (account?.provider === "google") {
         try {
-          await syncUserFromProviderProfile({
+          user.id = await resolveGoogleSignInUserId({
             email: user.email,
             name: user.name,
             image: user.image,
           });
         } catch (error) {
-          console.error("[auth] Google sign-in profile sync failed:", error);
+          console.error("[auth] Google sign-in failed:", error);
           return false;
         }
       }

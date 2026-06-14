@@ -55,7 +55,16 @@ function getAuthProviders() {
       authorization: {
         params: {
           prompt: "select_account",
+          scope: "openid email profile",
         },
+      },
+      profile(profile) {
+        return {
+          id: profile.sub,
+          email: profile.email,
+          name: profile.name,
+          image: profile.picture,
+        };
       },
     }),
   ];
@@ -68,6 +77,7 @@ export function getAuthConfig(): NextAuthConfig {
     trustHost: true,
     pages: {
       signIn: "/login",
+      error: "/login",
     },
     session: {
       strategy: "jwt",
