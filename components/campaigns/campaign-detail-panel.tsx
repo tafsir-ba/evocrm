@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  buildLeadEnrollmentPayload,
+  buildOpportunityEnrollmentPayload,
+  CampaignEnrollmentActions,
+  CampaignEnrollmentSelector,
+  getActiveEnrollmentTargetIds,
+  getEnrollmentSelectionError,
+} from "@/components/campaigns/campaign-enrollment-selector";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +46,8 @@ type CampaignStep = {
 type Enrollment = {
   id: string;
   status: string;
+  leadId: string | null;
+  opportunityId: string | null;
   leadName: string | null;
   leadEmail: string | null;
   leadEmailConsentStatus: string | null;
@@ -99,7 +109,7 @@ export function CampaignDetailPanel({
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [stepForm, setStepForm] = useState<StepFormState>(emptyStepForm);
   const [stepFormError, setStepFormError] = useState<string | null>(null);
-  const [enrollTargetId, setEnrollTargetId] = useState("");
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [previewStep, setPreviewStep] = useState<CampaignStep | null>(null);
 
@@ -153,6 +163,21 @@ export function CampaignDetailPanel({
 
   const stepsEditable =
     canUpdate && campaign && (campaign.status === "draft" || campaign.status === "paused");
+
+  const excludedEnrollmentTargetIds = useMemo(() => {
+    if (!campaign) {
+      return [];
+    }
+
+    return getActiveEnrollmentTargetIds(enrollments, campaign.audienceType);
+  }, [campaign, enrollments]);
+
+  function handleEnrollmentSelectionChange(ids: string[]) {
+    setSelectedEnrollmentIds(ids);
+    if (ids.length > 0) {
+      setEnrollError(null);
+    }
+  }
 
   async function runAction(path: string, method = "PATCH") {
     setActionPending(true);
@@ -250,31 +275,61 @@ export function CampaignDetailPanel({
     }
   }
 
-  async function handleEnroll(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleEnroll() {
+    if (!campaign) {
+      return;
+    }
+
+    const selectionError = getEnrollmentSelectionError(
+      campaign.audienceType,
+      selectedEnrollmentIds,
+    );
+
+    if (selectionError) {
+      setEnrollError(selectionError);
+      return;
+    }
+
     setEnrollError(null);
     setActionPending(true);
 
-    const body =
-      campaign?.audienceType === "leads"
-        ? { leadId: enrollTargetId.trim() }
-        : { opportunityId: enrollTargetId.trim() };
+    const failures: string[] = [];
+    let enrolledCount = 0;
 
     try {
-      const response = await fetch(`${apiBase}/enrollments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = await response.json();
+      for (const targetId of selectedEnrollmentIds) {
+        const body =
+          campaign.audienceType === "leads"
+            ? buildLeadEnrollmentPayload(targetId)
+            : buildOpportunityEnrollmentPayload(targetId);
 
-      if (!response.ok) {
-        setEnrollError(payload.error?.message ?? "Enrollment failed.");
-        return;
+        const response = await fetch(`${apiBase}/enrollments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          failures.push(payload.error?.message ?? "Enrollment failed.");
+          continue;
+        }
+
+        enrolledCount += 1;
       }
 
-      setEnrollTargetId("");
-      await loadAll();
+      if (enrolledCount > 0) {
+        setSelectedEnrollmentIds([]);
+        await loadAll();
+      }
+
+      if (failures.length > 0) {
+        setEnrollError(
+          enrolledCount > 0
+            ? `${enrolledCount} enrolled. ${failures[0]}`
+            : failures[0],
+        );
+      }
     } catch {
       setEnrollError("Enrollment failed.");
     } finally {
@@ -436,24 +491,23 @@ export function CampaignDetailPanel({
       <Card className="mb-6">
         <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">Enrollments</h2>
         {canUpdate && campaign.status !== "archived" && (
-          <form onSubmit={handleEnroll} className="flex flex-wrap gap-2 mb-4">
-            <Input
-              placeholder={
-                campaign.audienceType === "leads"
-                  ? "Lead ID to enroll"
-                  : "Opportunity ID to enroll"
-              }
-              value={enrollTargetId}
-              onChange={(e) => setEnrollTargetId(e.target.value)}
-              className="max-w-sm"
+          <div className="mb-4 space-y-3">
+            <CampaignEnrollmentSelector
+              workspaceSlug={workspaceSlug}
+              audienceType={campaign.audienceType}
+              selectedIds={selectedEnrollmentIds}
+              onSelectionChange={handleEnrollmentSelectionChange}
+              excludedTargetIds={excludedEnrollmentTargetIds}
+              disabled={actionPending}
             />
-            <Button type="submit" size="sm" disabled={actionPending || !enrollTargetId.trim()}>
-              Enroll
-            </Button>
-            {enrollError && (
-              <p className="w-full text-[12px] text-[var(--color-danger)]">{enrollError}</p>
-            )}
-          </form>
+            <CampaignEnrollmentActions
+              selectedIds={selectedEnrollmentIds}
+              onEnroll={() => void handleEnroll()}
+              enrolling={actionPending}
+              disabled={actionPending}
+              error={enrollError}
+            />
+          </div>
         )}
         {enrollments.length === 0 ? (
           <EmptyState compact title="No enrollments" description="Manually enroll a lead or opportunity." />

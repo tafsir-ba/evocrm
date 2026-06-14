@@ -365,6 +365,8 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 
 **Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
 
+**Enrollment UI:** Campaign detail uses searchable multi-select lead/opportunity selectors backed by workspace `GET /leads` and `GET /opportunities`. The UI submits canonical entity IDs — not names, emails, or raw text labels.
+
 **Missing email / unsubscribed:** Sends are skipped and logged as `CampaignSend.status = skipped`.
 
 **Step edits:** Allowed only when campaign is `draft` or `paused`.

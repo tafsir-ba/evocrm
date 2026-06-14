@@ -147,6 +147,7 @@ A phase with any **Missing / deviating** item in a critical section cannot merge
 - [ ] Document access requires auth + permission (Phase 8+)
 - [x] Campaign cron protected by `CRON_SECRET` (Phase 10)
 - [x] Unsubscribe behavior works (Phase 10 — `GET /unsubscribe?token=...`)
+- [x] Campaign enrollment UI uses searchable lead/opportunity selectors (Phase 10 — not raw ObjectId text input)
 - [ ] File upload restrictions enforced (Phase 8+)
 
 **Rating:** Fully aligned / Partially aligned / Missing / deviating
