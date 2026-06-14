@@ -1,8 +1,8 @@
 import "server-only";
 
-/**
- * Audit log contract — persistence implemented in a later phase.
- */
+import { sanitizeAuditPayload } from "@/server/audit/sanitize-audit-payload";
+import { createAuditLogRecord } from "@/server/repositories/audit-logs";
+import { captureError } from "@/server/observability/capture-error";
 
 export type AuditEntityType =
   | "workspace"
@@ -38,13 +38,29 @@ export type CreateAuditLogInput = {
 };
 
 /**
- * Record an audit log entry.
- * Phase 0: typed no-op — not wired to production routes yet.
- * TODO(Phase 2+): persist AuditLog model and enforce in services.
+ * Record an audit log entry. Failures are logged but do not block the caller.
  */
-export async function createAuditLog(
-  _input: CreateAuditLogInput,
-): Promise<void> {
-  // Intentional no-op until AuditLog model exists.
-  return Promise.resolve();
+export async function createAuditLog(input: CreateAuditLogInput): Promise<void> {
+  try {
+    await createAuditLogRecord({
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      before: sanitizeAuditPayload(input.before),
+      after: sanitizeAuditPayload(input.after),
+      createdAt: input.createdAt,
+    });
+  } catch (error) {
+    captureError(error, {
+      code: "AUDIT_LOG_WRITE_FAILED",
+      workspaceId: input.workspaceId,
+      userId: input.actorId,
+      tags: {
+        action: input.action,
+        entityType: input.entityType,
+      },
+    });
+  }
 }

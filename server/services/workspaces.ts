@@ -9,7 +9,7 @@ import {
   type WorkspaceNavigationItem,
 } from "@/lib/v1-navigation";
 import { workspaceNavPath } from "@/lib/workspace-paths";
-import { findRoleById } from "@/server/repositories/roles";
+import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
 import {
   createWorkspace,
   findWorkspaceBySlug,
@@ -160,7 +160,7 @@ export async function getWorkspaceContext(
 
   const { requireMembership } = await import("@/server/permissions/require-membership");
   const membership = await requireMembership(workspace.id, userId);
-  const role = await findRoleById(membership.roleId);
+  const role = await findRoleByIdInWorkspace(membership.roleId, workspace.id);
 
   if (!role) {
     throw new AppError("INTERNAL_ERROR", "Membership role not found.", {

@@ -381,19 +381,29 @@ Implementation detail for Phase 0/2.
 
 ## Audit Logging
 
-Write `AuditLog` for sensitive actions:
+`AuditLog` model persisted (Phase 13). `createAuditLog()` writes workspace-scoped, append-only records with sanitized `before`/`after` payloads (secrets redacted). Failures are logged via `captureError` but do not block the caller.
+
+Sensitive actions audited across services include:
 
 ```txt
-member.invited
-member.removed
-member.role_changed
-ownership.transferred
-role.permissions_updated
-integration.credentials_updated
-document.downloaded (optional, if compliance requires)
+workspace.created / workspace.updated / workspace.exported
+membership.* / role.*
+lead.* / property.* / opportunity.*
+activity.* / document.*
+campaign.* / campaign_email.* / campaign_unsubscribed
+integration.* / integration.website_lead_*
+tag.* / project.* / dictionary*
 ```
 
 Audit logs are workspace-scoped and append-only.
+
+---
+
+## Error Tracking (Phase 13)
+
+- Server errors captured via `server/observability/capture-error.ts` (structured console JSON)
+- No third-party provider wired in V1 beta — Sentry recommended post-beta
+- `handleRouteError` invokes `captureError` for non-exposed `AppError` and unknown errors
 
 ---
 

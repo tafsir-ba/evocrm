@@ -2,7 +2,6 @@ import "server-only";
 
 import bcrypt from "bcryptjs";
 
-import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import {
   createCredentialsUser,
@@ -47,15 +46,6 @@ export async function registerCredentialsUser(
     email,
     name: input.name.trim(),
     passwordHash,
-  });
-
-  await createAuditLog({
-    workspaceId: "system",
-    actorId: user.id,
-    action: "auth.user_created_credentials",
-    entityType: "workspace",
-    entityId: user.id,
-    after: { email: user.email, authProvider: user.authProvider },
   });
 
   return user;

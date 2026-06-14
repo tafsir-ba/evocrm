@@ -139,13 +139,18 @@ workspace data leak exists
 permissions are frontend-only
 document access is public (unsigned/unauthenticated)
 campaign unsubscribe fails
+cron endpoint is unprotected
+integration webhook is unauthenticated
 pipeline movement is broken
 activity due/overdue logic is wrong
 dashboard numbers are inaccurate
 build / typecheck / lint / test fail
+/docs/qa/release-readiness.md missing or status = Not ready
 ```
 
 All beta blockers must be resolved before `dev` → `main` for beta.
+
+Phase 13 QA artifacts live under `/docs/qa/`. Release verdict: **Ready with accepted risks** (see `release-readiness.md`).
 
 ---
 

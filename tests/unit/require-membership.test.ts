@@ -8,11 +8,11 @@ vi.mock("@/server/repositories/memberships", () => ({
 }));
 
 vi.mock("@/server/repositories/roles", () => ({
-  findRoleById: vi.fn(),
+  findRoleByIdInWorkspace: vi.fn(),
 }));
 
 import { findMembership } from "@/server/repositories/memberships";
-import { findRoleById } from "@/server/repositories/roles";
+import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
 
 describe("requireMembership", () => {
   beforeEach(() => {
@@ -55,7 +55,7 @@ describe("requireMembership", () => {
       updatedAt: new Date(),
     });
 
-    vi.mocked(findRoleById).mockResolvedValue({
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
       id: "role-1",
       workspaceId: "ws-1",
       name: "Owner",
@@ -68,6 +68,7 @@ describe("requireMembership", () => {
 
     const membership = await requireMembership("ws-1", "user-1");
 
+    expect(findRoleByIdInWorkspace).toHaveBeenCalledWith("role-1", "ws-1");
     expect(membership.permissions).toEqual(["dashboard:read"]);
     expect(membership.status).toBe("active");
   });
@@ -82,7 +83,7 @@ describe("requireMembership", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    vi.mocked(findRoleById).mockResolvedValue(null);
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue(null);
 
     await expect(requireMembership("ws-1", "user-1")).rejects.toBeInstanceOf(
       AppError,

@@ -10,6 +10,7 @@ import {
   type ErrorCode,
   type ErrorDetails,
 } from "@/server/errors";
+import { captureError } from "@/server/observability/capture-error";
 
 export type PaginationMeta = {
   page: number;
@@ -102,10 +103,16 @@ export function appErrorResponse(
 
 export function handleRouteError(error: unknown): NextResponse<ErrorResponseBody> {
   if (error instanceof AppError) {
+    if (!error.expose) {
+      captureError(error, { code: error.code });
+    }
+
     return NextResponse.json(serializeAppErrorForApi(error), {
       status: httpStatusForAppError(error),
     });
   }
+
+  captureError(error, { code: "INTERNAL_ERROR" });
 
   const serialized = serializeUnknownError(error);
   return NextResponse.json(serialized, { status: 500 });

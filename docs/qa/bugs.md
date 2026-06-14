@@ -1,0 +1,48 @@
+# Known Bugs — Phase 13
+
+Tracked defects at beta gate. **Critical** bugs block beta release.
+
+---
+
+## Critical
+
+_None at Phase 13 gate._
+
+---
+
+## High
+
+| ID | Severity | Area | Roles | Steps | Expected | Actual | Status | Owner/Fix |
+|----|----------|------|-------|-------|----------|--------|--------|-----------|
+| BUG-001 | High | E2E auth | All | Run full Playwright suite with real Google OAuth | Authenticated smoke paths pass | OAuth cannot run in CI without credentials; only public/unauth paths automated | Open (accepted limitation) | Documented in `/docs/testing-strategy.md` |
+
+---
+
+## Medium
+
+| ID | Severity | Area | Roles | Steps | Expected | Actual | Status | Owner/Fix |
+|----|----------|------|-------|-------|----------|--------|--------|-----------|
+| BUG-002 | Medium | Rate limiting | Public | Burst requests to `/api/auth/signup` | Rate limited | No in-process limiter on auth signup yet | Open | Accepted beta risk — see security review |
+| BUG-003 | Medium | Rate limiting | Public | Burst requests to `/unsubscribe` | Rate limited | No dedicated unsubscribe limiter | Open | Accepted beta risk |
+| BUG-004 | Medium | Export | Owner/Admin | Export very large workspace (>10k records) | Async job or streaming | Synchronous JSON bundle may be slow/large | Open | Beta uses sync export; monitor size |
+
+---
+
+## Low
+
+| ID | Severity | Area | Roles | Steps | Expected | Actual | Status | Owner/Fix |
+|----|----------|------|-------|-------|----------|--------|--------|-----------|
+| BUG-005 | Low | Seed | Dev | Re-run `npm run seed` after partial failure | Idempotent full fixture | Skips entity seed if workspace slug already exists | Open | Documented; delete workspace to re-seed |
+| BUG-006 | Low | Monitoring | Ops | Trigger unhandled server error | External alert | Console-only via `captureError` placeholder | Open | Sentry recommended post-beta |
+
+---
+
+## Fixed in Phase 13
+
+| ID | Area | Fix |
+|----|------|-----|
+| FIX-001 | Audit log | `AuditLog` model + persisted `createAuditLog()` with payload sanitization |
+| FIX-002 | Backup/export | `GET /api/workspaces/[workspaceSlug]/export` workspace-scoped JSON export |
+| FIX-003 | Production config | `validateProductionEnv()` fail-fast on missing required vars |
+| FIX-004 | Error handling | `handleRouteError` logs non-exposed errors via `captureError` |
+| FIX-005 | Website webhook | Rate limiting verified (60 req/min per API key hash or IP) |

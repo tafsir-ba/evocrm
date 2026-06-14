@@ -61,7 +61,18 @@ Phase 1 adds React component tests (Vitest + jsdom + Testing Library) for:
 
 Critical flows only — not every edge case. Run against a test workspace with seeded data.
 
-Phase 2 note: full Google OAuth cannot run in CI without credentials. E2E smoke verifies unauthenticated redirect to `/login`. Auth/workspace/permission logic is covered by Vitest unit tests with mocked repositories.
+Phase 2 note: full Google OAuth cannot run in CI without credentials. E2E smoke verifies unauthenticated redirect, public routes, cron protection, and webhook auth rejection. Auth/workspace/permission logic is covered by Vitest unit tests with mocked repositories.
+
+Phase 13 E2E (`tests/e2e/smoke.spec.ts`): login/signup page render, unsubscribe token requirement, protected route redirects, website webhook without API key, cron without secret.
+
+### Seed / demo data
+
+```txt
+npm run seed          # creates demo@evocrm.local + demo-agency workspace (idempotent)
+npm run seed -- --dry-run
+```
+
+Requires `MONGODB_URI`. Optional `SEED_DEMO_PASSWORD`. Do not run against production.
 
 Phase 2A adds unit tests for credentials signup/login (`credentials-auth.test.ts`, `auth-signup-api.test.ts`, `auth-validation.test.ts`) and login/signup UI component tests.
 

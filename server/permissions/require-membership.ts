@@ -2,7 +2,7 @@ import "server-only";
 
 import { AppError } from "@/server/errors";
 import { findMembership } from "@/server/repositories/memberships";
-import { findRoleById } from "@/server/repositories/roles";
+import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
 
 import type { WorkspaceMembership } from "./types";
 
@@ -23,7 +23,7 @@ export async function requireMembership(
     throw new AppError("FORBIDDEN", "Workspace membership is not active.");
   }
 
-  const role = await findRoleById(membership.roleId);
+  const role = await findRoleByIdInWorkspace(membership.roleId, workspaceId);
 
   if (!role) {
     throw new AppError("INTERNAL_ERROR", "Membership role not found.", {

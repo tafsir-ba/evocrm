@@ -66,6 +66,44 @@ function withBuildDefaults(input: EnvInput): EnvInput {
   };
 }
 
+const PRODUCTION_REQUIRED_KEYS = [
+  "NEXTAUTH_URL",
+  "NEXTAUTH_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "DIGITALOCEAN_SPACES_ENDPOINT",
+  "DIGITALOCEAN_SPACES_REGION",
+  "DIGITALOCEAN_SPACES_BUCKET",
+  "DIGITALOCEAN_SPACES_KEY",
+  "DIGITALOCEAN_SPACES_SECRET",
+  "RESEND_API_KEY",
+  "EMAIL_FROM",
+  "EMAIL_REPLY_TO",
+  "CRON_SECRET",
+] as const satisfies readonly (keyof Env)[];
+
+export function getProductionRequiredKeys(): readonly (keyof Env)[] {
+  return PRODUCTION_REQUIRED_KEYS;
+}
+
+export function validateProductionEnv(env: Env): void {
+  if (env.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+
+  const missing = PRODUCTION_REQUIRED_KEYS.filter((key) => !env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required production environment variables: ${missing.join(", ")}`,
+    );
+  }
+}
+
 export function parseEnv(input: EnvInput = process.env): Env {
   const result = envSchema.safeParse(withBuildDefaults(input));
 

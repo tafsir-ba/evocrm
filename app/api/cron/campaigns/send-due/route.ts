@@ -7,7 +7,7 @@ function requireCronAuth(request: Request): void {
   const env = getEnv();
 
   if (!env.CRON_SECRET) {
-    throw new AppError("INTERNAL_ERROR", "Cron is not configured.", { expose: false });
+    throw new AppError("UNAUTHENTICATED", "Invalid cron authorization.");
   }
 
   const authHeader = request.headers.get("authorization");

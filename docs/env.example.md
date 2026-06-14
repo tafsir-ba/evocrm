@@ -177,6 +177,21 @@ Other variables may use test doubles or mocks per `/docs/testing-strategy.md`.
 
 ---
 
+## Production Validation (Phase 13)
+
+When `NODE_ENV=production` at **runtime** (first DB connect), `validateProductionEnv()` fail fast if any of the following are missing:
+
+```txt
+NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+DIGITALOCEAN_SPACES_ENDPOINT, DIGITALOCEAN_SPACES_REGION, DIGITALOCEAN_SPACES_BUCKET
+DIGITALOCEAN_SPACES_KEY, DIGITALOCEAN_SPACES_SECRET
+RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO, CRON_SECRET
+```
+
+Stripe variables remain optional until live billing is enabled.
+
+---
+
 ## Security Notes
 
 - Never commit `.env`, `.env.local`, or real credentials

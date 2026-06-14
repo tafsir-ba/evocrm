@@ -1,21 +1,32 @@
 import "server-only";
 
+import { seedDemoWorkspace } from "@/server/seed/demo-workspace";
+
 /**
- * Seed / demo data scaffold.
+ * Seed / demo data entry point.
  *
- * Future phases will add:
- * - demo workspace and memberships
- * - sample leads/properties for E2E
+ * Creates (idempotently):
+ * - demo credentials user (demo@evocrm.local)
+ * - demo workspace (demo-agency slug)
+ * - sample leads, properties, opportunities, activities, campaign, integration
  *
- * Default dictionaries are seeded via ensureDefaultDictionaries() in
- * /server/services/default-dictionaries.ts (workspace creation + context load).
+ * Default dictionaries and roles are created via workspace creation.
  */
 
 export type SeedOptions = {
   dryRun?: boolean;
+  password?: string;
 };
 
-export async function runSeed(_options: SeedOptions = {}): Promise<void> {
-  // Reserved for Phase 2+ demo and test fixtures.
-  return Promise.resolve();
+export { DEMO_USER_EMAIL, DEMO_WORKSPACE_SLUG } from "@/server/seed/demo-workspace";
+
+export async function runSeed(options: SeedOptions = {}): Promise<void> {
+  const result = await seedDemoWorkspace({
+    dryRun: options.dryRun,
+    password: options.password,
+  });
+
+  console.info(
+    `[seed] workspace=${result.workspaceSlug} created=${result.created} userId=${result.userId}`,
+  );
 }

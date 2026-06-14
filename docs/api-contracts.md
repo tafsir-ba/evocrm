@@ -770,6 +770,23 @@ Inbound leads set `sourceId` from dictionary item `lead_source` key `website` wh
 
 ---
 
+## Workspace Export (Phase 13)
+
+Workspace-scoped backup/export for admins:
+
+```txt
+GET /api/workspaces/[workspaceSlug]/export
+```
+
+- Requires active membership and `settings:read` or `settings:update`
+- Returns JSON bundle `{ data: { export: { … } } }`
+- Includes metadata for all major workspace entities
+- Excludes: raw API keys, `apiKeyHash`, `credentialsEncrypted`, `storageKey`, signed URLs, file binaries
+- Writes `workspace.exported` audit log with record counts
+- Synchronous response — large workspaces may be slow; async export is a future enhancement
+
+---
+
 ## Request Validation
 
 - All mutation bodies validated with Zod on the server.

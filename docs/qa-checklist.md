@@ -428,6 +428,24 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 13 — Final Hardening / Beta Release
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] `/docs/qa/*` deliverables exist (bugs, security, isolation, permissions, edge cases, regression, release-readiness, deployment)
+- [ ] `AuditLog` model persisted; `createAuditLog()` sanitizes secrets
+- [ ] `GET /api/workspaces/[workspaceSlug]/export` workspace-scoped backup
+- [ ] Production env fail-fast validation
+- [ ] `captureError` placeholder for server error tracking
+- [ ] Seed script: `npm run seed` (demo workspace, idempotent)
+- [ ] E2E smoke expanded (public routes, cron, webhook auth)
+- [ ] No critical auth/workspace/permission defects
+- [ ] No scope creep (V1 nav unchanged)
+- [ ] Release readiness verdict documented
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.
 
 See `/docs/release-gates.md` for merge rules.
