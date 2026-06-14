@@ -1,24 +1,8 @@
 import "server-only";
 
-import { getEnv } from "@/server/env";
-
-function parsePlatformAdminEmails(raw: string | undefined): Set<string> {
-  if (!raw) {
-    return new Set();
-  }
-
-  return new Set(
-    raw
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
-
-export function getPlatformAdminEmails(): Set<string> {
-  return parsePlatformAdminEmails(getEnv().PLATFORM_ADMIN_EMAILS);
-}
+/** Sole platform operator account for cross-workspace admin tools. */
+export const PLATFORM_ADMIN_EMAIL = "tafsir@evo-home.ch";
 
 export function isPlatformAdminEmail(email: string): boolean {
-  return getPlatformAdminEmails().has(email.trim().toLowerCase());
+  return email.trim().toLowerCase() === PLATFORM_ADMIN_EMAIL;
 }

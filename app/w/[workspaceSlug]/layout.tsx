@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { WorkspaceShellProvider } from "@/components/layout/workspace-shell-context";
+import { isPlatformAdminEmail } from "@/server/auth/platform-admin";
 import {
   getWorkspaceInitials,
   listActiveWorkspacesForUser,
@@ -35,6 +36,7 @@ export default async function WorkspaceLayout({
           initials: getWorkspaceInitials(workspace.name),
         })),
         permissionDenied: access.permissionDenied,
+        isPlatformAdmin: isPlatformAdminEmail(access.user.email),
       }}
     >
       <AppShell>{children}</AppShell>

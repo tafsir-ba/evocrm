@@ -31,6 +31,7 @@ export type WorkspaceShellContextValue = {
     initials: string;
   }>;
   permissionDenied?: boolean;
+  isPlatformAdmin?: boolean;
 };
 
 const WorkspaceShellContext = createContext<WorkspaceShellContextValue | null>(

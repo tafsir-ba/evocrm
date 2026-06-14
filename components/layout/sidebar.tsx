@@ -14,6 +14,7 @@ import {
   IconPipeline,
   IconProperties,
   IconSettings,
+  IconShield,
 } from "@/lib/icons";
 import { workspaceNavPath } from "@/lib/workspace-paths";
 import type { V1NavSegment } from "@/lib/v1-navigation";
@@ -37,7 +38,7 @@ export function Sidebar({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
-  const { workspace, navigation, workspaces } = useWorkspaceShell();
+  const { workspace, navigation, workspaces, isPlatformAdmin } = useWorkspaceShell();
 
   return (
     <aside
@@ -131,6 +132,39 @@ export function Sidebar({
           );
         })}
       </nav>
+
+      {isPlatformAdmin && (
+        <div className="px-2 py-2 border-t border-[var(--color-line)]">
+          {!collapsed && (
+            <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-faint)]">
+              Platform
+            </p>
+          )}
+          <Link
+            href="/admin"
+            onClick={onNavigate}
+            className={cn(
+              "group flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13.5px] font-medium transition-colors focus-ring",
+              pathname?.startsWith("/admin")
+                ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)]"
+                : "text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]",
+              collapsed && "justify-center",
+            )}
+            title={collapsed ? "Platform admin" : undefined}
+          >
+            <IconShield
+              size={17}
+              className={cn(
+                "shrink-0",
+                pathname?.startsWith("/admin")
+                  ? "text-[var(--color-brand-600)]"
+                  : "text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink-soft)]",
+              )}
+            />
+            {!collapsed && <span className="truncate">Platform admin</span>}
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }

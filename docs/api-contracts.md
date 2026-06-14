@@ -808,7 +808,7 @@ POST /api/feedback
 
 ### Platform admin
 
-Gate: `PLATFORM_ADMIN_EMAILS` env list (email match, case-insensitive).
+Gate: hardcoded platform operator email `tafsir@evo-home.ch` (`server/auth/platform-admin.ts`).
 
 ```txt
 GET    /api/admin/feedback
@@ -826,7 +826,7 @@ GET    /api/admin/feedback/summary
 - DELETE hard-deletes row and best-effort storage blobs; writes `feedback.delete` audit
 - Audit actions: `feedback.resolve`, `feedback.reopen`, `feedback.delete` (`entityType: feedback`)
 
-UI: floating widget on authenticated workspace shell; admin queue at `/admin/feedback`.
+UI: floating widget on authenticated workspace shell; platform admin menu at `/admin` (sidebar link visible only to `tafsir@evo-home.ch`).
 
 ---
 

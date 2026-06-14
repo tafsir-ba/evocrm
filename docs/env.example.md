@@ -31,7 +31,6 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 | `STRIPE_SECRET_KEY` | Phase 11 | Only if live billing implemented |
 | `STRIPE_WEBHOOK_SECRET` | Phase 11 | Only if live billing implemented |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Phase 11 | Only if checkout UI added |
-| `PLATFORM_ADMIN_EMAILS` | Phase 14 | Comma-separated emails for `/admin/feedback` access |
 
 ---
 
@@ -122,13 +121,7 @@ Access via signed URLs only. Not required before Phase 8.
 | `STRIPE_WEBHOOK_SECRET` | Phase 11 | Stripe webhook signing secret |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Phase 11 | Client-side key if checkout UI added |
 
----
-
-## Platform Admin (Phase 14)
-
-| Variable | Required from | Description |
-|----------|---------------|-------------|
-| `PLATFORM_ADMIN_EMAILS` | Phase 14 | Comma-separated operator emails allowed to access `/admin/feedback` and `/api/admin/feedback/*` |
+Platform admin access is hardcoded to `tafsir@evo-home.ch` in `server/auth/platform-admin.ts` — no env var required.
 
 ---
 

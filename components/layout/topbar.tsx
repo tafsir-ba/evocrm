@@ -14,6 +14,7 @@ import {
   IconLogout,
   IconUser,
   IconSettings,
+  IconShield,
 } from "@/lib/icons";
 import { workspaceNavPath } from "@/lib/workspace-paths";
 import { cn } from "@/lib/utils";
@@ -25,7 +26,7 @@ export function Topbar({
   onOpenMobileNav?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, workspace, navigation } = useWorkspaceShell();
+  const { user, workspace, navigation, isPlatformAdmin } = useWorkspaceShell();
   const canAccessSettings = navigation.some((item) => item.segment === "settings");
 
   const displayName = user.name ?? user.email;
@@ -110,6 +111,11 @@ export function Topbar({
                   href={workspaceNavPath(workspace.slug, "settings")}
                 >
                   Workspace settings
+                </MenuItem>
+              )}
+              {isPlatformAdmin && (
+                <MenuItem icon={<IconShield size={15} />} href="/admin">
+                  Platform admin
                 </MenuItem>
               )}
               <div className="my-1 border-t border-[var(--color-line)]" />
