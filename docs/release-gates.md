@@ -209,6 +209,8 @@ Before requesting Codex review:
 | Phase 5 complete | Properties CRUD (supply capture, dictionary-backed status/type, project linking) |
 | Phase 6 complete | Opportunities CRUD + Pipeline (lead/property linking, behavior-based stages, backend pipeline totals) |
 | Phase 7 complete | Activities CRUD + timeline (relationship validation, behavior-based complete/cancel, overdue/upcoming views) |
+| Phase 8 complete | Documents / Files (upload auth, signed URLs, linked entity validation, archive) |
+| Phase 9 complete | Dashboard / Analytics (backend-driven metrics, date range, dictionary-backed charts, `dashboard:read`) |
 | MVP feature complete | Phases 1–10 on dev |
 | Beta | Phase 13 on main |
 | V1 GA | Beta stable + billing (Phase 11) as scoped |

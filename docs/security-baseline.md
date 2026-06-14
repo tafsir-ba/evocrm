@@ -152,6 +152,24 @@ Activities, Files, and timeline Notes tabs on opportunity detail: **Phase 7** Ac
 
 ---
 
+## Phase 9 Dashboard (implemented)
+
+Dashboard APIs enforce `dashboard:read` only — aggregate metrics do not require separate `lead:read`, `property:read`, etc. for high-level counts.
+
+```txt
+dashboard:read — all GET /dashboard/* routes and /w/[workspaceSlug]/dashboard page
+```
+
+All metrics are workspace-scoped via server-resolved `workspaceId`. Client-provided `workspaceId` is ignored. `dateFrom`/`dateTo` are validated; default range is last 30 days.
+
+Won/lost/open pipeline logic uses `DictionaryItem.behavior` only. Currency totals are grouped by opportunity `currency` — no silent cross-currency sums.
+
+`activitiesDueToday` uses workspace timezone day boundaries. Overdue counts exclude completed, cancelled, and archived activities.
+
+Reports and Analytics are **not** primary navigation — Dashboard is the V1 analytics surface.
+
+---
+
 ## Phase 5 Properties (implemented)
 
 Property APIs enforce workspace isolation and property permissions:

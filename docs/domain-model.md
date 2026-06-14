@@ -464,6 +464,25 @@ Documents are embedded under Lead/Property/Opportunity detail Files tabs — **n
 
 ---
 
+## Dashboard Metrics (Phase 9)
+
+Dashboard is read-only aggregation over existing entities — no new persisted model. Metrics are computed server-side per request (with MongoDB `countDocuments` / `aggregate`).
+
+| Metric | Source entities | Behavior |
+|--------|-----------------|----------|
+| New leads | Lead | `createdAt` in date range; archived excluded |
+| Active opportunities | Opportunity + `opportunity_status` | `behavior = open`; not date-bounded |
+| Won / lost opportunities | Opportunity + `opportunity_status` | `terminal_won` / `terminal_lost` + close timestamps in date range |
+| Active pipeline / won value | Opportunity | Sum `value` grouped by `currency`; open or won only |
+| Activities due today / overdue | Activity + `activity_status` | Pending behavior; due today uses `Workspace.timezone` |
+| Leads by source | Lead + `lead_source` | Date-bounded grouping |
+| Properties by status | Property + `property_status` | Current inventory snapshot |
+| Opportunities by stage | Opportunity + `opportunity_status` | Dictionary order; all non-archived |
+
+Reports and Analytics remain non-V1 primary modules.
+
+---
+
 ### Campaign
 
 Drip email campaign.

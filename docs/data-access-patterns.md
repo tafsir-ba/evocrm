@@ -358,7 +358,9 @@ Never paginate without `workspaceId` in the filter.
 
 ## Aggregation / Dashboard Queries
 
-Dashboard aggregations must always start with `$match: { workspaceId }`.
+**Phase 9 — implemented** in `/server/repositories/dashboard.ts` and `/server/services/dashboard.ts`.
+
+Dashboard aggregations must always start with `$match: { workspaceId }` via `withWorkspaceScope`.
 
 ```ts
 Opportunity.aggregate([
@@ -366,6 +368,21 @@ Opportunity.aggregate([
   { $group: { _id: "$statusId", count: { $sum: 1 } } },
 ]);
 ```
+
+**Patterns:**
+
+| Query | Repository helper | Notes |
+|-------|-------------------|-------|
+| New leads count | `countLeadsCreatedInRange` | `createdAt` bounds; excludes archived |
+| Open/won/lost counts | `countOpportunitiesByStatusIds`, `countWon/LostOpportunitiesInRange` | Status IDs resolved from dictionary `behavior`, never labels |
+| Pipeline/value sums | `sumOpportunityValuesByCurrency`, `groupOpportunitiesByStatus` | Grouped by `currency`; no conversion |
+| Leads by source | `groupLeadsBySource` | Date-bounded; null `sourceId` → unknown bucket |
+| Properties by status | `groupPropertiesByStatus` | Current state; excludes archived |
+| Activities due/overdue | `countActivitiesDueToday`, `countOverdueActivities` | Pending status IDs; due today uses workspace day bounds |
+
+**Date range:** normalized in service via `resolveDashboardDateRange` (default last 30 days). **Timezone:** `getDayBoundsInTimezone` for activities due today.
+
+**Lists:** recent opportunities and upcoming activities use paginated repository queries with small `limit` (default 10, max 25) — never load full collections.
 
 ---
 

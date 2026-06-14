@@ -346,9 +346,64 @@ POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enroll
 
 ### Dashboard
 
+**Phase 9 — implemented.** Workspace-scoped backend-driven analytics. Requires `dashboard:read` on all routes. Reports and Analytics are **not** separate V1 modules — Dashboard is the V1 reports surface.
+
 ```txt
+GET    /api/workspaces/[workspaceSlug]/dashboard                 # consolidated page payload
 GET    /api/workspaces/[workspaceSlug]/dashboard/summary
+GET    /api/workspaces/[workspaceSlug]/dashboard/pipeline
+GET    /api/workspaces/[workspaceSlug]/dashboard/activities
+GET    /api/workspaces/[workspaceSlug]/dashboard/sources
+GET    /api/workspaces/[workspaceSlug]/dashboard/properties
 ```
+
+| Method | Permission |
+|--------|------------|
+| GET (all dashboard routes) | `dashboard:read` |
+
+**Shared query params:** `dateFrom`, `dateTo` (ISO dates, must be provided together), `periodDays` (1–366, rolling window ending now), optional `timezone` (defaults to `Workspace.timezone`), optional `limit` (1–25, list endpoints).
+
+**Default date range:** last 30 days ending now when no date params provided. `periodDays` and `dateFrom`/`dateTo` are mutually exclusive.
+
+**`GET /dashboard/summary`** returns `{ dateRange, metrics }` where `metrics` includes:
+
+```txt
+newLeads
+activeOpportunities
+wonOpportunities
+lostOpportunities
+activePipelineValue[]   # grouped by currency
+wonValue[]              # grouped by currency
+activitiesDueToday
+overdueActivities
+```
+
+**Metric definitions:**
+
+| Metric | Definition |
+|--------|------------|
+| `newLeads` | Leads with `createdAt` in date range; `archivedAt: null` |
+| `activeOpportunities` | Opportunities where `opportunity_status.behavior = open`; not date-bounded |
+| `wonOpportunities` | `behavior = terminal_won` and `wonAt` (fallback `closedAt`) in date range |
+| `lostOpportunities` | `behavior = terminal_lost` and `lostAt` (fallback `closedAt`) in date range |
+| `activePipelineValue` | Sum of `value` for open opportunities only, grouped by `currency` |
+| `wonValue` | Sum of `value` for terminal_won in date range, grouped by `currency` |
+| `activitiesDueToday` | Pending activities with `dueDate` in current workspace day |
+| `overdueActivities` | Pending activities with `dueDate < now`; excludes completed/cancelled/archived |
+
+**`GET /dashboard/pipeline`** returns stages from `opportunity_status` dictionary (ordered), with per-stage `count` and `valueByCurrency`, plus `activePipelineValue` (open only).
+
+**`GET /dashboard/activities`** returns `dueToday`, `overdue`, and `upcoming` counts/lists (pending behavior; workspace timezone for due today).
+
+**`GET /dashboard/sources`** returns leads grouped by `lead_source` dictionary item for the date range; includes null/unknown bucket when needed.
+
+**`GET /dashboard/properties`** returns active properties grouped by `property_status` dictionary item (current state, not date-bounded).
+
+**`GET /dashboard`** consolidates summary, pipeline, activities, sources, properties, and `recentOpportunities` (limit 10 default).
+
+**Currency:** no conversion in V1; totals are grouped by opportunity `currency`. Frontend must not sum mixed currencies into one number.
+
+**Zero-data:** all metrics return `0` or empty arrays; no errors when workspace has no records.
 
 ### Dictionaries / Tags (Phase 3 — implemented)
 

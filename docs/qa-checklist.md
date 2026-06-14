@@ -351,6 +351,31 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 9 Dashboard Checklist
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Dashboard APIs under `/api/workspaces/[workspaceSlug]/dashboard/*`
+- [ ] `dashboard:read` enforced server-side on all dashboard routes and page
+- [ ] Metrics calculated backend-side (not client-side full-record aggregation)
+- [ ] `newLeads` date-scoped; excludes archived leads
+- [ ] `activeOpportunities` uses `opportunity_status.behavior = open` (not date-bounded)
+- [ ] `wonOpportunities` / `lostOpportunities` use terminal behaviors + date range on `wonAt`/`lostAt` (fallback `closedAt`)
+- [ ] `activePipelineValue` includes open opportunities only; grouped by currency
+- [ ] `wonValue` grouped by currency for terminal_won in date range
+- [ ] `activitiesDueToday` uses pending behavior + workspace timezone day bounds
+- [ ] `overdueActivities` excludes completed, cancelled, and archived activities
+- [ ] Pipeline/sources/properties charts use dictionary labels/colors/order from backend
+- [ ] Recent opportunities and upcoming activities lists are limited and workspace-scoped
+- [ ] Date range defaults to last 30 days; `dateFrom <= dateTo` validated
+- [ ] Zero-data workspace returns safe zeros/empty arrays
+- [ ] Dashboard UI at `/w/[workspaceSlug]/dashboard` renders backend metrics with loading/empty/error/forbidden states
+- [ ] Reports and Analytics are not primary navigation modules
+- [ ] Unit tests for dashboard service, API permissions, metric behavior, zero-data
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

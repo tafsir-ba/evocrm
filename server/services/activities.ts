@@ -314,7 +314,7 @@ async function resolveOpportunitySummary(
   };
 }
 
-async function enrichActivityListItem(activity: ActivityRecord): Promise<ActivityListItem> {
+export async function enrichActivityListItem(activity: ActivityRecord): Promise<ActivityListItem> {
   const [type, status, lead, property, opportunity, assignedUser] = await Promise.all([
     resolveDictionarySummary(activity.workspaceId, activity.typeId, "activity_type"),
     resolveDictionarySummary(activity.workspaceId, activity.statusId, "activity_status"),
