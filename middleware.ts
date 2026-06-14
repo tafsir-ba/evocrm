@@ -5,7 +5,7 @@ import { getAuthConfig } from "@/auth.config";
 
 const { auth } = NextAuth(getAuthConfig());
 
-const PUBLIC_PATHS = ["/login", "/signup", "/api/auth"];
+const PUBLIC_PATHS = ["/login", "/signup", "/api/auth", "/unsubscribe"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(

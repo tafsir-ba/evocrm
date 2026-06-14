@@ -288,13 +288,16 @@ All activity queries use `{ workspaceId, _id }` — never `Activity.findById` wi
 
 All document queries use `{ workspaceId, _id }` — never `Document.findById` without workspace verification. Active lists exclude `status=archived` and `status=failed` by default.
 
-### Campaigns
+### Campaigns (Phase 10 — implemented)
 
 ```txt
-{ workspaceId: 1, campaignId: 1 }          // CampaignStep, Enrollment, Send
-{ workspaceId: 1, status: 1 }              // Campaign
-{ workspaceId: 1, nextSendAt: 1 }          // CampaignEnrollment — cron queries
+{ workspaceId: 1 }                          // Campaign, Step, Enrollment, Send
+{ workspaceId: 1, status: 1 }              // Campaign list filters
+{ workspaceId: 1, campaignId: 1, order: 1 } // CampaignStep — unique
+{ workspaceId: 1, status: 1, nextSendAt: 1 } // CampaignEnrollment — cron due query
 ```
+
+Campaign send flow: cron `sendDueCampaignEmails()` → validate active campaign/enrollment → skip missing email/unsubscribed → Resend send → `CampaignSend` log → advance enrollment or mark completed.
 
 ### Dictionaries (Phase 3)
 

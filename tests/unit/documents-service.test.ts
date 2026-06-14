@@ -19,6 +19,10 @@ vi.mock("@/server/repositories/opportunities", () => ({
   findOpportunityById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/campaigns", () => ({
+  findCampaignById: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -66,6 +70,7 @@ import {
   findDocuments,
 } from "@/server/repositories/documents";
 import { findLeadById } from "@/server/repositories/leads";
+import { findCampaignById } from "@/server/repositories/campaigns";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
 import { findUserById } from "@/server/repositories/users";
@@ -159,7 +164,9 @@ describe("documents service", () => {
     }));
   });
 
-  it("rejects campaign linked entity before Phase 10", async () => {
+  it("rejects campaign linked entity when campaign not found", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue(null);
+
     await expect(
       createDocumentUploadUrlForWorkspace(
         "ws-1",
@@ -174,7 +181,7 @@ describe("documents service", () => {
           visibility: "private",
         },
       ),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("rejects upload when linked lead is archived", async () => {

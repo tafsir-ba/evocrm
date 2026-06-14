@@ -1,6 +1,7 @@
 import "server-only";
 
 import { findLeadById } from "@/server/repositories/leads";
+import { findCampaignById } from "@/server/repositories/campaigns";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
 import { AppError } from "@/server/errors";
@@ -24,11 +25,18 @@ export async function validateDocumentLinkedEntity(
   linkedEntityId: string,
 ): Promise<ValidatedDocumentLinkedEntity> {
   if (linkedEntityType === "campaign") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "Campaign document attachments are not supported until Phase 10.",
-      { details: { linkedEntityType } },
-    );
+    const campaign = await findCampaignById(workspaceId, linkedEntityId);
+
+    if (!campaign || campaign.archivedAt) {
+      throw new AppError("NOT_FOUND", "Linked campaign not found.");
+    }
+
+    return {
+      linkedEntityType,
+      linkedEntityId,
+      readPermission: "campaign:read",
+      updatePermission: "campaign:update",
+    };
   }
 
   if (linkedEntityType === "lead") {

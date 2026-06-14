@@ -1,21 +1,21 @@
-import { CampaignsPanel } from "@/components/campaigns/campaigns-panel";
+import { CampaignDetailPanel } from "@/components/campaigns/campaign-detail-panel";
 import { PageContainer } from "@/components/layout/page-header";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
-type Params = Promise<{ workspaceSlug: string }>;
+type Params = Promise<{ workspaceSlug: string; campaignId: string }>;
 
-export const metadata = { title: "Dripping — EvoHome CRM" };
+export const metadata = { title: "Campaign — EvoHome CRM" };
 
-export default async function DrippingPage({ params }: { params: Params }) {
-  const { workspaceSlug } = await params;
+export default async function CampaignDetailPage({ params }: { params: Params }) {
+  const { workspaceSlug, campaignId } = await params;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
     return (
       <PageContainer>
         <p className="text-[13px] text-[var(--color-ink-muted)]">
-          You do not have permission to view dripping campaigns.
+          You do not have permission to view this campaign.
         </p>
       </PageContainer>
     );
@@ -25,9 +25,9 @@ export default async function DrippingPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <CampaignsPanel
+      <CampaignDetailPanel
         workspaceSlug={workspaceSlug}
-        canCreate={hasPermission(permissions, "campaign:create")}
+        campaignId={campaignId}
         canUpdate={hasPermission(permissions, "campaign:update")}
         canArchive={hasPermission(permissions, "campaign:archive")}
       />

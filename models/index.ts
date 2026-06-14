@@ -11,3 +11,10 @@ export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";
 export { ActivityModel, type ActivityDocument } from "./activity";
 export { DocumentModel, type DocumentDocument } from "./document";
+export { CampaignModel, type CampaignDocument } from "./campaign";
+export { CampaignStepModel, type CampaignStepDocument } from "./campaign-step";
+export {
+  CampaignEnrollmentModel,
+  type CampaignEnrollmentDocument,
+} from "./campaign-enrollment";
+export { CampaignSendModel, type CampaignSendDocument } from "./campaign-send";

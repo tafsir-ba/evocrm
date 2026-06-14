@@ -454,7 +454,7 @@ File attached to a workspace entity.
 | `updatedAt` | |
 | `archivedAt` | |
 
-**Linked entities (Phase 8):** `lead`, `property`, `opportunity` fully supported. `campaign` accepted at model level but upload rejected until Phase 10.
+**Linked entities (Phase 8–10):** `lead`, `property`, `opportunity`, and `campaign` fully supported for document upload when entity exists in workspace and is not archived.
 
 **Storage key pattern:** `workspaces/{workspaceId}/{linkedEntityType}/{linkedEntityId}/{uuid}/{sanitizedFileName}`
 

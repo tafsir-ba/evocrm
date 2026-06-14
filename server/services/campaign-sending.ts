@@ -1,0 +1,406 @@
+import "server-only";
+
+import { createAuditLog } from "@/server/audit/create-audit-log";
+import {
+  buildCampaignEmailHtml,
+  sendCampaignEmail,
+} from "@/server/email/resend";
+import { AppError } from "@/server/errors";
+import { findLeadById } from "@/server/repositories/leads";
+import {
+  findDueEnrollments,
+  updateCampaignEnrollment,
+  type CampaignEnrollmentRecord,
+} from "@/server/repositories/campaign-enrollments";
+import {
+  findCampaignStepById,
+  findNextStepAfterOrder,
+  findStepByOrder,
+} from "@/server/repositories/campaign-steps";
+import { findCampaignById } from "@/server/repositories/campaigns";
+import { createCampaignSend } from "@/server/repositories/campaign-sends";
+import {
+  createUnsubscribeToken,
+  buildUnsubscribeUrl,
+} from "@/server/utils/unsubscribe-token";
+
+export type SendDueSummary = {
+  processed: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+};
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+const SKIP_RETRY_DELAY_DAYS = 1;
+const FAILURE_RETRY_DELAY_DAYS = 1;
+
+async function deferEnrollmentRetry(
+  workspaceId: string,
+  enrollmentId: string,
+  from: Date,
+  delayDays: number,
+): Promise<void> {
+  await updateCampaignEnrollment(workspaceId, enrollmentId, {
+    nextSendAt: addDays(from, delayDays),
+  });
+}
+
+function isLeadUnsubscribed(lead: {
+  emailConsentStatus: string;
+  emailUnsubscribedAt: Date | null;
+}): boolean {
+  return (
+    lead.emailConsentStatus === "unsubscribed" || lead.emailUnsubscribedAt !== null
+  );
+}
+
+async function recordSkippedSend(params: {
+  workspaceId: string;
+  enrollment: CampaignEnrollmentRecord;
+  stepId: string;
+  reason: string;
+  actorId?: string;
+}): Promise<void> {
+  await createCampaignSend(params.workspaceId, {
+    campaignId: params.enrollment.campaignId,
+    campaignStepId: params.stepId,
+    enrollmentId: params.enrollment.id,
+    leadId: params.enrollment.leadId,
+    opportunityId: params.enrollment.opportunityId,
+    status: "skipped",
+    error: params.reason,
+    scheduledFor: params.enrollment.nextSendAt,
+    sentAt: null,
+  });
+
+  await createAuditLog({
+    workspaceId: params.workspaceId,
+    actorId: params.actorId ?? "system",
+    action: "campaign_email.skipped",
+    entityType: "campaign_send",
+    entityId: params.enrollment.id,
+    after: { reason: params.reason, enrollmentId: params.enrollment.id },
+  });
+}
+
+async function processEnrollment(
+  enrollment: CampaignEnrollmentRecord,
+): Promise<"sent" | "skipped" | "failed"> {
+  const workspaceId = enrollment.workspaceId;
+
+  const campaign = await findCampaignById(workspaceId, enrollment.campaignId);
+
+  if (!campaign || campaign.status !== "active") {
+    const step = await findStepByOrder(
+      workspaceId,
+      enrollment.campaignId,
+      enrollment.currentStep,
+    );
+
+    if (step) {
+      await recordSkippedSend({
+        workspaceId,
+        enrollment,
+        stepId: step.id,
+        reason:
+          campaign?.status === "paused"
+            ? "Campaign is paused."
+            : "Campaign is not active.",
+      });
+      await deferEnrollmentRetry(
+        workspaceId,
+        enrollment.id,
+        new Date(),
+        SKIP_RETRY_DELAY_DAYS,
+      );
+    }
+
+    return "skipped";
+  }
+
+  if (enrollment.status !== "active") {
+    const step = await findStepByOrder(
+      workspaceId,
+      enrollment.campaignId,
+      enrollment.currentStep,
+    );
+
+    if (step) {
+      await recordSkippedSend({
+        workspaceId,
+        enrollment,
+        stepId: step.id,
+        reason: "Enrollment is not active.",
+      });
+    }
+
+    return "skipped";
+  }
+
+  const step = await findStepByOrder(
+    workspaceId,
+    enrollment.campaignId,
+    enrollment.currentStep,
+  );
+
+  if (!step) {
+    await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      status: "failed",
+      failedAt: new Date(),
+      failureReason: "Campaign step not found.",
+    });
+
+    return "failed";
+  }
+
+  if (!enrollment.leadId) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Enrollment has no associated lead.",
+    });
+    await deferEnrollmentRetry(
+      workspaceId,
+      enrollment.id,
+      new Date(),
+      SKIP_RETRY_DELAY_DAYS,
+    );
+
+    return "skipped";
+  }
+
+  const lead = await findLeadById(workspaceId, enrollment.leadId);
+
+  if (!lead) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Lead not found.",
+    });
+    await deferEnrollmentRetry(
+      workspaceId,
+      enrollment.id,
+      new Date(),
+      SKIP_RETRY_DELAY_DAYS,
+    );
+
+    return "skipped";
+  }
+
+  if (!lead.email) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Lead has no email address.",
+    });
+    await deferEnrollmentRetry(
+      workspaceId,
+      enrollment.id,
+      new Date(),
+      SKIP_RETRY_DELAY_DAYS,
+    );
+
+    return "skipped";
+  }
+
+  if (isLeadUnsubscribed(lead)) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Lead is unsubscribed.",
+    });
+
+    await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      status: "unsubscribed",
+      unsubscribedAt: new Date(),
+    });
+
+    return "skipped";
+  }
+
+  const token = createUnsubscribeToken({
+    workspaceId,
+    leadId: lead.id,
+    enrollmentId: enrollment.id,
+    campaignId: campaign.id,
+  });
+  const unsubscribeUrl = buildUnsubscribeUrl(token);
+  const html = buildCampaignEmailHtml(step.body, unsubscribeUrl);
+
+  const sendResult = await sendCampaignEmail({
+    to: lead.email,
+    subject: step.subject,
+    html,
+    text: `${step.body}\n\nUnsubscribe: ${unsubscribeUrl}`,
+  });
+
+  const now = new Date();
+
+  if (!sendResult.success) {
+    await createCampaignSend(workspaceId, {
+      campaignId: enrollment.campaignId,
+      campaignStepId: step.id,
+      enrollmentId: enrollment.id,
+      leadId: enrollment.leadId,
+      opportunityId: enrollment.opportunityId,
+      status: "failed",
+      error: sendResult.error,
+      scheduledFor: enrollment.nextSendAt,
+      sentAt: null,
+    });
+
+    await createAuditLog({
+      workspaceId,
+      actorId: "system",
+      action: "campaign_email.failed",
+      entityType: "campaign_send",
+      entityId: enrollment.id,
+      after: { error: sendResult.error, enrollmentId: enrollment.id },
+    });
+
+    await deferEnrollmentRetry(
+      workspaceId,
+      enrollment.id,
+      now,
+      FAILURE_RETRY_DELAY_DAYS,
+    );
+
+    return "failed";
+  }
+
+  await createCampaignSend(workspaceId, {
+    campaignId: enrollment.campaignId,
+    campaignStepId: step.id,
+    enrollmentId: enrollment.id,
+    leadId: enrollment.leadId,
+    opportunityId: enrollment.opportunityId,
+    status: "sent",
+    providerMessageId: sendResult.messageId,
+    scheduledFor: enrollment.nextSendAt,
+    sentAt: now,
+  });
+
+  await createAuditLog({
+    workspaceId,
+    actorId: "system",
+    action: "campaign_email.sent",
+    entityType: "campaign_send",
+    entityId: enrollment.id,
+    after: {
+      messageId: sendResult.messageId,
+      enrollmentId: enrollment.id,
+      stepId: step.id,
+    },
+  });
+
+  const nextStep = await findNextStepAfterOrder(
+    workspaceId,
+    enrollment.campaignId,
+    step.order,
+  );
+
+  if (nextStep) {
+    await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      currentStep: nextStep.order,
+      nextSendAt: addDays(now, nextStep.delayDays),
+      lastSentAt: now,
+    });
+  } else {
+    await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      status: "completed",
+      completedAt: now,
+      lastSentAt: now,
+    });
+
+    await createAuditLog({
+      workspaceId,
+      actorId: "system",
+      action: "campaign_enrollment.completed",
+      entityType: "campaign_enrollment",
+      entityId: enrollment.id,
+    });
+  }
+
+  return "sent";
+}
+
+export async function sendDueCampaignEmails(
+  limit = 50,
+): Promise<SendDueSummary> {
+  const dueEnrollments = await findDueEnrollments(limit);
+
+  const summary: SendDueSummary = {
+    processed: 0,
+    sent: 0,
+    skipped: 0,
+    failed: 0,
+  };
+
+  for (const enrollment of dueEnrollments) {
+    try {
+      const outcome = await processEnrollment(enrollment);
+      summary.processed += 1;
+
+      if (outcome === "sent") {
+        summary.sent += 1;
+      } else if (outcome === "skipped") {
+        summary.skipped += 1;
+      } else {
+        summary.failed += 1;
+      }
+    } catch {
+      summary.processed += 1;
+      summary.failed += 1;
+    }
+  }
+
+  return summary;
+}
+
+export async function listCampaignSendsForWorkspace(
+  workspaceId: string,
+  campaignId: string,
+  filter: { status?: "queued" | "sent" | "failed" | "skipped"; page?: number; pageSize?: number } = {},
+) {
+  const campaign = await findCampaignById(workspaceId, campaignId);
+
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  const { findCampaignSends } = await import("@/server/repositories/campaign-sends");
+  const { sends, total } = await findCampaignSends(workspaceId, campaignId, filter);
+
+  const enriched = await Promise.all(
+    sends.map(async (send) => {
+      let leadName: string | null = null;
+      let stepSubject: string | null = null;
+
+      if (send.leadId) {
+        const lead = await findLeadById(workspaceId, send.leadId);
+        leadName = lead?.fullName ?? null;
+      }
+
+      const step = await findCampaignStepById(
+        workspaceId,
+        campaignId,
+        send.campaignStepId,
+      );
+      stepSubject = step?.subject ?? null;
+
+      return { ...send, leadName, stepSubject };
+    }),
+  );
+
+  return { sends: enriched, total };
+}

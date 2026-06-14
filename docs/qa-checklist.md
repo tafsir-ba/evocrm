@@ -145,8 +145,8 @@ A phase with any **Missing / deviating** item in a critical section cannot merge
 - [ ] No workspace data leak vectors identified
 - [ ] No secrets committed
 - [ ] Document access requires auth + permission (Phase 8+)
-- [ ] Campaign cron protected by `CRON_SECRET` (Phase 10+)
-- [ ] Unsubscribe behavior works (Phase 10+)
+- [x] Campaign cron protected by `CRON_SECRET` (Phase 10)
+- [x] Unsubscribe behavior works (Phase 10 — `GET /unsubscribe?token=...`)
 - [ ] File upload restrictions enforced (Phase 8+)
 
 **Rating:** Fully aligned / Partially aligned / Missing / deviating

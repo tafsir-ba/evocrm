@@ -435,5 +435,5 @@ Hard delete, if ever added, requires explicit approval and audit.
 [ ] No secrets in code
 [ ] Documents use signed URLs
 [ ] Campaign cron protected
-[ ] Unsubscribe path exists (when campaigns implemented)
+[ ] Unsubscribe path exists — **implemented:** `GET /unsubscribe?token=...`
 ```

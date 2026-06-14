@@ -326,11 +326,13 @@ V1 uses **presigned direct upload**, not backend multipart proxy. Do not impleme
 
 Download flow: `POST /documents/[documentId]/signed-url` after `document:read` + linked-entity read permission check. Signed URL TTL: **10 minutes**.
 
-**Campaign limitation:** `linkedEntityType=campaign` returns `VALIDATION_ERROR` until Phase 10.
+**Campaign documents (Phase 10):** `linkedEntityType=campaign` is supported when the campaign exists in the same workspace and is not archived. `CampaignStep.documentIds[]` references active same-workspace documents; documents are shown in UI/preview only — not embedded in outbound emails in V1.
 
 UI: Documents embedded under Lead/Property/Opportunity detail **Files** tabs via `DocumentsSection`. Documents is **not** primary navigation.
 
 ### Campaigns (Dripping)
+
+**Phase 10 — implemented.** Simple email drip campaigns for leads and opportunities.
 
 ```txt
 GET    /api/workspaces/[workspaceSlug]/campaigns
@@ -338,11 +340,36 @@ POST   /api/workspaces/[workspaceSlug]/campaigns
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
 DELETE /api/workspaces/[workspaceSlug]/campaigns/[campaignId]  # archive (soft)
+PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/pause
+PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/resume
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps
 POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps/[stepId]
-POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enroll
+DELETE /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps/[stepId]
+GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments
+POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments
+PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrollmentId]
+PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrollmentId]/pause
+PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrollmentId]/resume
+GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 ```
+
+| Method | Permission |
+|--------|------------|
+| GET list/detail/steps/enrollments/sends | `campaign:read` |
+| POST create campaign | `campaign:create` |
+| PATCH update/pause/resume/steps/enrollments | `campaign:update` |
+| DELETE archive | `campaign:archive` |
+
+**Campaign status:** `draft`, `active`, `paused`, `archived`. Only `active` campaigns send via cron. Archived excluded from default list.
+
+**Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
+
+**Missing email / unsubscribed:** Sends are skipped and logged as `CampaignSend.status = skipped`.
+
+**Step edits:** Allowed only when campaign is `draft` or `paused`.
+
+**UI routes:** `/w/[workspaceSlug]/dripping`, `/w/[workspaceSlug]/dripping/[campaignId]`
 
 ### Dashboard
 
@@ -645,11 +672,10 @@ Signed URL TTL should be short (e.g. 5–15 minutes). Regenerate on demand.
 ## Public Unsubscribe Endpoint
 
 ```txt
-GET  /api/public/unsubscribe/[token]
-POST /api/public/unsubscribe/[token]
+GET /unsubscribe?token=...
 ```
 
-Token-based; no session required. Updates lead `emailUnsubscribedAt` and relevant campaign enrollments. Exact token format defined in Phase 10.
+Token-based HMAC-signed payload (`workspaceId`, `leadId`, `enrollmentId`, `campaignId`, `exp`). No session required. Updates `Lead.emailConsentStatus = unsubscribed`, `Lead.emailUnsubscribedAt`, and active `CampaignEnrollment` to `unsubscribed`. Public route is allowlisted in middleware.
 
 ---
 
