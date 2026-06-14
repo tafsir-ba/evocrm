@@ -15,7 +15,11 @@ import { workspaceNavPath } from "@/lib/workspace-paths";
 export default async function HomePage() {
   const session = await auth();
 
-  if (!session?.user?.id || !isCanonicalSessionUserId(session.user.id)) {
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  if (!isCanonicalSessionUserId(session.user.id)) {
     redirect(STALE_SESSION_RECOVERY_PATH);
   }
 

@@ -20,7 +20,11 @@ export const metadata = { title: "Workspaces — EvoHome CRM" };
 export default async function WorkspacesPage() {
   const session = await auth();
 
-  if (!session?.user?.id || !isCanonicalSessionUserId(session.user.id)) {
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  if (!isCanonicalSessionUserId(session.user.id)) {
     redirect(STALE_SESSION_RECOVERY_PATH);
   }
 

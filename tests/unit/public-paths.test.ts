@@ -14,4 +14,9 @@ describe("public path allowlist", () => {
     expect(PUBLIC_PATHS).toContain("/unsubscribe");
     expect(isPublicPath("/api/auth/signin")).toBe(true);
   });
+
+  it("keeps stale-session recovery public", () => {
+    expect(PUBLIC_PATHS).toContain("/auth/session-expired");
+    expect(isPublicPath("/auth/session-expired")).toBe(true);
+  });
 });

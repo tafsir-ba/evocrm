@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CredentialsLoginForm } from "@/components/auth/credentials-login-form";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { normalizeLoginCallbackUrl } from "@/lib/auth-callback-url";
 import { IconLogo } from "@/lib/icons";
 
 export const metadata = { title: "Sign in — EvoHome CRM" };
@@ -21,7 +22,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackUrl, error } = await searchParams;
-  const redirectTo = callbackUrl ?? "/workspaces";
+  const redirectTo = normalizeLoginCallbackUrl(callbackUrl);
   const authErrorMessage = error
     ? (AUTH_ERROR_MESSAGES[error] ?? AUTH_ERROR_MESSAGES.Default)
     : null;
