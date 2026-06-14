@@ -10,8 +10,11 @@ function isProtectedAppPath(pathname: string): boolean {
   return (
     pathname.startsWith("/w/") ||
     pathname.startsWith("/workspaces") ||
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/api/me") ||
-    pathname.startsWith("/api/workspaces")
+    pathname.startsWith("/api/workspaces") ||
+    pathname.startsWith("/api/feedback") ||
+    pathname.startsWith("/api/admin")
   );
 }
 

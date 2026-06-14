@@ -137,6 +137,51 @@ export async function verifyUploadedObject(
   }
 }
 
+export async function uploadObject(input: {
+  storageKey: string;
+  body: Buffer | Uint8Array;
+  mimeType: string;
+}): Promise<void> {
+  const config = getSpacesConfig();
+  const client = createS3Client(config);
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: input.storageKey,
+      Body: input.body,
+      ContentType: input.mimeType,
+    }),
+  );
+}
+
+export async function getObjectBuffer(storageKey: string): Promise<{
+  body: Buffer;
+  contentType: string | undefined;
+}> {
+  const config = getSpacesConfig();
+  const client = createS3Client(config);
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: storageKey,
+    }),
+  );
+
+  if (!response.Body) {
+    throw new Error("Object body missing.");
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+
+  return {
+    body: Buffer.from(bytes),
+    contentType: response.ContentType,
+  };
+}
+
 export async function deleteObject(storageKey: string): Promise<void> {
   const config = getSpacesConfig();
   const client = createS3Client(config);

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { MobileNav } from "./mobile-nav";
@@ -35,6 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </main>
       </div>
+
+      <FeedbackWidget />
     </div>
   );
 }

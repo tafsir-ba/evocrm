@@ -46,6 +46,8 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: optionalNonEmptyString,
   STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optionalNonEmptyString,
+  // Phase 14 — Platform admin feedback triage
+  PLATFORM_ADMIN_EMAILS: optionalNonEmptyString,
 });
 
 export type Env = z.infer<typeof envSchema>;
