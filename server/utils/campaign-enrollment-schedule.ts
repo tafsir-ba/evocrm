@@ -7,7 +7,7 @@ export type EnrollmentScheduledStep = {
   stepOrder: number;
   subject: string;
   scheduledAt: Date | null;
-  state: "sent" | "pending" | "cancelled";
+  state: "sent" | "pending" | "paused" | "cancelled";
 };
 
 export type CampaignStepScheduleInput = {
@@ -42,6 +42,7 @@ export function buildEnrollmentScheduledSteps(
     "unsubscribed",
     "failed",
   ]);
+  const isPaused = enrollment.status === "paused";
 
   const schedule: EnrollmentScheduledStep[] = [];
   let sendAnchor = enrollment.nextSendAt;
@@ -62,7 +63,11 @@ export function buildEnrollmentScheduledSteps(
         stepOrder: step.order,
         subject: step.subject,
         scheduledAt: enrollment.nextSendAt,
-        state: terminalStates.has(enrollment.status) ? "cancelled" : "pending",
+        state: terminalStates.has(enrollment.status)
+          ? "cancelled"
+          : isPaused
+            ? "paused"
+            : "pending",
       });
       sendAnchor = enrollment.nextSendAt;
       continue;
@@ -83,7 +88,7 @@ export function buildEnrollmentScheduledSteps(
       stepOrder: step.order,
       subject: step.subject,
       scheduledAt: sendAnchor,
-      state: "pending",
+      state: isPaused ? "paused" : "pending",
     });
   }
 

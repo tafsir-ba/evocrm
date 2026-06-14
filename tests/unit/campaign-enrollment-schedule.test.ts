@@ -73,4 +73,21 @@ describe("campaign enrollment schedule", () => {
       anchor.getTime() + IMMEDIATE_SEND_DELAY_MS,
     );
   });
+
+  it("marks pending schedule steps as paused when enrollment is paused", () => {
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        currentStep: 1,
+        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
+        status: "paused",
+      },
+      [
+        { order: 1, delayDays: 0, subject: "drip 1" },
+        { order: 2, delayDays: 1, subject: "drip 2" },
+      ],
+    );
+
+    expect(schedule[0]?.state).toBe("paused");
+    expect(schedule[1]?.state).toBe("paused");
+  });
 });

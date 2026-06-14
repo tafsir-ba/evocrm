@@ -47,7 +47,7 @@ type EnrollmentScheduledStep = {
   stepOrder: number;
   subject: string;
   scheduledAt: string | null;
-  state: "sent" | "pending" | "cancelled";
+  state: "sent" | "pending" | "paused" | "cancelled";
 };
 
 type Enrollment = {
@@ -165,6 +165,13 @@ export function CampaignDetailPanel({
     }
   }, [apiBase]);
 
+  const reloadAfterCampaignMutation = useCallback(async () => {
+    await loadAll();
+    window.setTimeout(() => {
+      void loadAll();
+    }, 2500);
+  }, [loadAll]);
+
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
@@ -196,9 +203,34 @@ export function CampaignDetailPanel({
         setError(payload.error?.message ?? "Action failed.");
         return;
       }
-      await loadAll();
+      await reloadAfterCampaignMutation();
     } catch {
       setError("Action failed.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handleActivate() {
+    setActionPending(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiBase, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "active" }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Activation failed.");
+        return;
+      }
+
+      await reloadAfterCampaignMutation();
+    } catch {
+      setError("Activation failed.");
     } finally {
       setActionPending(false);
     }
@@ -328,7 +360,7 @@ export function CampaignDetailPanel({
 
       if (enrolledCount > 0) {
         setSelectedEnrollmentIds([]);
-        await loadAll();
+        await reloadAfterCampaignMutation();
       }
 
       if (failures.length > 0) {
@@ -411,16 +443,7 @@ export function CampaignDetailPanel({
                 </Button>
               )}
               {campaign.status === "draft" && steps.length > 0 && (
-                <Button
-                  disabled={actionPending}
-                  onClick={() =>
-                    void fetch(apiBase, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ status: "active" }),
-                    }).then(() => loadAll())
-                  }
-                >
+                <Button disabled={actionPending} onClick={() => void handleActivate()}>
                   Activate
                 </Button>
               )}
@@ -554,6 +577,8 @@ export function CampaignDetailPanel({
                             {" — "}
                             {scheduledStep.state === "sent" ? (
                               <span className="text-[var(--color-ink-muted)]">Sent</span>
+                            ) : scheduledStep.state === "paused" ? (
+                              <span className="text-[var(--color-warning)]">Paused</span>
                             ) : scheduledStep.state === "cancelled" ? (
                               <span className="text-[var(--color-ink-muted)]">Cancelled</span>
                             ) : scheduledStep.scheduledAt ? (
