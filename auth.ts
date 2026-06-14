@@ -49,11 +49,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (account?.provider === "google") {
-        await syncUserFromProviderProfile({
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        });
+        try {
+          await syncUserFromProviderProfile({
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          });
+        } catch (error) {
+          console.error("[auth] Google sign-in profile sync failed:", error);
+          return false;
+        }
       }
 
       return true;

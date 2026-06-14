@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthConfig } from "@/auth.config";
 import { isPublicPath } from "@/lib/public-paths";
+import { isCanonicalSessionUserId } from "@/lib/session-user-id";
 
 const { auth } = NextAuth(getAuthConfig());
 
@@ -20,7 +21,9 @@ function isProtectedAppPath(pathname: string): boolean {
 
 export default auth((request) => {
   const { pathname } = request.nextUrl;
-  const isLoggedIn = !!request.auth;
+  const isLoggedIn =
+    !!request.auth?.user?.email &&
+    isCanonicalSessionUserId(request.auth.user?.id);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);

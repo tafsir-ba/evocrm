@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isCanonicalSessionUserId } from "@/lib/session-user-id";
 import { findUserByEmail } from "@/server/repositories/users";
 
 /**
@@ -18,7 +19,7 @@ export async function resolveJwtSub(input: {
     }
   }
 
-  if (input.userId) {
+  if (input.userId && isCanonicalSessionUserId(input.userId)) {
     return input.userId;
   }
 

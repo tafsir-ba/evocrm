@@ -14,7 +14,7 @@ describe("resolveJwtSub", () => {
 
   it("prefers the DB user id by email over OAuth transient user id", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue({
-      id: "mongo-user-1",
+      id: "507f1f77bcf86cd799439011",
       email: "tafsir@evo-home.ch",
       authProvider: "credentials",
       createdAt: new Date(),
@@ -26,7 +26,7 @@ describe("resolveJwtSub", () => {
       email: "tafsir@evo-home.ch",
     });
 
-    expect(sub).toBe("mongo-user-1");
+    expect(sub).toBe("507f1f77bcf86cd799439011");
   });
 
   it("repairs stale JWT subs from token email on session refresh", async () => {
@@ -46,14 +46,25 @@ describe("resolveJwtSub", () => {
     expect(sub).toBe("507f1f77bcf86cd799439011");
   });
 
-  it("falls back to user id when no DB user exists for the email", async () => {
+  it("falls back to canonical user id when no DB user exists for the email", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue(null);
 
     const sub = await resolveJwtSub({
-      userId: "credentials-user-1",
+      userId: "507f1f77bcf86cd799439012",
       email: "new@example.com",
     });
 
-    expect(sub).toBe("credentials-user-1");
+    expect(sub).toBe("507f1f77bcf86cd799439012");
+  });
+
+  it("does not fall back to OAuth UUID user ids", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+
+    const sub = await resolveJwtSub({
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      email: "new@example.com",
+    });
+
+    expect(sub).toBeUndefined();
   });
 });
