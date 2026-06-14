@@ -18,6 +18,14 @@ vi.mock("@/server/repositories/campaign-enrollments", () => ({
   resumeEnrollmentsForCampaign: vi.fn(),
 }));
 
+vi.mock("@/server/services/campaign-enrollments", () => ({
+  rescheduleActiveEnrollmentSendsForCampaign: vi.fn(),
+}));
+
+vi.mock("@/server/services/campaign-sending", () => ({
+  sendCampaignEnrollmentsImmediately: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -34,6 +42,8 @@ import {
   updateCampaign,
 } from "@/server/repositories/campaigns";
 import { countCampaignEnrollments, pauseEnrollmentsForCampaign, resumeEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
+import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
+import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { countCampaignSteps } from "@/server/repositories/campaign-steps";
 import {
   archiveCampaignForWorkspace,
@@ -62,6 +72,13 @@ describe("campaign service", () => {
     vi.clearAllMocks();
     vi.mocked(countCampaignSteps).mockResolvedValue(0);
     vi.mocked(countCampaignEnrollments).mockResolvedValue(0);
+    vi.mocked(rescheduleActiveEnrollmentSendsForCampaign).mockResolvedValue([]);
+    vi.mocked(sendCampaignEnrollmentsImmediately).mockResolvedValue({
+      processed: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+    });
   });
 
   it("create sets workspaceId and createdBy server-side", async () => {
@@ -163,5 +180,33 @@ describe("campaign service", () => {
     await expect(
       updateCampaignForWorkspace("ws-1", "user-1", "camp-1", { status: "active" }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("activation from draft reschedules pending sends and triggers immediate processing", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      status: "draft",
+    });
+    vi.mocked(countCampaignSteps).mockResolvedValue(1);
+    vi.mocked(updateCampaign).mockResolvedValue({
+      ...baseCampaign,
+      status: "active",
+    });
+    vi.mocked(rescheduleActiveEnrollmentSendsForCampaign).mockResolvedValue(["enroll-1"]);
+
+    await updateCampaignForWorkspace("ws-1", "user-1", "camp-1", { status: "active" });
+
+    expect(rescheduleActiveEnrollmentSendsForCampaign).toHaveBeenCalledWith(
+      "ws-1",
+      "camp-1",
+      expect.any(Date),
+      "activation",
+    );
+    expect(sendCampaignEnrollmentsImmediately).toHaveBeenCalledWith(
+      "ws-1",
+      "camp-1",
+      "activation",
+      ["enroll-1"],
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
 import {
+  findCampaignEnrollments,
   findDueEnrollments,
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
@@ -23,6 +24,7 @@ import {
   createUnsubscribeToken,
   buildUnsubscribeUrl,
 } from "@/server/utils/unsubscribe-token";
+import { addDays, computeNextSendAt } from "@/server/utils/campaign-schedule";
 
 export type SendDueSummary = {
   processed: number;
@@ -30,12 +32,6 @@ export type SendDueSummary = {
   skipped: number;
   failed: number;
 };
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() + days);
-  return result;
-}
 
 const SKIP_RETRY_DELAY_DAYS = 1;
 const FAILURE_RETRY_DELAY_DAYS = 1;
@@ -97,30 +93,6 @@ async function processEnrollment(
   const campaign = await findCampaignById(workspaceId, enrollment.campaignId);
 
   if (!campaign || campaign.status !== "active") {
-    const step = await findStepByOrder(
-      workspaceId,
-      enrollment.campaignId,
-      enrollment.currentStep,
-    );
-
-    if (step) {
-      await recordSkippedSend({
-        workspaceId,
-        enrollment,
-        stepId: step.id,
-        reason:
-          campaign?.status === "paused"
-            ? "Campaign is paused."
-            : "Campaign is not active.",
-      });
-      await deferEnrollmentRetry(
-        workspaceId,
-        enrollment.id,
-        new Date(),
-        SKIP_RETRY_DELAY_DAYS,
-      );
-    }
-
     return "skipped";
   }
 
@@ -312,7 +284,7 @@ async function processEnrollment(
   if (nextStep) {
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       currentStep: nextStep.order,
-      nextSendAt: addDays(now, nextStep.delayDays),
+      nextSendAt: computeNextSendAt(now, nextStep.delayDays),
       lastSentAt: now,
     });
   } else {
@@ -334,11 +306,9 @@ async function processEnrollment(
   return "sent";
 }
 
-export async function sendDueCampaignEmails(
-  limit = 50,
+async function summarizeEnrollmentProcessing(
+  enrollments: CampaignEnrollmentRecord[],
 ): Promise<SendDueSummary> {
-  const dueEnrollments = await findDueEnrollments(limit);
-
   const summary: SendDueSummary = {
     processed: 0,
     sent: 0,
@@ -346,7 +316,7 @@ export async function sendDueCampaignEmails(
     failed: 0,
   };
 
-  for (const enrollment of dueEnrollments) {
+  for (const enrollment of enrollments) {
     try {
       const outcome = await processEnrollment(enrollment);
       summary.processed += 1;
@@ -365,6 +335,55 @@ export async function sendDueCampaignEmails(
   }
 
   return summary;
+}
+
+function filterEnrollmentsForImmediateSend(
+  enrollments: CampaignEnrollmentRecord[],
+  mode: "activation" | "resume" | "enrollment",
+  enrollmentIds?: string[],
+): CampaignEnrollmentRecord[] {
+  const idFilter = enrollmentIds ? new Set(enrollmentIds) : null;
+  const now = new Date();
+
+  return enrollments.filter((enrollment) => {
+    if (idFilter && !idFilter.has(enrollment.id)) {
+      return false;
+    }
+
+    if (idFilter) {
+      return true;
+    }
+
+    if (mode === "activation" || mode === "enrollment") {
+      return enrollment.lastSentAt === null;
+    }
+
+    return enrollment.nextSendAt <= now;
+  });
+}
+
+export async function sendCampaignEnrollmentsImmediately(
+  workspaceId: string,
+  campaignId: string,
+  mode: "activation" | "resume" | "enrollment",
+  enrollmentIds?: string[],
+): Promise<SendDueSummary> {
+  const { enrollments } = await findCampaignEnrollments(workspaceId, campaignId, {
+    status: "active",
+    pageSize: 500,
+  });
+
+  const eligible = filterEnrollmentsForImmediateSend(enrollments, mode, enrollmentIds);
+
+  return summarizeEnrollmentProcessing(eligible);
+}
+
+export async function sendDueCampaignEmails(
+  limit = 50,
+): Promise<SendDueSummary> {
+  const dueEnrollments = await findDueEnrollments(limit);
+
+  return summarizeEnrollmentProcessing(dueEnrollments);
 }
 
 export async function listCampaignSendsForWorkspace(

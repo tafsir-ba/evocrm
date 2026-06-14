@@ -284,6 +284,29 @@ describe("campaign sending service", () => {
     );
   });
 
+  it("skips inactive campaign without deferring next send", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      id: "camp-1",
+      workspaceId: "ws-1",
+      name: "Test",
+      status: "draft",
+      audienceType: "leads",
+      frequency: null,
+      createdBy: "user-1",
+      ownerId: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.skipped).toBe(1);
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(updateCampaignEnrollment).not.toHaveBeenCalled();
+    expect(createCampaignSend).not.toHaveBeenCalled();
+  });
+
   it("skips paused campaign", async () => {
     vi.mocked(findCampaignById).mockResolvedValue({
       id: "camp-1",

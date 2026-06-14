@@ -365,6 +365,8 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 
 **Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
 
+**Scheduling:** Zero-delay steps schedule `nextSendAt` one minute after enrollment, campaign activation, or overdue enrollment resume (not the exact click timestamp). Activation, enrollment into active campaigns, and overdue enrollment resume trigger an immediate backend send pass for the affected enrollments. Recurring step sends still rely on `POST /api/cron/campaigns/send-due` (must be scheduled in production with `CRON_SECRET`).
+
 **Enrollment UI:** Campaign detail uses searchable multi-select lead/opportunity selectors backed by workspace `GET /leads` and `GET /opportunities`. The UI submits canonical entity IDs — not names, emails, or raw text labels.
 
 **Missing email / unsubscribed:** Sends are skipped and logged as `CampaignSend.status = skipped`.

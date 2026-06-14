@@ -18,6 +18,8 @@ import {
   resumeEnrollmentsForCampaign,
 } from "@/server/repositories/campaign-enrollments";
 import { countCampaignSteps } from "@/server/repositories/campaign-steps";
+import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
+import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import type {
   CreateCampaignInput,
   UpdateCampaignInput,
@@ -199,6 +201,39 @@ export async function updateCampaignForWorkspace(
 
   if (input.status === "active" && existing.status === "paused") {
     await resumeEnrollmentsForCampaign(workspaceId, campaignId);
+    const anchor = new Date();
+    const resumedEnrollmentIds = await rescheduleActiveEnrollmentSendsForCampaign(
+      workspaceId,
+      campaignId,
+      anchor,
+      "resume",
+    );
+    if (resumedEnrollmentIds.length > 0) {
+      void sendCampaignEnrollmentsImmediately(
+        workspaceId,
+        campaignId,
+        "resume",
+        resumedEnrollmentIds,
+      ).catch(() => undefined);
+    }
+  }
+
+  if (input.status === "active" && existing.status === "draft") {
+    const anchor = new Date();
+    const activatedEnrollmentIds = await rescheduleActiveEnrollmentSendsForCampaign(
+      workspaceId,
+      campaignId,
+      anchor,
+      "activation",
+    );
+    if (activatedEnrollmentIds.length > 0) {
+      void sendCampaignEnrollmentsImmediately(
+        workspaceId,
+        campaignId,
+        "activation",
+        activatedEnrollmentIds,
+      ).catch(() => undefined);
+    }
   }
 
   const auditAction =
@@ -279,6 +314,22 @@ export async function resumeCampaignForWorkspace(
   }
 
   await resumeEnrollmentsForCampaign(workspaceId, campaignId);
+
+  const anchor = new Date();
+  const resumedEnrollmentIds = await rescheduleActiveEnrollmentSendsForCampaign(
+    workspaceId,
+    campaignId,
+    anchor,
+    "resume",
+  );
+  if (resumedEnrollmentIds.length > 0) {
+    void sendCampaignEnrollmentsImmediately(
+      workspaceId,
+      campaignId,
+      "resume",
+      resumedEnrollmentIds,
+    ).catch(() => undefined);
+  }
 
   await createAuditLog({
     workspaceId,

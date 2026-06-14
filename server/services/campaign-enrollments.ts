@@ -15,6 +15,9 @@ import {
 } from "@/server/repositories/campaign-enrollments";
 import { findFirstCampaignStep } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import { findStepByOrder } from "@/server/repositories/campaign-steps";
+import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
+import { computeNextSendAt } from "@/server/utils/campaign-schedule";
 import type {
   CreateCampaignEnrollmentInput,
   UpdateCampaignEnrollmentInput,
@@ -27,12 +30,6 @@ export type CampaignEnrollmentDetail = CampaignEnrollmentRecord & {
   opportunityLabel: string | null;
   warnings: string[];
 };
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() + days);
-  return result;
-}
 
 function enrollmentSnapshot(
   enrollment: CampaignEnrollmentRecord,
@@ -215,7 +212,7 @@ export async function createCampaignEnrollmentForWorkspace(
   }
 
   const now = new Date();
-  const nextSendAt = addDays(now, firstStep.delayDays);
+  const nextSendAt = computeNextSendAt(now, firstStep.delayDays);
 
   const enrollment = await createCampaignEnrollment(workspaceId, {
     campaignId,
@@ -234,7 +231,53 @@ export async function createCampaignEnrollmentForWorkspace(
     after: enrollmentSnapshot(enrollment),
   });
 
+  if (campaign.status === "active") {
+    void sendCampaignEnrollmentsImmediately(
+      workspaceId,
+      campaignId,
+      "enrollment",
+      [enrollment.id],
+    ).catch(() => undefined);
+  }
+
   return enrichEnrollment(workspaceId, enrollment);
+}
+
+export async function rescheduleActiveEnrollmentSendsForCampaign(
+  workspaceId: string,
+  campaignId: string,
+  anchor: Date,
+  mode: "activation" | "resume",
+): Promise<string[]> {
+  const { enrollments } = await findCampaignEnrollments(workspaceId, campaignId, {
+    status: "active",
+    pageSize: 500,
+  });
+
+  const updatedIds: string[] = [];
+
+  for (const enrollment of enrollments) {
+    if (mode === "activation" && enrollment.lastSentAt !== null) {
+      continue;
+    }
+
+    if (mode === "resume" && enrollment.nextSendAt > anchor) {
+      continue;
+    }
+
+    const step = await findStepByOrder(workspaceId, campaignId, enrollment.currentStep);
+
+    if (!step) {
+      continue;
+    }
+
+    await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      nextSendAt: computeNextSendAt(anchor, step.delayDays),
+    });
+    updatedIds.push(enrollment.id);
+  }
+
+  return updatedIds;
 }
 
 export async function updateCampaignEnrollmentForWorkspace(
@@ -267,12 +310,38 @@ export async function updateCampaignEnrollmentForWorkspace(
     );
   }
 
-  const updated = await updateCampaignEnrollment(workspaceId, enrollmentId, {
+  let updated = await updateCampaignEnrollment(workspaceId, enrollmentId, {
     status: input.status,
   });
 
   if (!updated) {
     throw new AppError("NOT_FOUND", "Enrollment not found.");
+  }
+
+  if (
+    input.status === "active" &&
+    existing.status === "paused" &&
+    campaign.status === "active" &&
+    existing.nextSendAt <= new Date()
+  ) {
+    const anchor = new Date();
+    const step = await findStepByOrder(workspaceId, campaignId, existing.currentStep);
+
+    if (step) {
+      const rescheduled = await updateCampaignEnrollment(workspaceId, enrollmentId, {
+        nextSendAt: computeNextSendAt(anchor, step.delayDays),
+      });
+
+      if (rescheduled) {
+        updated = rescheduled;
+        void sendCampaignEnrollmentsImmediately(
+          workspaceId,
+          campaignId,
+          "resume",
+          [rescheduled.id],
+        ).catch(() => undefined);
+      }
+    }
   }
 
   await createAuditLog({
