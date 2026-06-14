@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
+import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type ReassignmentCounts = {
@@ -104,68 +105,12 @@ export function ReassignmentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]">
-        <div className="px-5 py-4 border-b border-[var(--color-line)]">
-          <h3 className="text-[16px] font-semibold text-[var(--color-ink)]">
-            Reassign records
-          </h3>
-          <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
-            {membership.name ?? membership.email} has active assignments. Choose a replacement
-            member before {newStatus === "suspended" ? "suspending" : "removing"} them.
-          </p>
-        </div>
-
-        <div className="px-5 py-4 space-y-4">
-          {loading && (
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-full" />
-            </div>
-          )}
-
-          {error && !counts && (
-            <ErrorState
-              title="Could not load summary"
-              description={error}
-              primaryAction={{ label: "Retry", onClick: () => void loadSummary() }}
-            />
-          )}
-
-          {counts && (
-            <ul className="text-[13px] space-y-1 text-[var(--color-ink-soft)]">
-              <li>Leads: {counts.leads}</li>
-              <li>Properties: {counts.properties}</li>
-              <li>Opportunities: {counts.opportunities}</li>
-              <li>Activities: {counts.activities}</li>
-              <li>Projects: {counts.projects}</li>
-            </ul>
-          )}
-
-          <label className="block space-y-1.5">
-            <span className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold">
-              Replacement member
-            </span>
-            <select
-              className="w-full h-9 rounded-lg border border-[var(--color-line)] px-3 text-[13px] bg-white"
-              value={replacementUserId}
-              onChange={(event) => setReplacementUserId(event.target.value)}
-              disabled={activeMembers.length === 0}
-            >
-              {activeMembers.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.name ?? member.email}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {error && counts && (
-            <p className="text-[12.5px] text-[var(--color-danger)]">{error}</p>
-          )}
-        </div>
-
-        <div className="px-5 py-4 border-t border-[var(--color-line)] flex justify-end gap-2">
+    <Modal
+      open
+      onClose={onClose}
+      title="Reassign records"
+      footer={
+        <div className="flex justify-end gap-2">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
@@ -177,7 +122,61 @@ export function ReassignmentModal({
             {submitting ? "Reassigning…" : "Reassign and continue"}
           </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+          {membership.name ?? membership.email} has active assignments. Choose a replacement
+          member before {newStatus === "suspended" ? "suspending" : "removing"} them.
+        </p>
+
+        {loading && (
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+          </div>
+        )}
+
+        {error && !counts && (
+          <ErrorState
+            title="Could not load summary"
+            description={error}
+            primaryAction={{ label: "Retry", onClick: () => void loadSummary() }}
+          />
+        )}
+
+        {counts && (
+          <ul className="text-[13px] space-y-1 text-[var(--color-ink-soft)]">
+            <li>Leads: {counts.leads}</li>
+            <li>Properties: {counts.properties}</li>
+            <li>Opportunities: {counts.opportunities}</li>
+            <li>Activities: {counts.activities}</li>
+            <li>Projects: {counts.projects}</li>
+          </ul>
+        )}
+
+        <label className="block space-y-1.5">
+          <span className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold">
+            Replacement member
+          </span>
+          <select
+            className="w-full h-9 rounded-lg border border-[var(--color-line)] px-3 text-[13px] bg-white"
+            value={replacementUserId}
+            onChange={(event) => setReplacementUserId(event.target.value)}
+            disabled={activeMembers.length === 0}
+          >
+            {activeMembers.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.name ?? member.email}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {error && counts && (
+          <p className="text-[12.5px] text-[var(--color-danger)]">{error}</p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

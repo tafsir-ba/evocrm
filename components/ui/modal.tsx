@@ -9,12 +9,14 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
   className,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
   className?: string;
 }) {
   useEffect(() => {
@@ -25,6 +27,15 @@ export function Modal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -41,11 +52,11 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative w-full max-w-lg rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]",
+          "relative flex max-h-[min(calc(100dvh-2rem),100%)] w-full max-w-lg flex-col rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]",
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <h2 id="modal-title" className="text-[15px] font-semibold text-[var(--color-ink)]">
             {title}
           </h2>
@@ -58,7 +69,12 @@ export function Modal({
             <IconClose size={16} />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-[var(--color-line)] bg-white px-5 py-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

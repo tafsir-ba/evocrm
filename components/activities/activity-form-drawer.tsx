@@ -255,11 +255,27 @@ export function ActivityFormDrawer({
       onClose={onClose}
       title={isEdit ? "Edit activity" : "New activity"}
       className="w-[min(100%,420px)]"
+      footer={
+        !loading || form.title || !isEdit ? (
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="activity-form"
+              disabled={submitting || loading || (!isEdit && !hasLinkContext)}
+            >
+              {submitting ? "Saving…" : isEdit ? "Save changes" : "Create activity"}
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       {loading && !form.title && isEdit ? (
         <p className="text-[13px] text-[var(--color-ink-muted)]">Loading…</p>
       ) : (
-        <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+        <form id="activity-form" className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
           {!isEdit && !hasLinkContext && (
             <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
               Open this form from a Lead, Property, or Opportunity detail page to link the
@@ -387,18 +403,6 @@ export function ActivityFormDrawer({
           {error && (
             <p className="text-[12px] text-[var(--color-danger-fg)]">{error}</p>
           )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={submitting || loading || (!isEdit && !hasLinkContext)}
-            >
-              {submitting ? "Saving…" : isEdit ? "Save changes" : "Create activity"}
-            </Button>
-          </div>
         </form>
       )}
     </Drawer>

@@ -534,8 +534,18 @@ export function LeadsPanel({
         onClose={() => setDrawerOpen(false)}
         title="New lead"
         className="w-[min(100%,420px)]"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-lead-form" disabled={submitting}>
+              {submitting ? "Creating…" : "Create lead"}
+            </Button>
+          </div>
+        }
       >
-        <form className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
+        <form id="new-lead-form" className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="firstName" required>
@@ -744,15 +754,6 @@ export function LeadsPanel({
               {formWarning}
             </p>
           )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Creating…" : "Create lead"}
-            </Button>
-          </div>
         </form>
       </Drawer>
     </>

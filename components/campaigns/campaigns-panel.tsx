@@ -270,11 +270,21 @@ export function CampaignsPanel({
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title="New campaign"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-campaign-form" disabled={submitting || !form.name.trim()}>
+              {submitting ? "Creating…" : "Create campaign"}
+            </Button>
+          </div>
+        }
       >
         <p className="text-[13px] text-[var(--color-ink-muted)] mb-4">
           Create a draft campaign. Add email steps before enrolling recipients.
         </p>
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form id="new-campaign-form" onSubmit={handleCreate} className="space-y-4">
           {formError && (
             <p className="text-[13px] text-[var(--color-danger)]">{formError}</p>
           )}
@@ -312,14 +322,6 @@ export function CampaignsPanel({
               onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
               placeholder="manual"
             />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting || !form.name.trim()}>
-              {submitting ? "Creating…" : "Create campaign"}
-            </Button>
           </div>
         </form>
       </Drawer>

@@ -699,8 +699,23 @@ export function OpportunityDetailPanel({
         onClose={() => setDrawerOpen(false)}
         title="Edit opportunity"
         className="w-[min(100%,480px)]"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDrawerOpen(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="edit-opportunity-form" disabled={submitting}>
+              {submitting ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        }
       >
-        <form className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
+        <form id="edit-opportunity-form" className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="edit-value">Value</Label>
@@ -787,20 +802,6 @@ export function OpportunityDetailPanel({
               }
               rows={4}
             />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setDrawerOpen(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : "Save changes"}
-            </Button>
           </div>
         </form>
       </Drawer>

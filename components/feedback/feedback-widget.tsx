@@ -191,7 +191,27 @@ export function FeedbackWidget() {
         </div>
       )}
 
-      <Modal open={open} onClose={closeModal} title="Send feedback" className="max-w-xl">
+      <Modal
+        open={open}
+        onClose={closeModal}
+        title="Send feedback"
+        className="max-w-xl"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={closeModal}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              data-testid="feedback-submit"
+              disabled={submitState === "submitting"}
+              onClick={() => void handleSubmit()}
+            >
+              {submitState === "submitting" ? "Sending…" : "Send feedback"}
+            </Button>
+          </div>
+        }
+      >
         <div data-testid="feedback-dialog" className="space-y-4">
           <div>
             <p className="mb-2 text-[12px] font-medium text-[var(--color-ink-muted)]">Category</p>
@@ -244,20 +264,6 @@ export function FeedbackWidget() {
               {errorMessage}
             </p>
           )}
-
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--color-line)] pt-4">
-            <Button type="button" variant="secondary" onClick={closeModal}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              data-testid="feedback-submit"
-              disabled={submitState === "submitting"}
-              onClick={() => void handleSubmit()}
-            >
-              {submitState === "submitting" ? "Sending…" : "Send feedback"}
-            </Button>
-          </div>
         </div>
       </Modal>
     </>

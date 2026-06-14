@@ -657,8 +657,18 @@ export function CampaignDetailPanel({
         open={stepDrawerOpen}
         onClose={() => setStepDrawerOpen(false)}
         title={editingStepId ? "Edit step" : "Add step"}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setStepDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="campaign-step-form" disabled={actionPending}>
+              {actionPending ? "Saving…" : "Save step"}
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleStepSubmit} className="space-y-4">
+        <form id="campaign-step-form" onSubmit={handleStepSubmit} className="space-y-4">
           {stepFormError && (
             <p className="text-[13px] text-[var(--color-danger)]">{stepFormError}</p>
           )}
@@ -701,14 +711,6 @@ export function CampaignDetailPanel({
               required
               rows={8}
             />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setStepDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={actionPending}>
-              {actionPending ? "Saving…" : "Save step"}
-            </Button>
           </div>
         </form>
       </Drawer>

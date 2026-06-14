@@ -580,9 +580,21 @@ export function LeadDetailPanel({
         onClose={() => setDrawerOpen(false)}
         title="Edit lead"
         className="w-[min(100%,420px)]"
+        footer={
+          form ? (
+            <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" form="edit-lead-form" disabled={submitting}>
+                {submitting ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          ) : undefined
+        }
       >
         {form && (
-          <form className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
+          <form id="edit-lead-form" className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="edit-firstName" required>
@@ -812,15 +824,6 @@ export function LeadDetailPanel({
                 {formWarning}
               </p>
             )}
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
           </form>
         )}
       </Drawer>

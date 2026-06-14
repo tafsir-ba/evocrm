@@ -292,6 +292,7 @@ export function FeedbackAdminPanel() {
       )}
 
       <div className="overflow-hidden rounded-xl border border-[var(--color-line)] bg-white">
+        <div className="overflow-x-auto">
         <table className="min-w-full text-left text-[12px]">
           <thead className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[var(--color-ink-muted)]">
             <tr>
@@ -409,6 +410,7 @@ export function FeedbackAdminPanel() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Drawer
@@ -416,6 +418,27 @@ export function FeedbackAdminPanel() {
         onClose={() => setSelected(null)}
         title="Feedback details"
         className="w-[min(100%,480px)]"
+        footer={
+          selected ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  void updateStatus(
+                    selected,
+                    selected.status === "open" ? "resolved" : "open",
+                  )
+                }
+              >
+                {selected.status === "open" ? "Mark resolved" : "Reopen"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setDeleteTarget(selected)}>
+                Delete
+              </Button>
+            </div>
+          ) : undefined
+        }
       >
         {selected && (
           <div className="space-y-4">
@@ -500,23 +523,6 @@ export function FeedbackAdminPanel() {
                 ))}
               </div>
             )}
-            <div className="flex flex-wrap gap-2 border-t border-[var(--color-line)] pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() =>
-                  void updateStatus(
-                    selected,
-                    selected.status === "open" ? "resolved" : "open",
-                  )
-                }
-              >
-                {selected.status === "open" ? "Mark resolved" : "Reopen"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setDeleteTarget(selected)}>
-                Delete
-              </Button>
-            </div>
           </div>
         )}
       </Drawer>
@@ -525,12 +531,7 @@ export function FeedbackAdminPanel() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Delete feedback?"
-      >
-        <div className="space-y-4">
-          <p className="text-[13px] text-[var(--color-ink-muted)]">
-            This permanently removes the feedback row and screenshots. The audit log will retain a
-            deletion record.
-          </p>
+        footer={
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setDeleteTarget(null)}>
               Cancel
@@ -539,7 +540,12 @@ export function FeedbackAdminPanel() {
               Delete
             </Button>
           </div>
-        </div>
+        }
+      >
+        <p className="text-[13px] text-[var(--color-ink-muted)]">
+          This permanently removes the feedback row and screenshots. The audit log will retain a
+          deletion record.
+        </p>
       </Modal>
     </div>
   );

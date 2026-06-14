@@ -48,7 +48,25 @@ export function LostReasonModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Mark opportunity as lost">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Mark opportunity as lost"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!lostReasonId || pending}
+          >
+            {pending ? "Saving…" : "Confirm lost"}
+          </Button>
+        </div>
+      }
+    >
       <div className="space-y-4">
         <p className="text-[13px] text-[var(--color-ink-soft)]">
           Select a lost reason. This is required when moving to a lost status.
@@ -87,19 +105,6 @@ export function LostReasonModal({
         {error && (
           <p className="text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>
         )}
-
-        <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!lostReasonId || pending}
-          >
-            {pending ? "Saving…" : "Confirm lost"}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

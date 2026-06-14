@@ -234,8 +234,18 @@ export function OpportunityFormDrawer({
       onClose={onClose}
       title="New opportunity"
       className="w-[min(100%,480px)]"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button type="submit" form="new-opportunity-form" disabled={submitting || loadingOptions}>
+            {submitting ? "Creating…" : "Create opportunity"}
+          </Button>
+        </div>
+      }
     >
-      <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form id="new-opportunity-form" className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <div>
           <Label htmlFor="opp-lead" required>
             Lead
@@ -432,15 +442,6 @@ export function OpportunityFormDrawer({
         {error && (
           <p className="text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>
         )}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={submitting || loadingOptions}>
-            {submitting ? "Creating…" : "Create opportunity"}
-          </Button>
-        </div>
       </form>
     </Drawer>
   );

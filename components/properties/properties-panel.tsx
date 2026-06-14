@@ -632,8 +632,18 @@ export function PropertiesPanel({
         onClose={() => setDrawerOpen(false)}
         title="New property"
         className="w-[min(100%,480px)]"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-property-form" disabled={submitting}>
+              {submitting ? "Creating…" : "Create property"}
+            </Button>
+          </div>
+        }
       >
-        <form className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
+        <form id="new-property-form" className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
           <div>
             <Label htmlFor="title" required>
               Title
@@ -892,15 +902,6 @@ export function PropertiesPanel({
           {formError && (
             <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>
           )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Creating…" : "Create property"}
-            </Button>
-          </div>
         </form>
       </Drawer>
     </>

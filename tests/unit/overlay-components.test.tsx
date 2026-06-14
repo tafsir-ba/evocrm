@@ -46,6 +46,18 @@ describe("overlay and table primitives", () => {
     expect(screen.getByText("Modal body")).toBeInTheDocument();
   });
 
+  it("uses a scrollable body region on modal", () => {
+    const { container } = render(
+      <Modal open onClose={() => undefined} title="Confirm action">
+        Modal body
+      </Modal>,
+    );
+
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
+  });
+
   it("renders drawer when open", () => {
     render(
       <Drawer open onClose={() => undefined} title="Filters">
@@ -55,6 +67,55 @@ describe("overlay and table primitives", () => {
 
     expect(screen.getByRole("dialog", { name: "Filters" })).toBeInTheDocument();
     expect(screen.getByText("Drawer body")).toBeInTheDocument();
+  });
+
+  it("uses a flex column layout with scrollable body on drawer", () => {
+    const { container } = render(
+      <Drawer open onClose={() => undefined} title="Filters">
+        Drawer body
+      </Drawer>,
+    );
+
+    const panel = screen.getByRole("dialog", { name: "Filters" });
+    expect(panel).toHaveClass("flex", "flex-col", "h-full");
+
+    const scrollRegion = container.querySelector(".overflow-y-auto");
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
+  });
+
+  it("renders sticky footer outside scroll region on drawer", () => {
+    render(
+      <Drawer
+        open
+        onClose={() => undefined}
+        title="Filters"
+        footer={<button type="button">Apply</button>}
+      >
+        Drawer body
+      </Drawer>,
+    );
+
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.getByText("Drawer body").closest(".overflow-y-auto")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Apply" }).closest(".overflow-y-auto")).toBeNull();
+  });
+
+  it("renders sticky footer outside scroll region on modal", () => {
+    render(
+      <Modal
+        open
+        onClose={() => undefined}
+        title="Confirm action"
+        footer={<button type="button">Confirm</button>}
+      >
+        Modal body
+      </Modal>,
+    );
+
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
+    expect(screen.getByText("Modal body").closest(".overflow-y-auto")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Confirm" }).closest(".overflow-y-auto")).toBeNull();
   });
 
   it("opens dropdown menu on trigger click", async () => {
