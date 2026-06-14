@@ -1,5 +1,7 @@
 import "server-only";
 
+import mongoose from "mongoose";
+
 import { AppError } from "@/server/errors";
 import { connectDb } from "@/server/db/mongoose";
 import { MembershipModel, type MembershipDocument } from "@/models/membership";
@@ -43,6 +45,10 @@ export async function findMembership(
 export async function findActiveMembershipsForUser(
   userId: string,
 ): Promise<MembershipRecord[]> {
+  if (!mongoose.isValidObjectId(userId)) {
+    return [];
+  }
+
   await connectDb();
   const documents = await MembershipModel.find({
     userId,

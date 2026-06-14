@@ -16,7 +16,8 @@ vi.mock("@/models/user", () => ({
   },
 }));
 
-import { createCredentialsUser } from "@/server/repositories/users";
+import { createCredentialsUser, findUserById } from "@/server/repositories/users";
+import { UserModel } from "@/models/user";
 
 describe("users repository", () => {
   beforeEach(() => {
@@ -74,5 +75,12 @@ describe("users repository", () => {
     ).rejects.toMatchObject({
       code: "INTERNAL_ERROR",
     });
+  });
+
+  it("returns null for non-ObjectId user ids without querying the database", async () => {
+    const user = await findUserById("550e8400-e29b-41d4-a716-446655440000");
+
+    expect(user).toBeNull();
+    expect(UserModel.findById).not.toHaveBeenCalled();
   });
 });

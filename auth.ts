@@ -61,7 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       const sub = await resolveJwtSub({
         userId: user?.id,
-        email: user?.email,
+        email: user?.email ?? token.email,
       });
 
       if (sub) {

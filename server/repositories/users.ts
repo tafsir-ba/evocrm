@@ -1,5 +1,7 @@
 import "server-only";
 
+import mongoose from "mongoose";
+
 import { connectDb } from "@/server/db/mongoose";
 import { AppError } from "@/server/errors";
 import { UserModel, type AuthProvider, type UserDocument } from "@/models/user";
@@ -47,6 +49,10 @@ export async function findUserByEmail(email: string): Promise<UserRecord | null>
 }
 
 export async function findUserById(userId: string): Promise<UserRecord | null> {
+  if (!mongoose.isValidObjectId(userId)) {
+    return null;
+  }
+
   await connectDb();
   const document = await UserModel.findById(userId).lean<UserDocument>();
   return document ? toUserRecord(document) : null;

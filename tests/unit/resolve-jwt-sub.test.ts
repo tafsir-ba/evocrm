@@ -29,6 +29,23 @@ describe("resolveJwtSub", () => {
     expect(sub).toBe("mongo-user-1");
   });
 
+  it("repairs stale JWT subs from token email on session refresh", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      id: "507f1f77bcf86cd799439011",
+      email: "tafsir@evo-home.ch",
+      authProvider: "google",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const sub = await resolveJwtSub({
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      email: "tafsir@evo-home.ch",
+    });
+
+    expect(sub).toBe("507f1f77bcf86cd799439011");
+  });
+
   it("falls back to user id when no DB user exists for the email", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue(null);
 
