@@ -199,6 +199,23 @@ export async function findActiveLeadByEmailNormalized(
   return document ? toLeadRecord(document) : null;
 }
 
+export async function findLeadByIntegrationIdempotencyKey(
+  workspaceId: string,
+  integrationId: string,
+  idempotencyKey: string,
+): Promise<LeadRecord | null> {
+  await connectDb();
+  const document = await LeadModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      archivedAt: null,
+      "attributes.integration.integrationId": integrationId,
+      "attributes.integration.idempotencyKey": idempotencyKey,
+    }),
+  ).lean<LeadDocument>();
+
+  return document ? toLeadRecord(document) : null;
+}
+
 export async function findLeadByPhoneNormalized(
   workspaceId: string,
   phoneNormalized: string,

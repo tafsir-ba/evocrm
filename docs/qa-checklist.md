@@ -405,7 +405,26 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
-## Manual Smoke Test (post-merge to dev)
+## Phase 12 — External Integrations
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] `Integration` and `IntegrationLog` models with workspace-scoped indexes
+- [ ] Settings → Integrations UI (not primary navigation)
+- [ ] Management APIs enforce `settings:read` / `settings:update`
+- [ ] Website integration creates `apiKeyHash` only; raw key shown once on create/rotate
+- [ ] `POST /api/integrations/website/leads` authenticates via API key; derives workspace from integration
+- [ ] Paused/archived/error integrations reject inbound website leads
+- [ ] Website payload requires `firstName`, `lastName`, and email or phone
+- [ ] Lead creation reuses lead service; source attribution via `lead_source` key `website`
+- [ ] Idempotency via `Lead.attributes.integration.idempotencyKey`
+- [ ] Duplicate normalized email returns existing lead (`duplicate: true`) without second insert
+- [ ] Integration logs store sanitized `payloadSummary` only
+- [ ] MLS / Google Ads / Meta Ads are placeholders only (paused, no OAuth/credentials)
+- [ ] Unit tests for workspace isolation, permissions, webhook auth, duplicate/idempotency, logging
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.
 

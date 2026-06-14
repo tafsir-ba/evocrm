@@ -597,6 +597,7 @@ External system connection (settings/internal in V1).
 | `createdBy` | |
 | `createdAt` | |
 | `updatedAt` | |
+| `archivedAt` | Set when archived (soft delete) |
 
 ---
 

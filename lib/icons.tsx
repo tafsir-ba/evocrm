@@ -77,6 +77,7 @@ export function IconBell(p: IconProps) { return (<svg {...base(p)}><path d="M6 1
 export function IconArrowUp(p: IconProps) { return (<svg {...base(p)}><path d="m6 14 6-6 6 6"/></svg>); }
 export function IconArrowDown(p: IconProps) { return (<svg {...base(p)}><path d="m6 10 6 6 6-6"/></svg>); }
 export function IconExternalLink(p: IconProps) { return (<svg {...base(p)}><path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M14 4h6v6M20 4 11 13"/></svg>); }
+export function IconPlug(p: IconProps) { return (<svg {...base(p)}><path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>); }
 export function IconTag(p: IconProps) { return (<svg {...base(p)}><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10L14 2h-2Z"/><circle cx="7" cy="7" r="1.5"/></svg>); }
 export function IconFolder(p: IconProps) { return (<svg {...base(p)}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>); }
 export function IconCreditCard(p: IconProps) { return (<svg {...base(p)}><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>); }

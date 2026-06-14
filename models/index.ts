@@ -18,3 +18,5 @@ export {
   type CampaignEnrollmentDocument,
 } from "./campaign-enrollment";
 export { CampaignSendModel, type CampaignSendDocument } from "./campaign-send";
+export { IntegrationModel, type IntegrationDocument } from "./integration";
+export { IntegrationLogModel, type IntegrationLogDocument } from "./integration-log";

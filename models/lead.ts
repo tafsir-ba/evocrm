@@ -59,6 +59,19 @@ leadSchema.index(
     },
   },
 );
+leadSchema.index(
+  {
+    workspaceId: 1,
+    "attributes.integration.integrationId": 1,
+    "attributes.integration.idempotencyKey": 1,
+  },
+  {
+    partialFilterExpression: {
+      "attributes.integration.idempotencyKey": { $type: "string", $ne: "" },
+      archivedAt: null,
+    },
+  },
+);
 
 export type LeadDocument = InferSchemaType<typeof leadSchema> & {
   _id: mongoose.Types.ObjectId;

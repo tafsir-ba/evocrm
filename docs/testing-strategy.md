@@ -134,7 +134,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 | 9 | Dashboard aggregation workspace-scoped, behavior-based metrics, date range validation, permissions (`tests/unit/dashboard-{service,api,ui}.test.ts`) |
 | 10 | Campaign enroll, send skip rules, unsubscribe |
 | 11 | Member invite/remove guards, owner protection |
-| 12 | Webhook signature validation, idempotency |
+| 12 | Integration CRUD permissions, API key hash/rotate, website webhook auth, idempotency, duplicate email, log sanitization (`tests/unit/integrations-{validation,service,api}.test.ts`, `website-lead-capture-service.test.ts`, `integration-api-keys.test.ts`, `integration-logs-service.test.ts`) |
 | 13 | Full E2E MVP flow |
 
 ---

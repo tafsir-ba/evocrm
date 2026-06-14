@@ -415,7 +415,16 @@ Normalization happens in the service layer before repository persist.
 
 ---
 
-## Anti-Patterns
+## Integrations (Phase 12)
+
+- `Integration` and `IntegrationLog` queries must use `withWorkspaceScope(workspaceId, …)` for management APIs.
+- Website webhook lookup by `apiKeyHash` is global (hash → integration → workspaceId), but inbound lead writes always use the integration's server-resolved `workspaceId`.
+- Never accept client `workspaceId` on integration management or website webhook payloads.
+- Archive integrations with `status = archived` and `archivedAt`; do not hard-delete.
+- Idempotency: query leads by `workspaceId` + `attributes.integration.integrationId` + `attributes.integration.idempotencyKey`.
+- Integration logs: persist sanitized summaries only — no raw webhook bodies, API keys, or secrets.
+
+---
 
 | Anti-pattern | Why rejected |
 |--------------|--------------|

@@ -10,6 +10,7 @@ import {
   IconChevronRight,
   IconFolder,
   IconHash,
+  IconPlug,
   IconShieldUser,
   IconTag,
   IconUser,
@@ -98,13 +99,21 @@ export default async function SettingsPage({ params }: { params: Params }) {
       href: "billing",
       visible: canBilling,
     },
+    {
+      key: "integrations",
+      label: "Integrations",
+      desc: "Website lead capture and external connections",
+      Icon: IconPlug,
+      href: "integrations",
+      visible: true,
+    },
   ].filter((section) => section.visible);
 
   return (
     <PageContainer>
       <PageHeader
         title="Settings"
-        description="Configure your workspace, team, dictionaries and billing."
+        description="Configure your workspace, team, dictionaries, integrations and billing."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">

@@ -337,13 +337,16 @@ Authorization: Bearer <CRON_SECRET>
 
 ---
 
-## Integration Security (Phase 12+)
+## Integration Security (Phase 12)
 
-- Do not store raw credentials in plaintext.
-- Use `credentialsEncrypted` (encrypted at rest) and `apiKeyHash` (for webhook validation).
-- Do not log full sensitive payloads — use `payloadSummary` in `IntegrationLog`.
-- Validate webhooks via signature or API key.
-- Use idempotency keys for imports to prevent duplicate processing.
+- Website integrations store only `apiKeyHash` (SHA-256 with server pepper). Raw API keys are returned once on create/rotate only.
+- `credentialsEncrypted` is reserved for future MLS/Ads OAuth flows — not populated in Phase 12.
+- Do not log full sensitive payloads — use sanitized `payloadSummary` in `IntegrationLog` (no API keys, tokens, or full PII).
+- Website webhook authentication: `Authorization: Bearer <apiKey>` (or `X-Integration-Key`).
+- Workspace for inbound leads is derived from the integration record — never trusted from payload.
+- Paused/archived/error integrations cannot process inbound website leads.
+- Idempotency via `Lead.attributes.integration.idempotencyKey`; duplicate normalized email returns existing lead reference.
+- Per-integration/IP rate limiting is documented for Phase 13 hardening (not implemented in Phase 12).
 
 ---
 
@@ -368,6 +371,7 @@ Apply rate limiting to:
 
 - Auth endpoints
 - Public unsubscribe endpoint
+- Website lead capture webhook (`POST /api/integrations/website/leads`) — Phase 13
 - Cron endpoint (infrastructure + secret)
 - File upload URL generation
 

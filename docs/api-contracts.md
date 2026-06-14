@@ -716,6 +716,56 @@ Token-based HMAC-signed payload (`workspaceId`, `leadId`, `enrollmentId`, `campa
 
 ---
 
+## Integrations (Phase 12)
+
+Settings → Integrations management routes (authenticated, workspace-scoped):
+
+```txt
+GET    /api/workspaces/[workspaceSlug]/integrations
+POST   /api/workspaces/[workspaceSlug]/integrations
+GET    /api/workspaces/[workspaceSlug]/integrations/[integrationId]
+PATCH  /api/workspaces/[workspaceSlug]/integrations/[integrationId]
+DELETE /api/workspaces/[workspaceSlug]/integrations/[integrationId]   # archives
+POST   /api/workspaces/[workspaceSlug]/integrations/[integrationId]/rotate-api-key
+GET    /api/workspaces/[workspaceSlug]/integrations/[integrationId]/logs
+```
+
+Permissions:
+
+- `settings:read` — list/get integrations and logs
+- `settings:update` — create/update/archive/rotate API key
+
+Management responses expose `IntegrationPublicRecord` only (no `apiKeyHash`, no `credentialsEncrypted`, no stored raw API key). Website create/rotate responses may include `apiKey` once.
+
+Website lead capture (public webhook, not workspaceSlug-based):
+
+```txt
+POST /api/integrations/website/leads
+Authorization: Bearer <apiKey>
+```
+
+Alternative header: `X-Integration-Key: <apiKey>`.
+
+Success response:
+
+```json
+{
+  "data": {
+    "leadId": "...",
+    "duplicate": false,
+    "idempotent": false
+  }
+}
+```
+
+Duplicate email or repeated idempotency key returns HTTP 200 with `duplicate: true` (and `idempotent: true` when the same integration + idempotency key was already processed). Workspace is derived from the active website integration matched by hashed API key — never from the request body.
+
+Required payload fields: `firstName`, `lastName`, and at least one of `email` or `phone`. Optional: `externalId`, `idempotencyKey`, `message`, `source`, `preferredAreas`, `budgetMin`, `budgetMax`, `propertyReference`, `utm`.
+
+Inbound leads set `sourceId` from dictionary item `lead_source` key `website` when available. UTM/external metadata is stored in `Lead.attributes.integration`.
+
+---
+
 ## Request Validation
 
 - All mutation bodies validated with Zod on the server.
@@ -724,9 +774,13 @@ Token-based HMAC-signed payload (`workspaceId`, `leadId`, `enrollmentId`, `campa
 
 ---
 
-## Idempotency (integrations, later)
+## Idempotency (integrations — Phase 12)
 
-Inbound webhooks and imports should support idempotency keys. Documented for Phase 12; pattern:
+Website lead capture accepts `idempotencyKey` in the JSON body (or falls back to `externalId`). The server stores metadata in `Lead.attributes.integration` and replays the existing lead when the same integration + key is seen again.
+
+Duplicate normalized email within a workspace returns the existing lead reference with `duplicate: true` instead of creating a second lead.
+
+Optional HTTP header pattern for future endpoints:
 
 ```txt
 Idempotency-Key: <uuid>
