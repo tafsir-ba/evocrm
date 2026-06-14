@@ -563,7 +563,7 @@ export function CampaignDetailPanel({
           <EmptyState
             compact
             title="No sends yet"
-            description="Send logs appear after the cron job processes due enrollments."
+            description="Send logs appear after activation, enrollment, or scheduled processing."
           />
         ) : (
           <div className="overflow-x-auto">

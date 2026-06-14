@@ -17,7 +17,7 @@ import { findFirstCampaignStep } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
-import { computeNextSendAt } from "@/server/utils/campaign-schedule";
+import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
 import type {
   CreateCampaignEnrollmentInput,
   UpdateCampaignEnrollmentInput,
@@ -231,7 +231,7 @@ export async function createCampaignEnrollmentForWorkspace(
     after: enrollmentSnapshot(enrollment),
   });
 
-  if (campaign.status === "active") {
+  if (campaign.status === "active" && firstStep.delayDays <= 0) {
     void sendCampaignEnrollmentsImmediately(
       workspaceId,
       campaignId,
@@ -272,7 +272,9 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
     }
 
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
-      nextSendAt: computeNextSendAt(anchor, step.delayDays),
+      nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, {
+        overdue: mode === "resume" && enrollment.nextSendAt <= anchor,
+      }),
     });
     updatedIds.push(enrollment.id);
   }
@@ -329,7 +331,7 @@ export async function updateCampaignEnrollmentForWorkspace(
 
     if (step) {
       const rescheduled = await updateCampaignEnrollment(workspaceId, enrollmentId, {
-        nextSendAt: computeNextSendAt(anchor, step.delayDays),
+        nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, { overdue: true }),
       });
 
       if (rescheduled) {

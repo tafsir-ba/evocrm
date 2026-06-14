@@ -371,6 +371,25 @@ describe("campaign sending service", () => {
     expect(createCampaignSend).not.toHaveBeenCalled();
   });
 
+  it("skips delayed steps before their scheduled send time", async () => {
+    const futureEnrollment = {
+      ...enrollment,
+      nextSendAt: new Date("2099-01-01T00:00:00.000Z"),
+    };
+
+    vi.mocked(findDueEnrollments).mockResolvedValue([futureEnrollment]);
+    vi.mocked(findStepByOrder).mockResolvedValue({
+      ...step,
+      delayDays: 3,
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.skipped).toBe(1);
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(createCampaignSend).not.toHaveBeenCalled();
+  });
+
   it("skips paused campaign", async () => {
     vi.mocked(findCampaignById).mockResolvedValue({
       id: "camp-1",

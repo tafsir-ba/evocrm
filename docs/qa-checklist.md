@@ -150,6 +150,8 @@ A phase with any **Missing / deviating** item in a critical section cannot merge
 - [x] Campaign enrollment UI uses searchable lead/opportunity selectors (Phase 10 — not raw ObjectId text input)
 - [x] Zero-delay steps schedule from activation/enrollment anchor, not past click timestamps (Phase 10)
 - [x] Activation and active-campaign enrollment trigger immediate first-step send attempt (Phase 10)
+- [x] Consecutive zero-delay steps chain in one backend send pass (Phase 10)
+- [x] Delayed steps respect `nextSendAt` and do not send early on activation (Phase 10)
 - [ ] Production schedules `POST /api/cron/campaigns/send-due` with `CRON_SECRET` (Phase 10 ops)
 - [ ] `RESEND_API_KEY` and `EMAIL_FROM` configured for outbound campaign email (Phase 10 ops)
 - [ ] File upload restrictions enforced (Phase 8+)

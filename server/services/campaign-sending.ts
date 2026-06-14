@@ -25,7 +25,7 @@ import {
   createUnsubscribeToken,
   buildUnsubscribeUrl,
 } from "@/server/utils/unsubscribe-token";
-import { addDays, computeNextSendAt } from "@/server/utils/campaign-schedule";
+import { addDays, computeNextSendAt, isScheduledSendDue } from "@/server/utils/campaign-schedule";
 
 export type SendDueSummary = {
   processed: number;
@@ -165,6 +165,10 @@ async function processEnrollment(
     });
 
     return singleOutcomeResult("failed");
+  }
+
+  if (!isScheduledSendDue(enrollment.nextSendAt, step.delayDays)) {
+    return singleOutcomeResult("skipped");
   }
 
   if (!enrollment.leadId) {

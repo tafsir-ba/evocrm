@@ -16,3 +16,27 @@ export function computeNextSendAt(anchor: Date, delayDays: number): Date {
 
   return addDays(anchor, delayDays);
 }
+
+export function computeRescheduledSendAt(
+  anchor: Date,
+  stepDelayDays: number,
+  options: { overdue: boolean },
+): Date {
+  if (options.overdue) {
+    return computeNextSendAt(anchor, 0);
+  }
+
+  return computeNextSendAt(anchor, stepDelayDays);
+}
+
+export function isScheduledSendDue(
+  nextSendAt: Date,
+  stepDelayDays: number,
+  now = new Date(),
+): boolean {
+  if (nextSendAt <= now) {
+    return true;
+  }
+
+  return stepDelayDays <= 0;
+}
