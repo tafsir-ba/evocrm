@@ -1,5 +1,6 @@
 import "server-only";
 
+import { AppError } from "@/server/errors";
 import { connectDb } from "@/server/db/mongoose";
 import { WorkspaceModel, type WorkspaceDocument } from "@/models/workspace";
 
@@ -68,4 +69,22 @@ export async function createWorkspace(input: {
   });
 
   return toWorkspaceRecord(document.toObject() as WorkspaceDocument);
+}
+
+export async function updateWorkspace(
+  workspaceId: string,
+  input: Partial<Pick<WorkspaceRecord, "name" | "type" | "timezone" | "defaultCurrency">>,
+): Promise<WorkspaceRecord> {
+  await connectDb();
+  const document = await WorkspaceModel.findByIdAndUpdate(
+    workspaceId,
+    { $set: input },
+    { new: true, runValidators: true },
+  ).lean<WorkspaceDocument>();
+
+  if (!document) {
+    throw new AppError("NOT_FOUND", "Workspace not found.");
+  }
+
+  return toWorkspaceRecord(document);
 }

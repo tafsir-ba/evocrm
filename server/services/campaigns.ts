@@ -2,7 +2,6 @@ import "server-only";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
-import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveCampaign,
   createCampaign,
@@ -24,6 +23,7 @@ import type {
   CreateCampaignInput,
   UpdateCampaignInput,
 } from "@/server/validation/campaigns";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 
 export type CampaignListItem = CampaignRecord & {
   stepCount: number;
@@ -41,24 +41,6 @@ function campaignSnapshot(campaign: CampaignRecord): Record<string, unknown> {
     frequency: campaign.frequency,
     ownerId: campaign.ownerId,
   };
-}
-
-async function validateOptionalOwner(
-  workspaceId: string,
-  ownerId: string | null | undefined,
-): Promise<void> {
-  if (!ownerId) {
-    return;
-  }
-
-  const membership = await findMembership(ownerId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "ownerId must refer to an active workspace member.",
-    );
-  }
 }
 
 async function enrichCampaign(
@@ -104,7 +86,7 @@ export async function createCampaignForWorkspace(
   actorId: string,
   input: CreateCampaignInput,
 ): Promise<CampaignDetail> {
-  await validateOptionalOwner(workspaceId, input.ownerId);
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
   const campaign = await createCampaign(workspaceId, {
     name: input.name,
@@ -181,7 +163,7 @@ export async function updateCampaignForWorkspace(
   }
 
   if (input.ownerId !== undefined) {
-    await validateOptionalOwner(workspaceId, input.ownerId);
+    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   }
 
   const updated = await updateCampaign(workspaceId, campaignId, {

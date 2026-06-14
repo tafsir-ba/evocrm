@@ -381,6 +381,27 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 
 ---
 
+## Phase 11 — Settings / Billing / Ownership Reassignment
+
+- [ ] `npm run typecheck`, `lint`, `test`, `build` pass
+- [ ] Workspace settings API/UI (`GET/PATCH /settings`) with `settings:read` / `settings:update`
+- [ ] Membership APIs (`/memberships`) with `users:manage` for mutations
+- [ ] Role APIs (`/roles`) with `roles:manage` for mutations; system roles read-only
+- [ ] Billing shell at `/settings/billing` and `GET /billing` with `billing:manage`
+- [ ] Reassignment summary + POST reassign for leads/properties/opportunities/activities/projects
+- [ ] Owner protection: last active owner cannot be suspended/removed/demoted
+- [ ] Inactive members cannot receive new assignments (`validateAssignableMember`)
+- [ ] Users/Roles/Billing are Settings subsections only — not primary navigation
+- [ ] Primary navigation remains locked V1 modules
+- [ ] Workspace slug immutable; client `workspaceId` not trusted
+- [ ] Email invite delivery not faked — add-member requires existing user account
+- [ ] Stripe placeholder only — no secrets or invented pricing exposed
+- [ ] Unit tests for settings, memberships, roles, billing, assignments, reassignment, owner protection
+
+**Rating:** Fully aligned / Partially aligned / Missing / deviating
+
+---
+
 ## Manual Smoke Test (post-merge to dev)
 
 After Codex approval and merge to `dev`, perform manual smoke test for the phase scope before considering stable.

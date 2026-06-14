@@ -36,6 +36,30 @@ export async function findRoleById(roleId: string): Promise<RoleRecord | null> {
   return document ? toRoleRecord(document) : null;
 }
 
+export async function findRoleByIdInWorkspace(
+  roleId: string,
+  workspaceId: string,
+): Promise<RoleRecord | null> {
+  await connectDb();
+  const document = await RoleModel.findOne({
+    _id: roleId,
+    workspaceId,
+  }).lean<RoleDocument>();
+
+  return document ? toRoleRecord(document) : null;
+}
+
+export async function findRolesForWorkspace(
+  workspaceId: string,
+): Promise<RoleRecord[]> {
+  await connectDb();
+  const documents = await RoleModel.find({ workspaceId })
+    .sort({ isSystem: -1, name: 1 })
+    .lean<RoleDocument[]>();
+
+  return documents.map(toRoleRecord);
+}
+
 export async function findRoleByWorkspaceAndKey(
   workspaceId: string,
   key: string,
@@ -69,9 +93,39 @@ export async function createRole(input: {
   return toRoleRecord(document.toObject() as RoleDocument);
 }
 
-export async function deleteRoleById(roleId: string): Promise<void> {
+export async function updateRole(
+  roleId: string,
+  workspaceId: string,
+  input: Partial<Pick<RoleRecord, "name" | "permissions">>,
+): Promise<RoleRecord> {
   await connectDb();
-  const document = await RoleModel.findById(roleId).lean<RoleDocument>();
+
+  if (input.permissions) {
+    validatePermissions(input.permissions);
+  }
+
+  const document = await RoleModel.findOneAndUpdate(
+    { _id: roleId, workspaceId },
+    { $set: input },
+    { new: true, runValidators: true },
+  ).lean<RoleDocument>();
+
+  if (!document) {
+    throw new AppError("NOT_FOUND", "Role not found.");
+  }
+
+  return toRoleRecord(document);
+}
+
+export async function deleteRoleById(
+  roleId: string,
+  workspaceId: string,
+): Promise<void> {
+  await connectDb();
+  const document = await RoleModel.findOne({
+    _id: roleId,
+    workspaceId,
+  }).lean<RoleDocument>();
 
   if (!document) {
     throw new AppError("NOT_FOUND", "Role not found.");
@@ -81,5 +135,5 @@ export async function deleteRoleById(roleId: string): Promise<void> {
     throw new AppError("FORBIDDEN", "System roles cannot be deleted.");
   }
 
-  await RoleModel.findByIdAndDelete(roleId);
+  await RoleModel.findOneAndDelete({ _id: roleId, workspaceId });
 }

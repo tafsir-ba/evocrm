@@ -3,14 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertOwnerMembershipRemovable } from "@/server/permissions/owner-protection";
 
 vi.mock("@/server/repositories/memberships", () => ({
-  findMembership: vi.fn(),
+  findMembershipByIdInWorkspace: vi.fn(),
+  countActiveMembershipsWithRole: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/roles", () => ({
   findRoleByWorkspaceAndKey: vi.fn(),
 }));
 
-import { findMembership } from "@/server/repositories/memberships";
+import {
+  countActiveMembershipsWithRole,
+  findMembershipByIdInWorkspace,
+} from "@/server/repositories/memberships";
 import { findRoleByWorkspaceAndKey } from "@/server/repositories/roles";
 
 describe("owner protection", () => {
@@ -18,8 +22,8 @@ describe("owner protection", () => {
     vi.clearAllMocks();
   });
 
-  it("blocks removal of owner membership", async () => {
-    vi.mocked(findMembership).mockResolvedValue({
+  it("blocks removal of last owner membership", async () => {
+    vi.mocked(findMembershipByIdInWorkspace).mockResolvedValue({
       id: "m-1",
       userId: "user-1",
       workspaceId: "ws-1",
@@ -40,6 +44,8 @@ describe("owner protection", () => {
       updatedAt: new Date(),
     });
 
+    vi.mocked(countActiveMembershipsWithRole).mockResolvedValue(1);
+
     await expect(
       assertOwnerMembershipRemovable({
         workspaceId: "ws-1",
@@ -52,7 +58,7 @@ describe("owner protection", () => {
   });
 
   it("allows removal of non-owner membership", async () => {
-    vi.mocked(findMembership).mockResolvedValue({
+    vi.mocked(findMembershipByIdInWorkspace).mockResolvedValue({
       id: "m-2",
       userId: "user-2",
       workspaceId: "ws-1",

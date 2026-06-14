@@ -5,7 +5,6 @@ import { AppError } from "@/server/errors";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import type { DictionaryItemRecord } from "@/server/repositories/dictionary-items";
 import { findLeadById, findLeads } from "@/server/repositories/leads";
-import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveOpportunity,
   createOpportunity,
@@ -19,6 +18,7 @@ import {
 import { findProperties, findPropertyById } from "@/server/repositories/properties";
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
 import type {
@@ -125,25 +125,6 @@ export function applyOpportunityStatusBehavior(
     lostReasonText: null,
     probability: status.defaultProbability ?? null,
   };
-}
-
-async function validateOptionalWorkspaceMember(
-  workspaceId: string,
-  userId: string | null | undefined,
-  fieldLabel: string,
-): Promise<void> {
-  if (!userId) {
-    return;
-  }
-
-  const membership = await findMembership(userId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `${fieldLabel} must refer to an active workspace member.`,
-    );
-  }
 }
 
 async function validateOpportunityStatusId(
@@ -507,8 +488,8 @@ export async function createOpportunityForWorkspace(
   await validateLeadForOpportunity(workspaceId, input.leadId);
   await validatePropertyForOpportunity(workspaceId, input.propertyId);
   const status = await validateOpportunityStatusId(workspaceId, input.statusId);
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assignee");
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assignee");
   await validateOpportunityTags(workspaceId, input.tags);
 
   if (status.behavior === "terminal_lost" && !input.lostReasonId) {
@@ -596,8 +577,8 @@ export async function updateOpportunityForWorkspace(
     );
   }
 
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assignee");
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assignee");
   await validateOpportunityTags(workspaceId, input.tags);
 
   const targetStatus = statusItem;

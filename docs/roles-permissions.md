@@ -173,14 +173,16 @@ Permission checks live in server code only — never trust client-sent role or p
 
 ---
 
-## Owner Protection
+## Owner Protection (Phase 11 — implemented)
 
 | Rule | Detail |
 |------|--------|
-| Owner cannot be removed accidentally | Removing owner membership requires explicit owner transfer flow |
-| Owner transfer | Must be explicit action by current owner |
-| Minimum admin coverage | At least one active owner (or admin with equivalent rights) must remain |
-| Last owner guard | Block demotion/removal of last owner without transfer |
+| Owner-equivalent | Role with `key = owner` |
+| Last owner guard | Cannot suspend, remove, or demote the last **active** owner membership |
+| Reassignment required | Suspend/remove blocked when member has active `assignedTo` records — use `/reassign` first |
+| System roles | `owner`, `admin`, `agent`, `viewer` are read-only; cannot be deleted |
+
+Owner transfer to another user (changing who holds the owner role while keeping the workspace operational) is supported indirectly via reassignment of records plus role change, but explicit “transfer ownership” UI is not a separate flow in V1.
 
 ---
 

@@ -3,7 +3,6 @@ import "server-only";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
-import { findMembership } from "@/server/repositories/memberships";
 import { findProjectById } from "@/server/repositories/projects";
 import {
   archiveProperty,
@@ -17,6 +16,7 @@ import {
 } from "@/server/repositories/properties";
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreatePropertyInput, UpdatePropertyInput } from "@/server/validation/properties";
 
 export type PropertyDictionarySummary = {
@@ -97,25 +97,6 @@ export function normalizePropertyFeatures(features: string[] | undefined): strin
   }
 
   return normalized;
-}
-
-async function validateOptionalWorkspaceMember(
-  workspaceId: string,
-  userId: string | null | undefined,
-  fieldLabel: string,
-): Promise<void> {
-  if (!userId) {
-    return;
-  }
-
-  const membership = await findMembership(userId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `${fieldLabel} must refer to an active workspace member.`,
-    );
-  }
 }
 
 async function validatePropertyStatusId(
@@ -375,8 +356,8 @@ export async function createPropertyForWorkspace(
   await validatePropertyTypeId(workspaceId, input.typeId);
   await validatePropertyProjectId(workspaceId, input.projectId);
   await validatePropertyTags(workspaceId, input.tags);
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(
     workspaceId,
     input.assignedTo,
     "Assigned to",
@@ -448,10 +429,10 @@ export async function updatePropertyForWorkspace(
     await validatePropertyTags(workspaceId, input.tags);
   }
   if (input.ownerId !== undefined) {
-    await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   }
   if (input.assignedTo !== undefined) {
-    await validateOptionalWorkspaceMember(
+    await validateOptionalAssignableMember(
       workspaceId,
       input.assignedTo,
       "Assigned to",

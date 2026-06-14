@@ -2,7 +2,6 @@ import "server-only";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
-import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveProject,
   createProject,
@@ -13,26 +12,8 @@ import {
   type ProjectListFilter,
   type ProjectRecord,
 } from "@/server/repositories/projects";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreateProjectInput, UpdateProjectInput } from "@/server/validation/projects";
-
-async function validateOptionalWorkspaceMember(
-  workspaceId: string,
-  userId: string | null | undefined,
-  fieldLabel: string,
-): Promise<void> {
-  if (!userId) {
-    return;
-  }
-
-  const membership = await findMembership(userId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `${fieldLabel} must refer to an active workspace member.`,
-    );
-  }
-}
 
 function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
   return {
@@ -72,8 +53,8 @@ export async function createProjectForWorkspace(
   actorId: string,
   input: CreateProjectInput,
 ): Promise<ProjectRecord> {
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assigned to");
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assigned to");
 
   if (input.reference) {
     const duplicate = await findProjectByReference(workspaceId, input.reference);
@@ -121,10 +102,10 @@ export async function updateProjectForWorkspace(
   }
 
   if (input.ownerId !== undefined) {
-    await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   }
   if (input.assignedTo !== undefined) {
-    await validateOptionalWorkspaceMember(
+    await validateOptionalAssignableMember(
       workspaceId,
       input.assignedTo,
       "Assigned to",

@@ -4,7 +4,6 @@ import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { hasPermission } from "@/server/permissions/permissions";
 import type { PermissionKey } from "@/server/permissions/permissions";
-import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveDocument,
   createDocument,
@@ -13,6 +12,7 @@ import {
   type DocumentRecord,
 } from "@/server/repositories/documents";
 import { findUserById } from "@/server/repositories/users";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import {
   assertStorageKeyMatchesWorkspace,
   buildDocumentStorageKey,
@@ -50,24 +50,6 @@ function toPublicDocument(document: DocumentRecord): Omit<DocumentRecord, "bucke
   const { bucket: _bucket, storageKey: _storageKey, workspaceId: _workspaceId, ...publicDocument } =
     document;
   return publicDocument;
-}
-
-async function validateOptionalOwnerId(
-  workspaceId: string,
-  ownerId: string | null | undefined,
-): Promise<void> {
-  if (!ownerId) {
-    return;
-  }
-
-  const membership = await findMembership(ownerId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "ownerId must refer to an active workspace member.",
-    );
-  }
 }
 
 function assertEntityReadAccess(
@@ -182,7 +164,7 @@ export async function createDocumentUploadUrlForWorkspace(
 
   validateDocumentMimeType(input.mimeType);
   validateDocumentFileSize(input.fileSize);
-  await validateOptionalOwnerId(workspaceId, input.ownerId);
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
   const sanitizedFileName = sanitizeFileName(input.fileName);
   const storageKey = buildDocumentStorageKey({
@@ -259,7 +241,7 @@ export async function confirmDocumentUploadForWorkspace(
 
   validateDocumentMimeType(input.mimeType);
   validateDocumentFileSize(input.fileSize);
-  await validateOptionalOwnerId(workspaceId, input.ownerId);
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
   const uploaded = await verifyUploadedObject(input.storageKey, input.fileSize);
 

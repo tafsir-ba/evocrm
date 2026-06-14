@@ -18,10 +18,10 @@ import {
 } from "@/server/repositories/dictionary-items";
 import type { DictionaryItemRecord } from "@/server/repositories/dictionary-items";
 import { findLeadById } from "@/server/repositories/leads";
-import { findMembership } from "@/server/repositories/memberships";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
 import { findUserById } from "@/server/repositories/users";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import {
   applyActivityStatusBehavior,
   isActivityOverdue,
@@ -92,25 +92,6 @@ type ResolvedRelationships = {
   leadId: string | null;
   propertyId: string | null;
 };
-
-async function validateOptionalWorkspaceMember(
-  workspaceId: string,
-  userId: string | null | undefined,
-  fieldLabel: string,
-): Promise<void> {
-  if (!userId) {
-    return;
-  }
-
-  const membership = await findMembership(userId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `${fieldLabel} must refer to an active workspace member.`,
-    );
-  }
-}
 
 async function validateActivityTypeId(
   workspaceId: string,
@@ -455,8 +436,8 @@ export async function createActivityForWorkspace(
 ): Promise<ActivityDetail> {
   await validateActivityTypeId(workspaceId, input.typeId);
   const status = await validateActivityStatusId(workspaceId, input.statusId);
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assigned to");
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assigned to");
 
   const relationships = await resolveRelationships(workspaceId, input);
   const behaviorEffects = applyActivityStatusBehavior(status);
@@ -523,11 +504,11 @@ export async function updateActivityForWorkspace(
     updatePayload.nextActionDate = input.nextActionDate;
   }
   if (input.ownerId !== undefined) {
-    await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
     updatePayload.ownerId = input.ownerId;
   }
   if (input.assignedTo !== undefined) {
-    await validateOptionalWorkspaceMember(workspaceId, input.assignedTo, "Assigned to");
+    await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assigned to");
     updatePayload.assignedTo = input.assignedTo;
   }
   if (input.typeId !== undefined) {

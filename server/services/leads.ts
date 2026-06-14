@@ -3,7 +3,6 @@ import "server-only";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
-import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveLead,
   createLead,
@@ -17,6 +16,7 @@ import {
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
+import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreateLeadInput, UpdateLeadInput } from "@/server/validation/leads";
 
 export type LeadDictionarySummary = {
@@ -78,25 +78,6 @@ export function normalizeLeadPhone(phone: string): {
   const digits = trimmed.replace(/\D/g, "");
   const phoneNormalized = hasPlus ? `+${digits}` : digits;
   return { phone: trimmed, phoneNormalized };
-}
-
-async function validateOptionalWorkspaceMember(
-  workspaceId: string,
-  userId: string | null | undefined,
-  fieldLabel: string,
-): Promise<void> {
-  if (!userId) {
-    return;
-  }
-
-  const membership = await findMembership(userId, workspaceId);
-
-  if (!membership || membership.status !== "active") {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      `${fieldLabel} must refer to an active workspace member.`,
-    );
-  }
 }
 
 async function validateLeadStatusId(
@@ -329,8 +310,8 @@ export async function createLeadForWorkspace(
   await validateLeadStatusId(workspaceId, input.statusId);
   await validateLeadSourceId(workspaceId, input.sourceId);
   await validateLeadTags(workspaceId, input.tags);
-  await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
-  await validateOptionalWorkspaceMember(
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateOptionalAssignableMember(
     workspaceId,
     input.assignedTo,
     "Assigned to",
@@ -409,10 +390,10 @@ export async function updateLeadForWorkspace(
     await validateLeadTags(workspaceId, input.tags);
   }
   if (input.ownerId !== undefined) {
-    await validateOptionalWorkspaceMember(workspaceId, input.ownerId, "Owner");
+    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   }
   if (input.assignedTo !== undefined) {
-    await validateOptionalWorkspaceMember(
+    await validateOptionalAssignableMember(
       workspaceId,
       input.assignedTo,
       "Assigned to",

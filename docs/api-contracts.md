@@ -466,24 +466,57 @@ DELETE /api/workspaces/[workspaceSlug]/tags/[tagId]  # archive (soft)
 
 **Default seeding:** `ensureDefaultDictionaries(workspaceId)` runs on workspace creation and when loading workspace context (idempotent backfill for existing workspaces).
 
-### Settings / Workspace / Users
+### Settings / Workspace / Users / Roles / Billing (Phase 11 — implemented)
 
 ```txt
 GET    /api/workspaces/[workspaceSlug]/settings
 PATCH  /api/workspaces/[workspaceSlug]/settings
 
-GET    /api/workspaces/[workspaceSlug]/members
-POST   /api/workspaces/[workspaceSlug]/members/invite
-PATCH  /api/workspaces/[workspaceSlug]/members/[membershipId]
-POST   /api/workspaces/[workspaceSlug]/members/[membershipId]/remove
+GET    /api/workspaces/[workspaceSlug]/memberships
+POST   /api/workspaces/[workspaceSlug]/memberships
+PATCH  /api/workspaces/[workspaceSlug]/memberships/[membershipId]
+DELETE /api/workspaces/[workspaceSlug]/memberships/[membershipId]   # soft-remove (status=removed)
+
+GET    /api/workspaces/[workspaceSlug]/memberships/[membershipId]/reassignment-summary
+POST   /api/workspaces/[workspaceSlug]/memberships/[membershipId]/reassign
+
+GET    /api/workspaces/[workspaceSlug]/roles
+POST   /api/workspaces/[workspaceSlug]/roles
+PATCH  /api/workspaces/[workspaceSlug]/roles/[roleId]
+DELETE /api/workspaces/[workspaceSlug]/roles/[roleId]
+
+GET    /api/workspaces/[workspaceSlug]/billing
+
+GET    /api/workspaces/[workspaceSlug]/members   # active members for assignment pickers (Phase 4)
 ```
 
-**Phase 4 — `GET /members` implemented** for lead assignment pickers. Returns active workspace members `{ userId, name, email }`. Requires `settings:read`. Invite/remove/management routes remain future phase.
+| Route group | Read permission | Mutation permission |
+|-------------|-----------------|---------------------|
+| `/settings` | `settings:read` | `settings:update` |
+| `/memberships` | `settings:read` | `users:manage` |
+| `/roles` | `settings:read` | `roles:manage` |
+| `/billing` | `billing:manage` | — (shell only) |
+| `/members` | `settings:read` | — |
+
+**Workspace settings (`GET/PATCH /settings`):** Returns/updates `name`, `type`, `timezone`, `defaultCurrency`. Slug is immutable. Rejects client `workspaceId`, `createdBy`, `createdAt`, `updatedAt`.
+
+**Memberships:** Workspace-scoped queries only (`membershipId` + `workspaceId`). Status allowlist: `active`, `invited`, `suspended`, `removed`. `DELETE` sets `status=removed` (no hard-delete). Suspend/remove blocked when member has active assigned records — use reassignment flow first. Owner protection blocks demotion/removal of last active owner.
+
+**Member add (`POST /memberships`):** Adds an **existing** user by email with `roleId`. Email invitation delivery is **not implemented**; non-existent emails return `NOT_FOUND`.
+
+**Reassignment:** Counts/reassigns active non-archived records where `assignedTo` = source user across leads, properties, opportunities, activities, projects. Does **not** update `createdBy` or `uploadedBy`. Replacement must be an active workspace member. Optional `newStatus` (`suspended`/`removed`) applied after reassignment.
+
+**Roles:** Custom roles only (`isSystem: false`). System roles (`owner`, `admin`, `agent`, `viewer`) are read-only and cannot be deleted. Permissions validated against approved allowlist. Custom role deletion blocked when assigned to active memberships.
+
+**Billing shell:** Placeholder only — no Stripe secrets, no live pricing. Returns plan/status placeholders. Stripe connect disabled in UI.
+
+**Inactive assignment prevention:** `validateAssignableMember` in `/server/services/assignments.ts` centralizes checks — only `active` memberships may be assigned to `assignedTo` / `ownerId` across leads, properties, opportunities, activities, projects, campaigns, documents.
+
+**Audit events (typed stub):** `workspace.updated`, `membership.*`, `role.*`, `reassignment.*`, `billing.placeholder_viewed`.
+
+### Projects (Phase 3.5 — implemented)
 
 ```txt
-GET    /api/workspaces/[workspaceSlug]/roles
-PATCH  /api/workspaces/[workspaceSlug]/roles/[roleId]
-
 GET    /api/workspaces/[workspaceSlug]/projects
 POST   /api/workspaces/[workspaceSlug]/projects
 GET    /api/workspaces/[workspaceSlug]/projects/[projectId]
