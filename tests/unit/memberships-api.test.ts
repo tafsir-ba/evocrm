@@ -15,6 +15,7 @@ vi.mock("@/server/permissions/require-permission", () => ({
 vi.mock("@/server/services/memberships", () => ({
   listMembershipsForWorkspace: vi.fn(),
   addMembershipToWorkspace: vi.fn(),
+  updateMembershipInWorkspace: vi.fn(),
 }));
 
 import {
@@ -132,5 +133,39 @@ describe("memberships API", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("rejects PATCH status=invited with validation error", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1", email: "a@b.com" } });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["users:manage"],
+      },
+    });
+
+    const response = await patchMembership(
+      new Request("http://localhost/api/workspaces/demo/memberships/m1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "invited" }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo", membershipId: "m1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 });

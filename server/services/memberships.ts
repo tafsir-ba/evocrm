@@ -175,8 +175,8 @@ export async function updateMembershipInWorkspace(input: {
 
   if (
     input.data.status &&
-    (input.data.status === "suspended" || input.data.status === "removed") &&
-    membership.status === "active"
+    membership.status === "active" &&
+    input.data.status !== "active"
   ) {
     const counts = await countAssignedRecords(
       input.workspaceId,

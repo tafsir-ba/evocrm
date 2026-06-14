@@ -11,6 +11,9 @@ const membershipStatusSchema = z.enum([
   "removed",
 ]);
 
+/** PATCH may only transition among these statuses; `invited` is reserved for a future invite flow. */
+const membershipUpdateStatusSchema = z.enum(["active", "suspended", "removed"]);
+
 export const membershipListQuerySchema = z.object({
   status: membershipStatusSchema.optional(),
 });
@@ -23,7 +26,7 @@ export const createMembershipInputSchema = z.object({
 export const updateMembershipInputSchema = z
   .object({
     roleId: objectIdSchema.optional(),
-    status: membershipStatusSchema.optional(),
+    status: membershipUpdateStatusSchema.optional(),
   })
   .refine((value) => value.roleId !== undefined || value.status !== undefined, {
     message: "At least one field must be provided.",

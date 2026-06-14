@@ -500,7 +500,7 @@ GET    /api/workspaces/[workspaceSlug]/members   # active members for assignment
 
 **Workspace settings (`GET/PATCH /settings`):** Returns/updates `name`, `type`, `timezone`, `defaultCurrency`. Slug is immutable. Rejects client `workspaceId`, `createdBy`, `createdAt`, `updatedAt`.
 
-**Memberships:** Workspace-scoped queries only (`membershipId` + `workspaceId`). Status allowlist: `active`, `invited`, `suspended`, `removed`. `DELETE` sets `status=removed` (no hard-delete). Suspend/remove blocked when member has active assigned records — use reassignment flow first. Owner protection blocks demotion/removal of last active owner.
+**Memberships:** Workspace-scoped queries only (`membershipId` + `workspaceId`). Model statuses: `active`, `invited`, `suspended`, `removed`. **PATCH** accepts `active`, `suspended`, or `removed` only — `invited` is reserved for a future invite flow and cannot be set via PATCH. `DELETE` sets `status=removed` (no hard-delete). Any active → non-active transition is blocked when the member has active assigned records — use reassignment flow first. Owner protection blocks demotion/removal of last active owner.
 
 **Member add (`POST /memberships`):** Adds an **existing** user by email with `roleId`. Email invitation delivery is **not implemented**; non-existent emails return `NOT_FOUND`.
 
