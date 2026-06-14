@@ -43,6 +43,13 @@ type CampaignStep = {
   documentIds: string[];
 };
 
+type EnrollmentScheduledStep = {
+  stepOrder: number;
+  subject: string;
+  scheduledAt: string | null;
+  state: "sent" | "pending" | "cancelled";
+};
+
 type Enrollment = {
   id: string;
   status: string;
@@ -57,6 +64,7 @@ type Enrollment = {
   lastSentAt: string | null;
   failureReason: string | null;
   warnings: string[];
+  scheduledSteps: EnrollmentScheduledStep[];
 };
 
 type SendLog = {
@@ -518,8 +526,7 @@ export function CampaignDetailPanel({
                 <tr className="text-left text-[var(--color-ink-muted)] border-b border-[var(--color-line)]">
                   <th className="py-2 pr-4">Recipient</th>
                   <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Step</th>
-                  <th className="py-2 pr-4">Next send</th>
+                  <th className="py-2 pr-4">Scheduled drips</th>
                   <th className="py-2">Warnings</th>
                 </tr>
               </thead>
@@ -535,9 +542,28 @@ export function CampaignDetailPanel({
                       )}
                     </td>
                     <td className="py-2 pr-4 capitalize">{enrollment.status}</td>
-                    <td className="py-2 pr-4">{enrollment.currentStep}</td>
                     <td className="py-2 pr-4">
-                      {new Date(enrollment.nextSendAt).toLocaleString()}
+                      <ul className="space-y-1">
+                        {(enrollment.scheduledSteps ?? []).map((scheduledStep) => (
+                          <li key={`${enrollment.id}-${scheduledStep.stepOrder}`}>
+                            <span className="font-medium">
+                              Step {scheduledStep.stepOrder}
+                            </span>
+                            {" · "}
+                            {scheduledStep.subject}
+                            {" — "}
+                            {scheduledStep.state === "sent" ? (
+                              <span className="text-[var(--color-ink-muted)]">Sent</span>
+                            ) : scheduledStep.state === "cancelled" ? (
+                              <span className="text-[var(--color-ink-muted)]">Cancelled</span>
+                            ) : scheduledStep.scheduledAt ? (
+                              new Date(scheduledStep.scheduledAt).toLocaleString()
+                            ) : (
+                              "—"
+                            )}
+                          </li>
+                        ))}
+                      </ul>
                     </td>
                     <td className="py-2">
                       {enrollment.warnings.length > 0 ? (

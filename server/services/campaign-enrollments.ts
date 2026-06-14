@@ -13,11 +13,15 @@ import {
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
 } from "@/server/repositories/campaign-enrollments";
-import { findFirstCampaignStep } from "@/server/repositories/campaign-steps";
+import { findFirstCampaignStep, findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
+import {
+  buildEnrollmentScheduledSteps,
+  type EnrollmentScheduledStep,
+} from "@/server/utils/campaign-enrollment-schedule";
 import type {
   CreateCampaignEnrollmentInput,
   UpdateCampaignEnrollmentInput,
@@ -29,6 +33,7 @@ export type CampaignEnrollmentDetail = CampaignEnrollmentRecord & {
   leadEmailConsentStatus: string | null;
   opportunityLabel: string | null;
   warnings: string[];
+  scheduledSteps: EnrollmentScheduledStep[];
 };
 
 function enrollmentSnapshot(
@@ -45,9 +50,19 @@ function enrollmentSnapshot(
   };
 }
 
+async function enrichEnrollmentWithCampaignSteps(
+  workspaceId: string,
+  campaignId: string,
+  enrollment: CampaignEnrollmentRecord,
+): Promise<CampaignEnrollmentDetail> {
+  const steps = await findCampaignSteps(workspaceId, campaignId);
+  return enrichEnrollment(workspaceId, enrollment, steps);
+}
+
 async function enrichEnrollment(
   workspaceId: string,
   enrollment: CampaignEnrollmentRecord,
+  steps: Array<{ order: number; delayDays: number; subject: string }> = [],
 ): Promise<CampaignEnrollmentDetail> {
   const warnings: string[] = [];
   let leadName: string | null = null;
@@ -91,6 +106,7 @@ async function enrichEnrollment(
     leadEmailConsentStatus,
     opportunityLabel,
     warnings,
+    scheduledSteps: buildEnrollmentScheduledSteps(enrollment, steps),
   };
 }
 
@@ -111,8 +127,10 @@ export async function listCampaignEnrollmentsForWorkspace(
     filter,
   );
 
+  const steps = await findCampaignSteps(workspaceId, campaignId);
+
   const enriched = await Promise.all(
-    enrollments.map((enrollment) => enrichEnrollment(workspaceId, enrollment)),
+    enrollments.map((enrollment) => enrichEnrollment(workspaceId, enrollment, steps)),
   );
 
   return { enrollments: enriched, total };
@@ -240,7 +258,7 @@ export async function createCampaignEnrollmentForWorkspace(
     ).catch(() => undefined);
   }
 
-  return enrichEnrollment(workspaceId, enrollment);
+  return enrichEnrollmentWithCampaignSteps(workspaceId, campaignId, enrollment);
 }
 
 export async function rescheduleActiveEnrollmentSendsForCampaign(
@@ -302,7 +320,7 @@ export async function updateCampaignEnrollmentForWorkspace(
   }
 
   if (!input.status) {
-    return enrichEnrollment(workspaceId, existing);
+    return enrichEnrollmentWithCampaignSteps(workspaceId, campaignId, existing);
   }
 
   if (existing.status !== "active" && existing.status !== "paused") {
@@ -359,7 +377,7 @@ export async function updateCampaignEnrollmentForWorkspace(
     after: enrollmentSnapshot(updated),
   });
 
-  return enrichEnrollment(workspaceId, updated);
+  return enrichEnrollmentWithCampaignSteps(workspaceId, campaignId, updated);
 }
 
 export async function pauseCampaignEnrollmentForWorkspace(

@@ -6,6 +6,7 @@ vi.mock("@/server/repositories/campaigns", () => ({
 
 vi.mock("@/server/repositories/campaign-steps", () => ({
   findStepByOrder: vi.fn(),
+  findCampaignSteps: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
@@ -30,7 +31,7 @@ import {
   findEnrollmentById,
   updateCampaignEnrollment,
 } from "@/server/repositories/campaign-enrollments";
-import { findStepByOrder } from "@/server/repositories/campaign-steps";
+import { findCampaignSteps, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findLeadById } from "@/server/repositories/leads";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { updateCampaignEnrollmentForWorkspace } from "@/server/services/campaign-enrollments";
@@ -71,6 +72,21 @@ describe("campaign enrollment service", () => {
       updatedAt: new Date(),
     });
     vi.mocked(findEnrollmentById).mockResolvedValue(pausedEnrollment);
+    vi.mocked(findCampaignSteps).mockResolvedValue([
+      {
+        id: "step-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        order: 1,
+        delayDays: 0,
+        channel: "email",
+        subject: "Hello",
+        body: "Welcome",
+        documentIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
     vi.mocked(findStepByOrder).mockResolvedValue({
       id: "step-1",
       workspaceId: "ws-1",
