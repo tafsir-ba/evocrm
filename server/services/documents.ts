@@ -32,7 +32,7 @@ import {
   generateDownloadSignedUrl,
   generateUploadSignedUrl,
   getBucketName,
-  objectExists,
+  verifyUploadedObject,
 } from "@/server/storage/spaces";
 import type {
   DocumentConfirmInput,
@@ -261,9 +261,9 @@ export async function confirmDocumentUploadForWorkspace(
   validateDocumentFileSize(input.fileSize);
   await validateOptionalOwnerId(workspaceId, input.ownerId);
 
-  const exists = await objectExists(input.storageKey);
+  const uploaded = await verifyUploadedObject(input.storageKey, input.fileSize);
 
-  if (!exists) {
+  if (!uploaded) {
     await createAuditLog({
       workspaceId,
       actorId: userId,

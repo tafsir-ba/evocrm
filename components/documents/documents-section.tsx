@@ -114,7 +114,6 @@ export function DocumentsSection({
         method: "PUT",
         headers: {
           "Content-Type": file.type,
-          "Content-Length": String(file.size),
         },
         body: file,
       });

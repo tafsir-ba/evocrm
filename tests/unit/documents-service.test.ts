@@ -30,7 +30,7 @@ vi.mock("@/server/repositories/users", () => ({
 vi.mock("@/server/storage/spaces", () => ({
   generateUploadSignedUrl: vi.fn(),
   generateDownloadSignedUrl: vi.fn(),
-  objectExists: vi.fn(),
+  verifyUploadedObject: vi.fn(),
   getBucketName: vi.fn(() => "test-bucket"),
 }));
 
@@ -80,7 +80,7 @@ import { verifyDocumentUploadToken } from "@/server/services/document-upload-tok
 import {
   generateDownloadSignedUrl,
   generateUploadSignedUrl,
-  objectExists,
+  verifyUploadedObject,
 } from "@/server/storage/spaces";
 import { AppError } from "@/server/errors";
 
@@ -238,7 +238,7 @@ describe("documents service", () => {
   });
 
   it("does not create active document when storage object is missing", async () => {
-    vi.mocked(objectExists).mockResolvedValue(false);
+    vi.mocked(verifyUploadedObject).mockResolvedValue(false);
 
     await expect(
       confirmDocumentUploadForWorkspace("ws-1", "user-1", allPermissions, {
@@ -260,7 +260,7 @@ describe("documents service", () => {
   });
 
   it("creates active document only after successful storage verification", async () => {
-    vi.mocked(objectExists).mockResolvedValue(true);
+    vi.mocked(verifyUploadedObject).mockResolvedValue(true);
     vi.mocked(createDocument).mockResolvedValue(sampleDocument);
 
     const result = await confirmDocumentUploadForWorkspace("ws-1", "user-1", allPermissions, {

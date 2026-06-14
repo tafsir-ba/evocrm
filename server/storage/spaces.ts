@@ -80,7 +80,6 @@ export async function generateUploadSignedUrl(input: {
     Bucket: config.bucket,
     Key: input.storageKey,
     ContentType: input.mimeType,
-    ContentLength: input.fileSize,
   });
 
   const url = await getSignedUrl(client, command, {
@@ -117,18 +116,22 @@ export async function generateDownloadSignedUrl(input: {
   };
 }
 
-export async function objectExists(storageKey: string): Promise<boolean> {
+export async function verifyUploadedObject(
+  storageKey: string,
+  expectedFileSize: number,
+): Promise<boolean> {
   const config = getSpacesConfig();
   const client = createS3Client(config);
 
   try {
-    await client.send(
+    const response = await client.send(
       new HeadObjectCommand({
         Bucket: config.bucket,
         Key: storageKey,
       }),
     );
-    return true;
+
+    return response.ContentLength === expectedFileSize;
   } catch {
     return false;
   }
