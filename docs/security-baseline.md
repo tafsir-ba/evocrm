@@ -346,7 +346,7 @@ Authorization: Bearer <CRON_SECRET>
 - Workspace for inbound leads is derived from the integration record — never trusted from payload.
 - Paused/archived/error integrations cannot process inbound website leads.
 - Idempotency via `Lead.attributes.integration.idempotencyKey`; duplicate normalized email returns existing lead reference.
-- Per-integration/IP rate limiting is documented for Phase 13 hardening (not implemented in Phase 12).
+- Website lead webhook rate limiting: in-process fixed window of **60 requests per minute** per API key hash (authenticated) or client IP (missing/invalid key attempts). Excess requests return `RATE_LIMITED` (HTTP 429). Suitable for single-instance V1; use edge/WAF limits in multi-instance production if needed.
 
 ---
 
@@ -371,7 +371,7 @@ Apply rate limiting to:
 
 - Auth endpoints
 - Public unsubscribe endpoint
-- Website lead capture webhook (`POST /api/integrations/website/leads`) — Phase 13
+- Website lead capture webhook (`POST /api/integrations/website/leads`) — 60 req/min per API key hash or client IP
 - Cron endpoint (infrastructure + secret)
 - File upload URL generation
 

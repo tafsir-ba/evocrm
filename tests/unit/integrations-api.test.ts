@@ -46,6 +46,10 @@ import {
 import { captureWebsiteLeadFromRequest } from "@/server/services/website-lead-capture";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
+import {
+  resetWebsiteLeadRateLimitStoreForTests,
+  WEBSITE_LEAD_RATE_LIMIT,
+} from "@/server/security/website-lead-rate-limit";
 
 const workspace = {
   id: "ws-1",
@@ -58,6 +62,7 @@ const workspace = {
 describe("integrations API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetWebsiteLeadRateLimitStoreForTests();
     vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1", email: "a@b.com" } });
     vi.mocked(resolveWorkspace).mockResolvedValue(workspace);
     vi.mocked(requirePermission).mockResolvedValue({
@@ -235,14 +240,13 @@ describe("integrations API", () => {
   });
 
   it("returns 401 when webhook API key is missing", async () => {
-    vi.mocked(captureWebsiteLeadFromRequest).mockRejectedValue(
-      new AppError("UNAUTHENTICATED", "Invalid or missing API key."),
-    );
-
     const response = await captureWebsiteLead(
       new Request("http://localhost/api/integrations/website/leads", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.50",
+        },
         body: JSON.stringify({
           firstName: "John",
           lastName: "Smith",
@@ -252,6 +256,49 @@ describe("integrations API", () => {
     );
 
     expect(response.status).toBe(401);
+    expect(captureWebsiteLeadFromRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 when website webhook rate limit is exceeded", async () => {
+    vi.mocked(captureWebsiteLeadFromRequest).mockResolvedValue({
+      leadId: "lead-1",
+      duplicate: false,
+      idempotent: false,
+    });
+
+    const headers = {
+      Authorization: "Bearer evocrm_whk_secret",
+      "Content-Type": "application/json",
+      "x-forwarded-for": "203.0.113.51",
+    };
+    const body = JSON.stringify({
+      firstName: "John",
+      lastName: "Smith",
+      email: "john@example.com",
+    });
+
+    for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
+      const response = await captureWebsiteLead(
+        new Request("http://localhost/api/integrations/website/leads", {
+          method: "POST",
+          headers,
+          body,
+        }),
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await captureWebsiteLead(
+      new Request("http://localhost/api/integrations/website/leads", {
+        method: "POST",
+        headers,
+        body,
+      }),
+    );
+
+    expect(blocked.status).toBe(429);
+    const payload = await blocked.json();
+    expect(payload.error.code).toBe("RATE_LIMITED");
   });
 
   it("requires settings:update to create integrations", async () => {

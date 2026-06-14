@@ -2,22 +2,9 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
 import { getAuthConfig } from "@/auth.config";
+import { isPublicPath } from "@/lib/public-paths";
 
 const { auth } = NextAuth(getAuthConfig());
-
-const PUBLIC_PATHS = [
-  "/login",
-  "/signup",
-  "/api/auth",
-  "/unsubscribe",
-  "/api/integrations",
-];
-
-function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
-}
 
 function isProtectedAppPath(pathname: string): boolean {
   return (

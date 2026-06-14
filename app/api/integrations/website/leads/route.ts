@@ -9,6 +9,7 @@ import {
   parseIntegrationApiKeyFromRequest,
 } from "@/server/services/integration-api-keys";
 import { findWebsiteIntegrationByApiKeyHash } from "@/server/repositories/integrations";
+import { assertWebsiteLeadRateLimit } from "@/server/security/website-lead-rate-limit";
 import { captureWebsiteLeadFromRequest } from "@/server/services/website-lead-capture";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { websiteLeadCaptureInputSchema } from "@/server/validation/website-lead-capture";
@@ -16,6 +17,13 @@ import { websiteLeadCaptureInputSchema } from "@/server/validation/website-lead-
 export async function POST(request: Request) {
   try {
     const rawApiKey = parseIntegrationApiKeyFromRequest(request);
+
+    assertWebsiteLeadRateLimit(request, rawApiKey);
+
+    if (!rawApiKey) {
+      throw new AppError("UNAUTHENTICATED", "Invalid or missing API key.");
+    }
+
     const body: unknown = await request.json();
 
     let input;
@@ -23,7 +31,7 @@ export async function POST(request: Request) {
     try {
       input = parseRequestOrThrow(websiteLeadCaptureInputSchema, body);
     } catch (error) {
-      if (rawApiKey && error instanceof AppError && error.code === "VALIDATION_ERROR") {
+      if (error instanceof AppError && error.code === "VALIDATION_ERROR") {
         const integration = await findWebsiteIntegrationByApiKeyHash(
           hashIntegrationApiKey(rawApiKey),
         );
