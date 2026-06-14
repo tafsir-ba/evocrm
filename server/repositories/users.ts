@@ -97,6 +97,32 @@ export async function createCredentialsUser(input: {
   }
 }
 
+export async function linkCredentialsToUser(input: {
+  email: string;
+  name?: string;
+  passwordHash: string;
+}): Promise<UserRecord> {
+  await connectDb();
+  const email = input.email.toLowerCase().trim();
+
+  const document = await UserModel.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        passwordHash: input.passwordHash,
+        ...(input.name ? { name: input.name } : {}),
+      },
+    },
+    { new: true, runValidators: true },
+  ).lean<UserDocument>();
+
+  if (!document) {
+    throw new AppError("NOT_FOUND", "User not found.");
+  }
+
+  return toUserRecord(document);
+}
+
 export async function upsertUserFromProvider(input: {
   email: string;
   name?: string | null;
@@ -106,8 +132,23 @@ export async function upsertUserFromProvider(input: {
   const email = input.email.toLowerCase().trim();
   const existing = await UserModel.findOne({ email }).lean<UserDocument>();
 
-  if (existing && existing.authProvider === "credentials") {
-    throw new Error("CREDENTIALS_USER_EXISTS");
+  if (existing) {
+    const document = await UserModel.findOneAndUpdate(
+      { email },
+      {
+        $set: {
+          ...(input.name ? { name: input.name } : {}),
+          ...(input.image ? { image: input.image } : {}),
+        },
+      },
+      { new: true, runValidators: true },
+    ).lean<UserDocument>();
+
+    if (!document) {
+      throw new AppError("NOT_FOUND", "User not found.");
+    }
+
+    return toUserRecord(document);
   }
 
   const document = await UserModel.findOneAndUpdate(

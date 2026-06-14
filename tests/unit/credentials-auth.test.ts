@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@/server/errors";
 
 vi.mock("@/server/repositories/users", () => ({
-  findUserByEmail: vi.fn(),
   findUserWithPasswordByEmail: vi.fn(),
   createCredentialsUser: vi.fn(),
+  linkCredentialsToUser: vi.fn(),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({
@@ -14,8 +14,8 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 
 import {
   createCredentialsUser,
-  findUserByEmail,
   findUserWithPasswordByEmail,
+  linkCredentialsToUser,
 } from "@/server/repositories/users";
 import {
   hashPassword,
@@ -42,7 +42,7 @@ describe("credentials auth service", () => {
   });
 
   it("registerCredentialsUser normalizes email and hashes password", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(findUserWithPasswordByEmail).mockResolvedValue(null);
     vi.mocked(createCredentialsUser).mockResolvedValue({
       id: "user-1",
       email: "qa@example.com",
@@ -69,11 +69,47 @@ describe("credentials auth service", () => {
     );
   });
 
-  it("rejects duplicate Google email with CONFLICT", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue({
+  it("links password to an existing Google-only account", async () => {
+    vi.mocked(findUserWithPasswordByEmail).mockResolvedValue({
       id: "user-1",
       email: "qa@example.com",
       authProvider: "google",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(linkCredentialsToUser).mockResolvedValue({
+      id: "user-1",
+      email: "qa@example.com",
+      name: "QA User",
+      authProvider: "google",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const user = await registerCredentialsUser({
+      name: "QA User",
+      email: "qa@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+    });
+
+    expect(user.email).toBe("qa@example.com");
+    expect(linkCredentialsToUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "qa@example.com",
+        name: "QA User",
+        passwordHash: expect.not.stringMatching("SecurePass123"),
+      }),
+    );
+    expect(createCredentialsUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects signup when the email already has a password", async () => {
+    vi.mocked(findUserWithPasswordByEmail).mockResolvedValue({
+      id: "user-1",
+      email: "qa@example.com",
+      authProvider: "credentials",
+      passwordHash: await hashPassword("SecurePass123"),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -134,26 +170,35 @@ describe("credentials auth service", () => {
     expect(user).not.toHaveProperty("passwordHash");
   });
 
-  it("verifyCredentialsLogin rejects users without passwordHash", async () => {
+  it("verifyCredentialsLogin accepts any user with a passwordHash", async () => {
     vi.mocked(findUserWithPasswordByEmail).mockResolvedValue({
       id: "user-1",
       email: "qa@example.com",
+      name: "QA User",
       authProvider: "google",
+      passwordHash: await hashPassword("SecurePass123"),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    expect(
-      await verifyCredentialsLogin({
+    const user = await verifyCredentialsLogin({
+      email: "qa@example.com",
+      password: "SecurePass123",
+    });
+
+    expect(user).toEqual(
+      expect.objectContaining({
+        id: "user-1",
         email: "qa@example.com",
-        password: "SecurePass123",
+        authProvider: "google",
       }),
-    ).toBeNull();
+    );
+    expect(user).not.toHaveProperty("passwordHash");
   });
 
   it("maps duplicate key errors from createCredentialsUser to CONFLICT", async () => {
     const { AppError: RepoAppError } = await import("@/server/errors");
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(findUserWithPasswordByEmail).mockResolvedValue(null);
     vi.mocked(createCredentialsUser).mockRejectedValue(
       new RepoAppError("CONFLICT", "An account with this email already exists."),
     );
@@ -171,10 +216,11 @@ describe("credentials auth service", () => {
   });
 
   it("registerCredentialsUser rejects duplicate credentials email", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue({
+    vi.mocked(findUserWithPasswordByEmail).mockResolvedValue({
       id: "user-1",
       email: "qa@example.com",
       authProvider: "credentials",
+      passwordHash: await hashPassword("SecurePass123"),
       createdAt: new Date(),
       updatedAt: new Date(),
     });

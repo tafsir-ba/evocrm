@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 import { getAuthConfig } from "@/auth.config";
-import { findUserByEmail } from "@/server/repositories/users";
+import { resolveJwtSub } from "@/server/auth/resolve-jwt-sub";
 import { verifyCredentialsLogin } from "@/server/services/credentials-auth";
 import { syncUserFromProviderProfile } from "@/server/services/users";
 import { credentialsLoginSchema } from "@/server/validation/auth";
@@ -49,12 +49,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (account?.provider === "google") {
-        const existing = await findUserByEmail(user.email);
-
-        if (existing?.authProvider === "credentials") {
-          return false;
-        }
-
         await syncUserFromProviderProfile({
           email: user.email,
           name: user.name,
@@ -65,14 +59,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, user }) {
-      if (user?.id) {
-        token.sub = user.id;
-      } else if (user?.email) {
-        const dbUser = await findUserByEmail(user.email);
+      const sub = await resolveJwtSub({
+        userId: user?.id,
+        email: user?.email,
+      });
 
-        if (dbUser) {
-          token.sub = dbUser.id;
-        }
+      if (sub) {
+        token.sub = sub;
       }
 
       return token;

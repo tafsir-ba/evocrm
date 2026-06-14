@@ -635,7 +635,7 @@ Success `201`:
 }
 ```
 
-Errors: `VALIDATION_ERROR`, `CONFLICT` (duplicate email or existing Google account), `INTERNAL_ERROR`. Response never includes `passwordHash`.
+Errors: `VALIDATION_ERROR`, `CONFLICT` (email already has a password — sign in instead), `INTERNAL_ERROR`. A Google-only account (no `passwordHash`) accepts signup and links a password to the existing user (`201`). Response never includes `passwordHash`.
 
 #### `GET /api/workspaces/[workspaceSlug]/context`
 

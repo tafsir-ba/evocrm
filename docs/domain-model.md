@@ -109,7 +109,7 @@ Global identity. Not workspace-owned.
 
 **Phase 2:** Mongoose model at `/models/user.ts`. Email normalized (lowercase, unique). OAuth secrets are not stored on the User model.
 
-**Phase 2A:** `authProvider` supports `google` | `credentials`. Credentials users store `passwordHash` (bcrypt, `select: false` — never returned from repositories/API). Optional `emailVerifiedAt`. Duplicate email across providers returns `CONFLICT` (no silent merge).
+**Phase 2A:** `authProvider` records the original signup method (`google` | `credentials`). The same email may use **both** Google and email/password when a `passwordHash` is present — Google sign-in links to the existing user record without removing the password. Credentials signup on a Google-only account adds a password to that record. `passwordHash` uses bcrypt (`select: false` — never returned from repositories/API). Optional `emailVerifiedAt`.
 
 | Field | Description |
 |-------|-------------|
