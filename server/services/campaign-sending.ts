@@ -10,6 +10,7 @@ import { findLeadById } from "@/server/repositories/leads";
 import {
   findCampaignEnrollments,
   findDueEnrollments,
+  findEnrollmentByIdOnly,
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
 } from "@/server/repositories/campaign-enrollments";
@@ -35,6 +36,40 @@ export type SendDueSummary = {
 
 const SKIP_RETRY_DELAY_DAYS = 1;
 const FAILURE_RETRY_DELAY_DAYS = 1;
+const MAX_ZERO_DELAY_CHAIN = 20;
+
+export type ProcessEnrollmentResult = {
+  outcome: "sent" | "skipped" | "failed";
+  processed: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+};
+
+function singleOutcomeResult(
+  outcome: ProcessEnrollmentResult["outcome"],
+): ProcessEnrollmentResult {
+  return {
+    outcome,
+    processed: 1,
+    sent: outcome === "sent" ? 1 : 0,
+    skipped: outcome === "skipped" ? 1 : 0,
+    failed: outcome === "failed" ? 1 : 0,
+  };
+}
+
+function mergeProcessResults(
+  current: ProcessEnrollmentResult,
+  next: ProcessEnrollmentResult,
+): ProcessEnrollmentResult {
+  return {
+    outcome: next.outcome,
+    processed: current.processed + next.processed,
+    sent: current.sent + next.sent,
+    skipped: current.skipped + next.skipped,
+    failed: current.failed + next.failed,
+  };
+}
 
 async function deferEnrollmentRetry(
   workspaceId: string,
@@ -87,13 +122,14 @@ async function recordSkippedSend(params: {
 
 async function processEnrollment(
   enrollment: CampaignEnrollmentRecord,
-): Promise<"sent" | "skipped" | "failed"> {
+  chainDepth = 0,
+): Promise<ProcessEnrollmentResult> {
   const workspaceId = enrollment.workspaceId;
 
   const campaign = await findCampaignById(workspaceId, enrollment.campaignId);
 
   if (!campaign || campaign.status !== "active") {
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   if (enrollment.status !== "active") {
@@ -112,7 +148,7 @@ async function processEnrollment(
       });
     }
 
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   const step = await findStepByOrder(
@@ -128,7 +164,7 @@ async function processEnrollment(
       failureReason: "Campaign step not found.",
     });
 
-    return "failed";
+    return singleOutcomeResult("failed");
   }
 
   if (!enrollment.leadId) {
@@ -145,7 +181,7 @@ async function processEnrollment(
       SKIP_RETRY_DELAY_DAYS,
     );
 
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   const lead = await findLeadById(workspaceId, enrollment.leadId);
@@ -164,7 +200,7 @@ async function processEnrollment(
       SKIP_RETRY_DELAY_DAYS,
     );
 
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   if (!lead.email) {
@@ -181,7 +217,7 @@ async function processEnrollment(
       SKIP_RETRY_DELAY_DAYS,
     );
 
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   if (isLeadUnsubscribed(lead)) {
@@ -197,7 +233,7 @@ async function processEnrollment(
       unsubscribedAt: new Date(),
     });
 
-    return "skipped";
+    return singleOutcomeResult("skipped");
   }
 
   const token = createUnsubscribeToken({
@@ -247,7 +283,7 @@ async function processEnrollment(
       FAILURE_RETRY_DELAY_DAYS,
     );
 
-    return "failed";
+    return singleOutcomeResult("failed");
   }
 
   await createCampaignSend(workspaceId, {
@@ -287,6 +323,17 @@ async function processEnrollment(
       nextSendAt: computeNextSendAt(now, nextStep.delayDays),
       lastSentAt: now,
     });
+
+    if (nextStep.delayDays <= 0 && chainDepth < MAX_ZERO_DELAY_CHAIN) {
+      const refreshed = await findEnrollmentByIdOnly(workspaceId, enrollment.id);
+
+      if (refreshed && refreshed.status === "active") {
+        return mergeProcessResults(
+          singleOutcomeResult("sent"),
+          await processEnrollment(refreshed, chainDepth + 1),
+        );
+      }
+    }
   } else {
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       status: "completed",
@@ -303,7 +350,7 @@ async function processEnrollment(
     });
   }
 
-  return "sent";
+  return singleOutcomeResult("sent");
 }
 
 async function summarizeEnrollmentProcessing(
@@ -318,16 +365,11 @@ async function summarizeEnrollmentProcessing(
 
   for (const enrollment of enrollments) {
     try {
-      const outcome = await processEnrollment(enrollment);
-      summary.processed += 1;
-
-      if (outcome === "sent") {
-        summary.sent += 1;
-      } else if (outcome === "skipped") {
-        summary.skipped += 1;
-      } else {
-        summary.failed += 1;
-      }
+      const result = await processEnrollment(enrollment);
+      summary.processed += result.processed;
+      summary.sent += result.sent;
+      summary.skipped += result.skipped;
+      summary.failed += result.failed;
     } catch {
       summary.processed += 1;
       summary.failed += 1;

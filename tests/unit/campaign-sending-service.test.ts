@@ -11,6 +11,7 @@ vi.mock("@/server/repositories/campaign-steps", () => ({
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   findDueEnrollments: vi.fn(),
+  findEnrollmentByIdOnly: vi.fn(),
   updateCampaignEnrollment: vi.fn(),
 }));
 
@@ -37,7 +38,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 import { sendCampaignEmail } from "@/server/email/resend";
-import { findDueEnrollments, updateCampaignEnrollment } from "@/server/repositories/campaign-enrollments";
+import { findDueEnrollments, findEnrollmentByIdOnly, updateCampaignEnrollment } from "@/server/repositories/campaign-enrollments";
 import { createCampaignSend } from "@/server/repositories/campaign-sends";
 import { findNextStepAfterOrder, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
@@ -231,6 +232,69 @@ describe("campaign sending service", () => {
       "ws-1",
       expect.objectContaining({ status: "sent", providerMessageId: "msg-1" }),
     );
+  });
+
+  it("chains consecutive zero-delay steps in one processing run", async () => {
+    const step2 = {
+      ...step,
+      id: "step-2",
+      order: 2,
+      subject: "Follow-up",
+      body: "Second email",
+    };
+
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-1",
+    });
+    vi.mocked(findNextStepAfterOrder)
+      .mockResolvedValueOnce(step2)
+      .mockResolvedValueOnce(null);
+    vi.mocked(findStepByOrder)
+      .mockResolvedValueOnce(step)
+      .mockResolvedValueOnce(step2);
+    vi.mocked(findEnrollmentByIdOnly).mockResolvedValue({
+      ...enrollment,
+      currentStep: 2,
+      lastSentAt: new Date(),
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.sent).toBe(2);
+    expect(summary.processed).toBe(2);
+    expect(sendCampaignEmail).toHaveBeenCalledTimes(2);
   });
 
   it("records failed email and defers retry", async () => {
