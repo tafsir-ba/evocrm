@@ -56,7 +56,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image,
           });
         } catch (error) {
-          console.error("[auth] Google sign-in failed:", error);
+          const message = error instanceof Error ? error.message : "unknown error";
+          console.error("[auth] Google sign-in failed:", message);
           return false;
         }
       }

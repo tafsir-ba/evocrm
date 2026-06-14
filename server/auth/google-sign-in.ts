@@ -18,7 +18,8 @@ export async function resolveGoogleSignInUserId(input: {
     });
     return record.id;
   } catch (error) {
-    console.error("[auth] Google profile sync failed, attempting email lookup:", error);
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.error("[auth] Google profile sync failed, attempting email lookup:", message);
     const existing = await findUserByEmail(email);
 
     if (existing) {

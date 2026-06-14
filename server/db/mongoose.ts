@@ -2,7 +2,7 @@ import "server-only";
 
 import mongoose from "mongoose";
 
-import { getEnv, validateProductionEnv } from "@/server/env";
+import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
 
 type MongooseCache = {
@@ -38,7 +38,6 @@ export async function connectDb(): Promise<typeof mongoose> {
   }
 
   const env = getEnv();
-  validateProductionEnv(env);
   const { MONGODB_URI } = env;
 
   if (!cache.promise) {

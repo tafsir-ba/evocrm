@@ -181,7 +181,11 @@ Other variables may use test doubles or mocks per `/docs/testing-strategy.md`.
 
 ## Production Validation (Phase 13)
 
-When `NODE_ENV=production` at **runtime** (first DB connect), `validateProductionEnv()` fail fast if any of the following are missing:
+`validateProductionEnv()` is available for ops checks and documents the full production variable set. Individual features fail closed when their own variables are missing (Spaces uploads, Resend email, cron routes, etc.).
+
+Auth and core CRM routes require `MONGODB_URI` plus Auth.js variables at runtime. They do **not** require Spaces/Resend/Cron to be configured before the first database connection.
+
+Recommended production variables:
 
 ```txt
 NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
