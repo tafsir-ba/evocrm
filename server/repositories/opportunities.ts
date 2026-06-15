@@ -1,8 +1,16 @@
 import "server-only";
 
+import mongoose from "mongoose";
+
 import { connectDb } from "@/server/db/mongoose";
 import { OpportunityModel, type OpportunityDocument } from "@/models/opportunity";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+
+function toObjectIdArray(ids: string[]): mongoose.Types.ObjectId[] {
+  return ids
+    .filter((id) => mongoose.isValidObjectId(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+}
 
 export type OpportunityRecord = {
   id: string;
@@ -74,6 +82,7 @@ export type OpportunityListFilter = {
   createdTo?: Date;
   closedFrom?: Date;
   closedTo?: Date;
+  excludeIds?: string[];
   page?: number;
   pageSize?: number;
 };
@@ -127,6 +136,10 @@ function buildListQuery(filter: OpportunityListFilter): Record<string, unknown> 
       createdAt.$lte = filter.createdTo;
     }
     query.createdAt = createdAt;
+  }
+
+  if (filter.excludeIds && filter.excludeIds.length > 0) {
+    query._id = { $nin: toObjectIdArray(filter.excludeIds) };
   }
 
   if (filter.closedFrom || filter.closedTo) {

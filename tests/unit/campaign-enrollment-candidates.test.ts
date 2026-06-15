@@ -39,6 +39,41 @@ const baseCampaign = {
   updatedAt: campaignCreatedAt,
 };
 
+const sampleLead = {
+  id: "lead-new",
+  workspaceId: "ws-1",
+  archivedAt: null,
+  statusId: "status-1",
+  sourceId: null,
+  ownerId: null,
+  assignedTo: null,
+  firstName: "Tafsir",
+  lastName: "Ba",
+  fullName: "Tafsir Ba",
+  email: "tafsir@example.com",
+  emailNormalized: "tafsir@example.com",
+  phone: null,
+  phoneNormalized: null,
+  language: null,
+  preferredContactMethod: null,
+  budgetMin: null,
+  budgetMax: null,
+  preferredAreas: [],
+  propertyTypeInterests: [],
+  transactionIntent: null,
+  usagePurpose: null,
+  notes: null,
+  tags: [],
+  attributes: {},
+  emailConsentStatus: "unknown",
+  emailUnsubscribedAt: null,
+  emailUnsubscribeReason: null,
+  lastContactedAt: null,
+  createdBy: "user-1",
+  createdAt: new Date("2026-06-15T10:00:00.000Z"),
+  updatedAt: new Date("2026-06-15T10:00:00.000Z"),
+};
+
 describe("listEnrollmentCandidatesForWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,42 +86,7 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
 
   it("returns leads created on or after campaign creation that are not enrolled", async () => {
     vi.mocked(findLeads).mockResolvedValue({
-      leads: [
-        {
-          id: "lead-new",
-          workspaceId: "ws-1",
-          archivedAt: null,
-          statusId: "status-1",
-          sourceId: null,
-          ownerId: null,
-          assignedTo: null,
-          firstName: "Tafsir",
-          lastName: "Ba",
-          fullName: "Tafsir Ba",
-          email: "tafsir@example.com",
-          emailNormalized: "tafsir@example.com",
-          phone: null,
-          phoneNormalized: null,
-          language: null,
-          preferredContactMethod: null,
-          budgetMin: null,
-          budgetMax: null,
-          preferredAreas: [],
-          propertyTypeInterests: [],
-          transactionIntent: null,
-          usagePurpose: null,
-          notes: null,
-          tags: [],
-          attributes: {},
-          emailConsentStatus: "unknown",
-          emailUnsubscribedAt: null,
-          emailUnsubscribeReason: null,
-          lastContactedAt: null,
-          createdBy: "user-1",
-          createdAt: new Date("2026-06-15T10:00:00.000Z"),
-          updatedAt: new Date("2026-06-15T10:00:00.000Z"),
-        },
-      ],
+      leads: [sampleLead],
       total: 1,
     });
 
@@ -95,6 +95,7 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     expect(findLeads).toHaveBeenCalledWith("ws-1", {
       createdFrom: campaignCreatedAt,
       search: undefined,
+      excludeIds: [],
       page: 1,
       pageSize: 50,
     });
@@ -106,56 +107,42 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
         email: "tafsir@example.com",
       }),
     ]);
+    expect(result.total).toBe(1);
   });
 
-  it("excludes leads that are already actively enrolled", async () => {
+  it("excludes enrolled lead ids in the repository query", async () => {
     vi.mocked(findNonTerminalEnrollmentTargetIds).mockResolvedValue({
-      leadIds: ["lead-new"],
+      leadIds: ["lead-enrolled"],
       opportunityIds: [],
     });
     vi.mocked(findLeads).mockResolvedValue({
-      leads: [
-        {
-          id: "lead-new",
-          workspaceId: "ws-1",
-          archivedAt: null,
-          statusId: "status-1",
-          sourceId: null,
-          ownerId: null,
-          assignedTo: null,
-          firstName: "Tafsir",
-          lastName: "Ba",
-          fullName: "Tafsir Ba",
-          email: "tafsir@example.com",
-          emailNormalized: "tafsir@example.com",
-          phone: null,
-          phoneNormalized: null,
-          language: null,
-          preferredContactMethod: null,
-          budgetMin: null,
-          budgetMax: null,
-          preferredAreas: [],
-          propertyTypeInterests: [],
-          transactionIntent: null,
-          usagePurpose: null,
-          notes: null,
-          tags: [],
-          attributes: {},
-          emailConsentStatus: "unknown",
-          emailUnsubscribedAt: null,
-          emailUnsubscribeReason: null,
-          lastContactedAt: null,
-          createdBy: "user-1",
-          createdAt: new Date("2026-06-15T10:00:00.000Z"),
-          updatedAt: new Date("2026-06-15T10:00:00.000Z"),
-        },
-      ],
+      leads: [sampleLead],
       total: 1,
     });
 
-    const result = await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1");
+    await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1");
 
-    expect(result.candidates).toEqual([]);
+    expect(findLeads).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        excludeIds: ["lead-enrolled"],
+      }),
+    );
+  });
+
+  it("returns repository total instead of the current page length", async () => {
+    vi.mocked(findLeads).mockResolvedValue({
+      leads: [sampleLead],
+      total: 11,
+    });
+
+    const result = await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1", {
+      page: 2,
+      pageSize: 50,
+    });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.total).toBe(11);
   });
 
   it("returns empty candidates for archived campaigns", async () => {
@@ -193,7 +180,6 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
           expectedCloseDate: null,
           notes: null,
           tags: [],
-          attributes: {},
           createdBy: "user-1",
           archivedAt: null,
           closedAt: null,
@@ -232,6 +218,7 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith("ws-1", {
       createdFrom: campaignCreatedAt,
       search: undefined,
+      excludeIds: [],
       page: 1,
       pageSize: 50,
     });
@@ -242,5 +229,6 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
         lead: expect.objectContaining({ fullName: "Jane Doe" }),
       }),
     ]);
+    expect(result.total).toBe(1);
   });
 });

@@ -163,22 +163,20 @@ export async function listEnrollmentCandidatesForWorkspace(
     workspaceId,
     campaignId,
   );
-  const enrolledLeadIds = new Set(leadIds);
-  const enrolledOpportunityIds = new Set(opportunityIds);
   const page = filter.page ?? 1;
   const pageSize = filter.pageSize ?? 50;
 
   if (campaign.audienceType === "leads") {
-    const { leads } = await findLeads(workspaceId, {
+    const { leads, total } = await findLeads(workspaceId, {
       createdFrom: campaign.createdAt,
       search: filter.search,
+      excludeIds: leadIds,
       page,
       pageSize,
     });
 
-    const candidates = leads
-      .filter((lead) => !enrolledLeadIds.has(lead.id))
-      .map((lead) => ({
+    return {
+      candidates: leads.map((lead) => ({
         audienceType: "leads" as const,
         id: lead.id,
         fullName: lead.fullName,
@@ -186,24 +184,21 @@ export async function listEnrollmentCandidatesForWorkspace(
         phone: lead.phone,
         emailConsentStatus: lead.emailConsentStatus,
         createdAt: lead.createdAt,
-      }));
-
-    return {
-      candidates,
-      total: candidates.length,
+      })),
+      total,
     };
   }
 
-  const { opportunities } = await listOpportunitiesForWorkspace(workspaceId, {
+  const { opportunities, total } = await listOpportunitiesForWorkspace(workspaceId, {
     createdFrom: campaign.createdAt,
     search: filter.search,
+    excludeIds: opportunityIds,
     page,
     pageSize,
   });
 
-  const candidates = opportunities
-    .filter((opportunity) => !enrolledOpportunityIds.has(opportunity.id))
-    .map((opportunity) => ({
+  return {
+    candidates: opportunities.map((opportunity) => ({
       audienceType: "opportunities" as const,
       id: opportunity.id,
       createdAt: opportunity.createdAt,
@@ -222,11 +217,8 @@ export async function listEnrollmentCandidatesForWorkspace(
           }
         : null,
       status: opportunity.status ? { label: opportunity.status.label } : null,
-    }));
-
-  return {
-    candidates,
-    total: candidates.length,
+    })),
+    total,
   };
 }
 
