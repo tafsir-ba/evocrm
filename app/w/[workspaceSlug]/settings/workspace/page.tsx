@@ -30,6 +30,7 @@ export default async function SettingsWorkspacePage({
 
   const permissions = access.context.membership.role.permissions;
   const canUpdate = hasPermission(permissions, "settings:update");
+  const canDelete = access.context.membership.role.key === "owner";
 
   return (
     <PageContainer>
@@ -45,7 +46,11 @@ export default async function SettingsWorkspacePage({
           </Link>
         }
       />
-      <WorkspaceSettingsPanel workspaceSlug={workspaceSlug} canUpdate={canUpdate} />
+      <WorkspaceSettingsPanel
+        workspaceSlug={workspaceSlug}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
+      />
     </PageContainer>
   );
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { AppError } from "@/server/errors";
 import {
   countActiveMembershipsWithRole,
+  findMembership,
   findMembershipByIdInWorkspace,
   type MembershipRecord,
 } from "@/server/repositories/memberships";
@@ -71,6 +72,26 @@ export async function assertOwnerProtection(input: {
       "FORBIDDEN",
       "Cannot remove or demote the last active owner. Reassign ownership first.",
     );
+  }
+}
+
+/**
+ * Requires the user to be an active workspace owner.
+ */
+export async function requireWorkspaceOwner(
+  workspaceId: string,
+  userId: string,
+): Promise<void> {
+  const membership = await findMembership(userId, workspaceId);
+
+  if (!membership || membership.status !== "active") {
+    throw new AppError("FORBIDDEN", "Workspace owner required.");
+  }
+
+  const isOwner = await isOwnerMembership(membership, workspaceId);
+
+  if (!isOwner) {
+    throw new AppError("FORBIDDEN", "Only the workspace owner can perform this action.");
   }
 }
 

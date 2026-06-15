@@ -105,6 +105,9 @@ export function Topbar({
                 </p>
               </div>
               <MenuItem icon={<IconUser size={15} />}>My profile</MenuItem>
+              <MenuItem icon={<IconSettings size={15} />} href="/workspaces">
+                All workspaces
+              </MenuItem>
               {canAccessSettings && (
                 <MenuItem
                   icon={<IconSettings size={15} />}

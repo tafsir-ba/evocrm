@@ -41,6 +41,8 @@ export type WorkspaceListItem = {
   type: string;
   timezone: string;
   defaultCurrency: string;
+  roleKey: string;
+  isOwner: boolean;
 };
 
 export type WorkspaceContext = {
@@ -131,9 +133,11 @@ export async function listActiveWorkspacesForUser(
 
   for (const membership of memberships) {
     const { findWorkspaceById } = await import("@/server/repositories/workspaces");
+    const { findRoleByIdInWorkspace } = await import("@/server/repositories/roles");
     const workspace = await findWorkspaceById(membership.workspaceId);
+    const role = await findRoleByIdInWorkspace(membership.roleId, membership.workspaceId);
 
-    if (workspace) {
+    if (workspace && role) {
       workspaces.push({
         id: workspace.id,
         name: workspace.name,
@@ -141,6 +145,8 @@ export async function listActiveWorkspacesForUser(
         type: workspace.type,
         timezone: workspace.timezone,
         defaultCurrency: workspace.defaultCurrency,
+        roleKey: role.key,
+        isOwner: role.key === "owner",
       });
     }
   }

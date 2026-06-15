@@ -88,3 +88,12 @@ export async function updateWorkspace(
 
   return toWorkspaceRecord(document);
 }
+
+export async function deleteWorkspaceById(workspaceId: string): Promise<void> {
+  await connectDb();
+  const result = await WorkspaceModel.deleteOne({ _id: workspaceId });
+
+  if (result.deletedCount === 0) {
+    throw new AppError("NOT_FOUND", "Workspace not found.");
+  }
+}

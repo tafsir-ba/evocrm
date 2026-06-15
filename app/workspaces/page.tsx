@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { WorkspaceListItem } from "@/components/workspaces/workspace-manage";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { auth } from "@/auth";
@@ -13,7 +14,6 @@ import {
   getWorkspaceInitials,
   listActiveWorkspacesForUser,
 } from "@/server/services/workspaces";
-import { workspaceNavPath } from "@/lib/workspace-paths";
 
 export const metadata = { title: "Workspaces — EvoHome CRM" };
 
@@ -32,16 +32,12 @@ export default async function WorkspacesPage() {
 
   const workspaces = await listActiveWorkspacesForUser(user.id);
 
-  if (workspaces.length === 1) {
-    redirect(workspaceNavPath(workspaces[0].slug, "dashboard"));
-  }
-
   return (
     <div className="min-h-screen bg-[var(--color-canvas)]">
       <div className="max-w-3xl mx-auto px-6 py-10">
         <PageHeader
           title="Your workspaces"
-          description="Select a workspace to continue or create a new one."
+          description="Open, edit, create, or delete workspaces at any time."
           actions={
             <Link href="/workspaces/new">
               <Button>Create workspace</Button>
@@ -64,29 +60,11 @@ export default async function WorkspacesPage() {
         ) : (
           <ul className="mt-8 space-y-3">
             {workspaces.map((workspace) => (
-              <li key={workspace.id}>
-                <Link
-                  href={workspaceNavPath(workspace.slug, "dashboard")}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] bg-white px-4 py-4 hover:border-[var(--color-brand-200)] transition-colors focus-ring"
-                >
-                  <span
-                    className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-[12px] font-bold text-white"
-                    style={{
-                      background: "linear-gradient(135deg, #1e3a8a, #2563eb)",
-                    }}
-                  >
-                    {getWorkspaceInitials(workspace.name)}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[15px] font-semibold text-[var(--color-ink)] truncate">
-                      {workspace.name}
-                    </span>
-                    <span className="block text-[12.5px] text-[var(--color-ink-muted)]">
-                      {workspace.type} · {workspace.timezone} · {workspace.defaultCurrency}
-                    </span>
-                  </span>
-                </Link>
-              </li>
+              <WorkspaceListItem
+                key={workspace.id}
+                workspace={workspace}
+                initials={getWorkspaceInitials(workspace.name)}
+              />
             ))}
           </ul>
         )}

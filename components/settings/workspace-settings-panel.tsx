@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { DeleteWorkspaceButton } from "@/components/workspaces/workspace-manage";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
@@ -21,6 +22,7 @@ type WorkspaceSettings = {
 type WorkspaceSettingsPanelProps = {
   workspaceSlug: string;
   canUpdate: boolean;
+  canDelete: boolean;
 };
 
 const WORKSPACE_TYPES = [
@@ -33,6 +35,7 @@ const WORKSPACE_TYPES = [
 export function WorkspaceSettingsPanel({
   workspaceSlug,
   canUpdate,
+  canDelete,
 }: WorkspaceSettingsPanelProps) {
   const [settings, setSettings] = useState<WorkspaceSettings | null>(null);
   const [form, setForm] = useState({
@@ -147,8 +150,9 @@ export function WorkspaceSettingsPanel({
   }
 
   return (
-    <Card>
-      <form onSubmit={(event) => void handleSave(event)} className="space-y-4">
+    <div className="space-y-4">
+      <Card>
+        <form onSubmit={(event) => void handleSave(event)} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Workspace name">
             <Input
@@ -207,8 +211,27 @@ export function WorkspaceSettingsPanel({
             {saving ? "Saving…" : "Save changes"}
           </Button>
         )}
-      </form>
-    </Card>
+        </form>
+      </Card>
+
+      {canDelete && settings && (
+        <Card>
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-[14px] font-semibold text-[var(--color-ink)]">Danger zone</h3>
+              <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
+                Permanently delete this workspace and all CRM data inside it.
+              </p>
+            </div>
+            <DeleteWorkspaceButton
+              workspaceSlug={workspaceSlug}
+              workspaceName={settings.name}
+              redirectTo="/workspaces"
+            />
+          </div>
+        </Card>
+      )}
+    </div>
   );
 }
 
