@@ -11,6 +11,7 @@ import type {
   UsagePurpose,
 } from "@/lib/lead-preferences";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import { toObjectIdString } from "@/server/utils/mongo-id";
 
 function toObjectIdArray(ids: string[]): mongoose.Types.ObjectId[] {
   return ids
@@ -30,7 +31,7 @@ function isDuplicateKeyError(error: unknown): boolean {
 export type LeadRecord = {
   id: string;
   workspaceId: string;
-  projectId: string;
+  projectId: string | null;
   statusId: string;
   sourceId: string | null;
   ownerId: string | null;
@@ -67,7 +68,7 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    projectId: document.projectId.toString(),
+    projectId: toObjectIdString(document.projectId),
     statusId: document.statusId.toString(),
     sourceId: document.sourceId?.toString() ?? null,
     ownerId: document.ownerId?.toString() ?? null,

@@ -49,12 +49,14 @@ import {
   findActiveLeadByEmailNormalized,
   findLeadById,
   findLeadByPhoneNormalized,
+  findLeads,
   updateLead,
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
 import {
   archiveLeadForWorkspace,
   createLeadForWorkspace,
+  listLeadsForWorkspace,
   normalizeLeadEmail,
   normalizeLeadPhone,
   updateLeadForWorkspace,
@@ -136,6 +138,19 @@ describe("lead service", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+  });
+
+  it("lists unmigrated leads without projectId without throwing", async () => {
+    vi.mocked(findLeads).mockResolvedValue({
+      leads: [{ ...baseLead, projectId: null }],
+      total: 1,
+    });
+
+    const result = await listLeadsForWorkspace("ws-1");
+
+    expect(result.leads).toHaveLength(1);
+    expect(result.leads[0]?.projectId).toBeNull();
+    expect(result.leads[0]?.project).toBeNull();
   });
 
   it("derives fullName server-side on create", async () => {

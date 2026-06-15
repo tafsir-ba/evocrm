@@ -10,6 +10,7 @@ import { PropertyModel } from "@/models/property";
 import { connectDb } from "@/server/db/mongoose";
 import { ProjectModel, type ProjectDocument } from "@/models/project";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import { isValidObjectId } from "@/server/utils/mongo-id";
 
 export type ProjectRecord = {
   id: string;
@@ -243,6 +244,10 @@ export async function findProjectById(
   workspaceId: string,
   projectId: string,
 ): Promise<ProjectRecord | null> {
+  if (!isValidObjectId(projectId)) {
+    return null;
+  }
+
   await connectDb();
   const document = await ProjectModel.findOne(
     withWorkspaceScope(workspaceId, { _id: projectId }),

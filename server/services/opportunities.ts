@@ -190,6 +190,13 @@ async function validateLeadForOpportunity(
     );
   }
 
+  if (!lead.projectId) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Lead must belong to a project before it can be linked to an opportunity.",
+    );
+  }
+
   return { projectId: lead.projectId };
 }
 
@@ -203,6 +210,13 @@ async function validatePropertyForOpportunity(
     throw new AppError(
       "VALIDATION_ERROR",
       "Property must exist in this workspace and not be archived.",
+    );
+  }
+
+  if (!property.projectId) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Property must belong to a project before it can be linked to an opportunity.",
     );
   }
 
@@ -349,8 +363,12 @@ async function resolvePropertySummary(
 
 async function resolveProjectSummary(
   workspaceId: string,
-  projectId: string,
+  projectId: string | null,
 ): Promise<OpportunityProjectSummary | null> {
+  if (!projectId) {
+    return null;
+  }
+
   const project = await findProjectById(workspaceId, projectId);
   if (!project) {
     return null;

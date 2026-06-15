@@ -243,6 +243,10 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
     return;
   }
 
+  if (!lead.projectId) {
+    return;
+  }
+
   const campaigns = await findActiveAutoEnrollmentCampaigns(input.workspaceId, {
     audienceType: "leads",
     trigger: input.trigger,

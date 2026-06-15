@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { connectDb } from "@/server/db/mongoose";
 import { OpportunityModel, type OpportunityDocument } from "@/models/opportunity";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import { toObjectIdString } from "@/server/utils/mongo-id";
 
 function toObjectIdArray(ids: string[]): mongoose.Types.ObjectId[] {
   return ids
@@ -15,7 +16,7 @@ function toObjectIdArray(ids: string[]): mongoose.Types.ObjectId[] {
 export type OpportunityRecord = {
   id: string;
   workspaceId: string;
-  projectId: string;
+  projectId: string | null;
   leadId: string;
   propertyId: string;
   statusId: string;
@@ -42,7 +43,7 @@ function toOpportunityRecord(document: OpportunityDocument): OpportunityRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    projectId: document.projectId.toString(),
+    projectId: toObjectIdString(document.projectId),
     leadId: document.leadId.toString(),
     propertyId: document.propertyId.toString(),
     statusId: document.statusId.toString(),

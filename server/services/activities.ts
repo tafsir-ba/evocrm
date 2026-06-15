@@ -132,6 +132,14 @@ async function resolveRelationships(
     leadId = opportunity.leadId;
     propertyId = opportunity.propertyId;
     projectId = opportunity.projectId;
+
+    if (!projectId) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Opportunity must belong to a project.",
+      );
+    }
+
     return { opportunityId, leadId, propertyId, projectId };
   }
 
@@ -147,9 +155,11 @@ async function resolveRelationships(
       );
     }
 
-    projectIds.add(lead.projectId);
-    if (!projectId) {
-      projectId = lead.projectId;
+    if (lead.projectId) {
+      projectIds.add(lead.projectId);
+      if (!projectId) {
+        projectId = lead.projectId;
+      }
     }
   }
 
@@ -163,9 +173,11 @@ async function resolveRelationships(
       );
     }
 
-    projectIds.add(property.projectId);
-    if (!projectId) {
-      projectId = property.projectId;
+    if (property.projectId) {
+      projectIds.add(property.projectId);
+      if (!projectId) {
+        projectId = property.projectId;
+      }
     }
   }
 

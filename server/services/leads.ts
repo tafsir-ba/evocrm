@@ -255,8 +255,12 @@ async function resolveTagsSummary(
 
 async function resolveProjectSummary(
   workspaceId: string,
-  projectId: string,
+  projectId: string | null,
 ): Promise<LeadProjectSummary | null> {
+  if (!projectId) {
+    return null;
+  }
+
   const project = await findProjectById(workspaceId, projectId);
 
   if (!project) {

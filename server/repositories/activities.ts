@@ -3,11 +3,12 @@ import "server-only";
 import { connectDb } from "@/server/db/mongoose";
 import { ActivityModel, type ActivityDocument } from "@/models/activity";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import { toObjectIdString } from "@/server/utils/mongo-id";
 
 export type ActivityRecord = {
   id: string;
   workspaceId: string;
-  projectId: string;
+  projectId: string | null;
   opportunityId: string | null;
   leadId: string | null;
   propertyId: string | null;
@@ -32,7 +33,7 @@ function toActivityRecord(document: ActivityDocument): ActivityRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    projectId: document.projectId.toString(),
+    projectId: toObjectIdString(document.projectId),
     opportunityId: document.opportunityId?.toString() ?? null,
     leadId: document.leadId?.toString() ?? null,
     propertyId: document.propertyId?.toString() ?? null,

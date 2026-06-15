@@ -12,7 +12,8 @@ vi.mock("@/models/project", () => ({
 }));
 
 import { ProjectModel } from "@/models/project";
-import { findProjects } from "@/server/repositories/projects";
+import { findProjectById, findProjects } from "@/server/repositories/projects";
+import { TEST_PROJECT_ID } from "@/tests/helpers/crm-fixtures";
 
 describe("projects repository", () => {
   beforeEach(() => {
@@ -52,11 +53,18 @@ describe("projects repository", () => {
     vi.mocked(ProjectModel.findOne).mockReturnValue({ lean } as never);
 
     const { findProjectById } = await import("@/server/repositories/projects");
-    await findProjectById("ws-1", "project-1");
+    await findProjectById("ws-1", TEST_PROJECT_ID);
 
     expect(ProjectModel.findOne).toHaveBeenCalledWith({
       workspaceId: "ws-1",
-      _id: "project-1",
+      _id: TEST_PROJECT_ID,
     });
+  });
+
+  it("returns null for invalid project ids without querying", async () => {
+    const result = await findProjectById("ws-1", "project-1");
+
+    expect(result).toBeNull();
+    expect(ProjectModel.findOne).not.toHaveBeenCalled();
   });
 });

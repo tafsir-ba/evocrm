@@ -5,6 +5,7 @@ import { AppError } from "@/server/errors";
 import { PropertyModel, type PropertyDocument } from "@/models/property";
 import type { SurfaceUnit } from "@/lib/surface-unit";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import { toObjectIdString } from "@/server/utils/mongo-id";
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -18,7 +19,7 @@ function isDuplicateKeyError(error: unknown): boolean {
 export type PropertyRecord = {
   id: string;
   workspaceId: string;
-  projectId: string;
+  projectId: string | null;
   statusId: string;
   typeId: string | null;
   ownerId: string | null;
@@ -50,7 +51,7 @@ function toPropertyRecord(document: PropertyDocument): PropertyRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    projectId: document.projectId.toString(),
+    projectId: toObjectIdString(document.projectId),
     statusId: document.statusId.toString(),
     typeId: document.typeId?.toString() ?? null,
     ownerId: document.ownerId?.toString() ?? null,
