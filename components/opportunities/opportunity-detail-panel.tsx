@@ -22,6 +22,14 @@ import {
   isTerminalOpportunityBehavior,
   isTerminalWonBehavior,
 } from "@/lib/dictionary-form-helpers";
+import {
+  labelPropertyTypeInterest,
+  labelTransactionIntent,
+  labelUsagePurpose,
+  type PropertyTypeInterest,
+  type TransactionIntent,
+  type UsagePurpose,
+} from "@/lib/lead-preferences";
 import { formatDate, formatPrice } from "@/lib/format-price";
 import { IconCheck } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -62,7 +70,15 @@ type OpportunityDetail = {
   statusId: string;
   status: DictionaryItem | null;
   lostReason: DictionaryItem | null;
-  lead: { id: string; fullName: string; email: string | null; phone: string | null } | null;
+  lead: {
+    id: string;
+    fullName: string;
+    email: string | null;
+    phone: string | null;
+    propertyTypeInterests: PropertyTypeInterest[];
+    transactionIntent: TransactionIntent | null;
+    usagePurpose: UsagePurpose | null;
+  } | null;
   property: {
     id: string;
     title: string;
@@ -377,27 +393,55 @@ export function OpportunityDetailPanel({
             Lead
           </p>
           {opportunity.lead ? (
-            <Link
-              href={workspacePath(workspaceSlug, "leads", opportunity.lead.id)}
-              className="flex items-center gap-3 hover:opacity-90"
-            >
-              <Avatar
-                user={{
-                  id: opportunity.lead.id,
-                  name: opportunity.lead.fullName,
-                  initials: userInitials(opportunity.lead.fullName, opportunity.lead.email ?? ""),
-                }}
-                size={36}
-              />
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-[var(--color-ink)] truncate">
-                  {opportunity.lead.fullName}
-                </p>
-                <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
-                  {opportunity.lead.email ?? opportunity.lead.phone ?? "—"}
-                </p>
-              </div>
-            </Link>
+            <div className="space-y-2">
+              <Link
+                href={workspacePath(workspaceSlug, "leads", opportunity.lead.id)}
+                className="flex items-center gap-3 hover:opacity-90"
+              >
+                <Avatar
+                  user={{
+                    id: opportunity.lead.id,
+                    name: opportunity.lead.fullName,
+                    initials: userInitials(opportunity.lead.fullName, opportunity.lead.email ?? ""),
+                  }}
+                  size={36}
+                />
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-[var(--color-ink)] truncate">
+                    {opportunity.lead.fullName}
+                  </p>
+                  <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
+                    {opportunity.lead.email ?? opportunity.lead.phone ?? "—"}
+                  </p>
+                </div>
+              </Link>
+              {(opportunity.lead.propertyTypeInterests.length > 0 ||
+                opportunity.lead.transactionIntent ||
+                opportunity.lead.usagePurpose) && (
+                <div className="space-y-1 border-t border-[var(--color-line)] pt-2 text-[12px] text-[var(--color-ink-muted)]">
+                  {opportunity.lead.propertyTypeInterests.length > 0 ? (
+                    <p>
+                      <span className="font-medium text-[var(--color-ink)]">Interests:</span>{" "}
+                      {opportunity.lead.propertyTypeInterests
+                        .map((interest) => labelPropertyTypeInterest(interest))
+                        .join(", ")}
+                    </p>
+                  ) : null}
+                  {opportunity.lead.transactionIntent ? (
+                    <p>
+                      <span className="font-medium text-[var(--color-ink)]">Intent:</span>{" "}
+                      {labelTransactionIntent(opportunity.lead.transactionIntent)}
+                    </p>
+                  ) : null}
+                  {opportunity.lead.usagePurpose ? (
+                    <p>
+                      <span className="font-medium text-[var(--color-ink)]">Purpose:</span>{" "}
+                      {labelUsagePurpose(opportunity.lead.usagePurpose)}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
           ) : (
             <p className="text-[13px] text-[var(--color-ink-muted)]">—</p>
           )}

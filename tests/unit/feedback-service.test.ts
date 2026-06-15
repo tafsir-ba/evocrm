@@ -228,6 +228,39 @@ describe("feedback service", () => {
     );
   });
 
+  it("resolves feedback without audit when workspace context is missing", async () => {
+    const recordWithoutWorkspace = { ...baseRecord, workspaceId: null };
+
+    vi.mocked(sendFeedbackResolvedEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-1",
+    });
+    vi.mocked(findFeedbackById)
+      .mockResolvedValueOnce(recordWithoutWorkspace)
+      .mockResolvedValueOnce({
+        ...recordWithoutWorkspace,
+        status: "resolved",
+        resolvedAt: new Date("2026-06-14T11:00:00.000Z"),
+        resolvedBy: "admin-1",
+      });
+    vi.mocked(updateFeedbackStatus).mockResolvedValue({
+      ...recordWithoutWorkspace,
+      status: "resolved",
+      resolvedAt: new Date("2026-06-14T11:00:00.000Z"),
+      resolvedBy: "admin-1",
+    });
+
+    await expect(
+      updateFeedbackStatusForAdmin({
+        feedbackId: "fb-1",
+        status: "resolved",
+        adminUserId: "admin-1",
+      }),
+    ).resolves.toBeDefined();
+
+    expect(createAuditLog).not.toHaveBeenCalled();
+  });
+
   it("deletes feedback row and storage keys", async () => {
     vi.mocked(findFeedbackById).mockResolvedValue({
       ...baseRecord,

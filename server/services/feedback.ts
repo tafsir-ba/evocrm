@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { createAuditLog } from "@/server/audit/create-audit-log";
+import { createAuditLog, type CreateAuditLogInput } from "@/server/audit/create-audit-log";
 import { sendFeedbackResolvedEmail } from "@/server/email/resend";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
@@ -237,14 +237,23 @@ async function deleteFeedbackScreenshots(screenshots: FeedbackScreenshotRecord[]
   );
 }
 
-function getAuditWorkspaceId(record: FeedbackRecord): string {
-  if (!record.workspaceId) {
-    throw new AppError("INTERNAL_ERROR", "Feedback workspace context is required for audit.", {
-      expose: false,
-    });
+function getAuditWorkspaceId(record: FeedbackRecord): string | null {
+  return record.workspaceId ?? null;
+}
+
+async function createFeedbackAuditLog(
+  record: FeedbackRecord,
+  entry: Omit<CreateAuditLogInput, "workspaceId">,
+): Promise<void> {
+  const workspaceId = getAuditWorkspaceId(record);
+  if (!workspaceId) {
+    return;
   }
 
-  return record.workspaceId;
+  await createAuditLog({
+    workspaceId,
+    ...entry,
+  });
 }
 
 async function resolveFeedbackProjectId(
@@ -407,8 +416,7 @@ export async function updateFeedbackStatusForAdmin(input: {
     });
 
     if (!sendResult.success) {
-      await createAuditLog({
-        workspaceId: getAuditWorkspaceId(existing),
+      await createFeedbackAuditLog(existing, {
         actorId: input.adminUserId,
         action: "feedback.notification.failed",
         entityType: "feedback",
@@ -440,8 +448,7 @@ export async function updateFeedbackStatusForAdmin(input: {
       return null;
     }
 
-    await createAuditLog({
-      workspaceId: getAuditWorkspaceId(updated),
+    await createFeedbackAuditLog(updated, {
       actorId: input.adminUserId,
       action: "feedback.resolve",
       entityType: "feedback",
@@ -458,8 +465,7 @@ export async function updateFeedbackStatusForAdmin(input: {
       },
     });
 
-    await createAuditLog({
-      workspaceId: getAuditWorkspaceId(updated),
+    await createFeedbackAuditLog(updated, {
       actorId: input.adminUserId,
       action: "feedback.notification.sent",
       entityType: "feedback",
@@ -484,8 +490,7 @@ export async function updateFeedbackStatusForAdmin(input: {
     return null;
   }
 
-  await createAuditLog({
-    workspaceId: getAuditWorkspaceId(updated),
+  await createFeedbackAuditLog(updated, {
     actorId: input.adminUserId,
     action: "feedback.reopen",
     entityType: "feedback",
@@ -523,8 +528,7 @@ export async function deleteFeedbackForAdmin(input: {
 
   await deleteFeedbackScreenshots(deleted.screenshots);
 
-  await createAuditLog({
-    workspaceId: getAuditWorkspaceId(deleted),
+  await createFeedbackAuditLog(deleted, {
     actorId: input.adminUserId,
     action: "feedback.delete",
     entityType: "feedback",

@@ -532,6 +532,25 @@ export function FeedbackAdminPanel() {
               </p>
               <p className="whitespace-pre-wrap text-[13px]">{selected.body || "—"}</p>
             </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+                Submitted
+              </p>
+              <p className="text-[13px]">{formatWhen(selected.createdAt)}</p>
+            </div>
+            {selected.status === "resolved" && selected.resolvedAt ? (
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+                  Resolved
+                </p>
+                <p className="text-[13px]">{formatWhen(selected.resolvedAt)}</p>
+                {selected.resolvedByEmail ? (
+                  <p className="text-[12px] text-[var(--color-ink-muted)]">
+                    by {selected.resolvedByEmail}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {selected.pageUrl && (
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">

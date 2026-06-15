@@ -69,14 +69,14 @@ test.describe("Phase 15 overlay layout", () => {
         await expect(page.getByRole("dialog", { name: "Example drawer" })).toBeHidden();
       });
 
-      test("new lead drawer keeps primary actions reachable", async ({ page }) => {
+      test("new lead focused form keeps primary actions reachable", async ({ page }) => {
         await page.goto(`/w/${workspaceSlug!}/leads`);
         await page.getByRole("button", { name: "New lead" }).click();
 
-        await assertDialogWithinViewport(page, "New lead");
-        await assertActionOutsideScrollRegion(page, "Create lead");
-        await assertActionOutsideScrollRegion(page, "Cancel");
-        await assertBodyScrollLocked(page);
+        await expect(page).toHaveURL(new RegExp(`/w/${workspaceSlug!}/leads/new$`));
+        await expect(page.getByRole("heading", { name: "New lead" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Create lead" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Cancel" })).toBeVisible();
         await assertNoDocumentHorizontalOverflow(page);
       });
 

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { IconClose } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 export function FocusedFormLayout({
@@ -25,6 +26,7 @@ export function FocusedFormLayout({
   maxWidth?: "lg" | "2xl" | "3xl";
 }) {
   const resolvedBack = back ?? (closeHref ? { href: closeHref, label: "Back" } : undefined);
+  const resolvedCloseHref = closeHref ?? back?.href;
   const maxWidthClass =
     maxWidth === "lg"
       ? "max-w-lg"
@@ -34,7 +36,18 @@ export function FocusedFormLayout({
 
   return (
     <div className={cn(maxWidthClass, "mx-auto", className)}>
-      <PageHeader title={title} description={description} back={resolvedBack} />
+      <div className="relative mb-6">
+        <PageHeader title={title} description={description} back={resolvedBack} />
+        {resolvedCloseHref ? (
+          <Link
+            href={resolvedCloseHref}
+            className="absolute right-0 top-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas)] focus-ring"
+            aria-label="Close"
+          >
+            <IconClose size={18} />
+          </Link>
+        ) : null}
+      </div>
       <div className="rounded-xl border border-[var(--color-line)] bg-white p-6">
         {children}
         {footer}
@@ -59,7 +72,7 @@ export function FocusedFormActions({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="mt-6 flex items-center justify-end gap-2 border-t border-[var(--color-line)] pt-4">
+    <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--color-line)] pt-4">
       {cancelHref ? (
         <Link
           href={cancelHref}

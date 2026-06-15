@@ -54,6 +54,9 @@ export type OpportunityLeadSummary = {
   fullName: string;
   email: string | null;
   phone: string | null;
+  propertyTypeInterests: string[];
+  transactionIntent: string | null;
+  usagePurpose: string | null;
 };
 
 export type OpportunityPropertySummary = {
@@ -295,6 +298,9 @@ async function resolveLeadSummary(
     fullName: lead.fullName,
     email: lead.email,
     phone: lead.phone,
+    propertyTypeInterests: lead.propertyTypeInterests,
+    transactionIntent: lead.transactionIntent,
+    usagePurpose: lead.usagePurpose,
   };
 }
 

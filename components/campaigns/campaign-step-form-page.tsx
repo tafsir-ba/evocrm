@@ -46,56 +46,96 @@ export function CampaignStepFormPage({
   const formId = "campaign-step-form";
 
   const [form, setForm] = useState<StepFormState>(emptyStepForm);
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isEdit || !stepId) {
-      void fetch(`${apiBase}`)
-        .then((res) => res.json())
-        .then((payload) => {
-          const campaign = payload.data?.campaign;
-          const steps = payload.data?.steps;
-          void fetch(`${apiBase}/steps`)
-            .then((r) => r.json())
-            .then((stepsPayload) => {
-              const stepCount = stepsPayload.data?.steps?.length ?? steps?.length ?? 0;
-              setForm({
-                ...emptyStepForm,
-                order: String(stepCount + 1),
-                fromName: campaign?.defaultFromName ?? campaign?.name ?? "",
-              });
-            });
+    let active = true;
+
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
+
+      try {
+        if (isEdit && stepId) {
+          const stepsRes = await fetch(`${apiBase}/steps`);
+          const stepsPayload = await stepsRes.json();
+
+          if (!stepsRes.ok) {
+            throw new Error(stepsPayload.error?.message ?? "Failed to load step.");
+          }
+
+          const step = (stepsPayload.data?.steps ?? []).find(
+            (item: { id: string }) => item.id === stepId,
+          );
+
+          if (!step) {
+            throw new Error("Step not found.");
+          }
+
+          if (!active) {
+            return;
+          }
+
+          setForm({
+            order: String(step.order),
+            delayDays: String(step.delayDays),
+            sendTime: step.sendTime,
+            fromName: step.fromName,
+            subject: step.subject,
+            body: step.body,
+          });
+          return;
+        }
+
+        const [campaignRes, stepsRes] = await Promise.all([
+          fetch(apiBase),
+          fetch(`${apiBase}/steps`),
+        ]);
+
+        const [campaignPayload, stepsPayload] = await Promise.all([
+          campaignRes.json(),
+          stepsRes.json(),
+        ]);
+
+        if (!campaignRes.ok) {
+          throw new Error(campaignPayload.error?.message ?? "Failed to load campaign.");
+        }
+
+        if (!stepsRes.ok) {
+          throw new Error(stepsPayload.error?.message ?? "Failed to load campaign steps.");
+        }
+
+        if (!active) {
+          return;
+        }
+
+        const campaign = campaignPayload.data?.campaign;
+        const stepCount = stepsPayload.data?.steps?.length ?? 0;
+
+        setForm({
+          ...emptyStepForm,
+          order: String(stepCount + 1),
+          fromName: campaign?.defaultFromName ?? campaign?.name ?? "",
         });
-      return;
+      } catch (error) {
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : "Failed to load form.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     }
 
-    setLoading(true);
-    void fetch(`${apiBase}/steps`)
-      .then(async (res) => {
-        const payload = await res.json();
-        if (!res.ok) {
-          throw new Error(payload.error?.message ?? "Failed to load step.");
-        }
-        const step = (payload.data?.steps ?? []).find(
-          (item: { id: string }) => item.id === stepId,
-        );
-        if (!step) {
-          throw new Error("Step not found.");
-        }
-        setForm({
-          order: String(step.order),
-          delayDays: String(step.delayDays),
-          sendTime: step.sendTime,
-          fromName: step.fromName,
-          subject: step.subject,
-          body: step.body,
-        });
-      })
-      .catch((error: Error) => setLoadError(error.message))
-      .finally(() => setLoading(false));
+    void load();
+
+    return () => {
+      active = false;
+    };
   }, [apiBase, isEdit, stepId]);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -137,7 +177,7 @@ export function CampaignStepFormPage({
 
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto px-6 py-10 space-y-4">
+      <div className="max-w-2xl mx-auto space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -149,7 +189,12 @@ export function CampaignStepFormPage({
       <ErrorState
         title="Could not load step"
         description={loadError}
-        primaryAction={{ label: "Back to campaign", onClick: () => { window.location.href = closeHref; } }}
+        primaryAction={{
+          label: "Back to campaign",
+          onClick: () => {
+            window.location.href = closeHref;
+          },
+        }}
       />
     );
   }

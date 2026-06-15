@@ -275,6 +275,9 @@ function leadSnapshot(lead: LeadRecord): Record<string, unknown> {
     email: lead.email,
     phone: lead.phone,
     tags: lead.tags,
+    propertyTypeInterests: lead.propertyTypeInterests,
+    transactionIntent: lead.transactionIntent,
+    usagePurpose: lead.usagePurpose,
   };
 }
 
