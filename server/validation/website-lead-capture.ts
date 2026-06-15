@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { objectIdSchema } from "@/server/validation/campaigns";
+
 const utmSchema = z
   .object({
     source: z.string().trim().max(120).optional(),
@@ -26,6 +28,8 @@ export const websiteLeadCaptureInputSchema = z
     budgetMin: z.number().min(0).optional(),
     budgetMax: z.number().min(0).optional(),
     propertyReference: z.string().trim().max(120).optional(),
+    projectId: objectIdSchema.optional(),
+    projectReference: z.string().trim().min(1).max(120).optional(),
     utm: utmSchema.optional(),
   })
   .strict()

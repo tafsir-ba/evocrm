@@ -18,7 +18,7 @@ import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
+import { scheduleCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
 import {
   assertValidProjectFilter,
   validateActiveProjectId,
@@ -403,14 +403,12 @@ export async function createLeadForWorkspace(
     after: leadSnapshot(lead),
   });
 
-  void Promise.resolve(
-    evaluateCampaignAutoEnrollmentForLead({
-      workspaceId,
-      leadId: lead.id,
-      trigger: "new_lead",
-      actorId,
-    }),
-  ).catch(() => undefined);
+  scheduleCampaignAutoEnrollmentForLead({
+    workspaceId,
+    leadId: lead.id,
+    trigger: "new_lead",
+    actorId,
+  });
 
   return {
     lead: await enrichLeadRecord(lead),
@@ -605,14 +603,12 @@ export async function updateLeadForWorkspace(
     });
   }
 
-  void Promise.resolve(
-    evaluateCampaignAutoEnrollmentForLead({
-      workspaceId,
-      leadId,
-      trigger: "lead_updated",
-      actorId,
-    }),
-  ).catch(() => undefined);
+  scheduleCampaignAutoEnrollmentForLead({
+    workspaceId,
+    leadId,
+    trigger: "lead_updated",
+    actorId,
+  });
 
   return {
     lead: await enrichLeadRecord(updated),

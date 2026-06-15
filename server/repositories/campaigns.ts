@@ -20,6 +20,8 @@ export type EnrollmentCondition = {
     | "is_empty"
     | "is_not_empty";
   value: string | string[] | boolean | number | null;
+  /** Lead attribute key when field is `customField`. */
+  customFieldKey?: string | null;
 };
 
 export type EnrollmentRules = {

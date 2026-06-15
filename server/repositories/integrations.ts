@@ -30,6 +30,7 @@ export type IntegrationRecord = {
   status: IntegrationStatus;
   credentialsEncrypted: string | null;
   apiKeyHash: string | null;
+  defaultProjectId: string | null;
   createdBy: string;
   archivedAt: Date | null;
   createdAt: Date;
@@ -45,6 +46,7 @@ function toIntegrationRecord(document: IntegrationDocument): IntegrationRecord {
     status: document.status as IntegrationStatus,
     credentialsEncrypted: document.credentialsEncrypted ?? null,
     apiKeyHash: document.apiKeyHash ?? null,
+    defaultProjectId: document.defaultProjectId?.toString() ?? null,
     createdBy: document.createdBy.toString(),
     archivedAt: document.archivedAt ?? null,
     createdAt: document.createdAt,
@@ -169,6 +171,7 @@ export async function updateIntegration(
     name?: string;
     status?: IntegrationStatus;
     apiKeyHash?: string | null;
+    defaultProjectId?: string | null;
     archivedAt?: Date | null;
   },
 ): Promise<IntegrationRecord | null> {

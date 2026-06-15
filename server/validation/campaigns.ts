@@ -36,6 +36,7 @@ export const enrollmentConditionSchema = z
       z.number(),
       z.null(),
     ]),
+    customFieldKey: z.string().trim().min(1).max(120).nullable().optional(),
   })
   .strict();
 

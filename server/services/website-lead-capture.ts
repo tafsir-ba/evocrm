@@ -25,7 +25,11 @@ import {
   createLeadForWorkspace,
   normalizeLeadEmail,
 } from "@/server/services/leads";
-import { findProjects } from "@/server/repositories/projects";
+import {
+  findProjectById,
+  findProjectByReference,
+  findProjects,
+} from "@/server/repositories/projects";
 import type { WebsiteLeadCaptureInput } from "@/server/validation/website-lead-capture";
 
 export type WebsiteLeadCaptureResult = {
@@ -34,7 +38,62 @@ export type WebsiteLeadCaptureResult = {
   idempotent: boolean;
 };
 
-async function resolveWebsiteLeadProjectId(workspaceId: string): Promise<string> {
+export async function resolveWebsiteLeadProjectId(input: {
+  workspaceId: string;
+  integration: IntegrationRecord;
+  payload: Pick<WebsiteLeadCaptureInput, "projectId" | "projectReference">;
+}): Promise<string> {
+  const { workspaceId, integration, payload } = input;
+
+  if (payload.projectId && payload.projectReference?.trim()) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Provide either projectId or projectReference, not both.",
+    );
+  }
+
+  if (payload.projectId) {
+    const project = await findProjectById(workspaceId, payload.projectId);
+
+    if (!project || project.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Project must exist in this workspace and not be archived.",
+      );
+    }
+
+    return project.id;
+  }
+
+  if (payload.projectReference?.trim()) {
+    const project = await findProjectByReference(
+      workspaceId,
+      payload.projectReference.trim(),
+    );
+
+    if (!project || project.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Project reference must match an active project in this workspace.",
+      );
+    }
+
+    return project.id;
+  }
+
+  if (integration.defaultProjectId) {
+    const project = await findProjectById(workspaceId, integration.defaultProjectId);
+
+    if (!project || project.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Integration default project is missing or archived. Configure a valid default project.",
+      );
+    }
+
+    return project.id;
+  }
+
   const projects = await findProjects(workspaceId, { includeArchived: false });
 
   if (projects.length === 0) {
@@ -44,7 +103,14 @@ async function resolveWebsiteLeadProjectId(workspaceId: string): Promise<string>
     );
   }
 
-  return projects[0].id;
+  if (projects.length === 1) {
+    return projects[0].id;
+  }
+
+  throw new AppError(
+    "VALIDATION_ERROR",
+    "Multiple active projects exist. Provide projectId or projectReference in the payload, or set a default project on the website integration.",
+  );
 }
 
 function resolveIdempotencyKey(input: WebsiteLeadCaptureInput): string | null {
@@ -231,7 +297,14 @@ export async function captureWebsiteLead(
 
   const statusId = await resolveDefaultLeadStatusId(workspaceId);
   const sourceId = await resolveWebsiteLeadSourceId(workspaceId);
-  const projectId = await resolveWebsiteLeadProjectId(workspaceId);
+  const projectId = await resolveWebsiteLeadProjectId({
+    workspaceId,
+    integration,
+    payload: {
+      projectId: input.projectId,
+      projectReference: input.projectReference,
+    },
+  });
   const attributes = buildIntegrationAttributes(integration, input, idempotencyKey);
 
   let result;

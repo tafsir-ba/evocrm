@@ -156,6 +156,27 @@ async function validateEnrollmentRules(
         throw new AppError("VALIDATION_ERROR", "Invalid assigned user in enrollment rule.");
       }
     }
+
+    if (condition.field === "customField") {
+      const key =
+        condition.customFieldKey?.trim() ||
+        (typeof condition.value === "string" && condition.value.includes(":")
+          ? condition.value.split(":")[0]?.trim()
+          : typeof condition.value === "string"
+            ? condition.value.trim()
+            : "");
+
+      if (
+        condition.operator !== "is_empty" &&
+        condition.operator !== "is_not_empty" &&
+        !key
+      ) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Custom field enrollment rules require a field key.",
+        );
+      }
+    }
   }
 }
 

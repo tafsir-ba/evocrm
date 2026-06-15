@@ -77,6 +77,7 @@ function defaultCondition(): EnrollmentCondition {
     field: "projectId",
     operator: "equals",
     value: "",
+    customFieldKey: null,
   };
 }
 
@@ -161,6 +162,7 @@ export function EnrollmentRulesBuilder({
         const operators = operatorsForField(patch.field);
         next.operator = operators[0];
         next.value = "";
+        next.customFieldKey = null;
       }
 
       return next;
@@ -276,6 +278,7 @@ export function EnrollmentRulesBuilder({
 
                 {value.enrollmentRules.conditions.map((condition, index) => {
                   const operators = operatorsForField(condition.field);
+                  const isCustomField = condition.field === "customField";
                   const showValue =
                     condition.operator !== "is_empty" &&
                     condition.operator !== "is_not_empty";
@@ -317,7 +320,30 @@ export function EnrollmentRulesBuilder({
                         ))}
                       </Select>
 
-                      {showValue ? (
+                      {isCustomField ? (
+                        <div className="flex flex-col gap-2">
+                          <Input
+                            value={condition.customFieldKey ?? ""}
+                            disabled={disabled}
+                            placeholder="Field key"
+                            onChange={(event) =>
+                              updateCondition(index, {
+                                customFieldKey: event.target.value,
+                              })
+                            }
+                          />
+                          {showValue ? (
+                            <Input
+                              value={String(condition.value ?? "")}
+                              disabled={disabled}
+                              placeholder="Expected value"
+                              onChange={(event) =>
+                                updateCondition(index, { value: event.target.value })
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      ) : showValue ? (
                         <ConditionValueInput
                           condition={condition}
                           disabled={disabled}
@@ -452,15 +478,6 @@ function ConditionValueInput({
             </option>
           ))}
         </Select>
-      );
-    case "customField":
-      return (
-        <Input
-          value={String(condition.value ?? "")}
-          disabled={disabled}
-          placeholder="field_key or field_key:expected"
-          onChange={(event) => onChange(event.target.value)}
-        />
       );
     default:
       return (

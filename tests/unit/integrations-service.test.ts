@@ -41,6 +41,7 @@ const baseIntegration = {
   status: "active" as const,
   credentialsEncrypted: null,
   apiKeyHash: "hashed-key",
+  defaultProjectId: null,
   createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),

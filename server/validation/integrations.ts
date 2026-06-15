@@ -33,6 +33,7 @@ export const updateIntegrationInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     status: z.enum(INTEGRATION_STATUSES).optional(),
+    defaultProjectId: objectIdSchema.nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

@@ -11,6 +11,7 @@ const integrationSchema = new Schema(
     status: { type: String, enum: INTEGRATION_STATUSES, required: true },
     credentialsEncrypted: { type: String, default: null },
     apiKeyHash: { type: String, default: null },
+    defaultProjectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     archivedAt: { type: Date, default: null },
   },

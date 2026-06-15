@@ -33,7 +33,7 @@ vi.mock("@/server/repositories/projects", () => ({
 }));
 
 vi.mock("@/server/services/campaign-auto-enrollment", () => ({
-  evaluateCampaignAutoEnrollmentForLead: vi.fn().mockResolvedValue(undefined),
+  scheduleCampaignAutoEnrollmentForLead: vi.fn(),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({

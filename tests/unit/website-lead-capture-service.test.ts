@@ -14,6 +14,8 @@ vi.mock("@/server/repositories/leads", () => ({
 
 vi.mock("@/server/repositories/projects", () => ({
   findProjects: vi.fn(),
+  findProjectById: vi.fn(),
+  findProjectByReference: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/dictionary-items", () => ({
@@ -47,7 +49,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
-import { findProjects } from "@/server/repositories/projects";
+import { findProjects, findProjectById, findProjectByReference } from "@/server/repositories/projects";
 import {
   findActiveWebsiteIntegrationByApiKeyHash,
   findWebsiteIntegrationByApiKeyHash,
@@ -61,6 +63,7 @@ import { createLeadForWorkspace } from "@/server/services/leads";
 import {
   captureWebsiteLead,
   resolveWebsiteIntegrationFromApiKey,
+  resolveWebsiteLeadProjectId,
 } from "@/server/services/website-lead-capture";
 import { AppError } from "@/server/errors";
 
@@ -72,7 +75,28 @@ const integration = {
   status: "active" as const,
   credentialsEncrypted: null,
   apiKeyHash: "hashed-key",
+  defaultProjectId: null,
   createdBy: "user-1",
+  archivedAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+const activeProject = {
+  id: TEST_PROJECT_ID,
+  workspaceId: "ws-1",
+  name: "Default Project",
+  reference: "default",
+  projectType: null,
+  defaultDripCampaignId: null,
+  statusId: null,
+  address: null,
+  city: null,
+  country: null,
+  description: null,
+  createdBy: "user-1",
+  ownerId: null,
+  assignedTo: null,
   archivedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -99,27 +123,22 @@ describe("website lead capture service", () => {
     }));
     vi.mocked(findLeadByIntegrationIdempotencyKey).mockResolvedValue(null);
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
-    vi.mocked(findProjects).mockResolvedValue([
-      {
-        id: TEST_PROJECT_ID,
-        workspaceId: "ws-1",
-        name: "Default Project",
-        reference: "default",
-        projectType: null,
-        defaultDripCampaignId: null,
-        statusId: null,
-        address: null,
-        city: null,
-        country: null,
-        description: null,
-        createdBy: "user-1",
-        ownerId: null,
-        assignedTo: null,
-        archivedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
+    vi.mocked(findProjects).mockResolvedValue([activeProject]);
+    vi.mocked(findProjectById).mockImplementation(async (_ws, projectId) => {
+      if (projectId === TEST_PROJECT_ID) {
+        return activeProject;
+      }
+      if (projectId === "archived-project") {
+        return { ...activeProject, id: "archived-project", archivedAt: new Date() };
+      }
+      return null;
+    });
+    vi.mocked(findProjectByReference).mockImplementation(async (_ws, reference) => {
+      if (reference === "default") {
+        return activeProject;
+      }
+      return null;
+    });
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: {
         id: "lead-1",
@@ -376,5 +395,109 @@ describe("website lead capture service", () => {
       duplicate: true,
       idempotent: false,
     });
+  });
+
+  it("rejects capture when no active projects exist", async () => {
+    vi.mocked(findProjects).mockResolvedValue([]);
+
+    await expect(
+      captureWebsiteLead("raw-key", {
+        firstName: "John",
+        lastName: "Smith",
+        email: "john@example.com",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("auto-selects the only active project in a single-project workspace", async () => {
+    await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      email: "john@example.com",
+    });
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+    );
+  });
+
+  it("rejects capture when multiple active projects exist without mapping", async () => {
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await expect(
+      captureWebsiteLead("raw-key", {
+        firstName: "John",
+        lastName: "Smith",
+        email: "john@example.com",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("accepts explicit projectId from payload", async () => {
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      email: "john@example.com",
+      projectId: TEST_PROJECT_ID,
+    });
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+    );
+  });
+
+  it("accepts projectReference from payload", async () => {
+    await resolveWebsiteLeadProjectId({
+      workspaceId: "ws-1",
+      integration,
+      payload: { projectReference: "default" },
+    });
+
+    expect(findProjectByReference).toHaveBeenCalledWith("ws-1", "default");
+  });
+
+  it("uses integration defaultProjectId when configured", async () => {
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await resolveWebsiteLeadProjectId({
+      workspaceId: "ws-1",
+      integration: { ...integration, defaultProjectId: TEST_PROJECT_ID },
+      payload: {},
+    });
+
+    expect(findProjectById).toHaveBeenCalledWith("ws-1", TEST_PROJECT_ID);
+  });
+
+  it("rejects archived or unknown mapped projects", async () => {
+    await expect(
+      resolveWebsiteLeadProjectId({
+        workspaceId: "ws-1",
+        integration,
+        payload: { projectId: "archived-project" },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await expect(
+      resolveWebsiteLeadProjectId({
+        workspaceId: "ws-1",
+        integration,
+        payload: { projectId: "missing-project" },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

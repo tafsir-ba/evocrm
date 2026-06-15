@@ -226,15 +226,78 @@ export async function migrateWorkspaceProjectScope(
   };
 }
 
-export async function migrateAllWorkspacesProjectScope(
-  actorId: string,
-): Promise<ProjectMigrationResult[]> {
+export async function migrateAllWorkspacesProjectScope(): Promise<ProjectMigrationResult[]> {
   await connectDb();
   const workspaces = await findAllWorkspaces();
   const results: ProjectMigrationResult[] = [];
 
   for (const workspace of workspaces) {
-    results.push(await migrateWorkspaceProjectScope(workspace.id, actorId));
+    results.push(await migrateWorkspaceProjectScope(workspace.id, workspace.createdBy));
+  }
+
+  return results;
+}
+
+export type ProjectScopeVerificationCounts = {
+  leads: number;
+  properties: number;
+  opportunities: number;
+  activities: number;
+  enrollments: number;
+};
+
+export type ProjectScopeVerificationResult = {
+  workspaceId: string;
+  missing: ProjectScopeVerificationCounts;
+  ok: boolean;
+};
+
+async function countMissingProjectId(
+  workspaceObjectId: mongoose.Types.ObjectId,
+  model: {
+    countDocuments: (query: Record<string, unknown>) => Promise<number>;
+  },
+): Promise<number> {
+  return model.countDocuments({
+    workspaceId: workspaceObjectId,
+    $or: [{ projectId: null }, { projectId: { $exists: false } }],
+  });
+}
+
+export async function verifyProjectScopeMigration(
+  workspaceId?: string,
+): Promise<ProjectScopeVerificationResult[]> {
+  await connectDb();
+
+  const workspaces = workspaceId
+    ? [{ id: workspaceId }]
+    : (await findAllWorkspaces()).map((workspace) => ({ id: workspace.id }));
+
+  const results: ProjectScopeVerificationResult[] = [];
+
+  for (const workspace of workspaces) {
+    const workspaceObjectId = new mongoose.Types.ObjectId(workspace.id);
+
+    const [leads, properties, opportunities, activities, enrollments] = await Promise.all([
+      countMissingProjectId(workspaceObjectId, LeadModel),
+      countMissingProjectId(workspaceObjectId, PropertyModel),
+      countMissingProjectId(workspaceObjectId, OpportunityModel),
+      countMissingProjectId(workspaceObjectId, ActivityModel),
+      CampaignEnrollmentModel.countDocuments({
+        workspaceId: workspaceObjectId,
+        leadId: { $ne: null },
+        $or: [{ projectId: null }, { projectId: { $exists: false } }],
+      }),
+    ]);
+
+    const missing = { leads, properties, opportunities, activities, enrollments };
+    const ok = Object.values(missing).every((count) => count === 0);
+
+    results.push({
+      workspaceId: workspace.id,
+      missing,
+      ok,
+    });
   }
 
   return results;

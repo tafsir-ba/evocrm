@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createAuditLog } from "@/server/audit/create-audit-log";
+import { captureError } from "@/server/observability/capture-error";
 import type { LeadRecord } from "@/server/repositories/leads";
 import type { EnrollmentCondition, EnrollmentRules } from "@/server/repositories/campaigns";
 import { findActiveAutoEnrollmentCampaigns } from "@/server/repositories/campaigns";
@@ -7,6 +9,49 @@ import { findLeadById } from "@/server/repositories/leads";
 import { enrollLeadInCampaignWithContext } from "@/server/services/campaign-enrollments";
 
 export type AutoEnrollmentTrigger = "new_lead" | "lead_updated";
+
+export type ParsedCustomFieldCondition = {
+  key: string | undefined;
+  expectedValue: string | undefined;
+};
+
+/** Parses structured and legacy `field_key:expected` custom-field rule values. */
+export function parseCustomFieldCondition(
+  condition: EnrollmentCondition,
+): ParsedCustomFieldCondition {
+  if (condition.field !== "customField") {
+    return { key: undefined, expectedValue: undefined };
+  }
+
+  if (condition.customFieldKey?.trim()) {
+    const expectedValue =
+      condition.operator === "is_empty" || condition.operator === "is_not_empty"
+        ? undefined
+        : condition.value != null
+          ? String(condition.value)
+          : undefined;
+
+    return {
+      key: condition.customFieldKey.trim(),
+      expectedValue,
+    };
+  }
+
+  if (typeof condition.value !== "string" || !condition.value.trim()) {
+    return { key: undefined, expectedValue: undefined };
+  }
+
+  const colonIndex = condition.value.indexOf(":");
+
+  if (colonIndex === -1) {
+    return { key: condition.value.trim(), expectedValue: undefined };
+  }
+
+  return {
+    key: condition.value.slice(0, colonIndex).trim(),
+    expectedValue: condition.value.slice(colonIndex + 1),
+  };
+}
 
 function getLeadFieldValue(
   lead: LeadRecord,
@@ -34,12 +79,31 @@ function getLeadFieldValue(
   }
 }
 
+function resolveComparisonValue(
+  condition: EnrollmentCondition,
+  parsedCustomField: ParsedCustomFieldCondition,
+): EnrollmentCondition["value"] {
+  if (condition.field !== "customField") {
+    return condition.value;
+  }
+
+  if (parsedCustomField.expectedValue !== undefined) {
+    return parsedCustomField.expectedValue;
+  }
+
+  if (condition.customFieldKey?.trim()) {
+    return condition.value;
+  }
+
+  return condition.value;
+}
+
 function evaluateCondition(lead: LeadRecord, condition: EnrollmentCondition): boolean {
+  const parsedCustomField = parseCustomFieldCondition(condition);
   const customFieldKey =
-    condition.field === "customField" && typeof condition.value === "string"
-      ? condition.value.split(":")[0]
-      : undefined;
+    condition.field === "customField" ? parsedCustomField.key : undefined;
   const actual = getLeadFieldValue(lead, condition.field, customFieldKey);
+  const comparisonValue = resolveComparisonValue(condition, parsedCustomField);
 
   switch (condition.operator) {
     case "is_empty":
@@ -57,44 +121,44 @@ function evaluateCondition(lead: LeadRecord, condition: EnrollmentCondition): bo
         (Array.isArray(actual) && actual.length === 0)
       );
     case "equals": {
-      if (Array.isArray(condition.value)) {
+      if (Array.isArray(comparisonValue)) {
         if (Array.isArray(actual)) {
-          return condition.value.every((item) => actual.includes(String(item)));
+          return comparisonValue.every((item) => actual.includes(String(item)));
         }
-        return condition.value.map(String).includes(String(actual));
+        return comparisonValue.map(String).includes(String(actual));
       }
-      return String(actual) === String(condition.value);
+      return String(actual) === String(comparisonValue);
     }
     case "not_equals": {
-      if (Array.isArray(condition.value)) {
+      if (Array.isArray(comparisonValue)) {
         if (Array.isArray(actual)) {
-          return !condition.value.every((item) => actual.includes(String(item)));
+          return !comparisonValue.every((item) => actual.includes(String(item)));
         }
-        return !condition.value.map(String).includes(String(actual));
+        return !comparisonValue.map(String).includes(String(actual));
       }
-      return String(actual) !== String(condition.value);
+      return String(actual) !== String(comparisonValue);
     }
     case "contains": {
       if (Array.isArray(actual)) {
-        if (Array.isArray(condition.value)) {
-          return condition.value.some((item) => actual.includes(String(item)));
+        if (Array.isArray(comparisonValue)) {
+          return comparisonValue.some((item) => actual.includes(String(item)));
         }
-        return actual.includes(String(condition.value));
+        return actual.includes(String(comparisonValue));
       }
-      if (typeof actual === "string" && condition.value != null) {
-        return actual.toLowerCase().includes(String(condition.value).toLowerCase());
+      if (typeof actual === "string" && comparisonValue != null) {
+        return actual.toLowerCase().includes(String(comparisonValue).toLowerCase());
       }
       return false;
     }
     case "not_contains": {
       if (Array.isArray(actual)) {
-        if (Array.isArray(condition.value)) {
-          return !condition.value.some((item) => actual.includes(String(item)));
+        if (Array.isArray(comparisonValue)) {
+          return !comparisonValue.some((item) => actual.includes(String(item)));
         }
-        return !actual.includes(String(condition.value));
+        return !actual.includes(String(comparisonValue));
       }
-      if (typeof actual === "string" && condition.value != null) {
-        return !actual.toLowerCase().includes(String(condition.value).toLowerCase());
+      if (typeof actual === "string" && comparisonValue != null) {
+        return !actual.toLowerCase().includes(String(comparisonValue).toLowerCase());
       }
       return true;
     }
@@ -119,6 +183,52 @@ export function evaluateEnrollmentConditions(input: {
   }
 
   return conditions.every((condition) => evaluateCondition(lead, condition));
+}
+
+export function logAutoEnrollmentFailure(
+  input: {
+    workspaceId: string;
+    leadId: string;
+    trigger: AutoEnrollmentTrigger;
+    actorId: string;
+  },
+  error: unknown,
+): void {
+  const message = error instanceof Error ? error.message : String(error);
+
+  captureError(error, {
+    workspaceId: input.workspaceId,
+    tags: {
+      leadId: input.leadId,
+      trigger: input.trigger,
+      domain: "campaign_auto_enrollment",
+    },
+  });
+
+  void Promise.resolve(
+    createAuditLog({
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      action: "campaign.auto_enrollment_failed",
+      entityType: "lead",
+      entityId: input.leadId,
+      after: {
+        trigger: input.trigger,
+        message,
+      },
+    }),
+  ).catch(() => undefined);
+}
+
+export function scheduleCampaignAutoEnrollmentForLead(input: {
+  workspaceId: string;
+  leadId: string;
+  trigger: AutoEnrollmentTrigger;
+  actorId: string;
+}): void {
+  void Promise.resolve(evaluateCampaignAutoEnrollmentForLead(input)).catch((error) => {
+    logAutoEnrollmentFailure(input, error);
+  });
 }
 
 export async function evaluateCampaignAutoEnrollmentForLead(input: {

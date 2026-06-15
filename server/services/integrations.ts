@@ -20,6 +20,7 @@ import {
   generateIntegrationApiKey,
   hashIntegrationApiKey,
 } from "@/server/services/integration-api-keys";
+import { validateActiveProjectId } from "@/server/services/project-scope";
 import type {
   CreateIntegrationInput,
   UpdateIntegrationInput,
@@ -160,9 +161,16 @@ export async function updateIntegrationForWorkspace(
     throw new AppError("NOT_FOUND", "Integration not found.");
   }
 
+  if (input.defaultProjectId) {
+    await validateActiveProjectId(workspaceId, input.defaultProjectId);
+  }
+
   const updated = await updateIntegration(workspaceId, integrationId, {
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.defaultProjectId !== undefined
+      ? { defaultProjectId: input.defaultProjectId }
+      : {}),
   });
 
   if (!updated) {
