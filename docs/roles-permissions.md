@@ -90,8 +90,9 @@ Permissions are string keys stored on `Role.permissions[]`.
 |-----|-------------|
 | `campaign:create` | Create campaigns |
 | `campaign:read` | View campaigns |
-| `campaign:update` | Edit campaigns; enroll leads |
-| `campaign:archive` | Archive campaigns |
+| `campaign:update` | Edit campaigns; enroll leads; restore archived campaigns |
+| `campaign:archive` | Archive campaigns (soft) |
+| `campaign:delete` | Permanently delete draft campaigns with zero enrollments |
 
 ### Settings
 
@@ -133,6 +134,7 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `campaign:read` | ✓ | ✓ | ✓ | ✓ |
 | `campaign:update` | ✓ | ✓ | | |
 | `campaign:archive` | ✓ | ✓ | | |
+| `campaign:delete` | ✓ | ✓ | | |
 | `settings:read` | ✓ | ✓ | ✓ | ✓ |
 | `settings:update` | ✓ | ✓ | | |
 | `users:manage` | ✓ | ✓ | | |

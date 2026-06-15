@@ -30,6 +30,7 @@ export default async function CampaignDetailPage({ params }: { params: Params })
         campaignId={campaignId}
         canUpdate={hasPermission(permissions, "campaign:update")}
         canArchive={hasPermission(permissions, "campaign:archive")}
+        canDelete={hasPermission(permissions, "campaign:delete")}
       />
     </PageContainer>
   );

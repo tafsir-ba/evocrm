@@ -9,7 +9,11 @@ const sendTimeSchema = z
   .trim()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Send time must use HH:mm format (e.g. 09:00).");
 
-const fromNameSchema = z.string().trim().min(1).max(120);
+const fromNameSchema = z
+  .string()
+  .trim()
+  .min(1, "From name is required for each step.")
+  .max(120);
 
 export const createCampaignStepInputSchema = z
   .object({

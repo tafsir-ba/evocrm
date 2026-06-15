@@ -3,6 +3,10 @@ import "server-only";
 import { AppError } from "@/server/errors";
 import { findMembership } from "@/server/repositories/memberships";
 import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
+import {
+  getDefaultRolePermissions,
+  isSystemRoleKey,
+} from "@/server/permissions/roles";
 
 import type { WorkspaceMembership } from "./types";
 
@@ -31,12 +35,17 @@ export async function requireMembership(
     });
   }
 
+  const permissions =
+    role.isSystem && isSystemRoleKey(role.key)
+      ? getDefaultRolePermissions(role.key)
+      : role.permissions;
+
   return {
     id: membership.id,
     workspaceId: membership.workspaceId,
     userId: membership.userId,
     roleId: membership.roleId,
     status: membership.status,
-    permissions: role.permissions,
+    permissions,
   };
 }

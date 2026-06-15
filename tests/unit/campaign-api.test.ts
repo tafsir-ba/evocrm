@@ -17,10 +17,14 @@ vi.mock("@/server/services/campaigns", () => ({
   createCampaignForWorkspace: vi.fn(),
   getCampaignForWorkspace: vi.fn(),
   archiveCampaignForWorkspace: vi.fn(),
+  restoreCampaignForWorkspace: vi.fn(),
+  purgeCampaignForWorkspace: vi.fn(),
 }));
 
 import { GET as getCampaigns, POST as postCampaign } from "@/app/api/workspaces/[workspaceSlug]/campaigns/route";
 import { DELETE as deleteCampaign } from "@/app/api/workspaces/[workspaceSlug]/campaigns/[campaignId]/route";
+import { POST as restoreCampaign } from "@/app/api/workspaces/[workspaceSlug]/campaigns/[campaignId]/restore/route";
+import { POST as purgeCampaign } from "@/app/api/workspaces/[workspaceSlug]/campaigns/[campaignId]/purge/route";
 import { POST as cronSendDue } from "@/app/api/cron/campaigns/send-due/route";
 import { requireAuth } from "@/server/auth/require-auth";
 import { requirePermission } from "@/server/permissions/require-permission";
@@ -28,6 +32,8 @@ import {
   createCampaignForWorkspace,
   listCampaignsForWorkspace,
   archiveCampaignForWorkspace,
+  restoreCampaignForWorkspace,
+  purgeCampaignForWorkspace,
 } from "@/server/services/campaigns";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -188,6 +194,82 @@ describe("campaign API routes", () => {
 
     expect(response.status).toBe(200);
     expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:archive");
+  });
+
+  it("restores campaign with campaign:update", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["campaign:update"],
+      },
+    });
+    vi.mocked(restoreCampaignForWorkspace).mockResolvedValue({
+      ...sampleCampaign,
+      status: "draft",
+      archivedAt: null,
+    });
+
+    const response = await restoreCampaign(
+      new Request("http://localhost/api/workspaces/demo/campaigns/camp-1/restore", {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo", campaignId: "camp-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:update");
+    expect(restoreCampaignForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", "camp-1");
+  });
+
+  it("purges campaign with campaign:delete", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["campaign:delete"],
+      },
+    });
+    vi.mocked(purgeCampaignForWorkspace).mockResolvedValue({ deleted: true });
+
+    const response = await purgeCampaign(
+      new Request("http://localhost/api/workspaces/demo/campaigns/camp-1/purge", {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo", campaignId: "camp-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data).toEqual({ deleted: true });
+    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:delete");
+    expect(purgeCampaignForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", "camp-1");
   });
 
   it("cron rejects missing CRON_SECRET", async () => {

@@ -1,5 +1,9 @@
 import "server-only";
 
+/**
+ * Defensive sender resolution for send-time only.
+ * API create/update requires a non-empty step fromName; this fallback covers legacy DB rows.
+ */
 export function resolveCampaignStepFromName(
   stepFromName: string,
   campaign: { defaultFromName: string | null; name: string },

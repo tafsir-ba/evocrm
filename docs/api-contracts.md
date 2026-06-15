@@ -340,6 +340,8 @@ POST   /api/workspaces/[workspaceSlug]/campaigns
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]
 DELETE /api/workspaces/[workspaceSlug]/campaigns/[campaignId]  # archive (soft)
+POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/restore
+POST   /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/purge
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/pause
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/resume
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/steps
@@ -359,9 +361,17 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 | GET list/detail/steps/enrollments/sends | `campaign:read` |
 | POST create campaign | `campaign:create` |
 | PATCH update/pause/resume/steps/enrollments | `campaign:update` |
+| POST restore | `campaign:update` |
 | DELETE archive | `campaign:archive` |
+| POST purge | `campaign:delete` |
 
-**Campaign status:** `draft`, `active`, `paused`, `archived`. Only `active` campaigns send via cron. Archived excluded from default list.
+**Campaign status:** `draft`, `active`, `paused`, `archived`. Only `active` campaigns send via cron. Archived excluded from default list (`includeArchived=true` or `status=archived` to include).
+
+**Restore:** Only `archived` campaigns. Sets status to `draft`, clears `archivedAt`. Does not re-activate or resume sends until the campaign is activated again.
+
+**Purge (permanent delete):** Only `draft` campaigns with zero enrollments. Deletes all campaign steps, then the campaign document. Cannot be undone. Requires `campaign:delete` (separate from archive).
+
+**Step fields:** Each step requires `order`, `delayDays`, `sendTime` (HH:mm, default `09:00`), `fromName`, `subject`, `body`. Campaign `defaultFromName` pre-fills new steps in the UI only; API create/update still requires a non-empty step `fromName`.
 
 **Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
 

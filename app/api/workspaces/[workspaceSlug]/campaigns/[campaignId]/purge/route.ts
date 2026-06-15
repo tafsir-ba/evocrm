@@ -11,7 +11,7 @@ export async function POST(_request: Request, context: RouteContext) {
     const { workspaceSlug, campaignId } = await context.params;
     const { userId, workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "campaign:archive",
+      "campaign:delete",
     );
 
     const result = await purgeCampaignForWorkspace(workspace.id, userId, campaignId);

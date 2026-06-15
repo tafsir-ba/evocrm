@@ -58,6 +58,36 @@ describe("requireMembership", () => {
     vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
       id: "role-1",
       workspaceId: "ws-1",
+      name: "Agent",
+      key: "agent",
+      permissions: ["dashboard:read"],
+      isSystem: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const membership = await requireMembership("ws-1", "user-1");
+
+    expect(findRoleByIdInWorkspace).toHaveBeenCalledWith("role-1", "ws-1");
+    expect(membership.permissions).toEqual(["dashboard:read"]);
+    expect(membership.status).toBe("active");
+  });
+
+  it("uses canonical permissions for system roles", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "m-1",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      roleId: "role-1",
+      status: "active",
+      joinedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
+      id: "role-1",
+      workspaceId: "ws-1",
       name: "Owner",
       key: "owner",
       permissions: ["dashboard:read"],
@@ -68,9 +98,8 @@ describe("requireMembership", () => {
 
     const membership = await requireMembership("ws-1", "user-1");
 
-    expect(findRoleByIdInWorkspace).toHaveBeenCalledWith("role-1", "ws-1");
-    expect(membership.permissions).toEqual(["dashboard:read"]);
-    expect(membership.status).toBe("active");
+    expect(membership.permissions).toContain("campaign:delete");
+    expect(membership.permissions).toContain("campaign:archive");
   });
 
   it("throws internal error when role is missing", async () => {

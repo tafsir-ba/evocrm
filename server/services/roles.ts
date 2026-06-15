@@ -95,6 +95,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "campaign:read": "View campaigns",
   "campaign:update": "Edit campaigns",
   "campaign:archive": "Archive campaigns",
+  "campaign:delete": "Permanently delete draft campaigns",
   "settings:read": "View settings",
   "settings:update": "Edit workspace settings",
   "users:manage": "Manage members",

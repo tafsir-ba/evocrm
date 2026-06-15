@@ -181,7 +181,7 @@ export async function getWorkspaceContext(
 
   const navigation = buildPermissionAwareNavigation(
     workspace.slug,
-    role.permissions,
+    membership.permissions,
   );
 
   return {
@@ -197,7 +197,7 @@ export async function getWorkspaceContext(
       role: {
         name: role.name,
         key: role.key,
-        permissions: role.permissions,
+        permissions: membership.permissions,
       },
     },
     navigation,

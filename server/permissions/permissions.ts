@@ -30,6 +30,7 @@ export const PERMISSION_KEYS = [
   "campaign:read",
   "campaign:update",
   "campaign:archive",
+  "campaign:delete",
   "settings:read",
   "settings:update",
   "users:manage",

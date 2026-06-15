@@ -19,6 +19,7 @@ describe("default role permission sets", () => {
     const ownerPermissions = getDefaultRolePermissions("owner");
     expect(ownerPermissions).toContain("billing:manage");
     expect(ownerPermissions).toContain("roles:manage");
+    expect(ownerPermissions).toContain("campaign:delete");
   });
 
   it("gives admin same operational permissions as owner for V1", () => {
@@ -26,6 +27,12 @@ describe("default role permission sets", () => {
     expect(adminPermissions).toContain("roles:manage");
     expect(adminPermissions).toContain("billing:manage");
     expect(adminPermissions).toContain("users:manage");
+    expect(adminPermissions).toContain("campaign:delete");
+  });
+
+  it("does not give agent or viewer campaign delete", () => {
+    expect(getDefaultRolePermissions("agent")).not.toContain("campaign:delete");
+    expect(getDefaultRolePermissions("viewer")).not.toContain("campaign:delete");
   });
 
   it("gives agent operational read/write without archive/manage", () => {

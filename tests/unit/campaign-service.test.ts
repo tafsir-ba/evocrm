@@ -6,10 +6,13 @@ vi.mock("@/server/repositories/campaigns", () => ({
   findCampaigns: vi.fn(),
   archiveCampaign: vi.fn(),
   updateCampaign: vi.fn(),
+  restoreCampaign: vi.fn(),
+  deleteCampaignById: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/campaign-steps", () => ({
   countCampaignSteps: vi.fn(),
+  deleteCampaignStepsForCampaign: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
@@ -38,18 +41,23 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import {
   archiveCampaign,
   createCampaign,
+  deleteCampaignById,
   findCampaignById,
   findCampaigns,
+  restoreCampaign,
   updateCampaign,
 } from "@/server/repositories/campaigns";
 import { countCampaignEnrollments, cancelEnrollmentsForCampaign, pauseEnrollmentsForCampaign, resumeEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
-import { countCampaignSteps } from "@/server/repositories/campaign-steps";
+import { countCampaignSteps, deleteCampaignStepsForCampaign } from "@/server/repositories/campaign-steps";
+import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   archiveCampaignForWorkspace,
   createCampaignForWorkspace,
   pauseCampaignForWorkspace,
+  purgeCampaignForWorkspace,
+  restoreCampaignForWorkspace,
   updateCampaignForWorkspace,
 } from "@/server/services/campaigns";
 import { AppError } from "@/server/errors";
@@ -233,5 +241,99 @@ describe("campaign service", () => {
       "activation",
       ["enroll-1"],
     );
+  });
+
+  it("restore rejects non-archived campaigns", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      status: "draft",
+    });
+
+    await expect(
+      restoreCampaignForWorkspace("ws-1", "user-1", "camp-1"),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Only archived campaigns can be restored.",
+    });
+
+    expect(restoreCampaign).not.toHaveBeenCalled();
+  });
+
+  it("restore archived campaign to draft and writes audit log", async () => {
+    const archived = {
+      ...baseCampaign,
+      status: "archived" as const,
+      archivedAt: new Date(),
+    };
+    const restored = {
+      ...baseCampaign,
+      status: "draft" as const,
+      archivedAt: null,
+    };
+
+    vi.mocked(findCampaignById).mockResolvedValue(archived);
+    vi.mocked(restoreCampaign).mockResolvedValue(restored);
+
+    const result = await restoreCampaignForWorkspace("ws-1", "user-1", "camp-1");
+
+    expect(restoreCampaign).toHaveBeenCalledWith("ws-1", "camp-1");
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "campaign.restored",
+        entityType: "campaign",
+        entityId: "camp-1",
+      }),
+    );
+    expect(result.status).toBe("draft");
+    expect(result.archivedAt).toBeNull();
+  });
+
+  it("purge rejects non-draft campaigns", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      status: "active",
+    });
+
+    await expect(
+      purgeCampaignForWorkspace("ws-1", "user-1", "camp-1"),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    expect(deleteCampaignStepsForCampaign).not.toHaveBeenCalled();
+    expect(deleteCampaignById).not.toHaveBeenCalled();
+  });
+
+  it("purge rejects campaigns with enrollments", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue(baseCampaign);
+    vi.mocked(countCampaignEnrollments).mockResolvedValue(2);
+
+    await expect(
+      purgeCampaignForWorkspace("ws-1", "user-1", "camp-1"),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Cannot delete a campaign with enrollments. Archive it instead.",
+    });
+
+    expect(deleteCampaignStepsForCampaign).not.toHaveBeenCalled();
+    expect(deleteCampaignById).not.toHaveBeenCalled();
+  });
+
+  it("purge deletes steps then campaign and writes audit log", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue(baseCampaign);
+    vi.mocked(countCampaignEnrollments).mockResolvedValue(0);
+    vi.mocked(deleteCampaignStepsForCampaign).mockResolvedValue(2);
+    vi.mocked(deleteCampaignById).mockResolvedValue(true);
+
+    const result = await purgeCampaignForWorkspace("ws-1", "user-1", "camp-1");
+
+    expect(deleteCampaignStepsForCampaign).toHaveBeenCalledWith("ws-1", "camp-1");
+    expect(deleteCampaignById).toHaveBeenCalledWith("ws-1", "camp-1");
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "campaign.deleted",
+        entityType: "campaign",
+        entityId: "camp-1",
+      }),
+    );
+    expect(result).toEqual({ deleted: true });
   });
 });
