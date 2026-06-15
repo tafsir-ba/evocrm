@@ -45,6 +45,9 @@ export async function GET(request: Request, context: RouteContext) {
       assignedTo: query.assignedTo,
       ownerId: query.ownerId,
       tagId: query.tagId,
+      propertyTypeInterest: query.propertyTypeInterest,
+      transactionIntent: query.transactionIntent,
+      usagePurpose: query.usagePurpose,
       createdFrom: query.createdFrom,
       createdTo: query.createdTo,
     });

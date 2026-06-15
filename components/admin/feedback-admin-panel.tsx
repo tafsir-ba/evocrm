@@ -36,6 +36,10 @@ type FeedbackListItem = {
   createdAt: string;
   resolvedAt: string | null;
   resolvedByEmail: string | null;
+  resolutionNotifiedAt?: string | null;
+  resolutionNotifiedEmail?: string | null;
+  resolutionNotificationStatus?: "sent" | "failed" | null;
+  resolutionNotificationError?: string | null;
   userAgent?: string | null;
   projectId?: string | null;
 };
@@ -137,6 +141,10 @@ export function FeedbackAdminPanel() {
   const [categoryFilter, setCategoryFilter] = useState<"all" | FeedbackCategory>("all");
   const [selected, setSelected] = useState<FeedbackListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FeedbackListItem | null>(null);
+  const [resolveTarget, setResolveTarget] = useState<FeedbackListItem | null>(null);
+  const [resolveEmail, setResolveEmail] = useState("");
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [resolvePending, setResolvePending] = useState(false);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -196,17 +204,23 @@ export function FeedbackAdminPanel() {
     return `${total} shown · ${summary.open} open · ${summary.resolved} resolved · ${summary.byCategory.bug} bugs · ${summary.byCategory.idea} ideas · ${summary.byCategory.other} other`;
   }, [summary, total]);
 
-  async function updateStatus(item: FeedbackListItem, status: FeedbackStatus) {
+  async function updateStatus(
+    item: FeedbackListItem,
+    status: FeedbackStatus,
+    notifyEmail?: string,
+  ) {
     const response = await fetch(`/api/admin/feedback/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        ...(notifyEmail ? { notifyEmail } : {}),
+      }),
     });
 
     if (!response.ok) {
       const payload = (await response.json()) as { error?: { message?: string } };
-      setError(payload.error?.message ?? "Could not update feedback status.");
-      return;
+      throw new Error(payload.error?.message ?? "Could not update feedback status.");
     }
 
     const payload = (await response.json()) as { data?: FeedbackListItem };
@@ -215,6 +229,54 @@ export function FeedbackAdminPanel() {
     if (updated) {
       setSelected((current) => (current?.id === updated.id ? updated : current));
       await loadFeedback();
+    }
+  }
+
+  function openResolveModal(item: FeedbackListItem) {
+    setResolveTarget(item);
+    setResolveEmail(item.userEmail?.trim() ?? "");
+    setResolveError(null);
+  }
+
+  async function confirmResolve() {
+    if (!resolveTarget) {
+      return;
+    }
+
+    const email = resolveEmail.trim();
+    if (!email) {
+      setResolveError("Reporter email is required to send the resolution notification.");
+      return;
+    }
+
+    setResolvePending(true);
+    setResolveError(null);
+
+    try {
+      await updateStatus(resolveTarget, "resolved", email);
+      setResolveTarget(null);
+      setResolveEmail("");
+    } catch (resolveFailure) {
+      setResolveError(
+        resolveFailure instanceof Error
+          ? resolveFailure.message
+          : "Could not mark feedback as resolved.",
+      );
+    } finally {
+      setResolvePending(false);
+    }
+  }
+
+  async function reopenFeedback(item: FeedbackListItem) {
+    try {
+      await updateStatus(item, "open");
+      setError(null);
+    } catch (reopenFailure) {
+      setError(
+        reopenFailure instanceof Error
+          ? reopenFailure.message
+          : "Could not reopen feedback.",
+      );
     }
   }
 
@@ -385,7 +447,9 @@ export function FeedbackAdminPanel() {
                           className="block w-full rounded-md px-3 py-2 text-left hover:bg-[var(--color-muted)]"
                           onClick={(event) => {
                             event.stopPropagation();
-                            void updateStatus(item, item.status === "open" ? "resolved" : "open");
+                            item.status === "open"
+                              ? openResolveModal(item)
+                              : void reopenFeedback(item);
                             setActionMenuId(null);
                           }}
                         >
@@ -425,10 +489,9 @@ export function FeedbackAdminPanel() {
                 type="button"
                 variant="secondary"
                 onClick={() =>
-                  void updateStatus(
-                    selected,
-                    selected.status === "open" ? "resolved" : "open",
-                  )
+                  selected.status === "open"
+                    ? openResolveModal(selected)
+                    : void reopenFeedback(selected)
                 }
               >
                 {selected.status === "open" ? "Mark resolved" : "Reopen"}
@@ -511,6 +574,27 @@ export function FeedbackAdminPanel() {
                 <p className="font-mono text-[12px] text-[var(--color-ink)]">{selected.projectId}</p>
               </div>
             )}
+            {selected.resolutionNotificationStatus && (
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+                  Resolution notification
+                </p>
+                <p className="text-[13px] capitalize">{selected.resolutionNotificationStatus}</p>
+                {selected.resolutionNotifiedEmail && (
+                  <p className="text-[12px] text-[var(--color-ink-muted)]">
+                    Sent to {selected.resolutionNotifiedEmail}
+                    {selected.resolutionNotifiedAt
+                      ? ` · ${formatWhen(selected.resolutionNotifiedAt)}`
+                      : ""}
+                  </p>
+                )}
+                {selected.resolutionNotificationError && (
+                  <p className="text-[12px] text-[var(--color-danger-fg)]">
+                    {selected.resolutionNotificationError}
+                  </p>
+                )}
+              </div>
+            )}
             {selected.screenshotCount > 0 && (
               <div className="grid grid-cols-2 gap-3">
                 {selected.screenshots.map((screenshot, index) => (
@@ -526,6 +610,65 @@ export function FeedbackAdminPanel() {
           </div>
         )}
       </Drawer>
+
+      <Modal
+        open={!!resolveTarget}
+        onClose={() => {
+          if (!resolvePending) {
+            setResolveTarget(null);
+            setResolveError(null);
+          }
+        }}
+        title="Mark feedback resolved?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={resolvePending}
+              onClick={() => setResolveTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" disabled={resolvePending} onClick={() => void confirmResolve()}>
+              {resolvePending ? "Sending…" : "Mark resolved & notify"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            The reporter will receive an email inviting them to test the app again. Feedback
+            status will not change if the notification cannot be sent.
+          </p>
+          <div>
+            <label
+              htmlFor="resolve-email"
+              className="mb-1 block text-[12px] font-medium text-[var(--color-ink-muted)]"
+            >
+              Reporter email
+            </label>
+            <Input
+              id="resolve-email"
+              type="email"
+              value={resolveEmail}
+              onChange={(event) => setResolveEmail(event.target.value)}
+              placeholder="reporter@example.com"
+              required
+            />
+            {!resolveTarget?.userEmail && (
+              <p className="mt-1 text-[12px] text-[var(--color-warning-fg,#b45309)]">
+                No reporter email on file. Enter one to send the resolution notification.
+              </p>
+            )}
+          </div>
+          {resolveError && (
+            <p className="text-[12px] text-[var(--color-danger-fg)]" role="alert">
+              {resolveError}
+            </p>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         open={!!deleteTarget}

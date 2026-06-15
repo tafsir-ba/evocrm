@@ -3,6 +3,11 @@ import "server-only";
 import { connectDb } from "@/server/db/mongoose";
 import { AppError } from "@/server/errors";
 import { LeadModel, type LeadDocument } from "@/models/lead";
+import type {
+  PropertyTypeInterest,
+  TransactionIntent,
+  UsagePurpose,
+} from "@/lib/lead-preferences";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -33,6 +38,9 @@ export type LeadRecord = {
   budgetMin: number | null;
   budgetMax: number | null;
   preferredAreas: string[];
+  propertyTypeInterests: PropertyTypeInterest[];
+  transactionIntent: TransactionIntent | null;
+  usagePurpose: UsagePurpose | null;
   notes: string | null;
   tags: string[];
   attributes: Record<string, unknown>;
@@ -66,6 +74,10 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
     budgetMin: document.budgetMin ?? null,
     budgetMax: document.budgetMax ?? null,
     preferredAreas: document.preferredAreas ?? [],
+    propertyTypeInterests: (document.propertyTypeInterests ??
+      []) as PropertyTypeInterest[],
+    transactionIntent: (document.transactionIntent as TransactionIntent | null) ?? null,
+    usagePurpose: (document.usagePurpose as UsagePurpose | null) ?? null,
     notes: document.notes ?? null,
     tags: (document.tags ?? []).map((tagId) => tagId.toString()),
     attributes: (document.attributes as Record<string, unknown>) ?? {},
@@ -88,6 +100,9 @@ export type LeadListFilter = {
   assignedTo?: string;
   ownerId?: string;
   tagId?: string;
+  propertyTypeInterest?: PropertyTypeInterest;
+  transactionIntent?: TransactionIntent;
+  usagePurpose?: UsagePurpose;
   createdFrom?: Date;
   createdTo?: Date;
   page?: number;
@@ -115,6 +130,15 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   }
   if (filter.tagId) {
     query.tags = filter.tagId;
+  }
+  if (filter.propertyTypeInterest) {
+    query.propertyTypeInterests = filter.propertyTypeInterest;
+  }
+  if (filter.transactionIntent) {
+    query.transactionIntent = filter.transactionIntent;
+  }
+  if (filter.usagePurpose) {
+    query.usagePurpose = filter.usagePurpose;
   }
 
   if (filter.createdFrom || filter.createdTo) {
@@ -254,6 +278,9 @@ export async function createLead(input: {
   budgetMin?: number | null;
   budgetMax?: number | null;
   preferredAreas?: string[];
+  propertyTypeInterests?: PropertyTypeInterest[];
+  transactionIntent?: TransactionIntent | null;
+  usagePurpose?: UsagePurpose | null;
   notes?: string | null;
   tags?: string[];
   attributes?: Record<string, unknown>;
@@ -280,6 +307,9 @@ export async function createLead(input: {
       budgetMin: input.budgetMin ?? null,
       budgetMax: input.budgetMax ?? null,
       preferredAreas: input.preferredAreas ?? [],
+      propertyTypeInterests: input.propertyTypeInterests ?? [],
+      transactionIntent: input.transactionIntent ?? null,
+      usagePurpose: input.usagePurpose ?? null,
       notes: input.notes ?? null,
       tags: input.tags ?? [],
       attributes: input.attributes ?? {},
@@ -320,6 +350,9 @@ export async function updateLead(
     budgetMin: number | null;
     budgetMax: number | null;
     preferredAreas: string[];
+    propertyTypeInterests: PropertyTypeInterest[];
+    transactionIntent: TransactionIntent | null;
+    usagePurpose: UsagePurpose | null;
     notes: string | null;
     tags: string[];
     attributes: Record<string, unknown>;

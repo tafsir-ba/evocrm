@@ -347,6 +347,9 @@ export async function createLeadForWorkspace(
     budgetMin: input.budgetMin ?? null,
     budgetMax: input.budgetMax ?? null,
     preferredAreas: input.preferredAreas ?? [],
+    propertyTypeInterests: input.propertyTypeInterests ?? [],
+    transactionIntent: input.transactionIntent ?? null,
+    usagePurpose: input.usagePurpose ?? null,
     notes: input.notes ?? null,
     tags: input.tags ?? [],
     attributes: input.attributes ?? {},
@@ -476,6 +479,15 @@ export async function updateLeadForWorkspace(
   }
   if (input.preferredAreas !== undefined) {
     updatePayload.preferredAreas = input.preferredAreas;
+  }
+  if (input.propertyTypeInterests !== undefined) {
+    updatePayload.propertyTypeInterests = input.propertyTypeInterests;
+  }
+  if (input.transactionIntent !== undefined) {
+    updatePayload.transactionIntent = input.transactionIntent;
+  }
+  if (input.usagePurpose !== undefined) {
+    updatePayload.usagePurpose = input.usagePurpose;
   }
   if (input.notes !== undefined) {
     updatePayload.notes = input.notes;

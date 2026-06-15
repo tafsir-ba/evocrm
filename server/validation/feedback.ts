@@ -36,6 +36,7 @@ export const feedbackListQuerySchema = z.object({
 
 export const feedbackStatusUpdateSchema = z.object({
   status: feedbackStatusSchema,
+  notifyEmail: z.string().trim().email().max(320).optional(),
 });
 
 export const feedbackSubmitFieldsSchema = z.object({

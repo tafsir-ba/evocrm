@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -9,7 +10,6 @@ import {
   formatActivityDateTime,
   formatRelatedSummary,
 } from "@/components/activities/activity-helpers";
-import { ActivityFormDrawer } from "@/components/activities/activity-form-drawer";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { PageHeader } from "@/components/layout/page-header";
@@ -26,6 +26,7 @@ import {
   IconChevronRight,
   IconPlus,
 } from "@/lib/icons";
+import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
   id: string;
@@ -69,6 +70,7 @@ export function ActivitiesPanel({
   canArchive,
   allowGlobalCreate = false,
 }: ActivitiesPanelProps) {
+  const router = useRouter();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -84,8 +86,6 @@ export function ActivitiesPanel({
   const [types, setTypes] = useState<DictionaryItem[]>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
@@ -343,10 +343,11 @@ export function ActivitiesPanel({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => {
-                    setEditId(activity.id);
-                    setDrawerOpen(true);
-                  }}
+                    onClick={() =>
+                      router.push(
+                        workspacePath(workspaceSlug, "activities", activity.id, "edit"),
+                      )
+                    }
                 >
                   Edit
                 </Button>
@@ -401,10 +402,7 @@ export function ActivitiesPanel({
           canCreate && allowGlobalCreate ? (
             <Button
               leadingIcon={<IconPlus size={14} />}
-              onClick={() => {
-                setEditId(null);
-                setDrawerOpen(true);
-              }}
+              onClick={() => router.push(workspacePath(workspaceSlug, "activities", "new"))}
             >
               New activity
             </Button>
@@ -530,17 +528,6 @@ export function ActivitiesPanel({
         </div>
       )}
 
-      <ActivityFormDrawer
-        open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-          setEditId(null);
-        }}
-        workspaceSlug={workspaceSlug}
-        workspaceTimezone={workspaceTimezone}
-        activityId={editId ?? undefined}
-        onSaved={() => void loadActivities()}
-      />
     </>
   );
 }

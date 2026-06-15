@@ -44,6 +44,14 @@ const feedbackSchema = new Schema(
     },
     resolvedAt: { type: Date, default: null },
     resolvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    resolutionNotifiedAt: { type: Date, default: null },
+    resolutionNotifiedEmail: { type: String, trim: true, lowercase: true, default: null },
+    resolutionNotificationStatus: {
+      type: String,
+      enum: ["sent", "failed"],
+      default: null,
+    },
+    resolutionNotificationError: { type: String, trim: true, default: null },
   },
   { timestamps: true },
 );

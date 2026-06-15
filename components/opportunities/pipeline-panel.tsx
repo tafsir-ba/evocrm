@@ -1,12 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { KanbanCard } from "@/components/domain/kanban-card";
 import { KanbanColumn } from "@/components/domain/kanban-column";
 import { SearchInput } from "@/components/domain/search-input";
 import { LostReasonModal } from "@/components/opportunities/lost-reason-modal";
-import { OpportunityFormDrawer } from "@/components/opportunities/opportunity-form-drawer";
 import { PageHeader } from "@/components/layout/page-header";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ export function PipelinePanel({
   canCreate,
   canUpdate,
 }: PipelinePanelProps) {
+  const router = useRouter();
   const [pipeline, setPipeline] = useState<PipelineResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +95,6 @@ export function PipelinePanel({
   const [lostReasons, setLostReasons] = useState<Array<{ id: string; label: string }>>(
     [],
   );
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [stageMovePending, setStageMovePending] = useState<string | null>(null);
   const [stageMoveError, setStageMoveError] = useState<string | null>(null);
   const [lostModal, setLostModal] = useState<{
@@ -283,7 +283,7 @@ export function PipelinePanel({
           canCreate ? (
             <Button
               leadingIcon={<IconPlus size={14} />}
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => router.push(workspacePath(workspaceSlug, "opportunities", "new"))}
             >
               New opportunity
             </Button>
@@ -324,7 +324,10 @@ export function PipelinePanel({
           description="Create an opportunity to connect a lead with a property."
           primaryAction={
             canCreate
-              ? { label: "New opportunity", onClick: () => setDrawerOpen(true) }
+              ? {
+                  label: "New opportunity",
+                  onClick: () => router.push(workspacePath(workspaceSlug, "opportunities", "new")),
+                }
               : undefined
           }
         />
@@ -416,14 +419,6 @@ export function PipelinePanel({
           </div>
         </div>
       )}
-
-      <OpportunityFormDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        workspaceSlug={workspaceSlug}
-        defaultCurrency={defaultCurrency}
-        onCreated={() => void loadPipeline()}
-      />
 
       <LostReasonModal
         open={lostModal !== null}

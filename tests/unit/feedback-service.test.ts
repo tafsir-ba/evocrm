@@ -51,7 +51,12 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/email/resend", () => ({
+  sendFeedbackResolvedEmail: vi.fn(),
+}));
+
 import { createAuditLog } from "@/server/audit/create-audit-log";
+import { sendFeedbackResolvedEmail } from "@/server/email/resend";
 import {
   createFeedback,
   deleteFeedback,
@@ -182,6 +187,10 @@ describe("feedback service", () => {
   });
 
   it("resolves feedback and writes audit log", async () => {
+    vi.mocked(sendFeedbackResolvedEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-1",
+    });
     vi.mocked(findFeedbackById)
       .mockResolvedValueOnce(baseRecord)
       .mockResolvedValueOnce({
@@ -206,6 +215,13 @@ describe("feedback service", () => {
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "feedback.resolve",
+        entityType: "feedback",
+        entityId: "fb-1",
+      }),
+    );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "feedback.notification.sent",
         entityType: "feedback",
         entityId: "fb-1",
       }),

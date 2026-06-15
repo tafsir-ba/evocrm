@@ -1,20 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PROPERTY_TYPE_INTERESTS,
+  PROPERTY_TYPE_INTEREST_LABELS,
+  TRANSACTION_INTENTS,
+  TRANSACTION_INTENT_LABELS,
+  USAGE_PURPOSES,
+  USAGE_PURPOSE_LABELS,
+} from "@/lib/lead-preferences";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -38,40 +44,6 @@ type LeadListItem = {
   assignedUser: { id: string; name: string | null; email: string } | null;
 };
 
-type LeadFormState = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  statusId: string;
-  sourceId: string;
-  language: string;
-  preferredContactMethod: string;
-  budgetMin: string;
-  budgetMax: string;
-  preferredAreas: string;
-  notes: string;
-  tagIds: string[];
-  assignedTo: string;
-};
-
-const emptyForm: LeadFormState = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  statusId: "",
-  sourceId: "",
-  language: "",
-  preferredContactMethod: "",
-  budgetMin: "",
-  budgetMax: "",
-  preferredAreas: "",
-  notes: "",
-  tagIds: [],
-  assignedTo: "",
-};
-
 type LeadsPanelProps = {
   workspaceSlug: string;
   canCreate: boolean;
@@ -83,6 +55,7 @@ export function LeadsPanel({
   canCreate,
   canArchive,
 }: LeadsPanelProps) {
+  const router = useRouter();
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -94,33 +67,28 @@ export function LeadsPanel({
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState("");
+  const [transactionIntentFilter, setTransactionIntentFilter] = useState("");
+  const [usagePurposeFilter, setUsagePurposeFilter] = useState("");
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
-  const [tags, setTags] = useState<TagSelectorTag[]>([]);
-  const [members, setMembers] = useState<MemberSelectorMember[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [form, setForm] = useState<LeadFormState>(emptyForm);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formWarning, setFormWarning] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const loadOptions = useCallback(async () => {
     try {
-      const [statusRes, sourceRes, tagsRes, membersRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
-        fetch(`${apiBase}/members`),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload, membersPayload] = await Promise.all([
+      const [statusPayload, sourcePayload, tagsPayload] = await Promise.all([
         statusRes.json(),
         sourceRes.json(),
         tagsRes.json(),
-        membersRes.json(),
       ]);
 
       if (statusRes.ok) {
@@ -130,10 +98,7 @@ export function LeadsPanel({
         setSources(sourcePayload.data.items as DictionaryItem[]);
       }
       if (tagsRes.ok) {
-        setTags(tagsPayload.data.tags as TagSelectorTag[]);
-      }
-      if (membersRes.ok) {
-        setMembers(membersPayload.data.members as MemberSelectorMember[]);
+        setTags(tagsPayload.data.tags as Array<{ id: string; name: string }>);
       }
     } catch {
       // Options are non-blocking for list view.
@@ -162,6 +127,15 @@ export function LeadsPanel({
       if (tagFilter) {
         params.set("tagId", tagFilter);
       }
+      if (propertyTypeInterestFilter) {
+        params.set("propertyTypeInterest", propertyTypeInterestFilter);
+      }
+      if (transactionIntentFilter) {
+        params.set("transactionIntent", transactionIntentFilter);
+      }
+      if (usagePurposeFilter) {
+        params.set("usagePurpose", usagePurposeFilter);
+      }
 
       const response = await fetch(`${apiBase}/leads?${params.toString()}`);
       const payload = await response.json();
@@ -181,7 +155,18 @@ export function LeadsPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, page, pageSize, search, sourceFilter, statusFilter, tagFilter]);
+  }, [
+    apiBase,
+    page,
+    pageSize,
+    propertyTypeInterestFilter,
+    search,
+    sourceFilter,
+    statusFilter,
+    tagFilter,
+    transactionIntentFilter,
+    usagePurposeFilter,
+  ]);
 
   useEffect(() => {
     void loadOptions();
@@ -190,81 +175,6 @@ export function LeadsPanel({
   useEffect(() => {
     void loadLeads();
   }, [loadLeads]);
-
-  const defaultStatusId = useMemo(
-    () => statuses.find((item) => item.isDefault)?.id ?? statuses[0]?.id ?? "",
-    [statuses],
-  );
-
-  function openCreateDrawer() {
-    setFormError(null);
-    setFormWarning(null);
-    setForm({ ...emptyForm, statusId: defaultStatusId });
-    setDrawerOpen(true);
-  }
-
-  function toggleTag(tagId: string) {
-    setForm((current) => ({
-      ...current,
-      tagIds: current.tagIds.includes(tagId)
-        ? current.tagIds.filter((id) => id !== tagId)
-        : [...current.tagIds, tagId],
-    }));
-  }
-
-  async function handleCreate(event: React.FormEvent) {
-    event.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-    setFormWarning(null);
-
-    try {
-      const payload = {
-        firstName: form.firstName,
-        lastName: form.lastName,
-        statusId: form.statusId,
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        sourceId: form.sourceId || undefined,
-        language: form.language.trim() || undefined,
-        preferredContactMethod: form.preferredContactMethod || undefined,
-        budgetMin: form.budgetMin ? Number(form.budgetMin) : undefined,
-        budgetMax: form.budgetMax ? Number(form.budgetMax) : undefined,
-        preferredAreas: form.preferredAreas
-          ? form.preferredAreas.split(",").map((area) => area.trim()).filter(Boolean)
-          : undefined,
-        notes: form.notes.trim() || undefined,
-        tags: form.tagIds.length > 0 ? form.tagIds : undefined,
-        assignedTo: form.assignedTo || undefined,
-      };
-
-      const response = await fetch(`${apiBase}/leads`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error?.message ?? "Failed to create lead.");
-      }
-
-      const hasDuplicatePhoneWarning = body.data.warnings?.includes("duplicate_phone");
-
-      if (hasDuplicatePhoneWarning) {
-        setFormWarning("A lead with this phone number already exists in this workspace.");
-      } else {
-        setDrawerOpen(false);
-      }
-
-      setPage(1);
-      await loadLeads();
-    } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "Failed to create.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function handleArchive(leadId: string, leadName: string) {
     if (!canArchive) {
@@ -315,7 +225,10 @@ export function LeadsPanel({
         }
         actions={
           canCreate ? (
-            <Button leadingIcon={<IconPlus size={14} />} onClick={openCreateDrawer}>
+            <Button
+              leadingIcon={<IconPlus size={14} />}
+              onClick={() => router.push(workspacePath(workspaceSlug, "leads", "new"))}
+            >
               New lead
             </Button>
           ) : undefined
@@ -382,6 +295,54 @@ export function LeadsPanel({
             </option>
           ))}
         </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[160px]"
+          value={propertyTypeInterestFilter}
+          onChange={(event) => {
+            setPage(1);
+            setPropertyTypeInterestFilter(event.target.value);
+          }}
+        >
+          <option value="">All property types</option>
+          {PROPERTY_TYPE_INTERESTS.map((value) => (
+            <option key={value} value={value}>
+              {PROPERTY_TYPE_INTEREST_LABELS[value]}
+            </option>
+          ))}
+        </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[140px]"
+          value={transactionIntentFilter}
+          onChange={(event) => {
+            setPage(1);
+            setTransactionIntentFilter(event.target.value);
+          }}
+        >
+          <option value="">All intents</option>
+          {TRANSACTION_INTENTS.map((value) => (
+            <option key={value} value={value}>
+              {TRANSACTION_INTENT_LABELS[value]}
+            </option>
+          ))}
+        </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[150px]"
+          value={usagePurposeFilter}
+          onChange={(event) => {
+            setPage(1);
+            setUsagePurposeFilter(event.target.value);
+          }}
+        >
+          <option value="">All usage purposes</option>
+          {USAGE_PURPOSES.map((value) => (
+            <option key={value} value={value}>
+              {USAGE_PURPOSE_LABELS[value]}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {loading ? (
@@ -398,7 +359,10 @@ export function LeadsPanel({
           description="Create your first lead to start capturing demand in this workspace."
           primaryAction={
             canCreate
-              ? { label: "New lead", onClick: openCreateDrawer }
+              ? {
+                  label: "New lead",
+                  onClick: () => router.push(workspacePath(workspaceSlug, "leads", "new")),
+                }
               : undefined
           }
         />
@@ -529,233 +493,6 @@ export function LeadsPanel({
         </div>
       )}
 
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="New lead"
-        className="w-[min(100%,420px)]"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" form="new-lead-form" disabled={submitting}>
-              {submitting ? "Creating…" : "Create lead"}
-            </Button>
-          </div>
-        }
-      >
-        <form id="new-lead-form" className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="firstName" required>
-                First name
-              </Label>
-              <Input
-                id="firstName"
-                value={form.firstName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, firstName: event.target.value }))
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="lastName" required>
-                Last name
-              </Label>
-              <Input
-                id="lastName"
-                value={form.lastName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, lastName: event.target.value }))
-                }
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, email: event.target.value }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={form.phone}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, phone: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="statusId" required>
-                Status
-              </Label>
-              <Select
-                id="statusId"
-                value={form.statusId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, statusId: event.target.value }))
-                }
-                required
-              >
-                <option value="">Select status</option>
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="sourceId">Source</Label>
-              <Select
-                id="sourceId"
-                value={form.sourceId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, sourceId: event.target.value }))
-                }
-              >
-                <option value="">Select source</option>
-                {sources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="assignedTo">Assigned to</Label>
-            <MemberSelector
-              members={members}
-              selectedUserId={form.assignedTo || null}
-              onChange={(userId) =>
-                setForm((current) => ({
-                  ...current,
-                  assignedTo: userId ?? "",
-                }))
-              }
-              placeholder="Unassigned"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="language">Language</Label>
-              <Input
-                id="language"
-                value={form.language}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, language: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="preferredContactMethod">Preferred contact</Label>
-              <Select
-                id="preferredContactMethod"
-                value={form.preferredContactMethod}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    preferredContactMethod: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Not set</option>
-                <option value="email">Email</option>
-                <option value="phone">Phone</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="sms">SMS</option>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="budgetMin">Budget min</Label>
-              <Input
-                id="budgetMin"
-                type="number"
-                min={0}
-                value={form.budgetMin}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, budgetMin: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="budgetMax">Budget max</Label>
-              <Input
-                id="budgetMax"
-                type="number"
-                min={0}
-                value={form.budgetMax}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, budgetMax: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="preferredAreas">Preferred areas</Label>
-            <Input
-              id="preferredAreas"
-              placeholder="Geneva, Nyon"
-              value={form.preferredAreas}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, preferredAreas: event.target.value }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label>Tags</Label>
-            <TagSelector
-              tags={tags}
-              entityType="lead"
-              selectedTagIds={form.tagIds}
-              onToggle={toggleTag}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={form.notes}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, notes: event.target.value }))
-              }
-              rows={4}
-            />
-          </div>
-
-          {formError && (
-            <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>
-          )}
-          {formWarning && (
-            <p className="text-[13px] text-[var(--color-warning-fg,#b45309)]">
-              {formWarning}
-            </p>
-          )}
-        </form>
-      </Drawer>
     </>
   );
 }

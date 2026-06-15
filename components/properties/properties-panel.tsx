@@ -1,19 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
-import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
+import type { MemberSelectorMember } from "@/components/domain/member-selector";
+import type { ProjectSelectorProject } from "@/components/domain/project-selector";
+import type { TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconChevronRight, IconImage, IconPlus } from "@/lib/icons";
@@ -42,50 +42,6 @@ type PropertyListItem = {
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
 };
-
-type PropertyFormState = {
-  title: string;
-  reference: string;
-  projectId: string;
-  statusId: string;
-  typeId: string;
-  price: string;
-  currency: string;
-  address: string;
-  city: string;
-  country: string;
-  rooms: string;
-  bedrooms: string;
-  bathrooms: string;
-  surface: string;
-  floor: string;
-  description: string;
-  features: string;
-  tagIds: string[];
-  assignedTo: string;
-};
-
-const emptyForm = (defaultCurrency: string): PropertyFormState => ({
-  title: "",
-  reference: "",
-  projectId: "",
-  statusId: "",
-  typeId: "",
-  price: "",
-  currency: defaultCurrency,
-  address: "",
-  city: "",
-  country: "",
-  rooms: "",
-  bedrooms: "",
-  bathrooms: "",
-  surface: "",
-  floor: "",
-  description: "",
-  features: "",
-  tagIds: [],
-  assignedTo: "",
-});
 
 type PropertiesPanelProps = {
   workspaceSlug: string;
@@ -116,6 +72,7 @@ export function PropertiesPanel({
   canCreate,
   canArchive,
 }: PropertiesPanelProps) {
+  const router = useRouter();
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -134,10 +91,6 @@ export function PropertiesPanel({
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [form, setForm] = useState<PropertyFormState>(emptyForm(defaultCurrency));
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -248,77 +201,6 @@ export function PropertiesPanel({
     void loadProperties();
   }, [loadProperties]);
 
-  const defaultStatusId = useMemo(
-    () => statuses.find((item) => item.isDefault)?.id ?? statuses[0]?.id ?? "",
-    [statuses],
-  );
-
-  function openCreateDrawer() {
-    setFormError(null);
-    setForm({ ...emptyForm(defaultCurrency), statusId: defaultStatusId });
-    setDrawerOpen(true);
-  }
-
-  function toggleTag(tagId: string) {
-    setForm((current) => ({
-      ...current,
-      tagIds: current.tagIds.includes(tagId)
-        ? current.tagIds.filter((id) => id !== tagId)
-        : [...current.tagIds, tagId],
-    }));
-  }
-
-  async function handleCreate(event: React.FormEvent) {
-    event.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-
-    try {
-      const payload = {
-        title: form.title,
-        statusId: form.statusId,
-        reference: form.reference.trim() || undefined,
-        projectId: form.projectId || undefined,
-        typeId: form.typeId || undefined,
-        price: form.price ? Number(form.price) : undefined,
-        currency: form.currency || defaultCurrency,
-        address: form.address.trim() || undefined,
-        city: form.city.trim() || undefined,
-        country: form.country.trim() || undefined,
-        rooms: form.rooms ? Number(form.rooms) : undefined,
-        bedrooms: form.bedrooms ? Number(form.bedrooms) : undefined,
-        bathrooms: form.bathrooms ? Number(form.bathrooms) : undefined,
-        surface: form.surface ? Number(form.surface) : undefined,
-        floor: form.floor ? Number(form.floor) : undefined,
-        description: form.description.trim() || undefined,
-        features: form.features
-          ? form.features.split(",").map((feature) => feature.trim()).filter(Boolean)
-          : undefined,
-        tags: form.tagIds.length > 0 ? form.tagIds : undefined,
-        assignedTo: form.assignedTo || undefined,
-      };
-
-      const response = await fetch(`${apiBase}/properties`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error?.message ?? "Failed to create property.");
-      }
-
-      setDrawerOpen(false);
-      setPage(1);
-      await loadProperties();
-    } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "Failed to create.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function handleArchive(propertyId: string, propertyTitle: string) {
     if (!canArchive) {
       return;
@@ -360,7 +242,10 @@ export function PropertiesPanel({
         }
         actions={
           canCreate ? (
-            <Button leadingIcon={<IconPlus size={14} />} onClick={openCreateDrawer}>
+            <Button
+              leadingIcon={<IconPlus size={14} />}
+              onClick={() => router.push(workspacePath(workspaceSlug, "properties", "new"))}
+            >
               New property
             </Button>
           ) : undefined
@@ -478,7 +363,12 @@ export function PropertiesPanel({
           title="No properties yet"
           description="Create your first property to start capturing supply in this workspace."
           primaryAction={
-            canCreate ? { label: "New property", onClick: openCreateDrawer } : undefined
+            canCreate
+              ? {
+                  label: "New property",
+                  onClick: () => router.push(workspacePath(workspaceSlug, "properties", "new")),
+                }
+              : undefined
           }
         />
       ) : (
@@ -626,284 +516,6 @@ export function PropertiesPanel({
           </div>
         </div>
       )}
-
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="New property"
-        className="w-[min(100%,480px)]"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" form="new-property-form" disabled={submitting}>
-              {submitting ? "Creating…" : "Create property"}
-            </Button>
-          </div>
-        }
-      >
-        <form id="new-property-form" className="space-y-4" onSubmit={(event) => void handleCreate(event)}>
-          <div>
-            <Label htmlFor="title" required>
-              Title
-            </Label>
-            <Input
-              id="title"
-              value={form.title}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, title: event.target.value }))
-              }
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="reference">Reference</Label>
-              <Input
-                id="reference"
-                value={form.reference}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, reference: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="statusId" required>
-                Status
-              </Label>
-              <Select
-                id="statusId"
-                value={form.statusId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, statusId: event.target.value }))
-                }
-                required
-              >
-                <option value="">Select status</option>
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="typeId">Type</Label>
-              <Select
-                id="typeId"
-                value={form.typeId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, typeId: event.target.value }))
-                }
-              >
-                <option value="">Select type</option>
-                {types.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="projectId">Project</Label>
-              <ProjectSelector
-                projects={projects}
-                selectedProjectId={form.projectId || null}
-                onChange={(projectId) =>
-                  setForm((current) => ({ ...current, projectId: projectId ?? "" }))
-                }
-                placeholder="No project"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                type="number"
-                min={0}
-                value={form.price}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, price: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Input
-                id="currency"
-                value={form.currency}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    currency: event.target.value.toUpperCase(),
-                  }))
-                }
-                maxLength={3}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              value={form.address}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, address: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={form.city}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, city: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                value={form.country}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, country: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="rooms">Rooms</Label>
-              <Input
-                id="rooms"
-                type="number"
-                min={0}
-                value={form.rooms}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, rooms: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="bedrooms">Bedrooms</Label>
-              <Input
-                id="bedrooms"
-                type="number"
-                min={0}
-                value={form.bedrooms}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, bedrooms: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="bathrooms">Bathrooms</Label>
-              <Input
-                id="bathrooms"
-                type="number"
-                min={0}
-                value={form.bathrooms}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, bathrooms: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="surface">Surface (m²)</Label>
-              <Input
-                id="surface"
-                type="number"
-                min={0}
-                value={form.surface}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, surface: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="floor">Floor</Label>
-              <Input
-                id="floor"
-                type="number"
-                value={form.floor}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, floor: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="assignedTo">Assigned to</Label>
-            <MemberSelector
-              members={members}
-              selectedUserId={form.assignedTo || null}
-              onChange={(userId) =>
-                setForm((current) => ({
-                  ...current,
-                  assignedTo: userId ?? "",
-                }))
-              }
-              placeholder="Unassigned"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="features">Features</Label>
-            <Input
-              id="features"
-              placeholder="Lake view, Balcony, Parking"
-              value={form.features}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, features: event.target.value }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label>Tags</Label>
-            <TagSelector
-              tags={tags}
-              entityType="property"
-              selectedTagIds={form.tagIds}
-              onToggle={toggleTag}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={form.description}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, description: event.target.value }))
-              }
-              rows={4}
-            />
-          </div>
-
-          {formError && (
-            <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>
-          )}
-        </form>
-      </Drawer>
     </>
   );
 }

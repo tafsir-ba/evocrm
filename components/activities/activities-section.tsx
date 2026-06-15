@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -9,7 +10,6 @@ import {
   formatActivityDateTime,
   formatRelatedSummary,
 } from "@/components/activities/activity-helpers";
-import { ActivityFormDrawer } from "@/components/activities/activity-form-drawer";
 import { Timeline } from "@/components/domain/timeline";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconCheck, IconPlus } from "@/lib/icons";
+import { workspacePath } from "@/lib/workspace-paths";
 
 type ActivityListItem = {
   id: string;
@@ -48,6 +49,25 @@ type ActivitiesSectionProps = {
   compact?: boolean;
 };
 
+function activityFormPath(
+  workspaceSlug: string,
+  options: { leadId?: string; propertyId?: string; opportunityId?: string; activityId?: string },
+): string {
+  const { leadId, propertyId, opportunityId, activityId } = options;
+  if (activityId) {
+    return workspacePath(workspaceSlug, "activities", activityId, "edit");
+  }
+
+  const params = new URLSearchParams();
+  if (leadId) params.set("leadId", leadId);
+  if (propertyId) params.set("propertyId", propertyId);
+  if (opportunityId) params.set("opportunityId", opportunityId);
+  const query = params.toString();
+  return query
+    ? `${workspacePath(workspaceSlug, "activities", "new")}?${query}`
+    : workspacePath(workspaceSlug, "activities", "new");
+}
+
 export function ActivitiesSection({
   workspaceSlug,
   workspaceTimezone,
@@ -60,12 +80,13 @@ export function ActivitiesSection({
   canArchive,
   compact = false,
 }: ActivitiesSectionProps) {
+  const router = useRouter();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
+
+  const createHref = activityFormPath(workspaceSlug, { leadId, propertyId, opportunityId });
 
   const loadActivities = useCallback(async () => {
     if (!canRead) {
@@ -209,10 +230,7 @@ export function ActivitiesSection({
           <Button
             size="sm"
             leadingIcon={<IconPlus size={13} />}
-            onClick={() => {
-              setEditId(null);
-              setDrawerOpen(true);
-            }}
+            onClick={() => router.push(createHref)}
           >
             New activity
           </Button>
@@ -227,10 +245,7 @@ export function ActivitiesSection({
             canCreate
               ? {
                   label: "Create activity",
-                  onClick: () => {
-                    setEditId(null);
-                    setDrawerOpen(true);
-                  },
+                  onClick: () => router.push(createHref),
                 }
               : undefined
           }
@@ -305,10 +320,11 @@ export function ActivitiesSection({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          setEditId(activity.id);
-                          setDrawerOpen(true);
-                        }}
+                        onClick={() =>
+                          router.push(
+                            activityFormPath(workspaceSlug, { activityId: activity.id }),
+                          )
+                        }
                       >
                         Edit
                       </Button>
@@ -384,10 +400,11 @@ export function ActivitiesSection({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          setEditId(activity.id);
-                          setDrawerOpen(true);
-                        }}
+                        onClick={() =>
+                          router.push(
+                            activityFormPath(workspaceSlug, { activityId: activity.id }),
+                          )
+                        }
                       >
                         Edit
                       </Button>
@@ -410,18 +427,6 @@ export function ActivitiesSection({
         </div>
       )}
 
-      <ActivityFormDrawer
-        open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-          setEditId(null);
-        }}
-        workspaceSlug={workspaceSlug}
-        workspaceTimezone={workspaceTimezone}
-        context={{ leadId, propertyId, opportunityId }}
-        activityId={editId ?? undefined}
-        onSaved={() => void loadActivities()}
-      />
     </div>
   );
 }

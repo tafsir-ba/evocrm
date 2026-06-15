@@ -2,6 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  PROPERTY_TYPE_INTERESTS,
+  TRANSACTION_INTENTS,
+  USAGE_PURPOSES,
+} from "@/lib/lead-preferences";
+
 const objectIdSchema = z
   .string()
   .trim()
@@ -24,6 +30,14 @@ const preferredAreasSchema = z
   .max(20)
   .optional();
 
+const propertyTypeInterestsSchema = z
+  .array(z.enum(PROPERTY_TYPE_INTERESTS))
+  .max(PROPERTY_TYPE_INTERESTS.length)
+  .optional();
+
+const transactionIntentSchema = z.enum(TRANSACTION_INTENTS);
+const usagePurposeSchema = z.enum(USAGE_PURPOSES);
+
 export const leadListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -37,6 +51,9 @@ export const leadListQuerySchema = z.object({
   assignedTo: objectIdSchema.optional(),
   ownerId: objectIdSchema.optional(),
   tagId: objectIdSchema.optional(),
+  propertyTypeInterest: z.enum(PROPERTY_TYPE_INTERESTS).optional(),
+  transactionIntent: transactionIntentSchema.optional(),
+  usagePurpose: usagePurposeSchema.optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
 });
@@ -56,6 +73,9 @@ export const createLeadInputSchema = z
     budgetMin: z.number().min(0).optional(),
     budgetMax: z.number().min(0).optional(),
     preferredAreas: preferredAreasSchema,
+    propertyTypeInterests: propertyTypeInterestsSchema,
+    transactionIntent: transactionIntentSchema.optional(),
+    usagePurpose: usagePurposeSchema.optional(),
     notes: z.string().trim().max(5000).optional(),
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,
@@ -85,6 +105,9 @@ export const updateLeadInputSchema = z
     budgetMin: z.number().min(0).nullable().optional(),
     budgetMax: z.number().min(0).nullable().optional(),
     preferredAreas: preferredAreasSchema,
+    propertyTypeInterests: propertyTypeInterestsSchema,
+    transactionIntent: transactionIntentSchema.nullable().optional(),
+    usagePurpose: usagePurposeSchema.nullable().optional(),
     notes: z.string().trim().max(5000).nullable().optional(),
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,

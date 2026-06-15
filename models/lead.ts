@@ -1,5 +1,11 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
+import {
+  PROPERTY_TYPE_INTERESTS,
+  TRANSACTION_INTENTS,
+  USAGE_PURPOSES,
+} from "@/lib/lead-preferences";
+
 const EMAIL_CONSENT_STATUSES = ["unknown", "subscribed", "unsubscribed"] as const;
 
 const leadSchema = new Schema(
@@ -21,6 +27,20 @@ const leadSchema = new Schema(
     budgetMin: { type: Number, default: null },
     budgetMax: { type: Number, default: null },
     preferredAreas: { type: [String], default: [] },
+    propertyTypeInterests: {
+      type: [{ type: String, enum: PROPERTY_TYPE_INTERESTS }],
+      default: [],
+    },
+    transactionIntent: {
+      type: String,
+      enum: TRANSACTION_INTENTS,
+      default: null,
+    },
+    usagePurpose: {
+      type: String,
+      enum: USAGE_PURPOSES,
+      default: null,
+    },
     notes: { type: String, trim: true, default: null },
     tags: { type: [{ type: Schema.Types.ObjectId, ref: "Tag" }], default: [] },
     attributes: { type: Schema.Types.Mixed, default: {} },
@@ -49,6 +69,9 @@ leadSchema.index({ workspaceId: 1, ownerId: 1 });
 leadSchema.index({ workspaceId: 1, phoneNormalized: 1 });
 leadSchema.index({ workspaceId: 1, fullName: 1 });
 leadSchema.index({ workspaceId: 1, tags: 1 });
+leadSchema.index({ workspaceId: 1, propertyTypeInterests: 1 });
+leadSchema.index({ workspaceId: 1, transactionIntent: 1 });
+leadSchema.index({ workspaceId: 1, usagePurpose: 1 });
 leadSchema.index(
   { workspaceId: 1, emailNormalized: 1 },
   {

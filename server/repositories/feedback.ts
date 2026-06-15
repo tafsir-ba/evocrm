@@ -31,6 +31,10 @@ export type FeedbackRecord = {
   updatedAt: Date;
   resolvedAt: Date | null;
   resolvedBy: string | null;
+  resolutionNotifiedAt: Date | null;
+  resolutionNotifiedEmail: string | null;
+  resolutionNotificationStatus: "sent" | "failed" | null;
+  resolutionNotificationError: string | null;
 };
 
 function toFeedbackRecord(document: FeedbackDocument): FeedbackRecord {
@@ -56,6 +60,10 @@ function toFeedbackRecord(document: FeedbackDocument): FeedbackRecord {
     updatedAt: document.updatedAt,
     resolvedAt: document.resolvedAt ?? null,
     resolvedBy: document.resolvedBy?.toString() ?? null,
+    resolutionNotifiedAt: document.resolutionNotifiedAt ?? null,
+    resolutionNotifiedEmail: document.resolutionNotifiedEmail ?? null,
+    resolutionNotificationStatus: document.resolutionNotificationStatus ?? null,
+    resolutionNotificationError: document.resolutionNotificationError ?? null,
   };
 }
 
@@ -150,6 +158,10 @@ export async function updateFeedbackStatus(input: {
   feedbackId: string;
   status: FeedbackStatus;
   resolvedBy?: string | null;
+  resolutionNotifiedAt?: Date | null;
+  resolutionNotifiedEmail?: string | null;
+  resolutionNotificationStatus?: "sent" | "failed" | null;
+  resolutionNotificationError?: string | null;
 }): Promise<FeedbackRecord | null> {
   await connectDb();
 
@@ -160,9 +172,25 @@ export async function updateFeedbackStatus(input: {
   if (input.status === "resolved") {
     update.resolvedAt = new Date();
     update.resolvedBy = input.resolvedBy ?? null;
+    if (input.resolutionNotifiedAt !== undefined) {
+      update.resolutionNotifiedAt = input.resolutionNotifiedAt;
+    }
+    if (input.resolutionNotifiedEmail !== undefined) {
+      update.resolutionNotifiedEmail = input.resolutionNotifiedEmail;
+    }
+    if (input.resolutionNotificationStatus !== undefined) {
+      update.resolutionNotificationStatus = input.resolutionNotificationStatus;
+    }
+    if (input.resolutionNotificationError !== undefined) {
+      update.resolutionNotificationError = input.resolutionNotificationError;
+    }
   } else {
     update.resolvedAt = null;
     update.resolvedBy = null;
+    update.resolutionNotifiedAt = null;
+    update.resolutionNotifiedEmail = null;
+    update.resolutionNotificationStatus = null;
+    update.resolutionNotificationError = null;
   }
 
   const document = await FeedbackModel.findByIdAndUpdate(input.feedbackId, update, {

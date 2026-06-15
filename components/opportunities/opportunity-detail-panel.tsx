@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { LostReasonModal } from "@/components/opportunities/lost-reason-modal";
 import { ActivitiesSection } from "@/components/activities/activities-section";
 import { DocumentsSection } from "@/components/documents/documents-section";
@@ -14,9 +12,8 @@ import { StateView } from "@/components/states/state-view";
 import { Avatar, AvatarWithName } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Drawer } from "@/components/ui/drawer";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import { Select, Label } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
@@ -110,24 +107,13 @@ export function OpportunityDetailPanel({
   const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
   const [stages, setStages] = useState<DictionaryItem[]>([]);
   const [lostReasons, setLostReasons] = useState<Array<{ id: string; label: string }>>([]);
-  const [tags, setTags] = useState<TagSelectorTag[]>([]);
-  const [members, setMembers] = useState<MemberSelectorMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [stagePending, setStagePending] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
   const [lostModal, setLostModal] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    value: "",
-    currency: "",
-    expectedCloseDate: "",
-    notes: "",
-    assignedTo: "",
-    tagIds: [] as string[],
-  });
 
   const loadOpportunity = useCallback(async () => {
     setLoading(true);
@@ -154,16 +140,6 @@ export function OpportunityDetailPanel({
 
       const body = (await response.json()) as { data: { opportunity: OpportunityDetail } };
       setOpportunity(body.data.opportunity);
-      setForm({
-        value: body.data.opportunity.value?.toString() ?? "",
-        currency: body.data.opportunity.currency,
-        expectedCloseDate: body.data.opportunity.expectedCloseDate
-          ? body.data.opportunity.expectedCloseDate.slice(0, 10)
-          : "",
-        notes: body.data.opportunity.notes ?? "",
-        assignedTo: body.data.opportunity.assignedUser?.id ?? "",
-        tagIds: body.data.opportunity.tagsResolved.map((tag) => tag.id),
-      });
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Failed to load opportunity.",
@@ -179,13 +155,10 @@ export function OpportunityDetailPanel({
 
   useEffect(() => {
     void (async () => {
-      const [stagesResponse, lostReasonsResponse, tagsResponse, membersResponse] =
-        await Promise.all([
-          fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=opportunity_status`),
-          fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=lost_reason`),
-          fetch(`/api/workspaces/${workspaceSlug}/tags?entityType=opportunity`),
-          fetch(`/api/workspaces/${workspaceSlug}/members`),
-        ]);
+      const [stagesResponse, lostReasonsResponse] = await Promise.all([
+        fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=opportunity_status`),
+        fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=lost_reason`),
+      ]);
 
       if (stagesResponse.ok) {
         const payload = (await stagesResponse.json()) as { data: { items: DictionaryItem[] } };
@@ -196,14 +169,6 @@ export function OpportunityDetailPanel({
           data: { items: Array<{ id: string; label: string }> };
         };
         setLostReasons(payload.data.items);
-      }
-      if (tagsResponse.ok) {
-        const payload = (await tagsResponse.json()) as { data: { tags: TagSelectorTag[] } };
-        setTags(payload.data.tags);
-      }
-      if (membersResponse.ok) {
-        const payload = (await membersResponse.json()) as { data: { members: MemberSelectorMember[] } };
-        setMembers(payload.data.members);
       }
     })();
   }, [workspaceSlug]);
@@ -264,48 +229,10 @@ export function OpportunityDetailPanel({
     void moveStage(statusId);
   };
 
-  const handleUpdate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `/api/workspaces/${workspaceSlug}/opportunities/${opportunityId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            value: form.value ? Number(form.value) : null,
-            currency: form.currency,
-            expectedCloseDate: form.expectedCloseDate || null,
-            notes: form.notes || null,
-            assignedTo: form.assignedTo || null,
-            tags: form.tagIds,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const body = (await response.json()) as { error?: { message?: string } };
-        throw new Error(body.error?.message ?? "Failed to update opportunity.");
-      }
-
-      setDrawerOpen(false);
-      await loadOpportunity();
-    } catch (updateError) {
-      setError(
-        updateError instanceof Error ? updateError.message : "Failed to update opportunity.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleArchive = async () => {
     if (!window.confirm("Archive this opportunity?")) return;
 
-    setSubmitting(true);
+    setArchivePending(true);
     setError(null);
 
     try {
@@ -326,7 +253,7 @@ export function OpportunityDetailPanel({
           ? archiveError.message
           : "Failed to archive opportunity.",
       );
-      setSubmitting(false);
+      setArchivePending(false);
     }
   };
 
@@ -413,12 +340,12 @@ export function OpportunityDetailPanel({
         actions={
           <>
             {canUpdate && (
-              <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
-                Edit
-              </Button>
+              <Link href={workspacePath(workspaceSlug, "opportunities", opportunityId, "edit")}>
+                <Button variant="secondary">Edit</Button>
+              </Link>
             )}
             {canArchive && (
-              <Button variant="secondary" onClick={() => void handleArchive()} disabled={submitting}>
+              <Button variant="secondary" onClick={() => void handleArchive()} disabled={archivePending}>
                 Archive
               </Button>
             )}
@@ -694,117 +621,6 @@ export function OpportunityDetailPanel({
         </Card>
       </div>
 
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="Edit opportunity"
-        className="w-[min(100%,480px)]"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setDrawerOpen(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" form="edit-opportunity-form" disabled={submitting}>
-              {submitting ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
-        }
-      >
-        <form id="edit-opportunity-form" className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="edit-value">Value</Label>
-              <Input
-                id="edit-value"
-                type="number"
-                min={0}
-                value={form.value}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, value: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-currency">Currency</Label>
-              <Input
-                id="edit-currency"
-                value={form.currency}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    currency: event.target.value.toUpperCase(),
-                  }))
-                }
-                maxLength={3}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="edit-expected-close">Expected close date</Label>
-            <Input
-              id="edit-expected-close"
-              type="date"
-              value={form.expectedCloseDate}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  expectedCloseDate: event.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label>Assigned to</Label>
-            <MemberSelector
-              members={members}
-              selectedUserId={form.assignedTo || null}
-              onChange={(userId) =>
-                setForm((current) => ({
-                  ...current,
-                  assignedTo: userId ?? "",
-                }))
-              }
-              placeholder="Unassigned"
-            />
-          </div>
-
-          <div>
-            <Label>Tags</Label>
-            <TagSelector
-              tags={tags}
-              entityType="opportunity"
-              selectedTagIds={form.tagIds}
-              onToggle={(tagId) =>
-                setForm((current) => ({
-                  ...current,
-                  tagIds: current.tagIds.includes(tagId)
-                    ? current.tagIds.filter((id) => id !== tagId)
-                    : [...current.tagIds, tagId],
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="edit-notes">Notes</Label>
-            <Textarea
-              id="edit-notes"
-              value={form.notes}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, notes: event.target.value }))
-              }
-              rows={4}
-            />
-          </div>
-        </form>
-      </Drawer>
 
       <LostReasonModal
         open={lostModal !== null}

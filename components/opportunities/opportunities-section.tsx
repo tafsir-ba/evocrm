@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { OpportunityFormDrawer } from "@/components/opportunities/opportunity-form-drawer";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -33,18 +33,34 @@ type OpportunitiesSectionProps = {
   canCreate: boolean;
 };
 
+function createOpportunityPath(
+  workspaceSlug: string,
+  leadId?: string,
+  propertyId?: string,
+): string {
+  const params = new URLSearchParams();
+  if (leadId) params.set("leadId", leadId);
+  if (propertyId) params.set("propertyId", propertyId);
+  const query = params.toString();
+  return query
+    ? `${workspacePath(workspaceSlug, "opportunities", "new")}?${query}`
+    : workspacePath(workspaceSlug, "opportunities", "new");
+}
+
 export function OpportunitiesSection({
   workspaceSlug,
-  defaultCurrency,
+  defaultCurrency: _defaultCurrency,
   leadId,
   propertyId,
   canRead,
   canCreate,
 }: OpportunitiesSectionProps) {
+  const router = useRouter();
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const createHref = createOpportunityPath(workspaceSlug, leadId, propertyId);
 
   const loadOpportunities = useCallback(async () => {
     if (!canRead) {
@@ -127,7 +143,7 @@ export function OpportunitiesSection({
           <Button
             size="sm"
             leadingIcon={<IconPlus size={13} />}
-            onClick={() => setDrawerOpen(true)}
+            onClick={() => router.push(createHref)}
           >
             Create opportunity
           </Button>
@@ -144,7 +160,7 @@ export function OpportunitiesSection({
           }
           primaryAction={
             canCreate
-              ? { label: "Create opportunity", onClick: () => setDrawerOpen(true) }
+              ? { label: "Create opportunity", onClick: () => router.push(createHref) }
               : undefined
           }
         />
@@ -185,18 +201,6 @@ export function OpportunitiesSection({
           ))}
         </ul>
       )}
-
-      <OpportunityFormDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        workspaceSlug={workspaceSlug}
-        defaultCurrency={defaultCurrency}
-        initialValues={{
-          leadId,
-          propertyId,
-        }}
-        onCreated={() => void loadOpportunities()}
-      />
     </div>
   );
 }

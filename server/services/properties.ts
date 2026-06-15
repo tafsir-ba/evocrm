@@ -385,6 +385,7 @@ export async function createPropertyForWorkspace(
     bedrooms: input.bedrooms ?? null,
     bathrooms: input.bathrooms ?? null,
     surface: input.surface ?? null,
+    surfaceUnit: input.surfaceUnit ?? "sqm",
     floor: input.floor ?? null,
     description: input.description ?? null,
     features: normalizePropertyFeatures(input.features),
@@ -490,6 +491,9 @@ export async function updatePropertyForWorkspace(
   }
   if (input.surface !== undefined) {
     updatePayload.surface = input.surface;
+  }
+  if (input.surfaceUnit !== undefined) {
+    updatePayload.surfaceUnit = input.surfaceUnit;
   }
   if (input.floor !== undefined) {
     updatePayload.floor = input.floor;

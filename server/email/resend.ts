@@ -85,6 +85,78 @@ export async function sendCampaignEmail(
   }
 }
 
+export function buildFeedbackResolvedEmailHtml(input: {
+  reporterName: string;
+  feedbackMessage: string;
+  pageUrl?: string | null;
+}): string {
+  const escapedMessage = input.feedbackMessage
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const pageLink = input.pageUrl
+    ? `<p style="margin-top: 16px;"><a href="${input.pageUrl}">Open the page where you reported this</a></p>`
+    : "";
+
+  return `
+    <div style="font-family: sans-serif; line-height: 1.6; color: #111; max-width: 560px;">
+      <p>Hello ${input.reporterName.replace(/</g, "&lt;")},</p>
+      <p>Thank you again for your feedback.</p>
+      <p>We have marked the following item as resolved:</p>
+      <blockquote style="margin: 16px 0; padding: 12px 16px; border-left: 3px solid #e5e5e5; color: #333;">
+        “${escapedMessage}”
+      </blockquote>
+      <p>Please test the app again when you have a moment and let us know if the issue is fully resolved on your side.</p>
+      <p>If anything is still not working as expected, or if you have any other user need, we remain available.</p>
+      ${pageLink}
+      <p style="margin-top: 24px;">Best regards,<br />The EvoHome Team</p>
+    </div>
+  `.trim();
+}
+
+export function buildFeedbackResolvedEmailText(input: {
+  reporterName: string;
+  feedbackMessage: string;
+  pageUrl?: string | null;
+}): string {
+  const lines = [
+    `Hello ${input.reporterName},`,
+    "",
+    "Thank you again for your feedback.",
+    "",
+    "We have marked the following item as resolved:",
+    `"${input.feedbackMessage}"`,
+    "",
+    "Please test the app again when you have a moment and let us know if the issue is fully resolved on your side.",
+    "",
+    "If anything is still not working as expected, or if you have any other user need, we remain available.",
+  ];
+
+  if (input.pageUrl) {
+    lines.push("", `Relevant page: ${input.pageUrl}`);
+  }
+
+  lines.push("", "Best regards,", "The EvoHome Team");
+
+  return lines.join("\n");
+}
+
+export async function sendFeedbackResolvedEmail(input: {
+  to: string;
+  reporterName: string;
+  feedbackMessage: string;
+  pageUrl?: string | null;
+}): Promise<SendCampaignEmailResult> {
+  return sendCampaignEmail({
+    to: input.to,
+    subject: "Your feedback has been resolved",
+    html: buildFeedbackResolvedEmailHtml(input),
+    text: buildFeedbackResolvedEmailText(input),
+    fromName: "EvoHome",
+  });
+}
+
 export function buildCampaignEmailHtml(body: string, unsubscribeUrl: string): string {
   const escapedBody = body
     .replace(/&/g, "&amp;")

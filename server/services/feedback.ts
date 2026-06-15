@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
+import { sendFeedbackResolvedEmail } from "@/server/email/resend";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
 import {
@@ -69,6 +70,10 @@ export type FeedbackListItem = {
   createdAt: string;
   resolvedAt: string | null;
   resolvedByEmail: string | null;
+  resolutionNotifiedAt: string | null;
+  resolutionNotifiedEmail: string | null;
+  resolutionNotificationStatus: "sent" | "failed" | null;
+  resolutionNotificationError: string | null;
 };
 
 export type FeedbackDetail = FeedbackListItem & {
@@ -148,6 +153,10 @@ async function enrichFeedbackRows(
     resolvedByEmail: record.resolvedBy
       ? (resolverEmailById.get(record.resolvedBy) ?? null)
       : null,
+    resolutionNotifiedAt: record.resolutionNotifiedAt?.toISOString() ?? null,
+    resolutionNotifiedEmail: record.resolutionNotifiedEmail,
+    resolutionNotificationStatus: record.resolutionNotificationStatus,
+    resolutionNotificationError: record.resolutionNotificationError,
   }));
 }
 
@@ -366,6 +375,7 @@ export async function updateFeedbackStatusForAdmin(input: {
   feedbackId: string;
   status: FeedbackStatus;
   adminUserId: string;
+  notifyEmail?: string;
 }): Promise<FeedbackDetail | null> {
   const existing = await findFeedbackById(input.feedbackId);
 
@@ -377,22 +387,107 @@ export async function updateFeedbackStatusForAdmin(input: {
     return getFeedbackDetailForAdmin(input.feedbackId);
   }
 
+  if (input.status === "resolved") {
+    const recipient = input.notifyEmail?.trim() || existing.userEmail?.trim();
+
+    if (!recipient) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Reporter email is required to mark feedback as resolved.",
+        { expose: true },
+      );
+    }
+
+    const reporterName = existing.userName?.trim() || "there";
+    const sendResult = await sendFeedbackResolvedEmail({
+      to: recipient,
+      reporterName,
+      feedbackMessage: existing.body || "(no message)",
+      pageUrl: existing.pageUrl,
+    });
+
+    if (!sendResult.success) {
+      await createAuditLog({
+        workspaceId: getAuditWorkspaceId(existing),
+        actorId: input.adminUserId,
+        action: "feedback.notification.failed",
+        entityType: "feedback",
+        entityId: existing.id,
+        after: {
+          to: recipient,
+          error: sendResult.error,
+        },
+      });
+
+      throw new AppError(
+        "INTERNAL_ERROR",
+        `Could not send resolution notification: ${sendResult.error}`,
+        { expose: true },
+      );
+    }
+
+    const updated = await updateFeedbackStatus({
+      feedbackId: input.feedbackId,
+      status: input.status,
+      resolvedBy: input.adminUserId,
+      resolutionNotifiedAt: new Date(),
+      resolutionNotifiedEmail: recipient,
+      resolutionNotificationStatus: "sent",
+      resolutionNotificationError: null,
+    });
+
+    if (!updated) {
+      return null;
+    }
+
+    await createAuditLog({
+      workspaceId: getAuditWorkspaceId(updated),
+      actorId: input.adminUserId,
+      action: "feedback.resolve",
+      entityType: "feedback",
+      entityId: updated.id,
+      before: {
+        status: existing.status,
+        category: existing.category,
+        reporterEmail: existing.userEmail,
+      },
+      after: {
+        status: updated.status,
+        category: updated.category,
+        reporterEmail: updated.userEmail,
+      },
+    });
+
+    await createAuditLog({
+      workspaceId: getAuditWorkspaceId(updated),
+      actorId: input.adminUserId,
+      action: "feedback.notification.sent",
+      entityType: "feedback",
+      entityId: updated.id,
+      after: {
+        to: recipient,
+        messageId: sendResult.messageId,
+        manualEmail: Boolean(input.notifyEmail?.trim()),
+      },
+    });
+
+    return getFeedbackDetailForAdmin(updated.id);
+  }
+
   const updated = await updateFeedbackStatus({
     feedbackId: input.feedbackId,
     status: input.status,
-    resolvedBy: input.status === "resolved" ? input.adminUserId : null,
+    resolvedBy: null,
   });
 
   if (!updated) {
     return null;
   }
 
-  const action = input.status === "resolved" ? "feedback.resolve" : "feedback.reopen";
-
   await createAuditLog({
     workspaceId: getAuditWorkspaceId(updated),
     actorId: input.adminUserId,
-    action,
+    action: "feedback.reopen",
     entityType: "feedback",
     entityId: updated.id,
     before: {

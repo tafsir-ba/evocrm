@@ -3,6 +3,7 @@ import "server-only";
 import { connectDb } from "@/server/db/mongoose";
 import { AppError } from "@/server/errors";
 import { PropertyModel, type PropertyDocument } from "@/models/property";
+import type { SurfaceUnit } from "@/lib/surface-unit";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -33,6 +34,7 @@ export type PropertyRecord = {
   bedrooms: number | null;
   bathrooms: number | null;
   surface: number | null;
+  surfaceUnit: SurfaceUnit;
   floor: number | null;
   description: string | null;
   features: string[];
@@ -64,6 +66,7 @@ function toPropertyRecord(document: PropertyDocument): PropertyRecord {
     bedrooms: document.bedrooms ?? null,
     bathrooms: document.bathrooms ?? null,
     surface: document.surface ?? null,
+    surfaceUnit: document.surfaceUnit === "sqft" ? "sqft" : "sqm",
     floor: document.floor ?? null,
     description: document.description ?? null,
     features: document.features ?? [],
@@ -236,6 +239,7 @@ export async function createProperty(input: {
   bedrooms?: number | null;
   bathrooms?: number | null;
   surface?: number | null;
+  surfaceUnit?: SurfaceUnit;
   floor?: number | null;
   description?: string | null;
   features?: string[];
@@ -263,6 +267,7 @@ export async function createProperty(input: {
       bedrooms: input.bedrooms ?? null,
       bathrooms: input.bathrooms ?? null,
       surface: input.surface ?? null,
+      surfaceUnit: input.surfaceUnit ?? "sqm",
       floor: input.floor ?? null,
       description: input.description?.trim() || null,
       features: input.features ?? [],
@@ -304,6 +309,7 @@ export async function updateProperty(
     bedrooms: number | null;
     bathrooms: number | null;
     surface: number | null;
+    surfaceUnit: SurfaceUnit;
     floor: number | null;
     description: string | null;
     features: string[];

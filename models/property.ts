@@ -19,6 +19,7 @@ const propertySchema = new Schema(
     bedrooms: { type: Number, default: null },
     bathrooms: { type: Number, default: null },
     surface: { type: Number, default: null },
+    surfaceUnit: { type: String, enum: ["sqm", "sqft"], default: "sqm" },
     floor: { type: Number, default: null },
     description: { type: String, trim: true, default: null },
     features: { type: [String], default: [] },

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { SURFACE_UNITS } from "@/lib/surface-unit";
 import { z } from "zod";
 
 const objectIdSchema = z
@@ -26,6 +27,8 @@ const featuresSchema = z
   .array(z.string().trim().min(1).max(80))
   .max(30)
   .optional();
+
+const surfaceUnitSchema = z.enum(SURFACE_UNITS);
 
 export const propertyListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -73,6 +76,7 @@ export const createPropertyInputSchema = z
     bedrooms: z.number().min(0).optional(),
     bathrooms: z.number().min(0).optional(),
     surface: z.number().min(0).optional(),
+    surfaceUnit: surfaceUnitSchema.optional(),
     floor: z.number().optional(),
     description: z.string().trim().max(5000).optional(),
     features: featuresSchema,
@@ -99,6 +103,7 @@ export const updatePropertyInputSchema = z
     bedrooms: z.number().min(0).nullable().optional(),
     bathrooms: z.number().min(0).nullable().optional(),
     surface: z.number().min(0).nullable().optional(),
+    surfaceUnit: surfaceUnitSchema.optional(),
     floor: z.number().nullable().optional(),
     description: z.string().trim().max(5000).nullable().optional(),
     features: featuresSchema,

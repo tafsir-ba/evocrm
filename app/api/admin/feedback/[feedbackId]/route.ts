@@ -23,6 +23,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       feedbackId,
       status: body.status,
       adminUserId: session.user.id,
+      notifyEmail: body.notifyEmail,
     });
 
     if (!updated) {

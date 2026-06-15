@@ -1,25 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { ActivitiesSection } from "@/components/activities/activities-section";
 import { DocumentsSection } from "@/components/documents/documents-section";
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
-import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
 import { StateView } from "@/components/states/state-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Drawer } from "@/components/ui/drawer";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
+import { formatSurfaceValue } from "@/lib/surface-unit";
 import {
   IconBath,
   IconBed,
@@ -51,6 +48,7 @@ type PropertyDetail = {
   bedrooms: number | null;
   bathrooms: number | null;
   surface: number | null;
+  surfaceUnit: "sqm" | "sqft";
   floor: number | null;
   description: string | null;
   features: string[];
@@ -65,28 +63,6 @@ type PropertyDetail = {
   statusId: string;
   typeId: string | null;
   projectId: string | null;
-};
-
-type PropertyFormState = {
-  title: string;
-  reference: string;
-  projectId: string;
-  statusId: string;
-  typeId: string;
-  price: string;
-  currency: string;
-  address: string;
-  city: string;
-  country: string;
-  rooms: string;
-  bedrooms: string;
-  bathrooms: string;
-  surface: string;
-  floor: string;
-  description: string;
-  features: string;
-  tagIds: string[];
-  assignedTo: string;
 };
 
 type PropertyDetailPanelProps = {
@@ -153,15 +129,6 @@ export function PropertyDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
-  const [types, setTypes] = useState<DictionaryItem[]>([]);
-  const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
-  const [tags, setTags] = useState<TagSelectorTag[]>([]);
-  const [members, setMembers] = useState<MemberSelectorMember[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [form, setForm] = useState<PropertyFormState | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -195,143 +162,9 @@ export function PropertyDetailPanel({
     }
   }, [apiBase, propertyId]);
 
-  const loadOptions = useCallback(async () => {
-    try {
-      const [statusRes, typeRes, projectsRes, tagsRes, membersRes] = await Promise.all([
-        fetch(`${apiBase}/dictionary-items?type=property_status`),
-        fetch(`${apiBase}/dictionary-items?type=property_type`),
-        fetch(`${apiBase}/projects`),
-        fetch(`${apiBase}/tags?entityType=property`),
-        fetch(`${apiBase}/members`),
-      ]);
-      const [statusPayload, typePayload, projectsPayload, tagsPayload, membersPayload] =
-        await Promise.all([
-          statusRes.json(),
-          typeRes.json(),
-          projectsRes.json(),
-          tagsRes.json(),
-          membersRes.json(),
-        ]);
-      if (statusRes.ok) {
-        setStatuses(statusPayload.data.items as DictionaryItem[]);
-      }
-      if (typeRes.ok) {
-        setTypes(typePayload.data.items as DictionaryItem[]);
-      }
-      if (projectsRes.ok) {
-        setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
-      }
-      if (tagsRes.ok) {
-        setTags(tagsPayload.data.tags as TagSelectorTag[]);
-      }
-      if (membersRes.ok) {
-        setMembers(membersPayload.data.members as MemberSelectorMember[]);
-      }
-    } catch {
-      // Non-blocking.
-    }
-  }, [apiBase]);
-
   useEffect(() => {
     void loadProperty();
-    void loadOptions();
-  }, [loadProperty, loadOptions]);
-
-  function openEditDrawer() {
-    if (!property) {
-      return;
-    }
-    setFormError(null);
-    setForm({
-      title: property.title,
-      reference: property.reference ?? "",
-      projectId: property.projectId ?? "",
-      statusId: property.statusId,
-      typeId: property.typeId ?? "",
-      price: property.price?.toString() ?? "",
-      currency: property.currency || defaultCurrency,
-      address: property.address ?? "",
-      city: property.city ?? "",
-      country: property.country ?? "",
-      rooms: property.rooms?.toString() ?? "",
-      bedrooms: property.bedrooms?.toString() ?? "",
-      bathrooms: property.bathrooms?.toString() ?? "",
-      surface: property.surface?.toString() ?? "",
-      floor: property.floor?.toString() ?? "",
-      description: property.description ?? "",
-      features: property.features.join(", "),
-      tagIds: property.tags,
-      assignedTo: property.assignedUser?.id ?? "",
-    });
-    setDrawerOpen(true);
-  }
-
-  function toggleTag(tagId: string) {
-    setForm((current) =>
-      current
-        ? {
-            ...current,
-            tagIds: current.tagIds.includes(tagId)
-              ? current.tagIds.filter((id) => id !== tagId)
-              : [...current.tagIds, tagId],
-          }
-        : current,
-    );
-  }
-
-  async function handleUpdate(event: React.FormEvent) {
-    event.preventDefault();
-    if (!form) {
-      return;
-    }
-
-    setSubmitting(true);
-    setFormError(null);
-
-    try {
-      const payload = {
-        title: form.title,
-        statusId: form.statusId,
-        reference: form.reference.trim() || null,
-        projectId: form.projectId || null,
-        typeId: form.typeId || null,
-        price: form.price ? Number(form.price) : null,
-        currency: form.currency || defaultCurrency,
-        address: form.address.trim() || null,
-        city: form.city.trim() || null,
-        country: form.country.trim() || null,
-        rooms: form.rooms ? Number(form.rooms) : null,
-        bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
-        bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
-        surface: form.surface ? Number(form.surface) : null,
-        floor: form.floor ? Number(form.floor) : null,
-        description: form.description.trim() || null,
-        features: form.features
-          ? form.features.split(",").map((feature) => feature.trim()).filter(Boolean)
-          : [],
-        tags: form.tagIds,
-        assignedTo: form.assignedTo || null,
-      };
-
-      const response = await fetch(`${apiBase}/properties/${propertyId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error?.message ?? "Failed to update property.");
-      }
-
-      setProperty(body.data.property as PropertyDetail);
-      setDrawerOpen(false);
-    } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "Failed to update.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  }, [loadProperty]);
 
   async function handleArchive() {
     if (!property || !canArchive) {
@@ -426,9 +259,9 @@ export function PropertyDetailPanel({
         actions={
           <>
             {canUpdate && (
-              <Button variant="secondary" onClick={openEditDrawer}>
-                Edit
-              </Button>
+              <Link href={workspacePath(workspaceSlug, "properties", propertyId, "edit")}>
+                <Button variant="secondary">Edit</Button>
+              </Link>
             )}
             {canArchive && (
               <Button variant="ghost" onClick={() => void handleArchive()}>
@@ -443,7 +276,7 @@ export function PropertyDetailPanel({
         <div className="md:flex-[2] aspect-[16/9] md:aspect-auto md:h-full rounded-xl overflow-hidden bg-[var(--color-muted)] relative flex items-center justify-center text-[var(--color-ink-faint)]">
           <IconImage size={32} />
           <span className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-[#0f172a]/60 text-white text-[11.5px] font-medium backdrop-blur-sm">
-            {property.surface ? `${property.surface} m²` : "—"} ·{" "}
+            {formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")} ·{" "}
             {property.rooms !== null ? `${property.rooms} rooms` : "—"}
           </span>
         </div>
@@ -491,7 +324,7 @@ export function PropertyDetailPanel({
             <Fact
               icon={<IconRuler size={14} />}
               label="Area"
-              value={property.surface !== null ? `${property.surface} m²` : "—"}
+              value={formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")}
             />
           </div>
 
@@ -594,7 +427,7 @@ export function PropertyDetailPanel({
                     />
                     <Info
                       label="Surface"
-                      value={property.surface !== null ? `${property.surface} m²` : "—"}
+                      value={formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")}
                     />
                     <Info label="City" value={property.city ?? "—"} />
                     <Info label="Country" value={property.country ?? "—"} />
@@ -677,318 +510,6 @@ export function PropertyDetailPanel({
         </Card>
       </div>
 
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title="Edit property"
-        className="w-[min(100%,480px)]"
-        footer={
-          form ? (
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setDrawerOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" form="edit-property-form" disabled={submitting}>
-                {submitting ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      >
-        {form && (
-          <form id="edit-property-form" className="space-y-4" onSubmit={(event) => void handleUpdate(event)}>
-            <div>
-              <Label htmlFor="edit-title" required>
-                Title
-              </Label>
-              <Input
-                id="edit-title"
-                value={form.title}
-                onChange={(event) =>
-                  setForm((current) =>
-                    current ? { ...current, title: event.target.value } : current,
-                  )
-                }
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-reference">Reference</Label>
-                <Input
-                  id="edit-reference"
-                  value={form.reference}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, reference: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-statusId" required>
-                  Status
-                </Label>
-                <Select
-                  id="edit-statusId"
-                  value={form.statusId}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, statusId: event.target.value } : current,
-                    )
-                  }
-                  required
-                >
-                  {statuses.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-typeId">Type</Label>
-                <Select
-                  id="edit-typeId"
-                  value={form.typeId}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, typeId: event.target.value } : current,
-                    )
-                  }
-                >
-                  <option value="">No type</option>
-                  {types.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-projectId">Project</Label>
-                <ProjectSelector
-                  projects={projects}
-                  selectedProjectId={form.projectId || null}
-                  onChange={(projectId) =>
-                    setForm((current) =>
-                      current ? { ...current, projectId: projectId ?? "" } : current,
-                    )
-                  }
-                  placeholder="No project"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-price">Price</Label>
-                <Input
-                  id="edit-price"
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, price: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-currency">Currency</Label>
-                <Input
-                  id="edit-currency"
-                  value={form.currency}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current
-                        ? { ...current, currency: event.target.value.toUpperCase() }
-                        : current,
-                    )
-                  }
-                  maxLength={3}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-address">Address</Label>
-              <Input
-                id="edit-address"
-                value={form.address}
-                onChange={(event) =>
-                  setForm((current) =>
-                    current ? { ...current, address: event.target.value } : current,
-                  )
-                }
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-city">City</Label>
-                <Input
-                  id="edit-city"
-                  value={form.city}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, city: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-country">Country</Label>
-                <Input
-                  id="edit-country"
-                  value={form.country}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, country: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label htmlFor="edit-rooms">Rooms</Label>
-                <Input
-                  id="edit-rooms"
-                  type="number"
-                  min={0}
-                  value={form.rooms}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, rooms: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-bedrooms">Bedrooms</Label>
-                <Input
-                  id="edit-bedrooms"
-                  type="number"
-                  min={0}
-                  value={form.bedrooms}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, bedrooms: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-bathrooms">Bathrooms</Label>
-                <Input
-                  id="edit-bathrooms"
-                  type="number"
-                  min={0}
-                  value={form.bathrooms}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, bathrooms: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-surface">Surface (m²)</Label>
-                <Input
-                  id="edit-surface"
-                  type="number"
-                  min={0}
-                  value={form.surface}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, surface: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-floor">Floor</Label>
-                <Input
-                  id="edit-floor"
-                  type="number"
-                  value={form.floor}
-                  onChange={(event) =>
-                    setForm((current) =>
-                      current ? { ...current, floor: event.target.value } : current,
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-assignedTo">Assigned to</Label>
-              <MemberSelector
-                members={members}
-                selectedUserId={form.assignedTo || null}
-                onChange={(userId) =>
-                  setForm((current) =>
-                    current ? { ...current, assignedTo: userId ?? "" } : current,
-                  )
-                }
-                placeholder="Unassigned"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="edit-features">Features</Label>
-              <Input
-                id="edit-features"
-                placeholder="Lake view, Balcony, Parking"
-                value={form.features}
-                onChange={(event) =>
-                  setForm((current) =>
-                    current ? { ...current, features: event.target.value } : current,
-                  )
-                }
-              />
-            </div>
-
-            <div>
-              <Label>Tags</Label>
-              <TagSelector
-                tags={tags}
-                entityType="property"
-                selectedTagIds={form.tagIds}
-                onToggle={toggleTag}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={form.description}
-                onChange={(event) =>
-                  setForm((current) =>
-                    current ? { ...current, description: event.target.value } : current,
-                  )
-                }
-                rows={4}
-              />
-            </div>
-
-            {formError && (
-              <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>
-            )}
-          </form>
-        )}
-      </Drawer>
     </>
   );
 }
