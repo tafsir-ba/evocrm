@@ -10,11 +10,14 @@ import {
   findActiveEnrollmentByOpportunity,
   findCampaignEnrollments,
   findEnrollmentById,
+  findNonTerminalEnrollmentTargetIds,
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
 } from "@/server/repositories/campaign-enrollments";
+import { findLeads } from "@/server/repositories/leads";
 import { findFirstCampaignStep, findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import { listOpportunitiesForWorkspace } from "@/server/services/opportunities";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
@@ -36,6 +39,27 @@ export type CampaignEnrollmentDetail = CampaignEnrollmentRecord & {
   warnings: string[];
   scheduledSteps: EnrollmentScheduledStep[];
 };
+
+export type CampaignEnrollmentLeadCandidate = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  emailConsentStatus: string;
+  createdAt: Date;
+};
+
+export type CampaignEnrollmentOpportunityCandidate = {
+  id: string;
+  createdAt: Date;
+  lead: { id: string; fullName: string; email: string | null } | null;
+  property: { id: string; title: string; reference: string | null } | null;
+  status: { label: string } | null;
+};
+
+export type CampaignEnrollmentCandidate =
+  | ({ audienceType: "leads" } & CampaignEnrollmentLeadCandidate)
+  | ({ audienceType: "opportunities" } & CampaignEnrollmentOpportunityCandidate);
 
 function enrollmentSnapshot(
   enrollment: CampaignEnrollmentRecord,
@@ -118,6 +142,92 @@ async function enrichEnrollment(
 async function getWorkspaceTimeZone(workspaceId: string): Promise<string> {
   const workspace = await findWorkspaceById(workspaceId);
   return workspace?.timezone ?? "UTC";
+}
+
+export async function listEnrollmentCandidatesForWorkspace(
+  workspaceId: string,
+  campaignId: string,
+  filter: { page?: number; pageSize?: number; search?: string } = {},
+): Promise<{ candidates: CampaignEnrollmentCandidate[]; total: number }> {
+  const campaign = await findCampaignById(workspaceId, campaignId);
+
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  if (campaign.status === "archived") {
+    return { candidates: [], total: 0 };
+  }
+
+  const { leadIds, opportunityIds } = await findNonTerminalEnrollmentTargetIds(
+    workspaceId,
+    campaignId,
+  );
+  const enrolledLeadIds = new Set(leadIds);
+  const enrolledOpportunityIds = new Set(opportunityIds);
+  const page = filter.page ?? 1;
+  const pageSize = filter.pageSize ?? 50;
+
+  if (campaign.audienceType === "leads") {
+    const { leads } = await findLeads(workspaceId, {
+      createdFrom: campaign.createdAt,
+      search: filter.search,
+      page,
+      pageSize,
+    });
+
+    const candidates = leads
+      .filter((lead) => !enrolledLeadIds.has(lead.id))
+      .map((lead) => ({
+        audienceType: "leads" as const,
+        id: lead.id,
+        fullName: lead.fullName,
+        email: lead.email,
+        phone: lead.phone,
+        emailConsentStatus: lead.emailConsentStatus,
+        createdAt: lead.createdAt,
+      }));
+
+    return {
+      candidates,
+      total: candidates.length,
+    };
+  }
+
+  const { opportunities } = await listOpportunitiesForWorkspace(workspaceId, {
+    createdFrom: campaign.createdAt,
+    search: filter.search,
+    page,
+    pageSize,
+  });
+
+  const candidates = opportunities
+    .filter((opportunity) => !enrolledOpportunityIds.has(opportunity.id))
+    .map((opportunity) => ({
+      audienceType: "opportunities" as const,
+      id: opportunity.id,
+      createdAt: opportunity.createdAt,
+      lead: opportunity.lead
+        ? {
+            id: opportunity.lead.id,
+            fullName: opportunity.lead.fullName,
+            email: opportunity.lead.email,
+          }
+        : null,
+      property: opportunity.property
+        ? {
+            id: opportunity.property.id,
+            title: opportunity.property.title,
+            reference: opportunity.property.reference,
+          }
+        : null,
+      status: opportunity.status ? { label: opportunity.status.label } : null,
+    }));
+
+  return {
+    candidates,
+    total: candidates.length,
+  };
 }
 
 export async function listCampaignEnrollmentsForWorkspace(

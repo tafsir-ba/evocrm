@@ -70,6 +70,25 @@ type Enrollment = {
   scheduledSteps: EnrollmentScheduledStep[];
 };
 
+type EnrollmentCandidate =
+  | {
+      audienceType: "leads";
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string | null;
+      emailConsentStatus: string;
+      createdAt: string;
+    }
+  | {
+      audienceType: "opportunities";
+      id: string;
+      createdAt: string;
+      lead: { id: string; fullName: string; email: string | null } | null;
+      property: { id: string; title: string; reference: string | null } | null;
+      status: { label: string } | null;
+    };
+
 type SendLog = {
   id: string;
   status: string;
@@ -100,6 +119,7 @@ export function CampaignDetailPanel({
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [enrollmentCandidates, setEnrollmentCandidates] = useState<EnrollmentCandidate[]>([]);
   const [sends, setSends] = useState<SendLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,11 +140,12 @@ export function CampaignDetailPanel({
     setForbidden(false);
 
     try {
-      const [campaignRes, stepsRes, enrollRes, sendsRes] = await Promise.all([
+      const [campaignRes, stepsRes, enrollRes, sendsRes, candidatesRes] = await Promise.all([
         fetch(apiBase),
         fetch(`${apiBase}/steps`),
         fetch(`${apiBase}/enrollments`),
         fetch(`${apiBase}/sends`),
+        fetch(`${apiBase}/enrollment-candidates`),
       ]);
 
       if (campaignRes.status === 403) {
@@ -132,12 +153,13 @@ export function CampaignDetailPanel({
         return;
       }
 
-      const [campaignPayload, stepsPayload, enrollPayload, sendsPayload] =
+      const [campaignPayload, stepsPayload, enrollPayload, sendsPayload, candidatesPayload] =
         await Promise.all([
           campaignRes.json(),
           stepsRes.json(),
           enrollRes.json(),
           sendsRes.json(),
+          candidatesRes.json(),
         ]);
 
       if (!campaignRes.ok) {
@@ -159,9 +181,14 @@ export function CampaignDetailPanel({
         warnings.push("Failed to load send history.");
       }
 
+      if (!candidatesRes.ok) {
+        warnings.push("Failed to load enrollment suggestions.");
+      }
+
       setCampaign(campaignPayload.data?.campaign ?? null);
       setSteps(stepsRes.ok ? (stepsPayload.data?.steps ?? []) : []);
       setEnrollments(enrollRes.ok ? (enrollPayload.data ?? []) : []);
+      setEnrollmentCandidates(candidatesRes.ok ? (candidatesPayload.data ?? []) : []);
       setSends(sendsRes.ok ? (sendsPayload.data ?? []) : []);
       setLoadWarning(warnings.length > 0 ? warnings.join(" ") : null);
     } catch {
@@ -327,15 +354,12 @@ export function CampaignDetailPanel({
     }
   }
 
-  async function handleEnroll() {
+  async function handleEnroll(targetIds = selectedEnrollmentIds) {
     if (!campaign) {
       return;
     }
 
-    const selectionError = getEnrollmentSelectionError(
-      campaign.audienceType,
-      selectedEnrollmentIds,
-    );
+    const selectionError = getEnrollmentSelectionError(campaign.audienceType, targetIds);
 
     if (selectionError) {
       setEnrollError(selectionError);
@@ -349,7 +373,7 @@ export function CampaignDetailPanel({
     let enrolledCount = 0;
 
     try {
-      for (const targetId of selectedEnrollmentIds) {
+      for (const targetId of targetIds) {
         const body =
           campaign.audienceType === "leads"
             ? buildLeadEnrollmentPayload(targetId)
@@ -600,6 +624,71 @@ export function CampaignDetailPanel({
       {/* Enrollments */}
       <Card className="mb-6">
         <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">Enrollments</h2>
+
+        {campaign.status === "draft" && (
+          <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+            Activate this campaign before enrolling recipients.
+            {enrollmentCandidates.length > 0
+              ? ` ${enrollmentCandidates.length} ${campaign.audienceType === "leads" ? "lead" : "opportunity"}${enrollmentCandidates.length === 1 ? "" : "s"} created since this campaign was set up can be enrolled after activation.`
+              : ""}
+          </div>
+        )}
+
+        {campaign.status === "paused" && canUpdate && (
+          <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+            Resume this campaign to enroll new recipients.
+          </div>
+        )}
+
+        {enrollmentCandidates.length > 0 && (
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] font-medium text-[var(--color-ink)]">
+                Suggested for enrollment
+              </p>
+              {canManageEnrollments ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={actionPending}
+                  onClick={() =>
+                    void handleEnroll(enrollmentCandidates.map((candidate) => candidate.id))
+                  }
+                >
+                  Enroll all suggested
+                </Button>
+              ) : null}
+            </div>
+            <ul className="rounded-lg border border-[var(--color-line)] divide-y divide-[var(--color-line)]">
+              {enrollmentCandidates.map((candidate) => (
+                <li key={candidate.id} className="px-3 py-2.5 text-[13px]">
+                  {candidate.audienceType === "leads" ? (
+                    <>
+                      <p className="font-medium text-[var(--color-ink)]">{candidate.fullName}</p>
+                      <p className="text-[12px] text-[var(--color-ink-muted)]">
+                        {candidate.email ?? "No email"}
+                        {candidate.phone ? ` · ${candidate.phone}` : ""}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-[var(--color-ink)]">
+                        {candidate.lead?.fullName ?? "Unknown lead"}
+                      </p>
+                      <p className="text-[12px] text-[var(--color-ink-muted)]">
+                        {candidate.property?.title ??
+                          candidate.property?.reference ??
+                          "No property"}
+                        {candidate.status ? ` · ${candidate.status.label}` : ""}
+                      </p>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {canManageEnrollments && (
           <div className="mb-4 space-y-3">
             <CampaignEnrollmentSelector
@@ -620,7 +709,19 @@ export function CampaignDetailPanel({
           </div>
         )}
         {enrollments.length === 0 ? (
-          <EmptyState compact title="No enrollments" description="Manually enroll a lead or opportunity." />
+          <EmptyState
+            compact
+            title="No enrollments"
+            description={
+              campaign.status === "draft"
+                ? "No recipients enrolled yet. Activate the campaign, then enroll suggested leads or search manually."
+                : campaign.status === "active"
+                  ? enrollmentCandidates.length > 0
+                    ? "No recipients enrolled yet. Use the suggestions above or search below."
+                    : "Search for a lead or opportunity below to enroll."
+                  : "Manually enroll a lead or opportunity once the campaign is active."
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">

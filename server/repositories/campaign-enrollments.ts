@@ -140,6 +140,39 @@ export async function findActiveEnrollmentByOpportunity(
   return document ? toEnrollmentRecord(document as CampaignEnrollmentDocument) : null;
 }
 
+export async function findNonTerminalEnrollmentTargetIds(
+  workspaceId: string,
+  campaignId: string,
+): Promise<{ leadIds: string[]; opportunityIds: string[] }> {
+  await connectDb();
+
+  const enrollments = await CampaignEnrollmentModel.find(
+    withWorkspaceScope(workspaceId, {
+      campaignId,
+      status: { $in: NON_TERMINAL_ENROLLMENT_STATUSES },
+    }),
+  )
+    .select({ leadId: 1, opportunityId: 1 })
+    .lean<Array<{ leadId?: { toString(): string }; opportunityId?: { toString(): string } }>>();
+
+  const leadIds = new Set<string>();
+  const opportunityIds = new Set<string>();
+
+  for (const enrollment of enrollments) {
+    if (enrollment.leadId) {
+      leadIds.add(enrollment.leadId.toString());
+    }
+    if (enrollment.opportunityId) {
+      opportunityIds.add(enrollment.opportunityId.toString());
+    }
+  }
+
+  return {
+    leadIds: Array.from(leadIds),
+    opportunityIds: Array.from(opportunityIds),
+  };
+}
+
 export async function countCampaignEnrollments(
   workspaceId: string,
   campaignId: string,
