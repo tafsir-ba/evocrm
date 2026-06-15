@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
@@ -10,6 +10,11 @@ import {
   FocusedFormActions,
   FocusedFormLayout,
 } from "@/components/layout/focused-form-layout";
+import {
+  PropertyFormPhotosSection,
+  addPropertyPhotoDrafts,
+  removePropertyPhotoDraft,
+} from "@/components/properties/property-media-section";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import {
   parseSurfaceInput,
@@ -18,6 +23,12 @@ import {
   SURFACE_UNIT_LABELS,
   type SurfaceUnit,
 } from "@/lib/surface-unit";
+import {
+  buildPropertyPhotoUploadWarning,
+  PROPERTY_PHOTO_UPLOAD_WARNING_KEY,
+  type PropertyPhotoDraft,
+  uploadPropertyPhotos,
+} from "@/lib/property-media";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -59,6 +70,7 @@ type PropertyFormPageProps = {
   initialValues?: PropertyFormInitialValues;
   cancelHref: string;
   back?: { href: string; label?: string };
+  canCreateDocument?: boolean;
 };
 
 const emptyForm = (defaultCurrency: string): PropertyFormInitialValues => ({
@@ -92,11 +104,15 @@ export function PropertyFormPage({
   initialValues,
   cancelHref,
   back,
+  canCreateDocument = false,
 }: PropertyFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<PropertyFormInitialValues>(
     initialValues ?? emptyForm(defaultCurrency),
   );
+  const [queuedPhotos, setQueuedPhotos] = useState<PropertyPhotoDraft[]>([]);
+  const queuedPhotosRef = useRef(queuedPhotos);
+  queuedPhotosRef.current = queuedPhotos;
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [types, setTypes] = useState<DictionaryItem[]>([]);
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
@@ -181,6 +197,20 @@ export function PropertyFormPage({
     }
   }, [form.projectId, isEdit, projects]);
 
+  useEffect(() => {
+    return () => {
+      queuedPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+    };
+  }, []);
+
+  function handleAddQueuedPhotos(files: File[]) {
+    setQueuedPhotos((current) => addPropertyPhotoDrafts(current, files));
+  }
+
+  function handleRemoveQueuedPhoto(id: string) {
+    setQueuedPhotos((current) => removePropertyPhotoDraft(current, id));
+  }
+
   function toggleTag(tagId: string) {
     setForm((current) => ({
       ...current,
@@ -245,6 +275,18 @@ export function PropertyFormPage({
       }
 
       const savedPropertyId = isEdit ? propertyId : body.data.property?.id;
+      if (savedPropertyId && canCreateDocument && queuedPhotos.length > 0) {
+        const uploadResults = await uploadPropertyPhotos({
+          workspaceSlug,
+          propertyId: savedPropertyId,
+          files: queuedPhotos.map((photo) => photo.file),
+        });
+        const warning = buildPropertyPhotoUploadWarning(uploadResults);
+        if (warning) {
+          sessionStorage.setItem(PROPERTY_PHOTO_UPLOAD_WARNING_KEY, warning);
+        }
+      }
+
       if (savedPropertyId) {
         router.push(workspacePath(workspaceSlug, "properties", savedPropertyId));
         router.refresh();
@@ -551,6 +593,18 @@ export function PropertyFormPage({
             rows={4}
           />
         </div>
+
+        {canCreateDocument && (
+          <div>
+            <Label>Photos</Label>
+            <PropertyFormPhotosSection
+              disabled={submitting}
+              photos={queuedPhotos}
+              onAddFiles={handleAddQueuedPhotos}
+              onRemove={handleRemoveQueuedPhoto}
+            />
+          </div>
+        )}
 
         {formError && (
           <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>

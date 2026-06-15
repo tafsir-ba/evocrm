@@ -121,6 +121,32 @@ describe("document API routes", () => {
     expect(listDocumentsForWorkspace).not.toHaveBeenCalled();
   });
 
+  it("forwards mimeTypePrefix=image/ to listDocumentsForWorkspace", async () => {
+    mockWorkspaceAccess(["document:read", "property:read"]);
+    vi.mocked(listDocumentsForWorkspace).mockResolvedValue({
+      documents: [sampleDocument as never],
+      total: 1,
+    });
+
+    const response = await getDocuments(
+      new Request(
+        "http://localhost/api/workspaces/demo/documents?linkedEntityType=property&linkedEntityId=507f1f77bcf86cd799439011&mimeTypePrefix=image/",
+      ),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(listDocumentsForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        linkedEntityType: "property",
+        linkedEntityId: "507f1f77bcf86cd799439011",
+        mimeTypePrefix: "image/",
+      }),
+      expect.any(Array),
+    );
+  });
+
   it("creates upload URL with document:create permission", async () => {
     mockWorkspaceAccess(["document:create", "lead:read"]);
     vi.mocked(createDocumentUploadUrlForWorkspace).mockResolvedValue({

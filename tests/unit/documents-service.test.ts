@@ -164,6 +164,29 @@ describe("documents service", () => {
     }));
   });
 
+  it("passes image mimeTypePrefix filter to repository", async () => {
+    vi.mocked(findDocuments).mockResolvedValue({ documents: [sampleDocument], total: 1 });
+
+    await listDocumentsForWorkspace(
+      "ws-1",
+      {
+        page: 1,
+        pageSize: 25,
+        includeArchived: false,
+        linkedEntityType: "property",
+        linkedEntityId: "property-1",
+        mimeTypePrefix: "image/",
+      },
+      allPermissions,
+    );
+
+    expect(findDocuments).toHaveBeenCalledWith("ws-1", expect.objectContaining({
+      linkedEntityType: "property",
+      linkedEntityId: "property-1",
+      mimeTypePrefix: "image/",
+    }));
+  });
+
   it("rejects campaign linked entity when campaign not found", async () => {
     vi.mocked(findCampaignById).mockResolvedValue(null);
 

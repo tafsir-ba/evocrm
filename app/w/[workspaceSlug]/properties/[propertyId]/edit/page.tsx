@@ -54,6 +54,7 @@ export default async function EditPropertyPage({ params }: { params: Params }) {
         defaultCurrency={defaultCurrency}
         mode="edit"
         propertyId={propertyId}
+        canCreateDocument={hasPermission(permissions, "document:create")}
         initialValues={propertyFormValuesFromSqm(property, defaultCurrency)}
         cancelHref={workspacePath(workspaceSlug, "properties", propertyId)}
         back={{

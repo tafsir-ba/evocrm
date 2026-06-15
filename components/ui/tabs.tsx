@@ -13,13 +13,26 @@ export type TabItem = {
 export function Tabs({
   items,
   defaultKey,
+  activeKey,
+  onChange,
   className,
 }: {
   items: TabItem[];
   defaultKey?: string;
+  activeKey?: string;
+  onChange?: (key: string) => void;
   className?: string;
 }) {
-  const [active, setActive] = useState(defaultKey ?? items[0]?.key);
+  const [internalActive, setInternalActive] = useState(defaultKey ?? items[0]?.key);
+  const active = activeKey ?? internalActive;
+
+  function setActive(key: string) {
+    if (onChange) {
+      onChange(key);
+    } else {
+      setInternalActive(key);
+    }
+  }
 
   return (
     <div className={cn(className)}>

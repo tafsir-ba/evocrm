@@ -32,6 +32,29 @@ describe("document validation schemas", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts optional image mimeTypePrefix filter", () => {
+    const result = documentListQuerySchema.safeParse({
+      linkedEntityType: "property",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      mimeTypePrefix: "image/",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mimeTypePrefix).toBe("image/");
+    }
+  });
+
+  it("rejects unsupported mimeTypePrefix values", () => {
+    const result = documentListQuerySchema.safeParse({
+      linkedEntityType: "property",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      mimeTypePrefix: "application/",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("accepts valid upload-url input", () => {
     const result = documentUploadUrlInputSchema.safeParse({
       linkedEntityType: "lead",

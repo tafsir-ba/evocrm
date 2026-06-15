@@ -90,6 +90,7 @@ export async function listDocumentsForWorkspace(
     includeArchived: query.includeArchived,
     linkedEntityType: query.linkedEntityType,
     linkedEntityId: query.linkedEntityId,
+    mimeTypePrefix: query.mimeTypePrefix,
     page: query.page,
     pageSize: query.pageSize,
   });

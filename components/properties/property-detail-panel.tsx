@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { ActivitiesSection } from "@/components/activities/activities-section";
 import { DocumentsSection } from "@/components/documents/documents-section";
+import { PropertyMediaHero } from "@/components/properties/property-media-hero";
+import { PropertyMediaSection } from "@/components/properties/property-media-section";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { PageHeader } from "@/components/layout/page-header";
 import { StateView } from "@/components/states/state-view";
@@ -22,11 +24,11 @@ import {
   IconBed,
   IconBuilding,
   IconCalendar,
-  IconImage,
   IconMapPin,
   IconRuler,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import { PROPERTY_PHOTO_UPLOAD_WARNING_KEY } from "@/lib/property-media";
 
 type DictionaryItem = {
   id: string;
@@ -129,6 +131,9 @@ export function PropertyDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [photoReloadToken, setPhotoReloadToken] = useState(0);
+  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -165,6 +170,18 @@ export function PropertyDetailPanel({
   useEffect(() => {
     void loadProperty();
   }, [loadProperty]);
+
+  useEffect(() => {
+    const warning = sessionStorage.getItem(PROPERTY_PHOTO_UPLOAD_WARNING_KEY);
+    if (warning) {
+      setUploadWarning(warning);
+      sessionStorage.removeItem(PROPERTY_PHOTO_UPLOAD_WARNING_KEY);
+    }
+  }, []);
+
+  function handlePhotosChanged() {
+    setPhotoReloadToken((current) => current + 1);
+  }
 
   async function handleArchive() {
     if (!property || !canArchive) {
@@ -272,25 +289,25 @@ export function PropertyDetailPanel({
         }
       />
 
-      <div className="flex flex-col md:flex-row gap-3 mb-4 md:h-[280px]">
-        <div className="md:flex-[2] aspect-[16/9] md:aspect-auto md:h-full rounded-xl overflow-hidden bg-[var(--color-muted)] relative flex items-center justify-center text-[var(--color-ink-faint)]">
-          <IconImage size={32} />
-          <span className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-[#0f172a]/60 text-white text-[11.5px] font-medium backdrop-blur-sm">
-            {formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")} ·{" "}
-            {property.rooms !== null ? `${property.rooms} rooms` : "—"}
-          </span>
+      {uploadWarning && (
+        <div
+          role="status"
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900"
+        >
+          {uploadWarning}
         </div>
-        <div className="md:flex-1 md:h-full grid grid-cols-3 md:grid-cols-1 md:grid-rows-3 gap-3">
-          {[0, 1, 2].map((index) => (
-            <div
-              key={index}
-              className="aspect-[16/10] md:aspect-auto md:h-full rounded-lg overflow-hidden bg-[var(--color-muted)] flex items-center justify-center text-[var(--color-ink-faint)]"
-            >
-              <IconImage size={20} />
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
+
+      <PropertyMediaHero
+        workspaceSlug={workspaceSlug}
+        propertyId={propertyId}
+        canReadPhotos={canReadDocuments}
+        canCreatePhoto={canCreateDocument}
+        surfaceLabel={formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")}
+        roomsLabel={property.rooms !== null ? `${property.rooms} rooms` : "—"}
+        reloadToken={photoReloadToken}
+        onUploadClick={() => setActiveTab("media")}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-1 self-start">
@@ -375,6 +392,8 @@ export function PropertyDetailPanel({
         <Card padded={false} className="xl:col-span-2">
           <Tabs
             className="px-5"
+            activeKey={activeTab}
+            onChange={setActiveTab}
             items={[
               {
                 key: "overview",
@@ -438,14 +457,14 @@ export function PropertyDetailPanel({
                 key: "media",
                 label: "Media",
                 content: (
-                  <div className="px-5 pb-5">
-                    <StateView
-                      variant="empty"
-                      compact
-                      title="No media yet"
-                      description="Property gallery upload will be available in a later phase."
-                    />
-                  </div>
+                  <PropertyMediaSection
+                    workspaceSlug={workspaceSlug}
+                    propertyId={propertyId}
+                    canRead={canReadDocuments}
+                    canCreate={canCreateDocument}
+                    canArchive={canArchiveDocument}
+                    onPhotosChanged={handlePhotosChanged}
+                  />
                 ),
               },
               {

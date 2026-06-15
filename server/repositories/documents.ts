@@ -48,6 +48,7 @@ export type DocumentListFilter = {
   includeArchived?: boolean;
   linkedEntityType?: "lead" | "property" | "opportunity" | "campaign";
   linkedEntityId?: string;
+  mimeTypePrefix?: "image/";
   page?: number;
   pageSize?: number;
 };
@@ -68,6 +69,10 @@ function buildListQuery(filter: DocumentListFilter): Record<string, unknown> {
 
   if (filter.linkedEntityId) {
     query.linkedEntityId = filter.linkedEntityId;
+  }
+
+  if (filter.mimeTypePrefix) {
+    query.mimeType = { $regex: `^${filter.mimeTypePrefix}` };
   }
 
   return query;

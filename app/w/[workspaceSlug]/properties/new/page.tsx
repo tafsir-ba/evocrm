@@ -45,6 +45,7 @@ export default async function NewPropertyPage({ params }: { params: Params }) {
         workspaceSlug={workspaceSlug}
         defaultCurrency={access.context.workspace.defaultCurrency}
         mode="create"
+        canCreateDocument={hasPermission(permissions, "document:create")}
         cancelHref={workspacePath(workspaceSlug, "properties")}
         back={{ href: workspacePath(workspaceSlug, "properties"), label: "Back to properties" }}
       />
