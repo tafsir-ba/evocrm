@@ -9,6 +9,7 @@ import {
   type WorkspaceNavigationItem,
 } from "@/lib/v1-navigation";
 import { workspaceNavPath } from "@/lib/workspace-paths";
+import { hasPermission } from "@/server/permissions/permissions";
 import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
 import {
   createWorkspace,
@@ -43,6 +44,7 @@ export type WorkspaceListItem = {
   defaultCurrency: string;
   roleKey: string;
   isOwner: boolean;
+  canEdit: boolean;
 };
 
 export type WorkspaceContext = {
@@ -147,6 +149,7 @@ export async function listActiveWorkspacesForUser(
         defaultCurrency: workspace.defaultCurrency,
         roleKey: role.key,
         isOwner: role.key === "owner",
+        canEdit: hasPermission(role.permissions, "settings:update"),
       });
     }
   }

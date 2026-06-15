@@ -12,6 +12,7 @@ vi.mock("@/server/services/workspace-deletion", () => ({
   deleteWorkspaceForOwner: vi.fn(),
 }));
 
+import { AppError } from "@/server/errors";
 import { DELETE } from "@/app/api/workspaces/[workspaceSlug]/route";
 import { deleteWorkspaceForOwner } from "@/server/services/workspace-deletion";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
@@ -60,5 +61,41 @@ describe("DELETE /api/workspaces/[workspaceSlug]", () => {
       actorUserId: "user-1",
       confirmation: { confirmName: "Evo CRM" },
     });
+  });
+
+  it("returns forbidden when service rejects non-owner", async () => {
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-2",
+      workspace: {
+        id: "ws-1",
+        slug: "evo-crm",
+        name: "Evo CRM",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m-2",
+        workspaceId: "ws-1",
+        userId: "user-2",
+        roleId: "role-agent",
+        status: "active",
+        permissions: [],
+      },
+    });
+
+    vi.mocked(deleteWorkspaceForOwner).mockRejectedValue(
+      new AppError("FORBIDDEN", "Only the workspace owner can perform this action."),
+    );
+
+    const response = await DELETE(
+      new Request("http://localhost/api/workspaces/evo-crm", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: "Evo CRM" }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "evo-crm" }) },
+    );
+
+    expect(response.status).toBe(403);
   });
 });

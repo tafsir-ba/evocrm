@@ -129,6 +129,7 @@ type WorkspaceListItemProps = {
     defaultCurrency: string;
     roleKey: string;
     isOwner: boolean;
+    canEdit: boolean;
   };
   initials: string;
 };
@@ -161,12 +162,14 @@ export function WorkspaceListItem({ workspace, initials }: WorkspaceListItemProp
         </a>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <Link
-            href={workspaceNavPath(workspace.slug, "settings/workspace")}
-            className="inline-flex h-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white px-3 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)] focus-ring"
-          >
-            Edit
-          </Link>
+          {workspace.canEdit && (
+            <Link
+              href={workspaceNavPath(workspace.slug, "settings/workspace")}
+              className="inline-flex h-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white px-3 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)] focus-ring"
+            >
+              Edit
+            </Link>
+          )}
           {workspace.isOwner && (
             <DeleteWorkspaceButton
               workspaceSlug={workspace.slug}
