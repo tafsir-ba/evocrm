@@ -49,6 +49,7 @@ export type DocumentListFilter = {
   linkedEntityType?: "lead" | "property" | "opportunity" | "campaign";
   linkedEntityId?: string;
   mimeTypePrefix?: "image/";
+  sortOrder?: "asc" | "desc";
   page?: number;
   pageSize?: number;
 };
@@ -88,9 +89,14 @@ export async function findDocuments(
   const page = filter.page ?? 1;
   const pageSize = filter.pageSize ?? 25;
   const skip = (page - 1) * pageSize;
+  const sortDirection = filter.sortOrder === "asc" ? 1 : -1;
 
   const [documents, total] = await Promise.all([
-    DocumentModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+    DocumentModel.find(query)
+      .sort({ createdAt: sortDirection })
+      .skip(skip)
+      .limit(pageSize)
+      .lean(),
     DocumentModel.countDocuments(query),
   ]);
 

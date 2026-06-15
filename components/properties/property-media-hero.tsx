@@ -6,7 +6,7 @@ import type { DocumentListItem } from "@/lib/documents";
 import { IconImage } from "@/lib/icons";
 import {
   fetchDocumentSignedUrl,
-  fetchPropertyImageDocuments,
+  fetchPropertyHeroImageDocuments,
 } from "@/lib/property-media";
 
 type PropertyMediaHeroProps = {
@@ -45,8 +45,7 @@ export function PropertyMediaHero({
     setLoading(true);
 
     try {
-      const documents = await fetchPropertyImageDocuments(workspaceSlug, propertyId);
-      const heroPhotos = documents.slice(0, 4);
+      const heroPhotos = await fetchPropertyHeroImageDocuments(workspaceSlug, propertyId);
       setPhotos(heroPhotos);
 
       const urlEntries = await Promise.all(

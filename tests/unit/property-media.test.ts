@@ -192,4 +192,41 @@ describe("property media helpers", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("fetches only the first hero page with pageSize=4 and sortOrder=asc", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: [
+          {
+            id: "doc-1",
+            fileName: "a.jpg",
+            mimeType: "image/jpeg",
+            fileSize: 100,
+            visibility: "private",
+            status: "active",
+            createdAt: "2026-06-14T10:00:00.000Z",
+            uploadedByUser: null,
+          },
+        ],
+        pagination: { page: 1, pageSize: 4, total: 12, totalPages: 3 },
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchPropertyHeroImageDocuments } = await import("@/lib/property-media");
+    const documents = await fetchPropertyHeroImageDocuments("demo", "507f1f77bcf86cd799439011");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(requestUrl).toContain("page=1");
+    expect(requestUrl).toContain("pageSize=4");
+    expect(requestUrl).toContain("mimeTypePrefix=image%2F");
+    expect(requestUrl).toContain("sortOrder=asc");
+    expect(documents).toHaveLength(1);
+
+    vi.unstubAllGlobals();
+  });
 });

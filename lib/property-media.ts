@@ -10,6 +10,8 @@ export type PropertyPhotoMimeType = (typeof PROPERTY_PHOTO_MIME_TYPES)[number];
 
 export const MAX_PROPERTY_PHOTO_QUEUE = 20;
 
+export const PROPERTY_HERO_IMAGE_COUNT = 4;
+
 export const MAX_PROPERTY_PHOTO_BYTES = MAX_DOCUMENT_FILE_SIZE_BYTES;
 
 export const PROPERTY_PHOTO_UPLOAD_WARNING_KEY = "property-photo-upload-warning";
@@ -181,6 +183,35 @@ export async function fetchPropertyImageDocuments(
   }
 
   return sortPropertyPhotosByCreatedAt(filterPropertyImageDocuments(allDocuments), "asc");
+}
+
+export async function fetchPropertyHeroImageDocuments(
+  workspaceSlug: string,
+  propertyId: string,
+): Promise<DocumentListItem[]> {
+  const params = new URLSearchParams({
+    page: "1",
+    pageSize: String(PROPERTY_HERO_IMAGE_COUNT),
+    linkedEntityType: "property",
+    linkedEntityId: propertyId,
+    mimeTypePrefix: "image/",
+    sortOrder: "asc",
+  });
+
+  const response = await fetch(
+    `/api/workspaces/${workspaceSlug}/documents?${params.toString()}`,
+  );
+
+  if (response.status === 403) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load property photos.");
+  }
+
+  const body = (await response.json()) as { data: DocumentListItem[] };
+  return filterPropertyImageDocuments(body.data);
 }
 
 export async function fetchDocumentSignedUrl(

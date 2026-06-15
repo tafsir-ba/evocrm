@@ -55,6 +55,19 @@ describe("document validation schemas", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts optional sortOrder for document list", () => {
+    const result = documentListQuerySchema.safeParse({
+      linkedEntityType: "property",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      sortOrder: "asc",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sortOrder).toBe("asc");
+    }
+  });
+
   it("accepts valid upload-url input", () => {
     const result = documentUploadUrlInputSchema.safeParse({
       linkedEntityType: "lead",

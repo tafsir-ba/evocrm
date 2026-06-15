@@ -187,6 +187,29 @@ describe("documents service", () => {
     }));
   });
 
+  it("passes sortOrder to repository when provided", async () => {
+    vi.mocked(findDocuments).mockResolvedValue({ documents: [sampleDocument], total: 1 });
+
+    await listDocumentsForWorkspace(
+      "ws-1",
+      {
+        page: 1,
+        pageSize: 4,
+        includeArchived: false,
+        linkedEntityType: "property",
+        linkedEntityId: "property-1",
+        mimeTypePrefix: "image/",
+        sortOrder: "asc",
+      },
+      allPermissions,
+    );
+
+    expect(findDocuments).toHaveBeenCalledWith("ws-1", expect.objectContaining({
+      sortOrder: "asc",
+      pageSize: 4,
+    }));
+  });
+
   it("rejects campaign linked entity when campaign not found", async () => {
     vi.mocked(findCampaignById).mockResolvedValue(null);
 

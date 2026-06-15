@@ -91,6 +91,7 @@ export async function listDocumentsForWorkspace(
     linkedEntityType: query.linkedEntityType,
     linkedEntityId: query.linkedEntityId,
     mimeTypePrefix: query.mimeTypePrefix,
+    sortOrder: query.sortOrder,
     page: query.page,
     pageSize: query.pageSize,
   });

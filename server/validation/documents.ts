@@ -30,6 +30,10 @@ export const MAX_DOCUMENT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
 const documentMimeTypePrefixSchema = z.literal("image/");
 
+export const DOCUMENT_LIST_SORT_ORDERS = ["asc", "desc"] as const;
+
+export type DocumentListSortOrder = (typeof DOCUMENT_LIST_SORT_ORDERS)[number];
+
 export const documentListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -40,6 +44,7 @@ export const documentListQuerySchema = z.object({
   linkedEntityType: z.enum(DOCUMENT_LINKED_ENTITY_TYPES),
   linkedEntityId: objectIdSchema,
   mimeTypePrefix: documentMimeTypePrefixSchema.optional(),
+  sortOrder: z.enum(DOCUMENT_LIST_SORT_ORDERS).optional(),
 });
 
 export const documentUploadUrlInputSchema = z
