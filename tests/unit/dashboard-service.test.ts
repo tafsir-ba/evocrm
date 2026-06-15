@@ -486,7 +486,15 @@ describe("dashboard service", () => {
             behavior: "open",
           },
           lostReason: null,
-          lead: { id: "lead-1", fullName: "Jane Doe", email: null, phone: null },
+          lead: {
+            id: "lead-1",
+            fullName: "Jane Doe",
+            email: null,
+            phone: null,
+            propertyTypeInterests: [],
+            transactionIntent: null,
+            usagePurpose: null,
+          },
           property: {
             id: "prop-1",
             title: "Lake View",

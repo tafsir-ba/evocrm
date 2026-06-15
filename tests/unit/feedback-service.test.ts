@@ -100,6 +100,10 @@ const baseRecord = {
   updatedAt: new Date("2026-06-14T10:00:00.000Z"),
   resolvedAt: null,
   resolvedBy: null,
+  resolutionNotifiedAt: null,
+  resolutionNotifiedEmail: null,
+  resolutionNotificationStatus: null,
+  resolutionNotificationError: null,
 };
 
 describe("feedback service", () => {

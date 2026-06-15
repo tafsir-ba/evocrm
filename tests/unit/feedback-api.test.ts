@@ -160,6 +160,10 @@ describe("feedback API", () => {
       resolvedAt: new Date().toISOString(),
       resolvedByEmail: "admin@example.com",
       resolvedBy: "admin-1",
+      resolutionNotifiedAt: new Date().toISOString(),
+      resolutionNotifiedEmail: "reporter@example.com",
+      resolutionNotificationStatus: "sent",
+      resolutionNotificationError: null,
     });
 
     const response = await patchFeedback(

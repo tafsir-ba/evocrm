@@ -71,6 +71,7 @@ const baseProperty = {
   bedrooms: 2,
   bathrooms: 2,
   surface: 96,
+  surfaceUnit: "sqm" as const,
   floor: 2,
   description: "Beautiful apartment with lake view.",
   features: ["Lake view", "Balcony"],

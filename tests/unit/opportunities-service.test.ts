@@ -148,6 +148,7 @@ describe("opportunity service", () => {
       bedrooms: null,
       bathrooms: null,
       surface: null,
+      surfaceUnit: "sqm" as const,
       floor: null,
       description: null,
       features: [],
