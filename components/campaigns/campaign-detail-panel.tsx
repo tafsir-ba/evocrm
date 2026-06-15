@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   buildLeadEnrollmentPayload,
@@ -19,9 +18,11 @@ import { Card } from "@/components/ui/card";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Input, Label, Textarea } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconMail, IconPlus } from "@/lib/icons";
+import { DEFAULT_CAMPAIGN_STEP_SEND_TIME } from "@/lib/campaign-defaults";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Campaign = {
@@ -81,6 +82,24 @@ type SendLog = {
   error: string | null;
 };
 
+type StepFormState = {
+  order: string;
+  delayDays: string;
+  sendTime: string;
+  fromName: string;
+  subject: string;
+  body: string;
+};
+
+const emptyStepForm: StepFormState = {
+  order: "1",
+  delayDays: "0",
+  sendTime: DEFAULT_CAMPAIGN_STEP_SEND_TIME,
+  fromName: "",
+  subject: "",
+  body: "",
+};
+
 type CampaignDetailPanelProps = {
   workspaceSlug: string;
   campaignId: string;
@@ -96,7 +115,6 @@ export function CampaignDetailPanel({
   canArchive,
   canDelete,
 }: CampaignDetailPanelProps) {
-  const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -107,9 +125,16 @@ export function CampaignDetailPanel({
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [stepDrawerOpen, setStepDrawerOpen] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [stepForm, setStepForm] = useState<StepFormState>(emptyStepForm);
+  const [stepFormError, setStepFormError] = useState<string | null>(null);
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [previewStep, setPreviewStep] = useState<CampaignStep | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({ name: "", defaultFromName: "" });
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}`;
 
@@ -307,6 +332,67 @@ export function CampaignDetailPanel({
     }
   }
 
+  function openSettings() {
+    if (!campaign) return;
+    setSettingsForm({
+      name: campaign.name,
+      defaultFromName: campaign.defaultFromName ?? "",
+    });
+    setSettingsError(null);
+    setSettingsOpen(true);
+  }
+
+  async function handleSettingsSave(event: React.FormEvent) {
+    event.preventDefault();
+    setSettingsError(null);
+    setActionPending(true);
+
+    try {
+      const response = await fetch(apiBase, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: settingsForm.name.trim(),
+          defaultFromName: settingsForm.defaultFromName.trim() || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setSettingsError(payload.error?.message ?? "Failed to save settings.");
+        return;
+      }
+      setSettingsOpen(false);
+      await loadAll();
+    } catch {
+      setSettingsError("Failed to save settings.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  function openStepDrawer(step?: CampaignStep) {
+    if (step) {
+      setEditingStepId(step.id);
+      setStepForm({
+        order: String(step.order),
+        delayDays: String(step.delayDays),
+        sendTime: step.sendTime,
+        fromName: step.fromName,
+        subject: step.subject,
+        body: step.body,
+      });
+    } else {
+      setEditingStepId(null);
+      setStepForm({
+        ...emptyStepForm,
+        order: String(steps.length + 1),
+        fromName: campaign?.defaultFromName ?? campaign?.name ?? "",
+      });
+    }
+    setStepFormError(null);
+    setStepDrawerOpen(true);
+  }
+
   async function handleDeleteStep(stepId: string) {
     if (!window.confirm("Delete this step?")) return;
 
@@ -322,6 +408,46 @@ export function CampaignDetailPanel({
       await loadAll();
     } catch {
       setActionError("Failed to delete step.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handleStepSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setStepFormError(null);
+    setActionPending(true);
+
+    const body = {
+      order: parseInt(stepForm.order, 10),
+      delayDays: parseInt(stepForm.delayDays, 10),
+      sendTime: stepForm.sendTime,
+      fromName: stepForm.fromName.trim(),
+      channel: "email" as const,
+      subject: stepForm.subject.trim(),
+      body: stepForm.body.trim(),
+    };
+
+    try {
+      const url = editingStepId
+        ? `${apiBase}/steps/${editingStepId}`
+        : `${apiBase}/steps`;
+      const response = await fetch(url, {
+        method: editingStepId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setStepFormError(payload.error?.message ?? "Failed to save step.");
+        return;
+      }
+
+      setStepDrawerOpen(false);
+      await loadAll();
+    } catch {
+      setStepFormError("Failed to save step.");
     } finally {
       setActionPending(false);
     }
@@ -436,13 +562,7 @@ export function CampaignDetailPanel({
         actions={
           <div className="flex flex-wrap gap-2">
             {canUpdate && !isArchived && (
-              <Button
-                variant="secondary"
-                disabled={actionPending}
-                onClick={() =>
-                  router.push(workspacePath(workspaceSlug, `dripping/${campaignId}/edit`))
-                }
-              >
+              <Button variant="secondary" disabled={actionPending} onClick={openSettings}>
                 Edit settings
               </Button>
             )}
@@ -525,9 +645,7 @@ export function CampaignDetailPanel({
             <Button
               size="sm"
               leadingIcon={<IconPlus size={14} />}
-              onClick={() =>
-                router.push(workspacePath(workspaceSlug, `dripping/${campaignId}/steps/new`))
-              }
+              onClick={() => openStepDrawer()}
             >
               Add step
             </Button>
@@ -561,18 +679,7 @@ export function CampaignDetailPanel({
                   </Button>
                   {stepsEditable && (
                     <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          router.push(
-                            workspacePath(
-                              workspaceSlug,
-                              `dripping/${campaignId}/steps/${step.id}/edit`,
-                            ),
-                          )
-                        }
-                      >
+                      <Button size="sm" variant="secondary" onClick={() => openStepDrawer(step)}>
                         Edit
                       </Button>
                       <Button
@@ -733,6 +840,91 @@ export function CampaignDetailPanel({
       </Card>
 
       <Drawer
+        open={stepDrawerOpen}
+        onClose={() => setStepDrawerOpen(false)}
+        title={editingStepId ? "Edit step" : "Add step"}
+        className="w-[min(100%,480px)]"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setStepDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="campaign-step-form" disabled={actionPending}>
+              {actionPending ? "Saving…" : "Save step"}
+            </Button>
+          </div>
+        }
+      >
+        <form id="campaign-step-form" onSubmit={handleStepSubmit} className="space-y-4">
+          {stepFormError && (
+            <p className="text-[13px] text-[var(--color-danger)]">{stepFormError}</p>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Order</Label>
+              <Input
+                type="number"
+                min={1}
+                value={stepForm.order}
+                onChange={(e) => setStepForm((f) => ({ ...f, order: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label>Delay (days)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={stepForm.delayDays}
+                onChange={(e) => setStepForm((f) => ({ ...f, delayDays: e.target.value }))}
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Sending time</Label>
+              <Input
+                type="time"
+                value={stepForm.sendTime}
+                onChange={(e) => setStepForm((f) => ({ ...f, sendTime: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label>From name</Label>
+              <Input
+                value={stepForm.fromName}
+                onChange={(e) => setStepForm((f) => ({ ...f, fromName: e.target.value }))}
+                required
+                maxLength={120}
+                placeholder="e.g. Grosvenor Vistas"
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Subject</Label>
+            <Input
+              value={stepForm.subject}
+              onChange={(e) => setStepForm((f) => ({ ...f, subject: e.target.value }))}
+              required
+              maxLength={500}
+            />
+          </div>
+          <div>
+            <Label>Body</Label>
+            <Textarea
+              value={stepForm.body}
+              onChange={(e) => setStepForm((f) => ({ ...f, body: e.target.value }))}
+              required
+              rows={6}
+              className="max-h-[min(40dvh,280px)] overflow-y-auto resize-y"
+            />
+          </div>
+        </form>
+      </Drawer>
+
+      <Drawer
         open={!!previewStep}
         onClose={() => setPreviewStep(null)}
         title="Email preview"
@@ -762,6 +954,48 @@ export function CampaignDetailPanel({
             </div>
           </div>
         )}
+      </Drawer>
+
+      <Drawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Campaign settings"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setSettingsOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="campaign-settings-form" disabled={actionPending}>
+              {actionPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        }
+      >
+        <form id="campaign-settings-form" onSubmit={handleSettingsSave} className="space-y-4">
+          {settingsError && (
+            <p className="text-[13px] text-[var(--color-danger)]">{settingsError}</p>
+          )}
+          <div>
+            <Label>Campaign name</Label>
+            <Input
+              value={settingsForm.name}
+              onChange={(e) => setSettingsForm((f) => ({ ...f, name: e.target.value }))}
+              required
+              maxLength={200}
+            />
+          </div>
+          <div>
+            <Label>Default from name</Label>
+            <Input
+              value={settingsForm.defaultFromName}
+              onChange={(e) =>
+                setSettingsForm((f) => ({ ...f, defaultFromName: e.target.value }))
+              }
+              maxLength={120}
+              placeholder="Pre-fills new steps"
+            />
+          </div>
+        </form>
       </Drawer>
     </>
   );

@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Label, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -36,6 +36,20 @@ const STATUS_TONE: Record<CampaignListItem["status"], "neutral" | "success" | "w
   archived: "muted",
 };
 
+type CampaignFormState = {
+  name: string;
+  audienceType: "leads" | "opportunities";
+  frequency: string;
+  defaultFromName: string;
+};
+
+const emptyForm: CampaignFormState = {
+  name: "",
+  audienceType: "leads",
+  frequency: "manual",
+  defaultFromName: "",
+};
+
 type CampaignsPanelProps = {
   workspaceSlug: string;
   canCreate: boolean;
@@ -47,7 +61,6 @@ export function CampaignsPanel({
   workspaceSlug,
   canCreate,
 }: CampaignsPanelProps) {
-  const router = useRouter();
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -57,6 +70,11 @@ export function CampaignsPanel({
   const [showArchived, setShowArchived] = useState(false);
   const [audienceFilter, setAudienceFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [form, setForm] = useState<CampaignFormState>(emptyForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns`;
 
   const loadCampaigns = useCallback(async () => {
@@ -97,6 +115,46 @@ export function CampaignsPanel({
     void loadCampaigns();
   }, [loadCampaigns]);
 
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault();
+    setFormError(null);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          audienceType: form.audienceType,
+          frequency: form.frequency.trim() || undefined,
+          defaultFromName: form.defaultFromName.trim() || undefined,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setFormError(payload.error?.message ?? "Failed to create campaign.");
+        return;
+      }
+
+      const campaignId = payload.data?.campaign?.id;
+      setDrawerOpen(false);
+      setForm(emptyForm);
+
+      if (campaignId) {
+        window.location.href = workspacePath(workspaceSlug, `dripping/${campaignId}`);
+      } else {
+        void loadCampaigns();
+      }
+    } catch {
+      setFormError("Failed to create campaign.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (forbidden) {
     return (
       <PermissionDenied
@@ -116,7 +174,7 @@ export function CampaignsPanel({
           canCreate ? (
             <Button
               leadingIcon={<IconPlus size={14} />}
-              onClick={() => router.push(workspacePath(workspaceSlug, "dripping/new"))}
+              onClick={() => setDrawerOpen(true)}
             >
               New campaign
             </Button>
@@ -180,10 +238,7 @@ export function CampaignsPanel({
           description="Create your first email drip campaign to automate follow-up with leads and opportunities."
           primaryAction={
             canCreate
-              ? {
-                  label: "New campaign",
-                  onClick: () => router.push(workspacePath(workspaceSlug, "dripping/new")),
-                }
+              ? { label: "New campaign", onClick: () => setDrawerOpen(true) }
               : undefined
           }
         />
@@ -228,6 +283,80 @@ export function CampaignsPanel({
           ))}
         </div>
       )}
+
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="New campaign"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDrawerOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-campaign-form" disabled={submitting || !form.name.trim()}>
+              {submitting ? "Creating…" : "Create campaign"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[13px] text-[var(--color-ink-muted)] mb-4">
+          Create a draft campaign. Add email steps before enrolling recipients.
+        </p>
+        <form id="new-campaign-form" onSubmit={handleCreate} className="space-y-4">
+          {formError && (
+            <p className="text-[13px] text-[var(--color-danger)]">{formError}</p>
+          )}
+          <div>
+            <Label htmlFor="campaign-name">Name</Label>
+            <Input
+              id="campaign-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              required
+              maxLength={200}
+            />
+          </div>
+          <div>
+            <Label htmlFor="campaign-audience">Audience</Label>
+            <Select
+              id="campaign-audience"
+              value={form.audienceType}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  audienceType: e.target.value as CampaignFormState["audienceType"],
+                }))
+              }
+            >
+              <option value="leads">Leads</option>
+              <option value="opportunities">Opportunities</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="campaign-frequency">Frequency (optional)</Label>
+            <Input
+              id="campaign-frequency"
+              value={form.frequency}
+              onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
+              placeholder="manual"
+            />
+          </div>
+          <div>
+            <Label htmlFor="campaign-default-from">Default from name (optional)</Label>
+            <Input
+              id="campaign-default-from"
+              value={form.defaultFromName}
+              onChange={(e) => setForm((f) => ({ ...f, defaultFromName: e.target.value }))}
+              placeholder="e.g. Grosvenor Vistas"
+              maxLength={120}
+            />
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Pre-fills the required from name on new email steps. Each step must have its own
+              sender name and can override this default.
+            </p>
+          </div>
+        </form>
+      </Drawer>
     </>
   );
 }
