@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { IconClose } from "@/lib/icons";
 
@@ -19,6 +20,12 @@ export function Modal({
   footer?: ReactNode;
   className?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -37,10 +44,10 @@ export function Modal({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <button
         type="button"
         className="absolute inset-0 bg-[#0f172a]/40 backdrop-blur-[2px]"
@@ -52,7 +59,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative flex max-h-[min(calc(100dvh-2rem),100%)] w-full max-w-lg flex-col rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]",
+          "relative flex max-h-[min(calc(100dvh-2rem),100%)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]",
           className,
         )}
       >
@@ -69,13 +76,14 @@ export function Modal({
             <IconClose size={16} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-5">{children}</div>
         {footer && (
           <div className="shrink-0 border-t border-[var(--color-line)] bg-white px-5 py-4">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -657,6 +657,7 @@ export function CampaignDetailPanel({
         open={stepDrawerOpen}
         onClose={() => setStepDrawerOpen(false)}
         title={editingStepId ? "Edit step" : "Add step"}
+        className="w-[min(100%,480px)]"
         footer={
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setStepDrawerOpen(false)}>
@@ -709,7 +710,8 @@ export function CampaignDetailPanel({
               value={stepForm.body}
               onChange={(e) => setStepForm((f) => ({ ...f, body: e.target.value }))}
               required
-              rows={8}
+              rows={6}
+              className="max-h-[min(40dvh,280px)] overflow-y-auto resize-y"
             />
           </div>
         </form>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { IconClose } from "@/lib/icons";
 
@@ -21,6 +22,12 @@ export function Drawer({
   side?: "left" | "right";
   className?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -39,10 +46,10 @@ export function Drawer({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50">
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-hidden">
       <button
         type="button"
         className="absolute inset-0 bg-[#0f172a]/40 backdrop-blur-[2px]"
@@ -54,7 +61,7 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "absolute top-0 flex h-full w-[min(100%,320px)] flex-col bg-white border-[var(--color-line)] shadow-[var(--shadow-lg)]",
+          "absolute inset-y-0 flex h-[100dvh] max-h-[100dvh] w-[min(100%,320px)] flex-col overflow-hidden bg-white border-[var(--color-line)] shadow-[var(--shadow-lg)]",
           side === "right" ? "right-0 border-l" : "left-0 border-r",
           className,
         )}
@@ -70,13 +77,14 @@ export function Drawer({
             <IconClose size={16} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">{children}</div>
         {footer && (
           <div className="shrink-0 border-t border-[var(--color-line)] bg-white px-4 py-3">
             {footer}
           </div>
         )}
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

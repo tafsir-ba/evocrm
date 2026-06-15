@@ -47,13 +47,13 @@ describe("overlay and table primitives", () => {
   });
 
   it("uses a scrollable body region on modal", () => {
-    const { container } = render(
+    render(
       <Modal open onClose={() => undefined} title="Confirm action">
         Modal body
       </Modal>,
     );
 
-    const scrollRegion = container.querySelector(".overflow-y-auto");
+    const scrollRegion = document.body.querySelector(".overflow-y-auto");
     expect(scrollRegion).toBeTruthy();
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
   });
@@ -70,16 +70,17 @@ describe("overlay and table primitives", () => {
   });
 
   it("uses a flex column layout with scrollable body on drawer", () => {
-    const { container } = render(
+    render(
       <Drawer open onClose={() => undefined} title="Filters">
         Drawer body
       </Drawer>,
     );
 
     const panel = screen.getByRole("dialog", { name: "Filters" });
-    expect(panel).toHaveClass("flex", "flex-col", "h-full");
+    expect(panel).toHaveClass("flex", "flex-col", "overflow-hidden");
+    expect(panel.className).toMatch(/100dvh/);
 
-    const scrollRegion = container.querySelector(".overflow-y-auto");
+    const scrollRegion = document.body.querySelector(".overflow-y-auto");
     expect(scrollRegion).toBeTruthy();
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
   });
