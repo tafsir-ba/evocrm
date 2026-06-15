@@ -242,6 +242,31 @@ export async function resumeEnrollmentsForCampaign(
   return result.modifiedCount;
 }
 
+export async function cancelEnrollmentsForCampaign(
+  workspaceId: string,
+  campaignId: string,
+  reason: string,
+): Promise<number> {
+  await connectDb();
+
+  const now = new Date();
+  const result = await CampaignEnrollmentModel.updateMany(
+    withWorkspaceScope(workspaceId, {
+      campaignId,
+      status: { $in: NON_TERMINAL_ENROLLMENT_STATUSES },
+    }),
+    {
+      $set: {
+        status: "failed",
+        failedAt: now,
+        failureReason: reason,
+      },
+    },
+  );
+
+  return result.modifiedCount;
+}
+
 export async function findDueEnrollments(
   limit: number,
 ): Promise<CampaignEnrollmentRecord[]> {

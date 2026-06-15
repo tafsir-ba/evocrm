@@ -16,6 +16,7 @@ vi.mock("@/server/repositories/campaign-enrollments", () => ({
   countCampaignEnrollments: vi.fn(),
   pauseEnrollmentsForCampaign: vi.fn(),
   resumeEnrollmentsForCampaign: vi.fn(),
+  cancelEnrollmentsForCampaign: vi.fn(),
 }));
 
 vi.mock("@/server/services/campaign-enrollments", () => ({
@@ -41,7 +42,7 @@ import {
   findCampaigns,
   updateCampaign,
 } from "@/server/repositories/campaigns";
-import { countCampaignEnrollments, pauseEnrollmentsForCampaign, resumeEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
+import { countCampaignEnrollments, cancelEnrollmentsForCampaign, pauseEnrollmentsForCampaign, resumeEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { countCampaignSteps } from "@/server/repositories/campaign-steps";
@@ -60,6 +61,7 @@ const baseCampaign = {
   status: "draft" as const,
   audienceType: "leads" as const,
   frequency: "manual",
+  defaultFromName: null,
   createdBy: "user-1",
   ownerId: null,
   archivedAt: null,
@@ -94,6 +96,7 @@ describe("campaign service", () => {
       name: "Buyer Follow-up",
       audienceType: "leads",
       frequency: "manual",
+      defaultFromName: null,
       createdBy: "user-1",
       ownerId: null,
     });
@@ -114,6 +117,11 @@ describe("campaign service", () => {
     const result = await archiveCampaignForWorkspace("ws-1", "user-1", "camp-1");
 
     expect(archiveCampaign).toHaveBeenCalledWith("ws-1", "camp-1");
+    expect(cancelEnrollmentsForCampaign).toHaveBeenCalledWith(
+      "ws-1",
+      "camp-1",
+      "Campaign archived.",
+    );
     expect(result.status).toBe("archived");
     expect(result.archivedAt).not.toBeNull();
   });
@@ -152,6 +160,23 @@ describe("campaign service", () => {
     await updateCampaignForWorkspace("ws-1", "user-1", "camp-1", { status: "paused" });
 
     expect(pauseEnrollmentsForCampaign).toHaveBeenCalledWith("ws-1", "camp-1");
+  });
+
+  it("rejects updates to archived campaigns", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      status: "archived",
+      archivedAt: new Date(),
+    });
+
+    await expect(
+      updateCampaignForWorkspace("ws-1", "user-1", "camp-1", { name: "Renamed" }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Archived campaigns cannot be edited. Restore the campaign first.",
+    });
+
+    expect(updateCampaign).not.toHaveBeenCalled();
   });
 
   it("update to active from paused resumes enrollments and requires steps", async () => {

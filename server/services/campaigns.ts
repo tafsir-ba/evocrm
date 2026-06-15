@@ -5,18 +5,21 @@ import { AppError } from "@/server/errors";
 import {
   archiveCampaign,
   createCampaign,
+  deleteCampaignById,
   findCampaignById,
   findCampaigns,
+  restoreCampaign,
   updateCampaign,
   type CampaignListFilter,
   type CampaignRecord,
 } from "@/server/repositories/campaigns";
 import {
   countCampaignEnrollments,
+  cancelEnrollmentsForCampaign,
   pauseEnrollmentsForCampaign,
   resumeEnrollmentsForCampaign,
 } from "@/server/repositories/campaign-enrollments";
-import { countCampaignSteps } from "@/server/repositories/campaign-steps";
+import { countCampaignSteps, deleteCampaignStepsForCampaign } from "@/server/repositories/campaign-steps";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import type {
@@ -39,6 +42,7 @@ function campaignSnapshot(campaign: CampaignRecord): Record<string, unknown> {
     status: campaign.status,
     audienceType: campaign.audienceType,
     frequency: campaign.frequency,
+    defaultFromName: campaign.defaultFromName,
     ownerId: campaign.ownerId,
   };
 }
@@ -92,6 +96,7 @@ export async function createCampaignForWorkspace(
     name: input.name,
     audienceType: input.audienceType,
     frequency: input.frequency ?? null,
+    defaultFromName: input.defaultFromName ?? null,
     createdBy: actorId,
     ownerId: input.ownerId ?? null,
   });
@@ -147,6 +152,13 @@ export async function updateCampaignForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  if (existing.status === "archived") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Archived campaigns cannot be edited. Restore the campaign first.",
+    );
+  }
+
   if (input.status) {
     assertAllowedStatusTransition(existing.status, input.status);
 
@@ -169,6 +181,7 @@ export async function updateCampaignForWorkspace(
   const updated = await updateCampaign(workspaceId, campaignId, {
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
+    ...(input.defaultFromName !== undefined ? { defaultFromName: input.defaultFromName } : {}),
     ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
   });
@@ -343,7 +356,11 @@ export async function archiveCampaignForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
-  await pauseEnrollmentsForCampaign(workspaceId, campaignId);
+  await cancelEnrollmentsForCampaign(
+    workspaceId,
+    campaignId,
+    "Campaign archived.",
+  );
 
   await createAuditLog({
     workspaceId,
@@ -359,10 +376,97 @@ export async function archiveCampaignForWorkspace(
 }
 
 export function assertCampaignEditable(status: CampaignRecord["status"]): void {
+  if (status === "archived") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Archived campaigns cannot be edited. Restore the campaign first.",
+    );
+  }
+
   if (status !== "draft" && status !== "paused") {
     throw new AppError(
       "VALIDATION_ERROR",
       "Campaign steps can only be edited when the campaign is draft or paused.",
     );
   }
+}
+
+export async function restoreCampaignForWorkspace(
+  workspaceId: string,
+  actorId: string,
+  campaignId: string,
+): Promise<CampaignDetail> {
+  const existing = await findCampaignById(workspaceId, campaignId);
+
+  if (!existing) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  if (existing.status !== "archived") {
+    throw new AppError("VALIDATION_ERROR", "Only archived campaigns can be restored.");
+  }
+
+  const restored = await restoreCampaign(workspaceId, campaignId);
+
+  if (!restored) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "campaign.restored",
+    entityType: "campaign",
+    entityId: restored.id,
+    before: campaignSnapshot(existing),
+    after: campaignSnapshot(restored),
+  });
+
+  return enrichCampaign(workspaceId, restored);
+}
+
+export async function purgeCampaignForWorkspace(
+  workspaceId: string,
+  actorId: string,
+  campaignId: string,
+): Promise<{ deleted: true }> {
+  const existing = await findCampaignById(workspaceId, campaignId);
+
+  if (!existing) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  if (existing.status !== "draft") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Only draft campaigns can be permanently deleted. Archive active campaigns instead.",
+    );
+  }
+
+  const enrollmentCount = await countCampaignEnrollments(workspaceId, campaignId);
+
+  if (enrollmentCount > 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Cannot delete a campaign with enrollments. Archive it instead.",
+    );
+  }
+
+  await deleteCampaignStepsForCampaign(workspaceId, campaignId);
+  const deleted = await deleteCampaignById(workspaceId, campaignId);
+
+  if (!deleted) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "campaign.deleted",
+    entityType: "campaign",
+    entityId: campaignId,
+    before: campaignSnapshot(existing),
+  });
+
+  return { deleted: true };
 }

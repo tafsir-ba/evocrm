@@ -13,6 +13,7 @@ export type EnrollmentScheduledStep = {
 export type CampaignStepScheduleInput = {
   order: number;
   delayDays: number;
+  sendTime: string;
   subject: string;
 };
 
@@ -22,6 +23,7 @@ export function buildEnrollmentScheduledSteps(
     "currentStep" | "nextSendAt" | "status"
   >,
   steps: CampaignStepScheduleInput[],
+  timeZone = "UTC",
 ): EnrollmentScheduledStep[] {
   const sortedSteps = [...steps].sort((left, right) => left.order - right.order);
 
@@ -83,7 +85,10 @@ export function buildEnrollmentScheduledSteps(
       continue;
     }
 
-    sendAnchor = computeNextSendAt(sendAnchor, step.delayDays);
+    sendAnchor = computeNextSendAt(sendAnchor, step.delayDays, {
+      sendTime: step.sendTime,
+      timeZone,
+    });
     schedule.push({
       stepOrder: step.order,
       subject: step.subject,

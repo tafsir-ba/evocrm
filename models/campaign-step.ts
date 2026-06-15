@@ -6,6 +6,8 @@ const campaignStepSchema = new Schema(
     campaignId: { type: Schema.Types.ObjectId, ref: "Campaign", required: true },
     order: { type: Number, required: true, min: 1 },
     delayDays: { type: Number, required: true, min: 0 },
+    sendTime: { type: String, required: true, trim: true, default: "09:00" },
+    fromName: { type: String, required: true, trim: true },
     channel: { type: String, enum: ["email"], default: "email" },
     subject: { type: String, required: true, trim: true },
     body: { type: String, required: true, trim: true },

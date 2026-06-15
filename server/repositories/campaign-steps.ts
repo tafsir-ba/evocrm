@@ -20,6 +20,8 @@ export type CampaignStepRecord = {
   campaignId: string;
   order: number;
   delayDays: number;
+  sendTime: string;
+  fromName: string;
   channel: "email";
   subject: string;
   body: string;
@@ -35,6 +37,8 @@ function toCampaignStepRecord(document: CampaignStepDocument): CampaignStepRecor
     campaignId: document.campaignId.toString(),
     order: document.order,
     delayDays: document.delayDays,
+    sendTime: document.sendTime ?? "09:00",
+    fromName: document.fromName ?? "",
     channel: "email",
     subject: document.subject,
     body: document.body,
@@ -88,6 +92,8 @@ export type CreateCampaignStepInput = {
   campaignId: string;
   order: number;
   delayDays: number;
+  sendTime: string;
+  fromName: string;
   subject: string;
   body: string;
   documentIds?: string[];
@@ -105,6 +111,8 @@ export async function createCampaignStep(
       campaignId: input.campaignId,
       order: input.order,
       delayDays: input.delayDays,
+      sendTime: input.sendTime,
+      fromName: input.fromName.trim(),
       channel: "email",
       subject: input.subject.trim(),
       body: input.body.trim(),
@@ -131,6 +139,8 @@ export async function updateCampaignStep(
   input: Partial<{
     order: number;
     delayDays: number;
+    sendTime: string;
+    fromName: string;
     subject: string;
     body: string;
     documentIds: string[];
@@ -200,6 +210,19 @@ export async function findNextStepAfterOrder(
     .lean();
 
   return document ? toCampaignStepRecord(document as CampaignStepDocument) : null;
+}
+
+export async function deleteCampaignStepsForCampaign(
+  workspaceId: string,
+  campaignId: string,
+): Promise<number> {
+  await connectDb();
+
+  const result = await CampaignStepModel.deleteMany(
+    withWorkspaceScope(workspaceId, { campaignId }),
+  );
+
+  return result.deletedCount;
 }
 
 export async function findFirstCampaignStep(

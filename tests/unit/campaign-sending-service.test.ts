@@ -23,6 +23,10 @@ vi.mock("@/server/repositories/leads", () => ({
   findLeadById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/workspaces", () => ({
+  findWorkspaceById: vi.fn(),
+}));
+
 vi.mock("@/server/email/resend", () => ({
   sendCampaignEmail: vi.fn(),
   buildCampaignEmailHtml: vi.fn((body: string) => `<p>${body}</p>`),
@@ -42,6 +46,7 @@ import { findDueEnrollments, findEnrollmentByIdOnly, updateCampaignEnrollment } 
 import { createCampaignSend } from "@/server/repositories/campaign-sends";
 import { findNextStepAfterOrder, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findLeadById } from "@/server/repositories/leads";
 import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
 
@@ -69,6 +74,8 @@ const step = {
   campaignId: "camp-1",
   order: 1,
   delayDays: 0,
+  sendTime: "09:00",
+  fromName: "Test Project",
   channel: "email" as const,
   subject: "Hello",
   body: "Welcome",
@@ -88,9 +95,21 @@ describe("campaign sending service", () => {
       status: "active",
       audienceType: "leads",
       frequency: null,
+      defaultFromName: null,
       createdBy: "user-1",
       ownerId: null,
       archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      id: "ws-1",
+      name: "Workspace",
+      slug: "demo",
+      type: "agency",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+      createdBy: "user-1",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -185,6 +204,129 @@ describe("campaign sending service", () => {
     expect(createCampaignSend).toHaveBeenCalledWith(
       "ws-1",
       expect.objectContaining({ status: "skipped", error: "Lead is unsubscribed." }),
+    );
+  });
+
+  it("skips send when from name cannot be resolved", async () => {
+    vi.mocked(findStepByOrder).mockResolvedValue({
+      ...step,
+      fromName: "",
+    });
+    vi.mocked(findCampaignById).mockResolvedValue({
+      id: "camp-1",
+      workspaceId: "ws-1",
+      name: "   ",
+      status: "active",
+      audienceType: "leads",
+      frequency: null,
+      defaultFromName: null,
+      createdBy: "user-1",
+      ownerId: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.skipped).toBe(1);
+    expect(createCampaignSend).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({ status: "skipped", error: "Step from name is missing." }),
+    );
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+  });
+
+  it("uses campaign default from name when step from name is blank", async () => {
+    vi.mocked(findStepByOrder).mockResolvedValue({
+      ...step,
+      fromName: "",
+    });
+    vi.mocked(findCampaignById).mockResolvedValue({
+      id: "camp-1",
+      workspaceId: "ws-1",
+      name: "Test",
+      status: "active",
+      audienceType: "leads",
+      frequency: null,
+      defaultFromName: "Project X",
+      createdBy: "user-1",
+      ownerId: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-1",
+    });
+
+    await sendDueCampaignEmails(50);
+
+    expect(sendCampaignEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ fromName: "Project X" }),
     );
   });
 
@@ -356,6 +498,7 @@ describe("campaign sending service", () => {
       status: "draft",
       audienceType: "leads",
       frequency: null,
+      defaultFromName: null,
       createdBy: "user-1",
       ownerId: null,
       archivedAt: null,
@@ -398,6 +541,7 @@ describe("campaign sending service", () => {
       status: "paused",
       audienceType: "leads",
       frequency: null,
+      defaultFromName: null,
       createdBy: "user-1",
       ownerId: null,
       archivedAt: null,

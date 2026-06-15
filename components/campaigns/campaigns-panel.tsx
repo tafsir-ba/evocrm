@@ -23,6 +23,7 @@ type CampaignListItem = {
   status: "draft" | "active" | "paused" | "archived";
   audienceType: "leads" | "opportunities";
   frequency: string | null;
+  defaultFromName: string | null;
   stepCount: number;
   enrollmentCount: number;
   updatedAt: string;
@@ -39,12 +40,14 @@ type CampaignFormState = {
   name: string;
   audienceType: "leads" | "opportunities";
   frequency: string;
+  defaultFromName: string;
 };
 
 const emptyForm: CampaignFormState = {
   name: "",
   audienceType: "leads",
   frequency: "manual",
+  defaultFromName: "",
 };
 
 type CampaignsPanelProps = {
@@ -64,6 +67,7 @@ export function CampaignsPanel({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [showArchived, setShowArchived] = useState(true);
   const [audienceFilter, setAudienceFilter] = useState("");
   const [search, setSearch] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -80,6 +84,7 @@ export function CampaignsPanel({
 
     try {
       const params = new URLSearchParams();
+      if (showArchived) params.set("includeArchived", "true");
       if (statusFilter) params.set("status", statusFilter);
       if (audienceFilter) params.set("audienceType", audienceFilter);
       if (search.trim()) params.set("search", search.trim());
@@ -104,7 +109,7 @@ export function CampaignsPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, audienceFilter, search, statusFilter]);
+  }, [apiBase, audienceFilter, search, showArchived, statusFilter]);
 
   useEffect(() => {
     void loadCampaigns();
@@ -123,6 +128,7 @@ export function CampaignsPanel({
           name: form.name.trim(),
           audienceType: form.audienceType,
           frequency: form.frequency.trim() || undefined,
+          defaultFromName: form.defaultFromName.trim() || undefined,
         }),
       });
 
@@ -191,7 +197,16 @@ export function CampaignsPanel({
           <option value="draft">Draft</option>
           <option value="active">Active</option>
           <option value="paused">Paused</option>
+          <option value="archived">Archived</option>
         </Select>
+        <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+          />
+          Show archived
+        </label>
         <Select
           value={audienceFilter}
           onChange={(e) => setAudienceFilter(e.target.value)}
@@ -230,7 +245,10 @@ export function CampaignsPanel({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {campaigns.map((campaign) => (
-            <Card key={campaign.id} className="!p-0 group">
+            <Card
+              key={campaign.id}
+              className={`!p-0 group ${campaign.status === "archived" ? "opacity-75" : ""}`}
+            >
               <div className="p-5 border-b border-[var(--color-line)]">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -322,6 +340,19 @@ export function CampaignsPanel({
               onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
               placeholder="manual"
             />
+          </div>
+          <div>
+            <Label htmlFor="campaign-default-from">Default from name (optional)</Label>
+            <Input
+              id="campaign-default-from"
+              value={form.defaultFromName}
+              onChange={(e) => setForm((f) => ({ ...f, defaultFromName: e.target.value }))}
+              placeholder="e.g. Grosvenor Vistas"
+              maxLength={120}
+            />
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Pre-fills new email steps. Each step can override this sender name.
+            </p>
           </div>
         </form>
       </Drawer>

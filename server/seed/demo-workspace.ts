@@ -179,6 +179,8 @@ async function seedDemoEntities(
   await createCampaignStepForWorkspace(workspaceId, actorId, campaign.id, {
     order: 1,
     channel: "email",
+    sendTime: "09:00",
+    fromName: "Demo Agency",
     subject: "Welcome to Demo Agency",
     body: "<p>Thanks for your interest.</p>",
     delayDays: 0,

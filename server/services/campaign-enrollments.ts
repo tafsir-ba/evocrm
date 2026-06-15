@@ -15,6 +15,7 @@ import {
 } from "@/server/repositories/campaign-enrollments";
 import { findFirstCampaignStep, findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
@@ -55,14 +56,18 @@ async function enrichEnrollmentWithCampaignSteps(
   campaignId: string,
   enrollment: CampaignEnrollmentRecord,
 ): Promise<CampaignEnrollmentDetail> {
-  const steps = await findCampaignSteps(workspaceId, campaignId);
-  return enrichEnrollment(workspaceId, enrollment, steps);
+  const [steps, timeZone] = await Promise.all([
+    findCampaignSteps(workspaceId, campaignId),
+    getWorkspaceTimeZone(workspaceId),
+  ]);
+  return enrichEnrollment(workspaceId, enrollment, steps, timeZone);
 }
 
 async function enrichEnrollment(
   workspaceId: string,
   enrollment: CampaignEnrollmentRecord,
-  steps: Array<{ order: number; delayDays: number; subject: string }> = [],
+  steps: Array<{ order: number; delayDays: number; sendTime: string; subject: string }> = [],
+  timeZone = "UTC",
 ): Promise<CampaignEnrollmentDetail> {
   const warnings: string[] = [];
   let leadName: string | null = null;
@@ -106,8 +111,13 @@ async function enrichEnrollment(
     leadEmailConsentStatus,
     opportunityLabel,
     warnings,
-    scheduledSteps: buildEnrollmentScheduledSteps(enrollment, steps),
+    scheduledSteps: buildEnrollmentScheduledSteps(enrollment, steps, timeZone),
   };
+}
+
+async function getWorkspaceTimeZone(workspaceId: string): Promise<string> {
+  const workspace = await findWorkspaceById(workspaceId);
+  return workspace?.timezone ?? "UTC";
 }
 
 export async function listCampaignEnrollmentsForWorkspace(
@@ -127,10 +137,13 @@ export async function listCampaignEnrollmentsForWorkspace(
     filter,
   );
 
-  const steps = await findCampaignSteps(workspaceId, campaignId);
+  const [steps, timeZone] = await Promise.all([
+    findCampaignSteps(workspaceId, campaignId),
+    getWorkspaceTimeZone(workspaceId),
+  ]);
 
   const enriched = await Promise.all(
-    enrollments.map((enrollment) => enrichEnrollment(workspaceId, enrollment, steps)),
+    enrollments.map((enrollment) => enrichEnrollment(workspaceId, enrollment, steps, timeZone)),
   );
 
   return { enrollments: enriched, total };
@@ -150,6 +163,13 @@ export async function createCampaignEnrollmentForWorkspace(
 
   if (campaign.status === "archived") {
     throw new AppError("VALIDATION_ERROR", "Cannot enroll in an archived campaign.");
+  }
+
+  if (campaign.status !== "active") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Campaign must be active before enrolling recipients.",
+    );
   }
 
   const firstStep = await findFirstCampaignStep(workspaceId, campaignId);
@@ -230,7 +250,12 @@ export async function createCampaignEnrollmentForWorkspace(
   }
 
   const now = new Date();
-  const nextSendAt = computeNextSendAt(now, firstStep.delayDays);
+  const workspace = await findWorkspaceById(workspaceId);
+  const timeZone = workspace?.timezone ?? "UTC";
+  const nextSendAt = computeNextSendAt(now, firstStep.delayDays, {
+    sendTime: firstStep.sendTime,
+    timeZone,
+  });
 
   const enrollment = await createCampaignEnrollment(workspaceId, {
     campaignId,
@@ -267,6 +292,8 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
   anchor: Date,
   mode: "activation" | "resume",
 ): Promise<string[]> {
+  const workspace = await findWorkspaceById(workspaceId);
+  const timeZone = workspace?.timezone ?? "UTC";
   const { enrollments } = await findCampaignEnrollments(workspaceId, campaignId, {
     status: "active",
     pageSize: 500,
@@ -292,6 +319,8 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, {
         overdue: mode === "resume" && enrollment.nextSendAt <= anchor,
+        sendTime: step.sendTime,
+        timeZone,
       }),
     });
     updatedIds.push(enrollment.id);
@@ -348,8 +377,14 @@ export async function updateCampaignEnrollmentForWorkspace(
     const step = await findStepByOrder(workspaceId, campaignId, existing.currentStep);
 
     if (step) {
+      const workspace = await findWorkspaceById(workspaceId);
+      const timeZone = workspace?.timezone ?? "UTC";
       const rescheduled = await updateCampaignEnrollment(workspaceId, enrollmentId, {
-        nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, { overdue: true }),
+        nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, {
+          overdue: true,
+          sendTime: step.sendTime,
+          timeZone,
+        }),
       });
 
       if (rescheduled) {

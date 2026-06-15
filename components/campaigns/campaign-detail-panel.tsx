@@ -30,6 +30,7 @@ type Campaign = {
   status: "draft" | "active" | "paused" | "archived";
   audienceType: "leads" | "opportunities";
   frequency: string | null;
+  defaultFromName: string | null;
   stepCount: number;
   enrollmentCount: number;
 };
@@ -38,6 +39,8 @@ type CampaignStep = {
   id: string;
   order: number;
   delayDays: number;
+  sendTime: string;
+  fromName: string;
   subject: string;
   body: string;
   documentIds: string[];
@@ -81,6 +84,8 @@ type SendLog = {
 type StepFormState = {
   order: string;
   delayDays: string;
+  sendTime: string;
+  fromName: string;
   subject: string;
   body: string;
 };
@@ -88,6 +93,8 @@ type StepFormState = {
 const emptyStepForm: StepFormState = {
   order: "1",
   delayDays: "0",
+  sendTime: "09:00",
+  fromName: "",
   subject: "",
   body: "",
 };
@@ -110,7 +117,9 @@ export function CampaignDetailPanel({
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [sends, setSends] = useState<SendLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [stepDrawerOpen, setStepDrawerOpen] = useState(false);
@@ -120,12 +129,16 @@ export function CampaignDetailPanel({
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [previewStep, setPreviewStep] = useState<CampaignStep | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({ name: "", defaultFromName: "" });
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}`;
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
+    setLoadWarning(null);
     setForbidden(false);
 
     try {
@@ -150,16 +163,31 @@ export function CampaignDetailPanel({
         ]);
 
       if (!campaignRes.ok) {
-        setError(campaignPayload.error?.message ?? "Failed to load campaign.");
+        setLoadError(campaignPayload.error?.message ?? "Failed to load campaign.");
         return;
       }
 
+      const warnings: string[] = [];
+
+      if (!stepsRes.ok) {
+        warnings.push("Failed to load campaign steps.");
+      }
+
+      if (!enrollRes.ok) {
+        warnings.push("Failed to load enrollments.");
+      }
+
+      if (!sendsRes.ok) {
+        warnings.push("Failed to load send history.");
+      }
+
       setCampaign(campaignPayload.data?.campaign ?? null);
-      setSteps(stepsPayload.data?.steps ?? []);
-      setEnrollments(enrollPayload.data ?? []);
-      setSends(sendsPayload.data ?? []);
+      setSteps(stepsRes.ok ? (stepsPayload.data?.steps ?? []) : []);
+      setEnrollments(enrollRes.ok ? (enrollPayload.data ?? []) : []);
+      setSends(sendsRes.ok ? (sendsPayload.data ?? []) : []);
+      setLoadWarning(warnings.length > 0 ? warnings.join(" ") : null);
     } catch {
-      setError("Failed to load campaign.");
+      setLoadError("Failed to load campaign.");
     } finally {
       setLoading(false);
     }
@@ -176,8 +204,10 @@ export function CampaignDetailPanel({
     void loadAll();
   }, [loadAll]);
 
+  const isArchived = campaign?.status === "archived";
   const stepsEditable =
     canUpdate && campaign && (campaign.status === "draft" || campaign.status === "paused");
+  const canManageEnrollments = canUpdate && campaign && campaign.status === "active";
 
   const excludedEnrollmentTargetIds = useMemo(() => {
     if (!campaign) {
@@ -196,16 +226,17 @@ export function CampaignDetailPanel({
 
   async function runAction(path: string, method = "PATCH") {
     setActionPending(true);
+    setActionError(null);
     try {
       const response = await fetch(`${apiBase}${path}`, { method });
       const payload = await response.json();
       if (!response.ok) {
-        setError(payload.error?.message ?? "Action failed.");
+        setActionError(payload.error?.message ?? "Action failed.");
         return;
       }
       await reloadAfterCampaignMutation();
     } catch {
-      setError("Action failed.");
+      setActionError("Action failed.");
     } finally {
       setActionPending(false);
     }
@@ -213,7 +244,7 @@ export function CampaignDetailPanel({
 
   async function handleActivate() {
     setActionPending(true);
-    setError(null);
+    setActionError(null);
 
     try {
       const response = await fetch(apiBase, {
@@ -224,34 +255,113 @@ export function CampaignDetailPanel({
       const payload = await response.json();
 
       if (!response.ok) {
-        setError(payload.error?.message ?? "Activation failed.");
+        setActionError(payload.error?.message ?? "Activation failed.");
         return;
       }
 
       await reloadAfterCampaignMutation();
     } catch {
-      setError("Activation failed.");
+      setActionError("Activation failed.");
     } finally {
       setActionPending(false);
     }
   }
 
   async function handleArchive() {
-    if (!window.confirm("Archive this campaign? Active enrollments will be paused.")) {
+    if (!window.confirm("Archive this campaign? Pending sends will be cancelled.")) {
       return;
     }
 
     setActionPending(true);
+    setActionError(null);
     try {
       const response = await fetch(apiBase, { method: "DELETE" });
       if (!response.ok) {
         const payload = await response.json();
-        setError(payload.error?.message ?? "Archive failed.");
+        setActionError(payload.error?.message ?? "Archive failed.");
+        return;
+      }
+      await loadAll();
+    } catch {
+      setActionError("Archive failed.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handleRestore() {
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`${apiBase}/restore`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) {
+        setActionError(payload.error?.message ?? "Restore failed.");
+        return;
+      }
+      await loadAll();
+    } catch {
+      setActionError("Restore failed.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handlePurge() {
+    if (!window.confirm("Permanently delete this draft campaign? This cannot be undone.")) {
+      return;
+    }
+
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`${apiBase}/purge`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) {
+        setActionError(payload.error?.message ?? "Delete failed.");
         return;
       }
       window.location.href = workspacePath(workspaceSlug, "dripping");
     } catch {
-      setError("Archive failed.");
+      setActionError("Delete failed.");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  function openSettings() {
+    if (!campaign) return;
+    setSettingsForm({
+      name: campaign.name,
+      defaultFromName: campaign.defaultFromName ?? "",
+    });
+    setSettingsError(null);
+    setSettingsOpen(true);
+  }
+
+  async function handleSettingsSave(event: React.FormEvent) {
+    event.preventDefault();
+    setSettingsError(null);
+    setActionPending(true);
+
+    try {
+      const response = await fetch(apiBase, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: settingsForm.name.trim(),
+          defaultFromName: settingsForm.defaultFromName.trim() || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setSettingsError(payload.error?.message ?? "Failed to save settings.");
+        return;
+      }
+      setSettingsOpen(false);
+      await loadAll();
+    } catch {
+      setSettingsError("Failed to save settings.");
     } finally {
       setActionPending(false);
     }
@@ -263,6 +373,8 @@ export function CampaignDetailPanel({
       setStepForm({
         order: String(step.order),
         delayDays: String(step.delayDays),
+        sendTime: step.sendTime,
+        fromName: step.fromName,
         subject: step.subject,
         body: step.body,
       });
@@ -271,10 +383,31 @@ export function CampaignDetailPanel({
       setStepForm({
         ...emptyStepForm,
         order: String(steps.length + 1),
+        fromName: campaign?.defaultFromName ?? campaign?.name ?? "",
       });
     }
     setStepFormError(null);
     setStepDrawerOpen(true);
+  }
+
+  async function handleDeleteStep(stepId: string) {
+    if (!window.confirm("Delete this step?")) return;
+
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`${apiBase}/steps/${stepId}`, { method: "DELETE" });
+      if (!response.ok) {
+        const payload = await response.json();
+        setActionError(payload.error?.message ?? "Failed to delete step.");
+        return;
+      }
+      await loadAll();
+    } catch {
+      setActionError("Failed to delete step.");
+    } finally {
+      setActionPending(false);
+    }
   }
 
   async function handleStepSubmit(event: React.FormEvent) {
@@ -285,6 +418,8 @@ export function CampaignDetailPanel({
     const body = {
       order: parseInt(stepForm.order, 10),
       delayDays: parseInt(stepForm.delayDays, 10),
+      sendTime: stepForm.sendTime,
+      fromName: stepForm.fromName.trim(),
       channel: "email" as const,
       subject: stepForm.subject.trim(),
       body: stepForm.body.trim(),
@@ -396,11 +531,11 @@ export function CampaignDetailPanel({
     );
   }
 
-  if (error || !campaign) {
+  if (loadError || !campaign) {
     return (
       <ErrorState
         title="Could not load campaign"
-        description={error ?? "Campaign not found."}
+        description={loadError ?? "Campaign not found."}
         primaryAction={{ label: "Retry", onClick: () => void loadAll() }}
       />
     );
@@ -422,44 +557,82 @@ export function CampaignDetailPanel({
         description={`${campaign.audienceType} campaign · ${campaign.stepCount} steps · ${campaign.enrollmentCount} enrolled`}
         meta={<StatusBadge status={campaign.status} size="sm" />}
         actions={
-          canUpdate && campaign.status !== "archived" ? (
-            <div className="flex flex-wrap gap-2">
-              {campaign.status === "active" && (
-                <Button
-                  variant="secondary"
-                  disabled={actionPending}
-                  onClick={() => void runAction("/pause")}
-                >
-                  Pause
-                </Button>
-              )}
-              {campaign.status === "paused" && (
-                <Button
-                  variant="secondary"
-                  disabled={actionPending}
-                  onClick={() => void runAction("/resume")}
-                >
-                  Resume
-                </Button>
-              )}
-              {campaign.status === "draft" && steps.length > 0 && (
-                <Button disabled={actionPending} onClick={() => void handleActivate()}>
-                  Activate
-                </Button>
-              )}
-              {canArchive && (
-                <Button
-                  variant="secondary"
-                  disabled={actionPending}
-                  onClick={() => void handleArchive()}
-                >
-                  Archive
-                </Button>
-              )}
-            </div>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {canUpdate && !isArchived && (
+              <Button variant="secondary" disabled={actionPending} onClick={openSettings}>
+                Edit settings
+              </Button>
+            )}
+            {canUpdate && isArchived && (
+              <Button disabled={actionPending} onClick={() => void handleRestore()}>
+                Restore
+              </Button>
+            )}
+            {canUpdate && campaign.status !== "archived" ? (
+              <>
+                {campaign.status === "active" && (
+                  <Button
+                    variant="secondary"
+                    disabled={actionPending}
+                    onClick={() => void runAction("/pause")}
+                  >
+                    Pause
+                  </Button>
+                )}
+                {campaign.status === "paused" && (
+                  <Button
+                    variant="secondary"
+                    disabled={actionPending}
+                    onClick={() => void runAction("/resume")}
+                  >
+                    Resume
+                  </Button>
+                )}
+                {campaign.status === "draft" && steps.length > 0 && (
+                  <Button disabled={actionPending} onClick={() => void handleActivate()}>
+                    Activate
+                  </Button>
+                )}
+                {canArchive && (
+                  <Button
+                    variant="secondary"
+                    disabled={actionPending}
+                    onClick={() => void handleArchive()}
+                  >
+                    Archive
+                  </Button>
+                )}
+              </>
+            ) : null}
+            {canArchive && campaign.status === "draft" && campaign.enrollmentCount === 0 && (
+              <Button
+                variant="secondary"
+                disabled={actionPending}
+                onClick={() => void handlePurge()}
+              >
+                Delete
+              </Button>
+            )}
+          </div>
         }
       />
+
+      {loadWarning && (
+        <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+          {loadWarning}
+        </div>
+      )}
+
+      {actionError && (
+        <p className="mb-4 text-[12.5px] text-[var(--color-danger)]">{actionError}</p>
+      )}
+
+      {isArchived && (
+        <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+          This campaign is <strong>archived</strong>. Enrollments and sends are disabled. Restore it
+          to draft to edit or re-activate.
+        </div>
+      )}
 
       {/* Steps */}
       <Card className="mb-6">
@@ -494,7 +667,7 @@ export function CampaignDetailPanel({
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-[var(--color-ink)]">{step.subject}</p>
                   <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5">
-                    Day {step.delayDays} · {step.documentIds.length} documents attached (UI only)
+                    Day {step.delayDays} · {step.sendTime} · From {step.fromName}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -502,9 +675,19 @@ export function CampaignDetailPanel({
                     Preview
                   </Button>
                   {stepsEditable && (
-                    <Button size="sm" variant="secondary" onClick={() => openStepDrawer(step)}>
-                      Edit
-                    </Button>
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => openStepDrawer(step)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={actionPending}
+                        onClick={() => void handleDeleteStep(step.id)}
+                      >
+                        Delete
+                      </Button>
+                    </>
                   )}
                 </div>
               </li>
@@ -521,7 +704,7 @@ export function CampaignDetailPanel({
       {/* Enrollments */}
       <Card className="mb-6">
         <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">Enrollments</h2>
-        {canUpdate && campaign.status !== "archived" && (
+        {canManageEnrollments && (
           <div className="mb-4 space-y-3">
             <CampaignEnrollmentSelector
               workspaceSlug={workspaceSlug}
@@ -695,6 +878,27 @@ export function CampaignDetailPanel({
               />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Sending time</Label>
+              <Input
+                type="time"
+                value={stepForm.sendTime}
+                onChange={(e) => setStepForm((f) => ({ ...f, sendTime: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label>From name</Label>
+              <Input
+                value={stepForm.fromName}
+                onChange={(e) => setStepForm((f) => ({ ...f, fromName: e.target.value }))}
+                required
+                maxLength={120}
+                placeholder="e.g. Grosvenor Vistas"
+              />
+            </div>
+          </div>
           <div>
             <Label>Subject</Label>
             <Input
@@ -728,6 +932,10 @@ export function CampaignDetailPanel({
         {previewStep && (
           <div className="space-y-3">
             <div>
+              <p className="text-[11px] uppercase text-[var(--color-ink-muted)] font-semibold">From</p>
+              <p className="text-[14px] font-medium mt-1">{previewStep.fromName}</p>
+            </div>
+            <div>
               <p className="text-[11px] uppercase text-[var(--color-ink-muted)] font-semibold">Subject</p>
               <p className="text-[14px] font-medium mt-1">{previewStep.subject}</p>
             </div>
@@ -743,6 +951,48 @@ export function CampaignDetailPanel({
             </div>
           </div>
         )}
+      </Drawer>
+
+      <Drawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Campaign settings"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setSettingsOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="campaign-settings-form" disabled={actionPending}>
+              {actionPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        }
+      >
+        <form id="campaign-settings-form" onSubmit={handleSettingsSave} className="space-y-4">
+          {settingsError && (
+            <p className="text-[13px] text-[var(--color-danger)]">{settingsError}</p>
+          )}
+          <div>
+            <Label>Campaign name</Label>
+            <Input
+              value={settingsForm.name}
+              onChange={(e) => setSettingsForm((f) => ({ ...f, name: e.target.value }))}
+              required
+              maxLength={200}
+            />
+          </div>
+          <div>
+            <Label>Default from name</Label>
+            <Input
+              value={settingsForm.defaultFromName}
+              onChange={(e) =>
+                setSettingsForm((f) => ({ ...f, defaultFromName: e.target.value }))
+              }
+              maxLength={120}
+              placeholder="Pre-fills new steps"
+            />
+          </div>
+        </form>
       </Drawer>
     </>
   );

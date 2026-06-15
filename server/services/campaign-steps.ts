@@ -26,6 +26,8 @@ function stepSnapshot(step: CampaignStepRecord): Record<string, unknown> {
     campaignId: step.campaignId,
     order: step.order,
     delayDays: step.delayDays,
+    sendTime: step.sendTime,
+    fromName: step.fromName,
     subject: step.subject,
     documentIds: step.documentIds,
   };
@@ -95,6 +97,8 @@ export async function createCampaignStepForWorkspace(
     campaignId,
     order: input.order,
     delayDays: input.delayDays,
+    sendTime: input.sendTime,
+    fromName: input.fromName,
     subject: input.subject,
     body: input.body,
     documentIds,
@@ -141,6 +145,8 @@ export async function updateCampaignStepForWorkspace(
   const updated = await updateCampaignStep(workspaceId, campaignId, stepId, {
     ...(input.order !== undefined ? { order: input.order } : {}),
     ...(input.delayDays !== undefined ? { delayDays: input.delayDays } : {}),
+    ...(input.sendTime !== undefined ? { sendTime: input.sendTime } : {}),
+    ...(input.fromName !== undefined ? { fromName: input.fromName } : {}),
     ...(input.subject !== undefined ? { subject: input.subject } : {}),
     ...(input.body !== undefined ? { body: input.body } : {}),
     ...(documentIds !== undefined ? { documentIds } : {}),

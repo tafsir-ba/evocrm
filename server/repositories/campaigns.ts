@@ -11,6 +11,7 @@ export type CampaignRecord = {
   status: "draft" | "active" | "paused" | "archived";
   audienceType: "leads" | "opportunities";
   frequency: string | null;
+  defaultFromName: string | null;
   createdBy: string;
   ownerId: string | null;
   archivedAt: Date | null;
@@ -26,6 +27,7 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
     status: document.status as CampaignRecord["status"],
     audienceType: document.audienceType as CampaignRecord["audienceType"],
     frequency: document.frequency ?? null,
+    defaultFromName: document.defaultFromName ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
     archivedAt: document.archivedAt ?? null,
@@ -105,6 +107,7 @@ export type CreateCampaignInput = {
   name: string;
   audienceType: CampaignRecord["audienceType"];
   frequency?: string | null;
+  defaultFromName?: string | null;
   createdBy: string;
   ownerId?: string | null;
 };
@@ -121,6 +124,7 @@ export async function createCampaign(
     status: "draft",
     audienceType: input.audienceType,
     frequency: input.frequency ?? null,
+    defaultFromName: input.defaultFromName?.trim() ?? null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
     archivedAt: null,
@@ -136,6 +140,7 @@ export async function updateCampaign(
     name: string;
     status: CampaignRecord["status"];
     frequency: string | null;
+    defaultFromName: string | null;
     ownerId: string | null;
     archivedAt: Date | null;
   }>,
@@ -169,4 +174,37 @@ export async function archiveCampaign(
   ).lean();
 
   return document ? toCampaignRecord(document as CampaignDocument) : null;
+}
+
+export async function restoreCampaign(
+  workspaceId: string,
+  campaignId: string,
+): Promise<CampaignRecord | null> {
+  await connectDb();
+
+  const document = await CampaignModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, { _id: campaignId, status: "archived" }),
+    {
+      $set: {
+        status: "draft",
+        archivedAt: null,
+      },
+    },
+    { new: true },
+  ).lean();
+
+  return document ? toCampaignRecord(document as CampaignDocument) : null;
+}
+
+export async function deleteCampaignById(
+  workspaceId: string,
+  campaignId: string,
+): Promise<boolean> {
+  await connectDb();
+
+  const result = await CampaignModel.deleteOne(
+    withWorkspaceScope(workspaceId, { _id: campaignId }),
+  );
+
+  return result.deletedCount > 0;
 }

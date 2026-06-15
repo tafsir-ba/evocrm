@@ -18,6 +18,7 @@ const campaignSchema = new Schema(
       required: true,
     },
     frequency: { type: String, trim: true, default: null },
+    defaultFromName: { type: String, trim: true, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     archivedAt: { type: Date, default: null },

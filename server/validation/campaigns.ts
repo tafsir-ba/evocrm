@@ -28,6 +28,7 @@ export const createCampaignInputSchema = z
     name: z.string().trim().min(1).max(200),
     audienceType: audienceTypeSchema,
     frequency: z.string().trim().max(120).optional(),
+    defaultFromName: z.string().trim().min(1).max(120).optional(),
     ownerId: objectIdSchema.optional(),
   })
   .strict();
@@ -36,6 +37,7 @@ export const updateCampaignInputSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     frequency: z.string().trim().max(120).nullable().optional(),
+    defaultFromName: z.string().trim().min(1).max(120).nullable().optional(),
     ownerId: objectIdSchema.nullable().optional(),
     status: campaignUpdateStatusSchema.optional(),
   })

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { IMMEDIATE_SEND_DELAY_MS } from "@/server/utils/campaign-schedule";
 import { buildEnrollmentScheduledSteps } from "@/server/utils/campaign-enrollment-schedule";
 
 describe("campaign enrollment schedule", () => {
@@ -14,8 +13,8 @@ describe("campaign enrollment schedule", () => {
         status: "active",
       },
       [
-        { order: 1, delayDays: 0, subject: "drip 1" },
-        { order: 2, delayDays: 1, subject: "drip 2" },
+        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
+        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
       ],
     );
 
@@ -44,8 +43,8 @@ describe("campaign enrollment schedule", () => {
         status: "active",
       },
       [
-        { order: 1, delayDays: 0, subject: "drip 1" },
-        { order: 2, delayDays: 1, subject: "drip 2" },
+        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
+        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
       ],
     );
 
@@ -54,7 +53,7 @@ describe("campaign enrollment schedule", () => {
     expect(schedule[1]?.state).toBe("pending");
   });
 
-  it("chains zero-delay follow-up steps one minute apart", () => {
+  it("chains zero-delay follow-up steps at the next send-time slot", () => {
     const anchor = new Date("2026-06-14T12:00:00.000Z");
 
     const schedule = buildEnrollmentScheduledSteps(
@@ -64,14 +63,13 @@ describe("campaign enrollment schedule", () => {
         status: "active",
       },
       [
-        { order: 1, delayDays: 0, subject: "drip 1" },
-        { order: 2, delayDays: 0, subject: "drip 2" },
+        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
+        { order: 2, delayDays: 0, sendTime: "12:00", subject: "drip 2" },
       ],
+      "UTC",
     );
 
-    expect(schedule[1]?.scheduledAt?.getTime()).toBe(
-      anchor.getTime() + IMMEDIATE_SEND_DELAY_MS,
-    );
+    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
   });
 
   it("marks pending schedule steps as paused when enrollment is paused", () => {
@@ -82,8 +80,8 @@ describe("campaign enrollment schedule", () => {
         status: "paused",
       },
       [
-        { order: 1, delayDays: 0, subject: "drip 1" },
-        { order: 2, delayDays: 1, subject: "drip 2" },
+        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
+        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
       ],
     );
 

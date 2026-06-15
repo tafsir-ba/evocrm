@@ -20,12 +20,14 @@ import {
   findStepByOrder,
 } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { createCampaignSend } from "@/server/repositories/campaign-sends";
 import {
   createUnsubscribeToken,
   buildUnsubscribeUrl,
 } from "@/server/utils/unsubscribe-token";
 import { addDays, computeNextSendAt, isScheduledSendDue } from "@/server/utils/campaign-schedule";
+import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 
 export type SendDueSummary = {
   processed: number;
@@ -248,12 +250,25 @@ async function processEnrollment(
   });
   const unsubscribeUrl = buildUnsubscribeUrl(token);
   const html = buildCampaignEmailHtml(step.body, unsubscribeUrl);
+  const fromName = resolveCampaignStepFromName(step.fromName, campaign);
+
+  if (!fromName) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Step from name is missing.",
+    });
+
+    return singleOutcomeResult("skipped");
+  }
 
   const sendResult = await sendCampaignEmail({
     to: lead.email,
     subject: step.subject,
     html,
     text: `${step.body}\n\nUnsubscribe: ${unsubscribeUrl}`,
+    fromName,
   });
 
   const now = new Date();
@@ -322,9 +337,15 @@ async function processEnrollment(
   );
 
   if (nextStep) {
+    const workspace = await findWorkspaceById(workspaceId);
+    const timeZone = workspace?.timezone ?? "UTC";
+
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       currentStep: nextStep.order,
-      nextSendAt: computeNextSendAt(now, nextStep.delayDays),
+      nextSendAt: computeNextSendAt(now, nextStep.delayDays, {
+        sendTime: nextStep.sendTime,
+        timeZone,
+      }),
       lastSentAt: now,
     });
 

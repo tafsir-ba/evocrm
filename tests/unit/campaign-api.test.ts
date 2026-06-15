@@ -46,6 +46,7 @@ const sampleCampaign = {
   status: "draft" as const,
   audienceType: "leads" as const,
   frequency: null,
+  defaultFromName: null,
   createdBy: "user-1",
   ownerId: null,
   archivedAt: null,

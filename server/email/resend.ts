@@ -10,6 +10,7 @@ export type SendCampaignEmailInput = {
   subject: string;
   html: string;
   text?: string;
+  fromName: string;
 };
 
 export type SendCampaignEmailResult =
@@ -36,6 +37,17 @@ function getResendClient(): Resend {
   return resendClient;
 }
 
+function extractEmailAddress(from: string): string {
+  const match = from.match(/<([^>]+)>/);
+  return match ? match[1].trim() : from.trim();
+}
+
+function formatFromHeader(fromName: string, emailFrom: string): string {
+  const address = extractEmailAddress(emailFrom);
+  const safeName = fromName.replace(/["<>]/g, "").trim();
+  return `${safeName} <${address}>`;
+}
+
 export async function sendCampaignEmail(
   input: SendCampaignEmailInput,
 ): Promise<SendCampaignEmailResult> {
@@ -48,7 +60,7 @@ export async function sendCampaignEmail(
   try {
     const resend = getResendClient();
     const result = await resend.emails.send({
-      from: env.EMAIL_FROM,
+      from: formatFromHeader(input.fromName, env.EMAIL_FROM),
       to: input.to,
       subject: input.subject,
       html: input.html,

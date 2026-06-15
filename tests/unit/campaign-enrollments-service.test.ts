@@ -18,6 +18,10 @@ vi.mock("@/server/repositories/leads", () => ({
   findLeadById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/workspaces", () => ({
+  findWorkspaceById: vi.fn(),
+}));
+
 vi.mock("@/server/services/campaign-sending", () => ({
   sendCampaignEnrollmentsImmediately: vi.fn(),
 }));
@@ -33,6 +37,7 @@ import {
 } from "@/server/repositories/campaign-enrollments";
 import { findCampaignSteps, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findLeadById } from "@/server/repositories/leads";
+import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { updateCampaignEnrollmentForWorkspace } from "@/server/services/campaign-enrollments";
 import { IMMEDIATE_SEND_DELAY_MS } from "@/server/utils/campaign-schedule";
@@ -65,6 +70,7 @@ describe("campaign enrollment service", () => {
       status: "active",
       audienceType: "leads",
       frequency: null,
+      defaultFromName: null,
       createdBy: "user-1",
       ownerId: null,
       archivedAt: null,
@@ -72,6 +78,17 @@ describe("campaign enrollment service", () => {
       updatedAt: new Date(),
     });
     vi.mocked(findEnrollmentById).mockResolvedValue(pausedEnrollment);
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      id: "ws-1",
+      name: "Workspace",
+      slug: "demo",
+      type: "agency",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     vi.mocked(findCampaignSteps).mockResolvedValue([
       {
         id: "step-1",
@@ -79,6 +96,8 @@ describe("campaign enrollment service", () => {
         campaignId: "camp-1",
         order: 1,
         delayDays: 0,
+        sendTime: "09:00",
+        fromName: "Test",
         channel: "email",
         subject: "Hello",
         body: "Welcome",
@@ -93,6 +112,8 @@ describe("campaign enrollment service", () => {
       campaignId: "camp-1",
       order: 1,
       delayDays: 0,
+      sendTime: "09:00",
+      fromName: "Test",
       channel: "email",
       subject: "Hello",
       body: "Welcome",
