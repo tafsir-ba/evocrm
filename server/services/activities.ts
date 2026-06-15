@@ -23,6 +23,10 @@ import { findPropertyById } from "@/server/repositories/properties";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import {
+  assertValidProjectFilter,
+  validateActiveProjectId,
+} from "@/server/services/project-scope";
+import {
   applyActivityStatusBehavior,
   isActivityOverdue,
   isActivityUpcoming,
@@ -88,10 +92,105 @@ export type ActivityDetail = ActivityListItem & {
 };
 
 type ResolvedRelationships = {
+  projectId: string;
   opportunityId: string | null;
   leadId: string | null;
   propertyId: string | null;
 };
+
+async function resolveRelationships(
+  workspaceId: string,
+  input: {
+    projectId?: string;
+    opportunityId?: string | null;
+    leadId?: string | null;
+    propertyId?: string | null;
+  },
+): Promise<ResolvedRelationships> {
+  let opportunityId = input.opportunityId ?? null;
+  let leadId = input.leadId ?? null;
+  let propertyId = input.propertyId ?? null;
+  let projectId = input.projectId ?? null;
+
+  if (!opportunityId && !leadId && !propertyId && !projectId) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "At least one of opportunityId, leadId, propertyId, or projectId is required.",
+    );
+  }
+
+  if (opportunityId) {
+    const opportunity = await findOpportunityById(workspaceId, opportunityId);
+
+    if (!opportunity || opportunity.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Opportunity must exist in this workspace and not be archived.",
+      );
+    }
+
+    leadId = opportunity.leadId;
+    propertyId = opportunity.propertyId;
+    projectId = opportunity.projectId;
+    return { opportunityId, leadId, propertyId, projectId };
+  }
+
+  const projectIds = new Set<string>();
+
+  if (leadId) {
+    const lead = await findLeadById(workspaceId, leadId);
+
+    if (!lead || lead.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Lead must exist in this workspace and not be archived.",
+      );
+    }
+
+    projectIds.add(lead.projectId);
+    if (!projectId) {
+      projectId = lead.projectId;
+    }
+  }
+
+  if (propertyId) {
+    const property = await findPropertyById(workspaceId, propertyId);
+
+    if (!property || property.archivedAt) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Property must exist in this workspace and not be archived.",
+      );
+    }
+
+    projectIds.add(property.projectId);
+    if (!projectId) {
+      projectId = property.projectId;
+    }
+  }
+
+  if (projectIds.size > 1) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Linked lead and property belong to different projects.",
+    );
+  }
+
+  if (input.projectId && projectId && input.projectId !== projectId) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Provided projectId does not match linked lead or property project.",
+    );
+  }
+
+  if (!projectId) {
+    throw new AppError("VALIDATION_ERROR", "Project is required.");
+  }
+
+  await validateActiveProjectId(workspaceId, projectId);
+
+  return { opportunityId, leadId, propertyId, projectId };
+}
 
 async function validateActivityTypeId(
   workspaceId: string,
@@ -127,65 +226,6 @@ async function validateActivityStatusId(
   }
 
   return item;
-}
-
-async function resolveRelationships(
-  workspaceId: string,
-  input: {
-    opportunityId?: string | null;
-    leadId?: string | null;
-    propertyId?: string | null;
-  },
-): Promise<ResolvedRelationships> {
-  let opportunityId = input.opportunityId ?? null;
-  let leadId = input.leadId ?? null;
-  let propertyId = input.propertyId ?? null;
-
-  if (!opportunityId && !leadId && !propertyId) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "At least one of opportunityId, leadId, or propertyId is required.",
-    );
-  }
-
-  if (opportunityId) {
-    const opportunity = await findOpportunityById(workspaceId, opportunityId);
-
-    if (!opportunity || opportunity.archivedAt) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Opportunity must exist in this workspace and not be archived.",
-      );
-    }
-
-    leadId = opportunity.leadId;
-    propertyId = opportunity.propertyId;
-    return { opportunityId, leadId, propertyId };
-  }
-
-  if (leadId) {
-    const lead = await findLeadById(workspaceId, leadId);
-
-    if (!lead || lead.archivedAt) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Lead must exist in this workspace and not be archived.",
-      );
-    }
-  }
-
-  if (propertyId) {
-    const property = await findPropertyById(workspaceId, propertyId);
-
-    if (!property || property.archivedAt) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Property must exist in this workspace and not be archived.",
-      );
-    }
-  }
-
-  return { opportunityId, leadId, propertyId };
 }
 
 async function resolveUserSummary(
@@ -410,6 +450,7 @@ export async function listActivitiesForWorkspace(
   query: ActivityListQuery,
   currentUserId?: string,
 ): Promise<{ activities: ActivityListItem[]; total: number }> {
+  await assertValidProjectFilter(workspaceId, query.projectId);
   const filter = await buildListFilterFromQuery(workspaceId, query, currentUserId);
   const { activities, total } = await findActivities(workspaceId, filter);
   const enriched = await Promise.all(activities.map((activity) => enrichActivityListItem(activity)));
@@ -532,6 +573,7 @@ export async function updateActivityForWorkspace(
     updatePayload.opportunityId = relationships.opportunityId;
     updatePayload.leadId = relationships.leadId;
     updatePayload.propertyId = relationships.propertyId;
+    updatePayload.projectId = relationships.projectId;
   }
 
   if (input.statusId !== undefined) {

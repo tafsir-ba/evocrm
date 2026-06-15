@@ -12,6 +12,7 @@ import {
   IconLeads,
   IconLogo,
   IconPipeline,
+  IconProjects,
   IconProperties,
   IconSettings,
   IconShield,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ICONS = {
   dashboard: IconDashboard,
+  projects: IconProjects,
   pipeline: IconPipeline,
   leads: IconLeads,
   properties: IconProperties,

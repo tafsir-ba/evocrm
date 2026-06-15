@@ -15,6 +15,7 @@ function toObjectIdArray(ids: string[]): mongoose.Types.ObjectId[] {
 export type OpportunityRecord = {
   id: string;
   workspaceId: string;
+  projectId: string;
   leadId: string;
   propertyId: string;
   statusId: string;
@@ -41,6 +42,7 @@ function toOpportunityRecord(document: OpportunityDocument): OpportunityRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
+    projectId: document.projectId.toString(),
     leadId: document.leadId.toString(),
     propertyId: document.propertyId.toString(),
     statusId: document.statusId.toString(),
@@ -66,6 +68,7 @@ function toOpportunityRecord(document: OpportunityDocument): OpportunityRecord {
 
 export type OpportunityListFilter = {
   includeArchived?: boolean;
+  projectId?: string;
   search?: string;
   searchLeadIds?: string[];
   searchPropertyIds?: string[];
@@ -92,6 +95,10 @@ function buildListQuery(filter: OpportunityListFilter): Record<string, unknown> 
 
   if (!filter.includeArchived) {
     query.archivedAt = null;
+  }
+
+  if (filter.projectId) {
+    query.projectId = filter.projectId;
   }
 
   if (filter.statusId) {
@@ -231,6 +238,7 @@ export async function findOpportunityById(
 
 export async function createOpportunity(input: {
   workspaceId: string;
+  projectId: string;
   leadId: string;
   propertyId: string;
   statusId: string;
@@ -252,6 +260,7 @@ export async function createOpportunity(input: {
   await connectDb();
   const document = await OpportunityModel.create({
     workspaceId: input.workspaceId,
+    projectId: input.projectId,
     leadId: input.leadId,
     propertyId: input.propertyId,
     statusId: input.statusId,
@@ -278,6 +287,7 @@ export async function updateOpportunity(
   workspaceId: string,
   opportunityId: string,
   input: Partial<{
+    projectId: string;
     leadId: string;
     propertyId: string;
     statusId: string;

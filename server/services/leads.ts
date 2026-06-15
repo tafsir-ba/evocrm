@@ -15,8 +15,14 @@ import {
   type LeadRecord,
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
+import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
+import {
+  assertValidProjectFilter,
+  validateActiveProjectId,
+} from "@/server/services/project-scope";
 import type { CreateLeadInput, UpdateLeadInput } from "@/server/validation/leads";
 
 export type LeadDictionarySummary = {
@@ -38,7 +44,14 @@ export type LeadUserSummary = {
   email: string;
 };
 
+export type LeadProjectSummary = {
+  id: string;
+  name: string;
+  reference: string | null;
+};
+
 export type LeadListItem = LeadRecord & {
+  project: LeadProjectSummary | null;
   status: LeadDictionarySummary | null;
   source: LeadDictionarySummary | null;
   tagsResolved: LeadTagSummary[];
@@ -240,8 +253,26 @@ async function resolveTagsSummary(
   return resolved;
 }
 
+async function resolveProjectSummary(
+  workspaceId: string,
+  projectId: string,
+): Promise<LeadProjectSummary | null> {
+  const project = await findProjectById(workspaceId, projectId);
+
+  if (!project) {
+    return null;
+  }
+
+  return {
+    id: project.id,
+    name: project.name,
+    reference: project.reference,
+  };
+}
+
 async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
-  const [status, source, tagsResolved, assignedUser] = await Promise.all([
+  const [project, status, source, tagsResolved, assignedUser] = await Promise.all([
+    resolveProjectSummary(lead.workspaceId, lead.projectId),
     resolveDictionarySummary(lead.workspaceId, lead.statusId, "lead_status"),
     resolveDictionarySummary(lead.workspaceId, lead.sourceId, "lead_source"),
     resolveTagsSummary(lead.workspaceId, lead.tags),
@@ -250,6 +281,7 @@ async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
 
   return {
     ...lead,
+    project,
     status,
     source,
     tagsResolved,
@@ -285,6 +317,7 @@ export async function listLeadsForWorkspace(
   workspaceId: string,
   filter: LeadListFilter = {},
 ): Promise<{ leads: LeadListItem[]; total: number }> {
+  await assertValidProjectFilter(workspaceId, filter.projectId);
   const { leads, total } = await findLeads(workspaceId, filter);
 
   const enriched = await Promise.all(leads.map((lead) => enrichLeadListItem(lead)));
@@ -310,6 +343,7 @@ export async function createLeadForWorkspace(
   actorId: string,
   input: CreateLeadInput,
 ): Promise<LeadMutationResult> {
+  await validateActiveProjectId(workspaceId, input.projectId);
   await validateLeadStatusId(workspaceId, input.statusId);
   await validateLeadSourceId(workspaceId, input.sourceId);
   await validateLeadTags(workspaceId, input.tags);
@@ -333,6 +367,7 @@ export async function createLeadForWorkspace(
 
   const lead = await createLead({
     workspaceId,
+    projectId: input.projectId,
     createdBy: actorId,
     statusId: input.statusId,
     sourceId: input.sourceId ?? null,
@@ -367,6 +402,15 @@ export async function createLeadForWorkspace(
     entityId: lead.id,
     after: leadSnapshot(lead),
   });
+
+  void Promise.resolve(
+    evaluateCampaignAutoEnrollmentForLead({
+      workspaceId,
+      leadId: lead.id,
+      trigger: "new_lead",
+      actorId,
+    }),
+  ).catch(() => undefined);
 
   return {
     lead: await enrichLeadRecord(lead),
@@ -560,6 +604,15 @@ export async function updateLeadForWorkspace(
       after: entry.after,
     });
   }
+
+  void Promise.resolve(
+    evaluateCampaignAutoEnrollmentForLead({
+      workspaceId,
+      leadId,
+      trigger: "lead_updated",
+      actorId,
+    }),
+  ).catch(() => undefined);
 
   return {
     lead: await enrichLeadRecord(updated),

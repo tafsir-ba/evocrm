@@ -10,6 +10,7 @@ import {
   findProjects,
   updateProject,
   type ProjectListFilter,
+  type ProjectListItem,
   type ProjectRecord,
 } from "@/server/repositories/projects";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
@@ -19,6 +20,9 @@ function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
   return {
     name: project.name,
     reference: project.reference,
+    projectType: project.projectType,
+    defaultDripCampaignId: project.defaultDripCampaignId,
+    statusId: project.statusId,
     address: project.address,
     city: project.city,
     country: project.country,
@@ -31,7 +35,7 @@ function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
 export async function listProjectsForWorkspace(
   workspaceId: string,
   filter: ProjectListFilter = {},
-): Promise<ProjectRecord[]> {
+): Promise<ProjectListItem[]> {
   return findProjects(workspaceId, filter);
 }
 
@@ -69,6 +73,9 @@ export async function createProjectForWorkspace(
     createdBy: actorId,
     name: input.name,
     reference: input.reference ?? null,
+    projectType: input.projectType ?? null,
+    defaultDripCampaignId: input.defaultDripCampaignId ?? null,
+    statusId: input.statusId ?? null,
     address: input.address ?? null,
     city: input.city ?? null,
     country: input.country ?? null,
@@ -127,6 +134,15 @@ export async function updateProjectForWorkspace(
   }
   if (input.reference !== undefined) {
     updatePayload.reference = input.reference?.trim() || null;
+  }
+  if (input.projectType !== undefined) {
+    updatePayload.projectType = input.projectType;
+  }
+  if (input.defaultDripCampaignId !== undefined) {
+    updatePayload.defaultDripCampaignId = input.defaultDripCampaignId;
+  }
+  if (input.statusId !== undefined) {
+    updatePayload.statusId = input.statusId;
   }
   if (input.address !== undefined) {
     updatePayload.address = input.address?.trim() || null;

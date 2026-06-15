@@ -52,7 +52,14 @@ export default async function EditCampaignPage({ params }: { params: Params }) {
         campaignId={campaignId}
         initialValues={{
           name: campaign.name,
+          audienceType: campaign.audienceType,
           defaultFromName: campaign.defaultFromName ?? "",
+          enrollment: {
+            projectIds: campaign.projectIds,
+            autoEnrollmentEnabled: campaign.autoEnrollmentEnabled,
+            enrollmentTrigger: campaign.enrollmentTrigger,
+            enrollmentRules: campaign.enrollmentRules,
+          },
         }}
       />
     </PageContainer>

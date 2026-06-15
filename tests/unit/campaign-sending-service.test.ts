@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  campaignRecordExtras,
+  enrollmentRecordExtras,
+  leadRecordExtras,
+} from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/campaigns", () => ({
   findCampaignById: vi.fn(),
 }));
@@ -56,6 +62,7 @@ const enrollment = {
   campaignId: "camp-1",
   leadId: "lead-1",
   opportunityId: null,
+  ...enrollmentRecordExtras,
   status: "active" as const,
   currentStep: 1,
   nextSendAt: new Date(),
@@ -94,6 +101,7 @@ describe("campaign sending service", () => {
       name: "Test",
       status: "active",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: null,
       createdBy: "user-1",
@@ -121,6 +129,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -172,6 +181,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -224,6 +234,7 @@ describe("campaign sending service", () => {
       name: "   ",
       status: "active",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: null,
       createdBy: "user-1",
@@ -235,6 +246,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -288,6 +300,7 @@ describe("campaign sending service", () => {
       name: "Test",
       status: "active",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: "Project X",
       createdBy: "user-1",
@@ -299,6 +312,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -346,6 +360,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -403,6 +418,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -461,6 +477,7 @@ describe("campaign sending service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -518,6 +535,7 @@ describe("campaign sending service", () => {
       name: "Test",
       status: "draft",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: null,
       createdBy: "user-1",
@@ -561,6 +579,7 @@ describe("campaign sending service", () => {
       name: "Test",
       status: "paused",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: null,
       createdBy: "user-1",

@@ -7,6 +7,7 @@ import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 export type ActivityRecord = {
   id: string;
   workspaceId: string;
+  projectId: string;
   opportunityId: string | null;
   leadId: string | null;
   propertyId: string | null;
@@ -31,6 +32,7 @@ function toActivityRecord(document: ActivityDocument): ActivityRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
+    projectId: document.projectId.toString(),
     opportunityId: document.opportunityId?.toString() ?? null,
     leadId: document.leadId?.toString() ?? null,
     propertyId: document.propertyId?.toString() ?? null,
@@ -54,6 +56,7 @@ function toActivityRecord(document: ActivityDocument): ActivityRecord {
 
 export type ActivityListFilter = {
   includeArchived?: boolean;
+  projectId?: string;
   search?: string;
   typeId?: string;
   statusId?: string;
@@ -82,6 +85,10 @@ function buildListQuery(filter: ActivityListFilter): Record<string, unknown> {
 
   if (!filter.includeArchived) {
     query.archivedAt = null;
+  }
+
+  if (filter.projectId) {
+    query.projectId = filter.projectId;
   }
 
   if (filter.typeId) {
@@ -207,6 +214,7 @@ export async function findActivityById(
 
 export async function createActivity(input: {
   workspaceId: string;
+  projectId: string;
   opportunityId?: string | null;
   leadId?: string | null;
   propertyId?: string | null;
@@ -226,6 +234,7 @@ export async function createActivity(input: {
   await connectDb();
   const document = await ActivityModel.create({
     workspaceId: input.workspaceId,
+    projectId: input.projectId,
     opportunityId: input.opportunityId ?? null,
     leadId: input.leadId ?? null,
     propertyId: input.propertyId ?? null,
@@ -250,6 +259,7 @@ export async function updateActivity(
   workspaceId: string,
   activityId: string,
   input: Partial<{
+    projectId: string;
     opportunityId: string | null;
     leadId: string | null;
     propertyId: string | null;

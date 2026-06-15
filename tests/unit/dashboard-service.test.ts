@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  activityRecordExtras,
+  opportunityRecordExtras,
+  projectRecordExtras,
+} from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/dashboard", () => ({
   countLeadsCreatedInRange: vi.fn(),
   countOpportunitiesByStatusIds: vi.fn(),
@@ -245,21 +251,28 @@ describe("dashboard service", () => {
       dateTo,
     });
 
-    expect(countLeadsCreatedInRange).toHaveBeenCalledWith(workspaceId, dateFrom, dateTo);
-    expect(countOpportunitiesByStatusIds).toHaveBeenCalledWith(workspaceId, ["status-open"]);
+    expect(countLeadsCreatedInRange).toHaveBeenCalledWith(workspaceId, dateFrom, dateTo, undefined);
+    expect(countOpportunitiesByStatusIds).toHaveBeenCalledWith(workspaceId, ["status-open"], undefined);
     expect(countWonOpportunitiesInRange).toHaveBeenCalledWith(
       workspaceId,
       ["status-won"],
       dateFrom,
       dateTo,
+      undefined,
     );
     expect(countLostOpportunitiesInRange).toHaveBeenCalledWith(
       workspaceId,
       ["status-lost"],
       dateFrom,
       dateTo,
+      undefined,
     );
-    expect(sumOpportunityValuesByCurrency).toHaveBeenCalledWith(workspaceId, ["status-open"]);
+    expect(sumOpportunityValuesByCurrency).toHaveBeenCalledWith(
+      workspaceId,
+      ["status-open"],
+      undefined,
+      undefined,
+    );
     expect(result.metrics.newLeads).toBe(12);
     expect(result.metrics.activeOpportunities).toBe(8);
     expect(result.metrics.activePipelineValue).toEqual([
@@ -379,6 +392,7 @@ describe("dashboard service", () => {
         {
           id: "act-1",
           workspaceId,
+          ...activityRecordExtras,
           opportunityId: null,
           leadId: null,
           propertyId: null,
@@ -404,6 +418,7 @@ describe("dashboard service", () => {
     vi.mocked(enrichActivityListItem).mockResolvedValue({
       id: "act-1",
       workspaceId,
+      ...activityRecordExtras,
       opportunityId: null,
       leadId: null,
       propertyId: null,
@@ -458,6 +473,7 @@ describe("dashboard service", () => {
         {
           id: "opp-1",
           workspaceId,
+          ...opportunityRecordExtras,
           leadId: "lead-1",
           propertyId: "prop-1",
           statusId: "status-open",
@@ -486,6 +502,7 @@ describe("dashboard service", () => {
             behavior: "open",
           },
           lostReason: null,
+          project: null,
           lead: {
             id: "lead-1",
             fullName: "Jane Doe",

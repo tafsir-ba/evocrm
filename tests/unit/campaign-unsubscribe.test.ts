@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { enrollmentRecordExtras, leadRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/leads", () => ({
   findLeadById: vi.fn(),
   updateLead: vi.fn(),
@@ -43,6 +45,7 @@ describe("unsubscribe service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,
@@ -81,6 +84,7 @@ describe("unsubscribe service", () => {
       campaignId: "camp-1",
       leadId: "lead-1",
       opportunityId: null,
+      ...enrollmentRecordExtras,
       status: "active",
       currentStep: 1,
       nextSendAt: new Date(),

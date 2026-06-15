@@ -18,7 +18,7 @@ function isDuplicateKeyError(error: unknown): boolean {
 export type PropertyRecord = {
   id: string;
   workspaceId: string;
-  projectId: string | null;
+  projectId: string;
   statusId: string;
   typeId: string | null;
   ownerId: string | null;
@@ -50,7 +50,7 @@ function toPropertyRecord(document: PropertyDocument): PropertyRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    projectId: document.projectId?.toString() ?? null,
+    projectId: document.projectId.toString(),
     statusId: document.statusId.toString(),
     typeId: document.typeId?.toString() ?? null,
     ownerId: document.ownerId?.toString() ?? null,

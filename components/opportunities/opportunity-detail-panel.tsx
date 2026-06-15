@@ -70,6 +70,7 @@ type OpportunityDetail = {
   statusId: string;
   status: DictionaryItem | null;
   lostReason: DictionaryItem | null;
+  project: { id: string; name: string; reference: string | null } | null;
   lead: {
     id: string;
     fullName: string;
@@ -386,6 +387,20 @@ export function OpportunityDetailPanel({
       {error && (
         <p className="mb-3 text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>
       )}
+
+      {opportunity.project ? (
+        <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">
+          Project:{" "}
+          <Link
+            href={workspacePath(workspaceSlug, "projects", opportunity.project.id)}
+            className="text-[var(--color-brand-700)] hover:underline"
+          >
+            {opportunity.project.reference
+              ? `${opportunity.project.name} (${opportunity.project.reference})`
+              : opportunity.project.name}
+          </Link>
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <Card>

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { activityRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/activities", () => ({
   findActivityById: vi.fn(),
   createActivity: vi.fn(),
@@ -34,6 +36,10 @@ vi.mock("@/server/repositories/users", () => ({
   findUserById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/projects", () => ({
+  findProjectById: vi.fn(),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
@@ -42,6 +48,7 @@ import { findDictionaryItemById, findDictionaryItemByTypeAndBehavior } from "@/s
 import { findLeadById } from "@/server/repositories/leads";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
+import { findProjectById } from "@/server/repositories/projects";
 import {
   archiveActivity,
   createActivity,
@@ -109,6 +116,8 @@ const activityType = {
 const baseActivity = {
   id: "act-1",
   workspaceId: "ws-1",
+  ...activityRecordExtras,
+  projectId: "project-1",
   opportunityId: null,
   leadId: "lead-1",
   propertyId: null,
@@ -170,12 +179,32 @@ describe("activities service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+      projectId: "project-1",
       archivedAt: null,
       fullName: "Jane Doe",
       email: null,
     } as never);
     vi.mocked(findPropertyById).mockResolvedValue(null);
     vi.mocked(findOpportunityById).mockResolvedValue(null);
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Default Project",
+      reference: "default",
+      projectType: null,
+      defaultDripCampaignId: null,
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     vi.mocked(createActivity).mockResolvedValue(baseActivity);
     vi.mocked(findActivityById).mockResolvedValue(baseActivity);
     vi.mocked(updateActivity).mockImplementation(async (_ws, _id, input) => ({
@@ -227,6 +256,7 @@ describe("activities service", () => {
     vi.mocked(findOpportunityById).mockResolvedValue({
       id: "opp-1",
       workspaceId: "ws-1",
+      projectId: "project-1",
       leadId: "lead-1",
       propertyId: "prop-1",
       archivedAt: null,

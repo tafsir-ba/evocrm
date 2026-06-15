@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { leadRecordExtras, TEST_PROJECT_ID } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/integrations", () => ({
   findActiveWebsiteIntegrationByApiKeyHash: vi.fn(),
   findWebsiteIntegrationByApiKeyHash: vi.fn(),
@@ -8,6 +10,10 @@ vi.mock("@/server/repositories/integrations", () => ({
 vi.mock("@/server/repositories/leads", () => ({
   findActiveLeadByEmailNormalized: vi.fn(),
   findLeadByIntegrationIdempotencyKey: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/projects", () => ({
+  findProjects: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/dictionary-items", () => ({
@@ -41,6 +47,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
+import { findProjects } from "@/server/repositories/projects";
 import {
   findActiveWebsiteIntegrationByApiKeyHash,
   findWebsiteIntegrationByApiKeyHash,
@@ -92,10 +99,32 @@ describe("website lead capture service", () => {
     }));
     vi.mocked(findLeadByIntegrationIdempotencyKey).mockResolvedValue(null);
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
+    vi.mocked(findProjects).mockResolvedValue([
+      {
+        id: TEST_PROJECT_ID,
+        workspaceId: "ws-1",
+        name: "Default Project",
+        reference: "default",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: {
         id: "lead-1",
         workspaceId: "ws-1",
+  ...leadRecordExtras,
         statusId: "status-1",
         sourceId: "source-1",
         ownerId: null,
@@ -126,6 +155,7 @@ describe("website lead capture service", () => {
         archivedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        project: null,
         status: null,
         source: null,
         tagsResolved: [],
@@ -177,6 +207,7 @@ describe("website lead capture service", () => {
       "user-1",
       expect.objectContaining({
         sourceId: "source-1",
+        projectId: TEST_PROJECT_ID,
         attributes: {
           integration: expect.objectContaining({
             integrationId: "int-1",
@@ -196,6 +227,7 @@ describe("website lead capture service", () => {
     vi.mocked(findLeadByIntegrationIdempotencyKey).mockResolvedValue({
       id: "lead-existing",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "status-1",
       sourceId: "source-1",
       ownerId: null,
@@ -247,6 +279,7 @@ describe("website lead capture service", () => {
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue({
       id: "lead-dup",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "status-1",
       sourceId: "source-1",
       ownerId: null,
@@ -296,6 +329,7 @@ describe("website lead capture service", () => {
       .mockResolvedValueOnce({
         id: "lead-race",
         workspaceId: "ws-1",
+  ...leadRecordExtras,
         statusId: "status-1",
         sourceId: "source-1",
         ownerId: null,

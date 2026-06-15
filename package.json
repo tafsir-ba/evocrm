@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "seed": "npx tsx scripts/seed.ts",
+    "migrate:projects": "npx tsx scripts/migrate-projects.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

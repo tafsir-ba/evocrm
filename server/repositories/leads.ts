@@ -30,6 +30,7 @@ function isDuplicateKeyError(error: unknown): boolean {
 export type LeadRecord = {
   id: string;
   workspaceId: string;
+  projectId: string;
   statusId: string;
   sourceId: string | null;
   ownerId: string | null;
@@ -66,6 +67,7 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
+    projectId: document.projectId.toString(),
     statusId: document.statusId.toString(),
     sourceId: document.sourceId?.toString() ?? null,
     ownerId: document.ownerId?.toString() ?? null,
@@ -102,6 +104,7 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
 
 export type LeadListFilter = {
   includeArchived?: boolean;
+  projectId?: string;
   search?: string;
   statusId?: string;
   sourceId?: string;
@@ -123,6 +126,10 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
 
   if (!filter.includeArchived) {
     query.archivedAt = null;
+  }
+
+  if (filter.projectId) {
+    query.projectId = filter.projectId;
   }
 
   if (filter.statusId) {
@@ -275,6 +282,7 @@ export async function findLeadByPhoneNormalized(
 
 export async function createLead(input: {
   workspaceId: string;
+  projectId: string;
   statusId: string;
   sourceId?: string | null;
   ownerId?: string | null;
@@ -304,6 +312,7 @@ export async function createLead(input: {
   try {
     const document = await LeadModel.create({
       workspaceId: input.workspaceId,
+      projectId: input.projectId,
       statusId: input.statusId,
       sourceId: input.sourceId ?? null,
       ownerId: input.ownerId ?? null,

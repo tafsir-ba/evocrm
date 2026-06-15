@@ -17,6 +17,7 @@ export const activityListQuerySchema = z.object({
     .optional()
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
+  projectId: objectIdSchema.optional(),
   typeId: objectIdSchema.optional(),
   statusId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),
@@ -40,13 +41,14 @@ const relationshipFieldsSchema = z.object({
 });
 
 function hasAtLeastOneRelationship(
-  value: z.infer<typeof relationshipFieldsSchema>,
+  value: z.infer<typeof relationshipFieldsSchema> & { projectId?: string },
 ): boolean {
-  return Boolean(value.opportunityId || value.leadId || value.propertyId);
+  return Boolean(value.opportunityId || value.leadId || value.propertyId || value.projectId);
 }
 
 export const createActivityInputSchema = z
   .object({
+    projectId: objectIdSchema.optional(),
     opportunityId: objectIdSchema.optional(),
     leadId: objectIdSchema.optional(),
     propertyId: objectIdSchema.optional(),
@@ -62,7 +64,7 @@ export const createActivityInputSchema = z
   })
   .strict()
   .refine(hasAtLeastOneRelationship, {
-    message: "At least one of opportunityId, leadId, or propertyId is required.",
+    message: "At least one of opportunityId, leadId, propertyId, or projectId is required.",
   });
 
 export const updateActivityInputSchema = z

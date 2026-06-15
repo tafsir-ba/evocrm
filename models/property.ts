@@ -3,7 +3,7 @@ import mongoose, { type InferSchemaType, Schema } from "mongoose";
 const propertySchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     statusId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", required: true },
     typeId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },

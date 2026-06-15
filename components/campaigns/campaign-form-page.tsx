@@ -3,6 +3,10 @@
 import { useState } from "react";
 
 import {
+  EnrollmentRulesBuilder,
+  type EnrollmentRulesFormValue,
+} from "@/components/campaigns/enrollment-rules-builder";
+import {
   FocusedFormActions,
   FocusedFormLayout,
 } from "@/components/layout/focused-form-layout";
@@ -14,6 +18,14 @@ type CampaignFormState = {
   audienceType: "leads" | "opportunities";
   frequency: string;
   defaultFromName: string;
+  enrollment: EnrollmentRulesFormValue;
+};
+
+const emptyEnrollment: EnrollmentRulesFormValue = {
+  projectIds: [],
+  autoEnrollmentEnabled: false,
+  enrollmentTrigger: "manual_only",
+  enrollmentRules: { logic: "AND", conditions: [] },
 };
 
 const emptyForm: CampaignFormState = {
@@ -21,13 +33,20 @@ const emptyForm: CampaignFormState = {
   audienceType: "leads",
   frequency: "manual",
   defaultFromName: "",
+  enrollment: emptyEnrollment,
 };
+
+export type CampaignFormInitialValues = Partial<
+  Omit<CampaignFormState, "enrollment"> & {
+    enrollment?: Partial<EnrollmentRulesFormValue>;
+  }
+>;
 
 type CampaignFormPageProps = {
   workspaceSlug: string;
   mode: "create" | "edit";
   campaignId?: string;
-  initialValues?: Partial<CampaignFormState>;
+  initialValues?: CampaignFormInitialValues;
 };
 
 export function CampaignFormPage({
@@ -39,6 +58,15 @@ export function CampaignFormPage({
   const [form, setForm] = useState<CampaignFormState>({
     ...emptyForm,
     ...initialValues,
+    enrollment: {
+      ...emptyEnrollment,
+      ...initialValues?.enrollment,
+      enrollmentRules: {
+        ...emptyEnrollment.enrollmentRules,
+        ...initialValues?.enrollment?.enrollmentRules,
+        conditions: initialValues?.enrollment?.enrollmentRules?.conditions ?? [],
+      },
+    },
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -55,11 +83,19 @@ export function CampaignFormPage({
     setFormError(null);
     setSubmitting(true);
 
+    const enrollmentPayload = {
+      projectIds: form.enrollment.projectIds,
+      autoEnrollmentEnabled: form.enrollment.autoEnrollmentEnabled,
+      enrollmentTrigger: form.enrollment.enrollmentTrigger,
+      enrollmentRules: form.enrollment.enrollmentRules,
+    };
+
     const payload = {
       name: form.name.trim(),
       audienceType: form.audienceType,
       frequency: form.frequency.trim() || undefined,
       defaultFromName: form.defaultFromName.trim() || undefined,
+      ...enrollmentPayload,
     };
 
     try {
@@ -72,6 +108,7 @@ export function CampaignFormPage({
             : {
                 name: payload.name,
                 defaultFromName: payload.defaultFromName || null,
+                ...enrollmentPayload,
               },
         ),
       });
@@ -98,7 +135,7 @@ export function CampaignFormPage({
       description={
         isCreate
           ? "Create a draft campaign. Add email steps before enrolling recipients."
-          : "Update campaign name and default sender name."
+          : "Update campaign settings and lead auto-enrollment rules."
       }
       closeHref={closeHref}
       footer={
@@ -167,6 +204,13 @@ export function CampaignFormPage({
             Pre-fills new email steps. Each step can override this sender name.
           </p>
         </div>
+
+        <EnrollmentRulesBuilder
+          workspaceSlug={workspaceSlug}
+          audienceType={form.audienceType}
+          value={form.enrollment}
+          onChange={(enrollment) => setForm((current) => ({ ...current, enrollment }))}
+        />
       </form>
     </FocusedFormLayout>
   );

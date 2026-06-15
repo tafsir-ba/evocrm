@@ -44,6 +44,7 @@ const shellValue = {
   },
   navigation: buildPermissionAwareNavigation("demo-workspace", [
     "dashboard:read",
+    "project:read",
     "opportunity:read",
     "lead:read",
     "property:read",

@@ -58,6 +58,7 @@ describe("opportunities repository", () => {
     const lean = vi.fn().mockResolvedValue({
       _id: "opp-1",
       workspaceId: "ws-1",
+      projectId: "project-1",
       leadId: "lead-1",
       propertyId: "prop-1",
       statusId: "status-1",

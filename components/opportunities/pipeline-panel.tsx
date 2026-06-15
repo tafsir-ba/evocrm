@@ -21,6 +21,8 @@ import {
 } from "@/lib/dictionary-form-helpers";
 import { formatPrice } from "@/lib/format-price";
 import { IconPlus } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type PipelineColumnData = {
@@ -85,6 +87,7 @@ export function PipelinePanel({
   canUpdate,
 }: PipelinePanelProps) {
   const router = useRouter();
+  const projectId = useWorkspaceProjectFilter();
   const [pipeline, setPipeline] = useState<PipelineResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export function PipelinePanel({
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (assignedFilter) params.set("assignedTo", assignedFilter);
+      appendProjectIdToSearchParams(params, projectId);
 
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/pipeline?${params.toString()}`,
@@ -134,7 +138,7 @@ export function PipelinePanel({
     } finally {
       setLoading(false);
     }
-  }, [assignedFilter, search, workspaceSlug]);
+  }, [assignedFilter, projectId, search, workspaceSlug]);
 
   useEffect(() => {
     void loadPipeline();

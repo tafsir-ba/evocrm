@@ -21,6 +21,8 @@ import {
   IconLeads,
   IconSparkles,
 } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type CurrencyAmount = { currency: string; amount: number };
@@ -127,6 +129,7 @@ export function DashboardPanel({
   workspaceSlug,
   workspaceTimezone,
 }: DashboardPanelProps) {
+  const projectId = useWorkspaceProjectFilter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export function DashboardPanel({
         periodDays,
         timezone: workspaceTimezone,
       });
+      appendProjectIdToSearchParams(params, projectId);
 
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/dashboard?${params.toString()}`,
@@ -167,7 +171,7 @@ export function DashboardPanel({
     } finally {
       setLoading(false);
     }
-  }, [datePreset, workspaceSlug, workspaceTimezone]);
+  }, [datePreset, projectId, workspaceSlug, workspaceTimezone]);
 
   useEffect(() => {
     void loadDashboard();

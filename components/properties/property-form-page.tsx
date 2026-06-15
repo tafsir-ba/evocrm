@@ -171,6 +171,16 @@ export function PropertyFormPage({
     }
   }, [defaultStatusId, form.statusId, isEdit]);
 
+  useEffect(() => {
+    if (isEdit || form.projectId || projects.length === 0) {
+      return;
+    }
+
+    if (projects.length === 1) {
+      setForm((current) => ({ ...current, projectId: projects[0].id }));
+    }
+  }, [form.projectId, isEdit, projects]);
+
   function toggleTag(tagId: string) {
     setForm((current) => ({
       ...current,

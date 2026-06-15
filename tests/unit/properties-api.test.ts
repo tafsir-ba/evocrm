@@ -166,6 +166,7 @@ describe("property API routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: "507f1f77bcf86cd799439011",
           title: "Green View Apartment 12",
           statusId: "507f1f77bcf86cd799439013",
         }),
@@ -215,6 +216,7 @@ describe("property API routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: "507f1f77bcf86cd799439011",
           title: "Green View Apartment 12",
           statusId: "507f1f77bcf86cd799439013",
           reference: "GV-APT-12",
@@ -246,6 +248,7 @@ describe("property API routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: "507f1f77bcf86cd799439011",
           title: "Green View Apartment 12",
           statusId: "507f1f77bcf86cd799439013",
         }),

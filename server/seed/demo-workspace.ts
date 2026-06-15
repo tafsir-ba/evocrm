@@ -126,6 +126,7 @@ async function seedDemoEntities(
   });
 
   const lead = await createLeadForWorkspace(workspaceId, actorId, {
+    projectId: project.id,
     firstName: "Ana",
     lastName: "Silva",
     email: "ana.silva@example.com",

@@ -30,6 +30,12 @@ function toWorkspaceRecord(document: WorkspaceDocument): WorkspaceRecord {
   };
 }
 
+export async function findAllWorkspaces(): Promise<WorkspaceRecord[]> {
+  await connectDb();
+  const documents = await WorkspaceModel.find().lean<WorkspaceDocument[]>();
+  return documents.map(toWorkspaceRecord);
+}
+
 export async function findWorkspaceBySlug(slug: string): Promise<WorkspaceRecord | null> {
   await connectDb();
   const document = await WorkspaceModel.findOne({

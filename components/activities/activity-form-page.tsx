@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import {
+  ProjectSelector,
+  type ProjectSelectorProject,
+} from "@/components/domain/project-selector";
+import {
   FocusedFormActions,
   FocusedFormLayout,
 } from "@/components/layout/focused-form-layout";
@@ -31,6 +35,7 @@ export type ActivityFormContext = {
 };
 
 export type ActivityFormInitialValues = {
+  projectId?: string;
   typeId: string;
   statusId: string;
   title: string;
@@ -53,6 +58,7 @@ type ActivityFormPageProps = {
 };
 
 const emptyForm: ActivityFormInitialValues = {
+  projectId: "",
   typeId: "",
   statusId: "",
   title: "",
@@ -77,6 +83,7 @@ export function ActivityFormPage({
   const [types, setTypes] = useState<DictionaryItem[]>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
+  const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [form, setForm] = useState<ActivityFormInitialValues>(initialValues ?? emptyForm);
   const [loading, setLoading] = useState(mode === "edit" && !initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -108,16 +115,19 @@ export function ActivityFormPage({
       setError(null);
 
       try {
-        const [typesRes, statusesRes, membersRes] = await Promise.all([
+        const [typesRes, statusesRes, membersRes, projectsRes] = await Promise.all([
           fetch(`${apiBase}/dictionary-items?type=activity_type`),
           fetch(`${apiBase}/dictionary-items?type=activity_status`),
           fetch(`${apiBase}/members`),
+          fetch(`${apiBase}/projects`),
         ]);
 
-        const [typesPayload, statusesPayload, membersPayload] = await Promise.all([
+        const [typesPayload, statusesPayload, membersPayload, projectsPayload] =
+          await Promise.all([
           typesRes.json(),
           statusesRes.json(),
           membersRes.json(),
+          projectsRes.json(),
         ]);
 
         if (typesRes.ok) {
@@ -128,6 +138,9 @@ export function ActivityFormPage({
         }
         if (membersRes.ok) {
           setMembers(membersPayload.data.members as MemberSelectorMember[]);
+        }
+        if (projectsRes.ok) {
+          setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
         }
       } catch {
         setError("Failed to load form options.");
@@ -155,6 +168,16 @@ export function ActivityFormPage({
       statusId: defaultStatusId,
     });
   }, [defaultStatusId, defaultTypeId, initialValues, isEdit]);
+
+  useEffect(() => {
+    if (isEdit || hasLinkContext || form.projectId || projects.length === 0) {
+      return;
+    }
+
+    if (projects.length === 1) {
+      setForm((current) => ({ ...current, projectId: projects[0].id }));
+    }
+  }, [form.projectId, hasLinkContext, isEdit, projects]);
 
   useEffect(() => {
     if (!isEdit || !activityId || initialValues) {
@@ -185,6 +208,7 @@ export function ActivityFormPage({
         };
 
         setForm({
+          projectId: "",
           typeId: activity.typeId,
           statusId: activity.statusId,
           title: activity.title,
@@ -234,6 +258,8 @@ export function ActivityFormPage({
           payload.leadId = context.leadId;
         } else if (context?.propertyId) {
           payload.propertyId = context.propertyId;
+        } else if (form.projectId) {
+          payload.projectId = form.projectId;
         }
       }
 
@@ -291,9 +317,32 @@ export function ActivityFormPage({
     >
       <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         {!isEdit && !hasLinkContext && (
+          <>
+            {projects.length === 0 ? (
+              <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
+                Create an active project before scheduling a standalone activity.
+              </p>
+            ) : (
+              <div>
+                <Label htmlFor="activity-project" required>
+                  Project
+                </Label>
+                <ProjectSelector
+                  projects={projects}
+                  selectedProjectId={form.projectId || null}
+                  onChange={(projectId) =>
+                    setForm((current) => ({ ...current, projectId: projectId ?? "" }))
+                  }
+                  emptyLabel="No active projects available"
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {!isEdit && hasLinkContext && (
           <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
-            Open this form from a Lead, Property, or Opportunity detail page to link the
-            activity automatically, or pass leadId, propertyId, or opportunityId in the URL.
+            This activity will inherit project scope from the linked record.
           </p>
         )}
 

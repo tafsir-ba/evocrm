@@ -58,6 +58,7 @@ type LeadDetail = {
   createdAt: string;
   status: DictionaryItem | null;
   source: DictionaryItem | null;
+  project: { id: string; name: string; reference: string | null } | null;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   tags: string[];
   assignedUser: { id: string; name: string | null; email: string } | null;
@@ -364,6 +365,16 @@ export function LeadDetailPanel({
                         }
                       />
                       <Info label="Source" value={lead.source?.label ?? "—"} />
+                      <Info
+                        label="Project"
+                        value={
+                          lead.project
+                            ? lead.project.reference
+                              ? `${lead.project.name} (${lead.project.reference})`
+                              : lead.project.name
+                            : "—"
+                        }
+                      />
                       <Info label="Status" value={lead.status?.label ?? "—"} />
                       <Info
                         label="Property type interests"

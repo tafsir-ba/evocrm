@@ -7,8 +7,9 @@ import {
 } from "@/server/validation/leads";
 
 describe("lead validation", () => {
-  it("requires firstName, lastName, and statusId on create", () => {
+  it("requires firstName, lastName, projectId, and statusId on create", () => {
     const result = createLeadInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
       firstName: "John",
       lastName: "Smith",
       statusId: "507f1f77bcf86cd799439011",

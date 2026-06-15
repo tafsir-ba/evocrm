@@ -363,6 +363,8 @@ export async function createCampaignEnrollmentForWorkspace(
     campaignId,
     leadId,
     opportunityId,
+    projectId: leadId ? (await findLeadById(workspaceId, leadId))?.projectId ?? null : null,
+    enrollmentSource: "manual",
     currentStep: firstStep.order,
     nextSendAt,
   });
@@ -386,6 +388,95 @@ export async function createCampaignEnrollmentForWorkspace(
   }
 
   return enrichEnrollmentWithCampaignSteps(workspaceId, campaignId, enrollment);
+}
+
+export async function enrollLeadInCampaignWithContext(input: {
+  workspaceId: string;
+  campaignId: string;
+  leadId: string;
+  actorId: string;
+  projectId?: string | null;
+  enrollmentSource: "manual" | "project_auto_enroll" | "rule_based_auto_enrollment";
+  enrollmentReason?: Record<string, unknown> | null;
+}): Promise<CampaignEnrollmentDetail | null> {
+  const campaign = await findCampaignById(input.workspaceId, input.campaignId);
+
+  if (!campaign || campaign.status !== "active" || campaign.archivedAt) {
+    return null;
+  }
+
+  if (campaign.audienceType !== "leads") {
+    return null;
+  }
+
+  const lead = await findLeadById(input.workspaceId, input.leadId);
+
+  if (!lead || lead.archivedAt) {
+    return null;
+  }
+
+  const existing = await findActiveEnrollmentByLead(
+    input.workspaceId,
+    input.campaignId,
+    input.leadId,
+  );
+
+  if (existing) {
+    return null;
+  }
+
+  const firstStep = await findFirstCampaignStep(input.workspaceId, input.campaignId);
+
+  if (!firstStep) {
+    return null;
+  }
+
+  const now = new Date();
+  const workspace = await findWorkspaceById(input.workspaceId);
+  const timeZone = workspace?.timezone ?? "UTC";
+  const nextSendAt = computeNextSendAt(now, firstStep.delayDays, {
+    sendTime: firstStep.sendTime,
+    timeZone,
+  });
+
+  const enrollment = await createCampaignEnrollment(input.workspaceId, {
+    campaignId: input.campaignId,
+    leadId: input.leadId,
+    opportunityId: null,
+    projectId: input.projectId ?? lead.projectId,
+    enrollmentSource: input.enrollmentSource,
+    enrollmentReason: input.enrollmentReason ?? null,
+    currentStep: firstStep.order,
+    nextSendAt,
+  });
+
+  await createAuditLog({
+    workspaceId: input.workspaceId,
+    actorId: input.actorId,
+    action: "campaign_enrollment.created",
+    entityType: "campaign_enrollment",
+    entityId: enrollment.id,
+    after: {
+      ...enrollmentSnapshot(enrollment),
+      enrollmentSource: input.enrollmentSource,
+      enrollmentReason: input.enrollmentReason ?? null,
+    },
+  });
+
+  if (firstStep.delayDays <= 0) {
+    void sendCampaignEnrollmentsImmediately(
+      input.workspaceId,
+      input.campaignId,
+      "enrollment",
+      [enrollment.id],
+    ).catch(() => undefined);
+  }
+
+  return enrichEnrollmentWithCampaignSteps(
+    input.workspaceId,
+    input.campaignId,
+    enrollment,
+  );
 }
 
 export async function rescheduleActiveEnrollmentSendsForCampaign(

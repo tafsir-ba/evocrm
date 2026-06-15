@@ -22,6 +22,8 @@ import {
   USAGE_PURPOSE_LABELS,
 } from "@/lib/lead-preferences";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -56,6 +58,7 @@ export function LeadsPanel({
   canArchive,
 }: LeadsPanelProps) {
   const router = useRouter();
+  const projectId = useWorkspaceProjectFilter();
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -136,6 +139,7 @@ export function LeadsPanel({
       if (usagePurposeFilter) {
         params.set("usagePurpose", usagePurposeFilter);
       }
+      appendProjectIdToSearchParams(params, projectId);
 
       const response = await fetch(`${apiBase}/leads?${params.toString()}`);
       const payload = await response.json();
@@ -166,6 +170,7 @@ export function LeadsPanel({
     tagFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    projectId,
   ]);
 
   useEffect(() => {

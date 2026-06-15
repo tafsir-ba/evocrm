@@ -15,6 +15,8 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { IconChevronRight, IconMail, IconPlus } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type CampaignListItem = {
@@ -48,6 +50,7 @@ export function CampaignsPanel({
   canCreate,
 }: CampaignsPanelProps) {
   const router = useRouter();
+  const projectId = useWorkspaceProjectFilter();
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -72,6 +75,7 @@ export function CampaignsPanel({
       if (statusFilter) params.set("status", statusFilter);
       if (audienceFilter) params.set("audienceType", audienceFilter);
       if (search.trim()) params.set("search", search.trim());
+      appendProjectIdToSearchParams(params, projectId);
 
       const response = await fetch(`${apiBase}?${params.toString()}`);
       const payload = await response.json();
@@ -93,7 +97,7 @@ export function CampaignsPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, audienceFilter, search, showArchived, statusFilter]);
+  }, [apiBase, audienceFilter, projectId, search, showArchived, statusFilter]);
 
   useEffect(() => {
     void loadCampaigns();

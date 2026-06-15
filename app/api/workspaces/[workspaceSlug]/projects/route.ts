@@ -22,7 +22,7 @@ export async function GET(request: Request, context: RouteContext) {
     const { workspaceSlug } = await context.params;
     const { workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "settings:read",
+      "project:read",
     );
 
     const url = new URL(request.url);
@@ -36,6 +36,7 @@ export async function GET(request: Request, context: RouteContext) {
       includeArchived: queryResult.data.includeArchived,
       search: queryResult.data.search,
       assignedTo: queryResult.data.assignedTo,
+      withCounts: queryResult.data.withCounts,
     });
 
     return successResponse({ projects });
@@ -49,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { workspaceSlug } = await context.params;
     const { userId, workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "settings:update",
+      "project:create",
     );
 
     const body: unknown = await request.json();

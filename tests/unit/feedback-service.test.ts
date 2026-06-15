@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { projectRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/feedback", () => ({
   createFeedback: vi.fn(),
   findFeedbackById: vi.fn(),
@@ -345,6 +347,7 @@ describe("feedback service", () => {
       workspaceId: "ws-1",
       name: "Project",
       reference: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,

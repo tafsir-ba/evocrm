@@ -4,12 +4,39 @@ import { connectDb } from "@/server/db/mongoose";
 import { CampaignModel, type CampaignDocument } from "@/models/campaign";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 
+export type EnrollmentCondition = {
+  field:
+    | "projectId"
+    | "tags"
+    | "sourceId"
+    | "statusId"
+    | "assignedTo"
+    | "customField";
+  operator:
+    | "equals"
+    | "not_equals"
+    | "contains"
+    | "not_contains"
+    | "is_empty"
+    | "is_not_empty";
+  value: string | string[] | boolean | number | null;
+};
+
+export type EnrollmentRules = {
+  logic: "AND" | "OR";
+  conditions: EnrollmentCondition[];
+};
+
 export type CampaignRecord = {
   id: string;
   workspaceId: string;
   name: string;
   status: "draft" | "active" | "paused" | "archived";
   audienceType: "leads" | "opportunities";
+  projectIds: string[];
+  autoEnrollmentEnabled: boolean;
+  enrollmentTrigger: "new_lead" | "lead_updated" | "manual_only";
+  enrollmentRules: EnrollmentRules;
   frequency: string | null;
   defaultFromName: string | null;
   createdBy: string;
@@ -19,6 +46,14 @@ export type CampaignRecord = {
   updatedAt: Date;
 };
 
+function toEnrollmentRules(document: CampaignDocument): EnrollmentRules {
+  const rules = document.enrollmentRules as EnrollmentRules | undefined;
+  return {
+    logic: rules?.logic ?? "AND",
+    conditions: rules?.conditions ?? [],
+  };
+}
+
 function toCampaignRecord(document: CampaignDocument): CampaignRecord {
   return {
     id: document._id.toString(),
@@ -26,6 +61,12 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
     name: document.name,
     status: document.status as CampaignRecord["status"],
     audienceType: document.audienceType as CampaignRecord["audienceType"],
+    projectIds: (document.projectIds ?? []).map((id) => id.toString()),
+    autoEnrollmentEnabled: document.autoEnrollmentEnabled ?? false,
+    enrollmentTrigger:
+      (document.enrollmentTrigger as CampaignRecord["enrollmentTrigger"]) ??
+      "manual_only",
+    enrollmentRules: toEnrollmentRules(document),
     frequency: document.frequency ?? null,
     defaultFromName: document.defaultFromName ?? null,
     createdBy: document.createdBy.toString(),
@@ -40,6 +81,7 @@ export type CampaignListFilter = {
   includeArchived?: boolean;
   status?: CampaignRecord["status"];
   audienceType?: CampaignRecord["audienceType"];
+  projectId?: string;
   search?: string;
   page?: number;
   pageSize?: number;
@@ -59,6 +101,13 @@ function buildListQuery(filter: CampaignListFilter): Record<string, unknown> {
 
   if (filter.audienceType) {
     query.audienceType = filter.audienceType;
+  }
+
+  if (filter.projectId) {
+    query.$or = [
+      { projectIds: { $size: 0 } },
+      { projectIds: filter.projectId },
+    ];
   }
 
   if (filter.search) {
@@ -103,9 +152,37 @@ export async function findCampaignById(
   return document ? toCampaignRecord(document as CampaignDocument) : null;
 }
 
+export async function findActiveAutoEnrollmentCampaigns(
+  workspaceId: string,
+  filter: {
+    audienceType: CampaignRecord["audienceType"];
+    trigger: CampaignRecord["enrollmentTrigger"];
+  },
+): Promise<CampaignRecord[]> {
+  await connectDb();
+
+  const documents = await CampaignModel.find(
+    withWorkspaceScope(workspaceId, {
+      status: "active",
+      archivedAt: null,
+      audienceType: filter.audienceType,
+      autoEnrollmentEnabled: true,
+      enrollmentTrigger: filter.trigger,
+    }),
+  )
+    .sort({ createdAt: 1 })
+    .lean<CampaignDocument[]>();
+
+  return documents.map(toCampaignRecord);
+}
+
 export type CreateCampaignInput = {
   name: string;
   audienceType: CampaignRecord["audienceType"];
+  projectIds?: string[];
+  autoEnrollmentEnabled?: boolean;
+  enrollmentTrigger?: CampaignRecord["enrollmentTrigger"];
+  enrollmentRules?: EnrollmentRules;
   frequency?: string | null;
   defaultFromName?: string | null;
   createdBy: string;
@@ -123,6 +200,10 @@ export async function createCampaign(
     name: input.name.trim(),
     status: "draft",
     audienceType: input.audienceType,
+    projectIds: input.projectIds ?? [],
+    autoEnrollmentEnabled: input.autoEnrollmentEnabled ?? false,
+    enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
+    enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: input.frequency ?? null,
     defaultFromName: input.defaultFromName?.trim() ?? null,
     createdBy: input.createdBy,
@@ -139,6 +220,10 @@ export async function updateCampaign(
   input: Partial<{
     name: string;
     status: CampaignRecord["status"];
+    projectIds: string[];
+    autoEnrollmentEnabled: boolean;
+    enrollmentTrigger: CampaignRecord["enrollmentTrigger"];
+    enrollmentRules: EnrollmentRules;
     frequency: string | null;
     defaultFromName: string | null;
     ownerId: string | null;

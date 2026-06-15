@@ -17,6 +17,7 @@ export const opportunityListQuerySchema = z.object({
     .optional()
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
+  projectId: objectIdSchema.optional(),
   statusId: objectIdSchema.optional(),
   leadId: objectIdSchema.optional(),
   propertyId: objectIdSchema.optional(),
@@ -79,6 +80,7 @@ export const stageOpportunityInputSchema = z
 
 export const pipelineQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
+  projectId: objectIdSchema.optional(),
   statusId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),
   ownerId: objectIdSchema.optional(),

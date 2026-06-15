@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const objectIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-fA-F0-9]{24}$/, "Invalid ID.");
+
 const MAX_DATE_RANGE_DAYS = 366;
 
 export const dashboardQuerySchema = z
@@ -9,6 +14,7 @@ export const dashboardQuerySchema = z
     periodDays: z.coerce.number().int().min(1).max(MAX_DATE_RANGE_DAYS).optional(),
     timezone: z.string().trim().min(1).max(64).optional(),
     limit: z.coerce.number().int().min(1).max(25).optional(),
+    projectId: objectIdSchema.optional(),
   })
   .superRefine((value, context) => {
     const hasFrom = value.dateFrom !== undefined;

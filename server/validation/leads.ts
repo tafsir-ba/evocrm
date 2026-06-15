@@ -46,6 +46,7 @@ export const leadListQuerySchema = z.object({
     .optional()
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
+  projectId: objectIdSchema.optional(),
   statusId: objectIdSchema.optional(),
   sourceId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),
@@ -60,6 +61,7 @@ export const leadListQuerySchema = z.object({
 
 export const createLeadInputSchema = z
   .object({
+    projectId: objectIdSchema,
     statusId: objectIdSchema,
     sourceId: objectIdSchema.optional(),
     ownerId: objectIdSchema.optional(),

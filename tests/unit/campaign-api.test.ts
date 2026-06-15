@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { campaignRecordExtras, enrollmentRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/auth/require-auth", () => ({
   requireAuth: vi.fn(),
 }));
@@ -51,6 +53,7 @@ const sampleCampaign = {
   name: "Buyer Follow-up",
   status: "draft" as const,
   audienceType: "leads" as const,
+  ...campaignRecordExtras,
   frequency: null,
   defaultFromName: null,
   createdBy: "user-1",
@@ -149,6 +152,7 @@ describe("campaign API routes", () => {
         body: JSON.stringify({
           name: "Buyer Follow-up",
           audienceType: "leads",
+  ...campaignRecordExtras,
         }),
       }),
       { params: Promise.resolve({ workspaceSlug: "demo" }) },

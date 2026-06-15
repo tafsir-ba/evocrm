@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EnumChipSelector } from "@/components/domain/enum-chip-selector";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import {
+  ProjectSelector,
+  type ProjectSelectorProject,
+} from "@/components/domain/project-selector";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import {
   FocusedFormActions,
@@ -22,6 +26,7 @@ import {
   type TransactionIntent,
   type UsagePurpose,
 } from "@/lib/lead-preferences";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -33,6 +38,7 @@ type DictionaryItem = {
 };
 
 export type LeadFormInitialValues = {
+  projectId?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -62,6 +68,7 @@ type LeadFormPageProps = {
 };
 
 const emptyForm: LeadFormInitialValues = {
+  projectId: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -95,11 +102,13 @@ export function LeadFormPage({
   back,
 }: LeadFormPageProps) {
   const router = useRouter();
+  const scopedProjectId = useWorkspaceProjectFilter();
   const [form, setForm] = useState<LeadFormInitialValues>(initialValues ?? emptyForm);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
+  const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [formWarning, setFormWarning] = useState<string | null>(null);
@@ -117,18 +126,21 @@ export function LeadFormPage({
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const [statusRes, sourceRes, tagsRes, membersRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes, membersRes, projectsRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
         fetch(`${apiBase}/members`),
+        fetch(`${apiBase}/projects`),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload, membersPayload] = await Promise.all([
+      const [statusPayload, sourcePayload, tagsPayload, membersPayload, projectsPayload] =
+        await Promise.all([
         statusRes.json(),
         sourceRes.json(),
         tagsRes.json(),
         membersRes.json(),
+        projectsRes.json(),
       ]);
 
       if (statusRes.ok) {
@@ -142,6 +154,9 @@ export function LeadFormPage({
       }
       if (membersRes.ok) {
         setMembers(membersPayload.data.members as MemberSelectorMember[]);
+      }
+      if (projectsRes.ok) {
+        setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
       }
     } finally {
       setLoadingOptions(false);
@@ -163,6 +178,23 @@ export function LeadFormPage({
       setForm((current) => ({ ...current, statusId: defaultStatusId }));
     }
   }, [defaultStatusId, form.statusId, isEdit]);
+
+  useEffect(() => {
+    if (isEdit || form.projectId || projects.length === 0) {
+      return;
+    }
+
+    const preferredProjectId =
+      scopedProjectId && projects.some((project) => project.id === scopedProjectId)
+        ? scopedProjectId
+        : projects.length === 1
+          ? projects[0].id
+          : "";
+
+    if (preferredProjectId) {
+      setForm((current) => ({ ...current, projectId: preferredProjectId }));
+    }
+  }, [form.projectId, isEdit, projects, scopedProjectId]);
 
   function toggleTag(tagId: string) {
     setForm((current) => ({
@@ -198,6 +230,7 @@ export function LeadFormPage({
       firstName: form.firstName,
       lastName: form.lastName,
       statusId: form.statusId,
+      ...(isEdit ? {} : { projectId: form.projectId }),
       email: form.email.trim() || (isEdit ? null : undefined),
       phone: form.phone.trim() || (isEdit ? null : undefined),
       sourceId: form.sourceId || (isEdit ? null : undefined),
@@ -267,6 +300,29 @@ export function LeadFormPage({
       back={back}
     >
       <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+        {!isEdit && projects.length === 0 ? (
+          <p className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
+            Create an active project before adding leads.
+          </p>
+        ) : null}
+
+        {!isEdit ? (
+          <div>
+            <Label htmlFor="projectId" required>
+              Project
+            </Label>
+            <ProjectSelector
+              projects={projects}
+              selectedProjectId={form.projectId || null}
+              onChange={(projectId) =>
+                setForm((current) => ({ ...current, projectId: projectId ?? "" }))
+              }
+              disabled={loadingOptions || projects.length === 0}
+              emptyLabel="No active projects available"
+            />
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="firstName" required>

@@ -7,6 +7,10 @@ import { AppError } from "@/server/errors";
  */
 export const PERMISSION_KEYS = [
   "dashboard:read",
+  "project:create",
+  "project:read",
+  "project:update",
+  "project:archive",
   "lead:create",
   "lead:read",
   "lead:update",

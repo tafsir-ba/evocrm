@@ -7,8 +7,9 @@ import {
 } from "@/server/validation/properties";
 
 describe("property validation", () => {
-  it("requires title and statusId on create", () => {
+  it("requires title, projectId, and statusId on create", () => {
     const result = createPropertyInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
       title: "Green View Apartment 12",
       statusId: "507f1f77bcf86cd799439011",
     });
@@ -52,6 +53,7 @@ describe("property validation", () => {
 
   it("validates currency as 3-letter ISO code", () => {
     const result = createPropertyInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
       title: "Test Property",
       statusId: "507f1f77bcf86cd799439011",
       currency: "CHF",

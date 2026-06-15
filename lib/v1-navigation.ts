@@ -6,6 +6,7 @@ import { workspaceNavPath } from "@/lib/workspace-paths";
 
 export const V1_NAV_ITEMS = [
   { segment: "dashboard", label: "Dashboard" },
+  { segment: "projects", label: "Projects" },
   { segment: "pipeline", label: "Pipeline" },
   { segment: "leads", label: "Leads" },
   { segment: "properties", label: "Properties" },
@@ -23,7 +24,6 @@ export const FORBIDDEN_PRIMARY_NAV_LABELS = [
   "Documents",
   "Integrations",
   "Client Portal",
-  "Projects",
   "Opportunities",
   "Calendar",
   "Automations",
@@ -37,6 +37,7 @@ export type V1NavSegment = (typeof V1_NAV_ITEMS)[number]["segment"];
 
 export const V1_NAV_PERMISSIONS: Record<V1NavSegment, string> = {
   dashboard: "dashboard:read",
+  projects: "project:read",
   pipeline: "opportunity:read",
   leads: "lead:read",
   properties: "property:read",

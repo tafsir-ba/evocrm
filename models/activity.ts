@@ -3,6 +3,7 @@ import mongoose, { type InferSchemaType, Schema } from "mongoose";
 const activitySchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     opportunityId: { type: Schema.Types.ObjectId, ref: "Opportunity", default: null },
     leadId: { type: Schema.Types.ObjectId, ref: "Lead", default: null },
     propertyId: { type: Schema.Types.ObjectId, ref: "Property", default: null },
@@ -24,6 +25,8 @@ const activitySchema = new Schema(
 );
 
 activitySchema.index({ workspaceId: 1 });
+activitySchema.index({ workspaceId: 1, projectId: 1 });
+activitySchema.index({ workspaceId: 1, projectId: 1, archivedAt: 1 });
 activitySchema.index({ workspaceId: 1, createdAt: -1 });
 activitySchema.index({ workspaceId: 1, updatedAt: -1 });
 activitySchema.index({ workspaceId: 1, archivedAt: 1 });

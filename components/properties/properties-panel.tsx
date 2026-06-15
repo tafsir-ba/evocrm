@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { StatusBadge } from "@/components/domain/status-badge";
 import type { MemberSelectorMember } from "@/components/domain/member-selector";
-import type { ProjectSelectorProject } from "@/components/domain/project-selector";
 import type { TagSelectorTag } from "@/components/domain/tag-selector";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,8 @@ import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconChevronRight, IconImage, IconPlus } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -73,6 +74,7 @@ export function PropertiesPanel({
   canArchive,
 }: PropertiesPanelProps) {
   const router = useRouter();
+  const projectId = useWorkspaceProjectFilter();
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -83,12 +85,10 @@ export function PropertiesPanel({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [assignedFilter, setAssignedFilter] = useState("");
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [types, setTypes] = useState<DictionaryItem[]>([]);
-  const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
 
@@ -97,19 +97,17 @@ export function PropertiesPanel({
 
   const loadOptions = useCallback(async () => {
     try {
-      const [statusRes, typeRes, projectsRes, tagsRes, membersRes] = await Promise.all([
+      const [statusRes, typeRes, tagsRes, membersRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=property_status`),
         fetch(`${apiBase}/dictionary-items?type=property_type`),
-        fetch(`${apiBase}/projects`),
         fetch(`${apiBase}/tags?entityType=property`),
         fetch(`${apiBase}/members`),
       ]);
 
-      const [statusPayload, typePayload, projectsPayload, tagsPayload, membersPayload] =
+      const [statusPayload, typePayload, tagsPayload, membersPayload] =
         await Promise.all([
           statusRes.json(),
           typeRes.json(),
-          projectsRes.json(),
           tagsRes.json(),
           membersRes.json(),
         ]);
@@ -119,9 +117,6 @@ export function PropertiesPanel({
       }
       if (typeRes.ok) {
         setTypes(typePayload.data.items as DictionaryItem[]);
-      }
-      if (projectsRes.ok) {
-        setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
       }
       if (tagsRes.ok) {
         setTags(tagsPayload.data.tags as TagSelectorTag[]);
@@ -153,9 +148,7 @@ export function PropertiesPanel({
       if (typeFilter) {
         params.set("typeId", typeFilter);
       }
-      if (projectFilter) {
-        params.set("projectId", projectFilter);
-      }
+      appendProjectIdToSearchParams(params, projectId);
       if (tagFilter) {
         params.set("tagId", tagFilter);
       }
@@ -186,7 +179,7 @@ export function PropertiesPanel({
     assignedFilter,
     page,
     pageSize,
-    projectFilter,
+    projectId,
     search,
     statusFilter,
     tagFilter,
@@ -293,22 +286,6 @@ export function PropertiesPanel({
           {types.map((type) => (
             <option key={type.id} value={type.id}>
               {type.label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[140px]"
-          value={projectFilter}
-          onChange={(event) => {
-            setPage(1);
-            setProjectFilter(event.target.value);
-          }}
-        >
-          <option value="">All projects</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
             </option>
           ))}
         </Select>

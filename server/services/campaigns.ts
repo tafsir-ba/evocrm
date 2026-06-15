@@ -12,6 +12,7 @@ import {
   updateCampaign,
   type CampaignListFilter,
   type CampaignRecord,
+  type EnrollmentRules,
 } from "@/server/repositories/campaigns";
 import {
   countCampaignEnrollments,
@@ -20,6 +21,10 @@ import {
   resumeEnrollmentsForCampaign,
 } from "@/server/repositories/campaign-enrollments";
 import { countCampaignSteps, deleteCampaignStepsForCampaign } from "@/server/repositories/campaign-steps";
+import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
+import { findProjectById } from "@/server/repositories/projects";
+import { findTagById } from "@/server/repositories/tags";
+import { findMembership } from "@/server/repositories/memberships";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import type {
@@ -27,6 +32,10 @@ import type {
   UpdateCampaignInput,
 } from "@/server/validation/campaigns";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import {
+  assertValidProjectFilter,
+  validateActiveProjectId,
+} from "@/server/services/project-scope";
 
 export type CampaignListItem = CampaignRecord & {
   stepCount: number;
@@ -63,6 +72,7 @@ export async function listCampaignsForWorkspace(
   workspaceId: string,
   filter: CampaignListFilter = {},
 ): Promise<{ campaigns: CampaignListItem[]; total: number }> {
+  await assertValidProjectFilter(workspaceId, filter.projectId);
   const { campaigns, total } = await findCampaigns(workspaceId, filter);
 
   const enriched = await Promise.all(
@@ -85,16 +95,86 @@ export async function getCampaignForWorkspace(
   return enrichCampaign(workspaceId, campaign);
 }
 
+async function validateCampaignProjectIds(
+  workspaceId: string,
+  projectIds: string[] | undefined,
+): Promise<void> {
+  if (!projectIds) {
+    return;
+  }
+
+  for (const projectId of projectIds) {
+    await validateActiveProjectId(workspaceId, projectId);
+  }
+}
+
+async function validateEnrollmentRules(
+  workspaceId: string,
+  rules: EnrollmentRules | undefined,
+): Promise<void> {
+  if (!rules) {
+    return;
+  }
+
+  for (const condition of rules.conditions) {
+    if (condition.field === "projectId" && typeof condition.value === "string" && condition.value) {
+      await validateActiveProjectId(workspaceId, condition.value);
+    }
+
+    if (condition.field === "sourceId" && typeof condition.value === "string" && condition.value) {
+      const item = await findDictionaryItemById(workspaceId, condition.value);
+      if (!item || item.type !== "lead_source") {
+        throw new AppError("VALIDATION_ERROR", "Invalid lead source in enrollment rule.");
+      }
+    }
+
+    if (condition.field === "statusId" && typeof condition.value === "string" && condition.value) {
+      const item = await findDictionaryItemById(workspaceId, condition.value);
+      if (!item || item.type !== "lead_status") {
+        throw new AppError("VALIDATION_ERROR", "Invalid lead status in enrollment rule.");
+      }
+    }
+
+    if (condition.field === "tags") {
+      const tagIds = Array.isArray(condition.value)
+        ? condition.value
+        : typeof condition.value === "string" && condition.value
+          ? [condition.value]
+          : [];
+
+      for (const tagId of tagIds) {
+        const tag = await findTagById(workspaceId, tagId);
+        if (!tag) {
+          throw new AppError("VALIDATION_ERROR", "Invalid tag in enrollment rule.");
+        }
+      }
+    }
+
+    if (condition.field === "assignedTo" && typeof condition.value === "string" && condition.value) {
+      const membership = await findMembership(workspaceId, condition.value);
+      if (!membership || membership.status !== "active") {
+        throw new AppError("VALIDATION_ERROR", "Invalid assigned user in enrollment rule.");
+      }
+    }
+  }
+}
+
 export async function createCampaignForWorkspace(
   workspaceId: string,
   actorId: string,
   input: CreateCampaignInput,
 ): Promise<CampaignDetail> {
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  await validateCampaignProjectIds(workspaceId, input.projectIds);
+  await validateEnrollmentRules(workspaceId, input.enrollmentRules);
 
   const campaign = await createCampaign(workspaceId, {
     name: input.name,
     audienceType: input.audienceType,
+    projectIds: input.projectIds ?? [],
+    autoEnrollmentEnabled: input.autoEnrollmentEnabled ?? false,
+    enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
+    enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: input.frequency ?? null,
     defaultFromName: input.defaultFromName ?? null,
     createdBy: actorId,
@@ -178,8 +258,19 @@ export async function updateCampaignForWorkspace(
     await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   }
 
+  await validateCampaignProjectIds(workspaceId, input.projectIds);
+  await validateEnrollmentRules(workspaceId, input.enrollmentRules);
+
   const updated = await updateCampaign(workspaceId, campaignId, {
     ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.projectIds !== undefined ? { projectIds: input.projectIds } : {}),
+    ...(input.autoEnrollmentEnabled !== undefined
+      ? { autoEnrollmentEnabled: input.autoEnrollmentEnabled }
+      : {}),
+    ...(input.enrollmentTrigger !== undefined
+      ? { enrollmentTrigger: input.enrollmentTrigger }
+      : {}),
+    ...(input.enrollmentRules !== undefined ? { enrollmentRules: input.enrollmentRules } : {}),
     ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
     ...(input.defaultFromName !== undefined ? { defaultFromName: input.defaultFromName } : {}),
     ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),

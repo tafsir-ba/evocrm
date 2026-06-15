@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { campaignRecordExtras, enrollmentRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/campaigns", () => ({
   createCampaign: vi.fn(),
   findCampaignById: vi.fn(),
@@ -68,6 +70,11 @@ const baseCampaign = {
   name: "Buyer Follow-up",
   status: "draft" as const,
   audienceType: "leads" as const,
+  ...campaignRecordExtras,
+  projectIds: [] as string[],
+  autoEnrollmentEnabled: false,
+  enrollmentTrigger: "manual_only" as const,
+  enrollmentRules: { logic: "AND" as const, conditions: [] },
   frequency: "manual",
   defaultFromName: null,
   createdBy: "user-1",
@@ -97,12 +104,18 @@ describe("campaign service", () => {
     const result = await createCampaignForWorkspace("ws-1", "user-1", {
       name: "Buyer Follow-up",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: "manual",
     });
 
     expect(createCampaign).toHaveBeenCalledWith("ws-1", {
       name: "Buyer Follow-up",
       audienceType: "leads",
+  ...campaignRecordExtras,
+      projectIds: [],
+      autoEnrollmentEnabled: false,
+      enrollmentTrigger: "manual_only",
+      enrollmentRules: { logic: "AND", conditions: [] },
       frequency: "manual",
       defaultFromName: null,
       createdBy: "user-1",

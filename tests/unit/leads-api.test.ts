@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { leadRecordExtras, projectRecordExtras, campaignRecordExtras, enrollmentRecordExtras, activityRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/auth/require-auth", () => ({
   requireAuth: vi.fn(),
 }));
@@ -140,6 +142,7 @@ describe("lead API routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: "507f1f77bcf86cd799439011",
           firstName: "John",
           lastName: "Smith",
           statusId: "507f1f77bcf86cd799439013",
@@ -195,6 +198,7 @@ describe("lead API routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projectId: "507f1f77bcf86cd799439011",
           firstName: "John",
           lastName: "Smith",
           statusId: "507f1f77bcf86cd799439013",

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  campaignRecordExtras,
+  enrollmentRecordExtras,
+  leadRecordExtras,
+} from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/campaigns", () => ({
   findCampaignById: vi.fn(),
 }));
@@ -48,6 +54,7 @@ const pausedEnrollment = {
   campaignId: "camp-1",
   leadId: "lead-1",
   opportunityId: null,
+  ...enrollmentRecordExtras,
   status: "paused" as const,
   currentStep: 1,
   nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
@@ -69,6 +76,7 @@ describe("campaign enrollment service", () => {
       name: "Test",
       status: "active",
       audienceType: "leads",
+  ...campaignRecordExtras,
       frequency: null,
       defaultFromName: null,
       createdBy: "user-1",
@@ -124,6 +132,7 @@ describe("campaign enrollment service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+  ...leadRecordExtras,
       statusId: "s1",
       sourceId: null,
       ownerId: null,

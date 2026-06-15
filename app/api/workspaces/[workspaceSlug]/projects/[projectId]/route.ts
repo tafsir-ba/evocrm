@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const { workspaceSlug, projectId } = await context.params;
     const { workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "settings:read",
+      "project:read",
     );
 
     const project = await getProjectForWorkspace(workspace.id, projectId);
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { workspaceSlug, projectId } = await context.params;
     const { userId, workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "settings:update",
+      "project:update",
     );
 
     const body: unknown = await request.json();
@@ -57,7 +57,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const { workspaceSlug, projectId } = await context.params;
     const { userId, workspace } = await requireWorkspaceApiAccess(
       workspaceSlug,
-      "settings:update",
+      "project:archive",
     );
 
     const project = await archiveProjectForWorkspace(

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
+import { ProjectFilter } from "@/components/layout/project-filter";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";

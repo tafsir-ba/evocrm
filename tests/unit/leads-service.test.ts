@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { leadRecordExtras, projectRecordExtras, campaignRecordExtras, enrollmentRecordExtras, activityRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/leads", () => ({
   findActiveLeadByEmailNormalized: vi.fn(),
   findLeadByPhoneNormalized: vi.fn(),
@@ -26,12 +28,21 @@ vi.mock("@/server/repositories/users", () => ({
   findUserById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/projects", () => ({
+  findProjectById: vi.fn(),
+}));
+
+vi.mock("@/server/services/campaign-auto-enrollment", () => ({
+  evaluateCampaignAutoEnrollmentForLead: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
+import { findProjectById } from "@/server/repositories/projects";
 import {
   archiveLead,
   createLead,
@@ -52,6 +63,8 @@ import {
 const baseLead = {
   id: "lead-1",
   workspaceId: "ws-1",
+  ...leadRecordExtras,
+  projectId: "project-1",
   statusId: "status-1",
   sourceId: null,
   ownerId: null,
@@ -104,12 +117,32 @@ describe("lead service", () => {
     });
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
     vi.mocked(findLeadByPhoneNormalized).mockResolvedValue(null);
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Default Project",
+      reference: "default",
+      projectType: null,
+      defaultDripCampaignId: null,
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   });
 
   it("derives fullName server-side on create", async () => {
     vi.mocked(createLead).mockResolvedValue(baseLead);
 
     await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       firstName: "John",
       lastName: "Smith",
       statusId: "status-1",
@@ -128,6 +161,7 @@ describe("lead service", () => {
     vi.mocked(createLead).mockResolvedValue(baseLead);
 
     await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       firstName: "John",
       lastName: "Smith",
       statusId: "status-1",
@@ -161,6 +195,7 @@ describe("lead service", () => {
 
     await expect(
       createLeadForWorkspace("ws-1", "user-1", {
+        projectId: "project-1",
         firstName: "Jane",
         lastName: "Doe",
         statusId: "status-1",
@@ -174,6 +209,7 @@ describe("lead service", () => {
     vi.mocked(createLead).mockResolvedValue(baseLead);
 
     const result = await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       firstName: "Jane",
       lastName: "Doe",
       statusId: "status-1",
@@ -197,6 +233,7 @@ describe("lead service", () => {
 
     await expect(
       createLeadForWorkspace("ws-1", "user-1", {
+        projectId: "project-1",
         firstName: "John",
         lastName: "Smith",
         statusId: "status-1",
@@ -210,6 +247,7 @@ describe("lead service", () => {
 
     await expect(
       createLeadForWorkspace("ws-1", "user-1", {
+        projectId: "project-1",
         firstName: "John",
         lastName: "Smith",
         statusId: "status-1",
@@ -234,6 +272,7 @@ describe("lead service", () => {
     });
 
     await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       firstName: "John",
       lastName: "Smith",
       statusId: "status-1",

@@ -1,10 +1,27 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
+const PROJECT_TYPES = [
+  "development",
+  "resale_mandate",
+  "rental_project",
+  "other",
+] as const;
+
 const projectSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     name: { type: String, required: true, trim: true },
     reference: { type: String, trim: true, default: null },
+    projectType: {
+      type: String,
+      enum: PROJECT_TYPES,
+      default: null,
+    },
+    defaultDripCampaignId: {
+      type: Schema.Types.ObjectId,
+      ref: "Campaign",
+      default: null,
+    },
     statusId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
     address: { type: String, trim: true, default: null },
     city: { type: String, trim: true, default: null },

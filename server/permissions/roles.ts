@@ -16,6 +16,10 @@ export type DefaultRoleDefinition = {
 
 const OWNER_PERMISSIONS = validatePermissions([
   "dashboard:read",
+  "project:create",
+  "project:read",
+  "project:update",
+  "project:archive",
   "lead:create",
   "lead:read",
   "lead:update",
@@ -49,6 +53,10 @@ const OWNER_PERMISSIONS = validatePermissions([
 
 const ADMIN_PERMISSIONS = validatePermissions([
   "dashboard:read",
+  "project:create",
+  "project:read",
+  "project:update",
+  "project:archive",
   "lead:create",
   "lead:read",
   "lead:update",
@@ -82,6 +90,7 @@ const ADMIN_PERMISSIONS = validatePermissions([
 
 const AGENT_PERMISSIONS = validatePermissions([
   "dashboard:read",
+  "project:read",
   "lead:create",
   "lead:read",
   "lead:update",
@@ -100,6 +109,7 @@ const AGENT_PERMISSIONS = validatePermissions([
 
 const VIEWER_PERMISSIONS = validatePermissions([
   "dashboard:read",
+  "project:read",
   "lead:read",
   "property:read",
   "opportunity:read",

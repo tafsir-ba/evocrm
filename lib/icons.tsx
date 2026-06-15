@@ -22,6 +22,7 @@ export function IconLogo(props: IconProps) {
   );
 }
 export function IconDashboard(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>); }
+export function IconProjects(p: IconProps) { return (<svg {...base(p)}><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/><path d="M4 9h16"/></svg>); }
 export function IconPipeline(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="4" width="4" height="16" rx="1"/><rect x="10" y="4" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/></svg>); }
 export function IconLeads(p: IconProps) { return (<svg {...base(p)}><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.5-3 3-5 6-5s5.5 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M21 19c-.4-2-1.8-3.5-4-3.9"/></svg>); }
 export function IconProperties(p: IconProps) { return (<svg {...base(p)}><path d="M4 10 12 4l8 6v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1v-9Z"/></svg>); }

@@ -72,6 +72,10 @@ export type PermissionGroup = {
 
 const PERMISSION_LABELS: Record<string, string> = {
   "dashboard:read": "View dashboard",
+  "project:create": "Create projects",
+  "project:read": "View projects",
+  "project:update": "Edit projects",
+  "project:archive": "Archive projects",
   "lead:create": "Create leads",
   "lead:read": "View leads",
   "lead:update": "Edit leads",

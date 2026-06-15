@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react";
 import { useState } from "react";
 
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
+import { ProjectFilter } from "@/components/layout/project-filter";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +20,7 @@ import {
 import { workspaceNavPath } from "@/lib/workspace-paths";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Suspense } from "react";
 
 export function Topbar({
   onOpenMobileNav,
@@ -57,6 +59,10 @@ export function Topbar({
       </div>
 
       <div className="flex-1 md:hidden" />
+
+      <Suspense fallback={null}>
+        <ProjectFilter />
+      </Suspense>
 
       <button
         className="relative inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-[var(--color-muted)] focus-ring text-[var(--color-ink-soft)]"

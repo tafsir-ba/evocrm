@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  campaignRecordExtras,
+  leadRecordExtras,
+  opportunityRecordExtras,
+} from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/campaigns", () => ({
   findCampaignById: vi.fn(),
 }));
@@ -30,6 +36,7 @@ const baseCampaign = {
   name: "Test drip",
   status: "draft" as const,
   audienceType: "leads" as const,
+  ...campaignRecordExtras,
   frequency: "manual",
   defaultFromName: null,
   createdBy: "user-1",
@@ -42,6 +49,7 @@ const baseCampaign = {
 const sampleLead = {
   id: "lead-new",
   workspaceId: "ws-1",
+  ...leadRecordExtras,
   archivedAt: null,
   statusId: "status-1",
   sourceId: null,
@@ -162,12 +170,14 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     vi.mocked(findCampaignById).mockResolvedValue({
       ...baseCampaign,
       audienceType: "opportunities",
+  ...campaignRecordExtras,
     });
     vi.mocked(listOpportunitiesForWorkspace).mockResolvedValue({
       opportunities: [
         {
           id: "opp-1",
           workspaceId: "ws-1",
+          ...opportunityRecordExtras,
           leadId: "lead-1",
           propertyId: "prop-1",
           statusId: "status-1",
@@ -208,6 +218,7 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
           },
           tagsResolved: [],
           assignedUser: null,
+          project: null,
         },
       ],
       total: 1,

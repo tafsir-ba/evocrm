@@ -9,6 +9,7 @@ describe("V1 navigation scope", () => {
   it("includes only locked V1 primary modules", () => {
     expect(V1_NAV_ITEMS.map((item) => item.label)).toEqual([
       "Dashboard",
+      "Projects",
       "Pipeline",
       "Leads",
       "Properties",
@@ -34,7 +35,6 @@ describe("V1 navigation scope", () => {
       "Documents",
       "Integrations",
       "Client Portal",
-      "Projects",
       "Opportunities",
       "Calendar",
       "Automations",

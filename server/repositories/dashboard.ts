@@ -23,23 +23,43 @@ function toObjectIdArray(ids: string[]): Types.ObjectId[] {
   return ids.map((id) => new Types.ObjectId(id));
 }
 
+function withOptionalProjectScope(
+  workspaceId: string,
+  filter: Record<string, unknown>,
+  projectId?: string,
+): Record<string, unknown> {
+  const scoped = withWorkspaceScope(workspaceId, filter);
+
+  if (projectId) {
+    return { ...scoped, projectId: new Types.ObjectId(projectId) };
+  }
+
+  return scoped;
+}
+
 export async function countLeadsCreatedInRange(
   workspaceId: string,
   from: Date,
   to: Date,
+  projectId?: string,
 ): Promise<number> {
   await connectDb();
   return LeadModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      createdAt: { $gte: from, $lte: to },
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        createdAt: { $gte: from, $lte: to },
+      },
+      projectId,
+    ),
   );
 }
 
 export async function countOpportunitiesByStatusIds(
   workspaceId: string,
   statusIds: string[],
+  projectId?: string,
 ): Promise<number> {
   if (statusIds.length === 0) {
     return 0;
@@ -47,10 +67,14 @@ export async function countOpportunitiesByStatusIds(
 
   await connectDb();
   return OpportunityModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      statusId: { $in: toObjectIdArray(statusIds) },
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        statusId: { $in: toObjectIdArray(statusIds) },
+      },
+      projectId,
+    ),
   );
 }
 
@@ -59,6 +83,7 @@ export async function countWonOpportunitiesInRange(
   wonStatusIds: string[],
   from: Date,
   to: Date,
+  projectId?: string,
 ): Promise<number> {
   if (wonStatusIds.length === 0) {
     return 0;
@@ -66,14 +91,18 @@ export async function countWonOpportunitiesInRange(
 
   await connectDb();
   return OpportunityModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      statusId: { $in: toObjectIdArray(wonStatusIds) },
-      $or: [
-        { wonAt: { $gte: from, $lte: to } },
-        { wonAt: null, closedAt: { $gte: from, $lte: to } },
-      ],
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        statusId: { $in: toObjectIdArray(wonStatusIds) },
+        $or: [
+          { wonAt: { $gte: from, $lte: to } },
+          { wonAt: null, closedAt: { $gte: from, $lte: to } },
+        ],
+      },
+      projectId,
+    ),
   );
 }
 
@@ -82,6 +111,7 @@ export async function countLostOpportunitiesInRange(
   lostStatusIds: string[],
   from: Date,
   to: Date,
+  projectId?: string,
 ): Promise<number> {
   if (lostStatusIds.length === 0) {
     return 0;
@@ -89,14 +119,18 @@ export async function countLostOpportunitiesInRange(
 
   await connectDb();
   return OpportunityModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      statusId: { $in: toObjectIdArray(lostStatusIds) },
-      $or: [
-        { lostAt: { $gte: from, $lte: to } },
-        { lostAt: null, closedAt: { $gte: from, $lte: to } },
-      ],
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        statusId: { $in: toObjectIdArray(lostStatusIds) },
+        $or: [
+          { lostAt: { $gte: from, $lte: to } },
+          { lostAt: null, closedAt: { $gte: from, $lte: to } },
+        ],
+      },
+      projectId,
+    ),
   );
 }
 
@@ -104,6 +138,7 @@ export async function sumOpportunityValuesByCurrency(
   workspaceId: string,
   statusIds: string[],
   dateFilter?: { from: Date; to: Date; field: "won" | "lost" },
+  projectId?: string,
 ): Promise<CurrencySum[]> {
   if (statusIds.length === 0) {
     return [];
@@ -129,7 +164,7 @@ export async function sumOpportunityValuesByCurrency(
   }
 
   const results = await OpportunityModel.aggregate<CurrencySum>([
-    { $match: withWorkspaceScope(workspaceId, match) },
+    { $match: withOptionalProjectScope(workspaceId, match, projectId) },
     {
       $group: {
         _id: "$currency",
@@ -157,6 +192,7 @@ export async function countActivitiesDueToday(
   pendingStatusIds: string[],
   dayStart: Date,
   dayEnd: Date,
+  projectId?: string,
 ): Promise<number> {
   if (pendingStatusIds.length === 0) {
     return 0;
@@ -164,11 +200,15 @@ export async function countActivitiesDueToday(
 
   await connectDb();
   return ActivityModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      statusId: { $in: toObjectIdArray(pendingStatusIds) },
-      dueDate: { $gte: dayStart, $lte: dayEnd },
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        statusId: { $in: toObjectIdArray(pendingStatusIds) },
+        dueDate: { $gte: dayStart, $lte: dayEnd },
+      },
+      projectId,
+    ),
   );
 }
 
@@ -176,6 +216,7 @@ export async function countOverdueActivities(
   workspaceId: string,
   pendingStatusIds: string[],
   now: Date,
+  projectId?: string,
 ): Promise<number> {
   if (pendingStatusIds.length === 0) {
     return 0;
@@ -183,11 +224,15 @@ export async function countOverdueActivities(
 
   await connectDb();
   return ActivityModel.countDocuments(
-    withWorkspaceScope(workspaceId, {
-      archivedAt: null,
-      statusId: { $in: toObjectIdArray(pendingStatusIds) },
-      dueDate: { $ne: null, $lt: now },
-    }),
+    withOptionalProjectScope(
+      workspaceId,
+      {
+        archivedAt: null,
+        statusId: { $in: toObjectIdArray(pendingStatusIds) },
+        dueDate: { $ne: null, $lt: now },
+      },
+      projectId,
+    ),
   );
 }
 
@@ -195,15 +240,20 @@ export async function groupLeadsBySource(
   workspaceId: string,
   from: Date,
   to: Date,
+  projectId?: string,
 ): Promise<GroupCount[]> {
   await connectDb();
 
   const results = await LeadModel.aggregate<GroupCount>([
     {
-      $match: withWorkspaceScope(workspaceId, {
-        archivedAt: null,
-        createdAt: { $gte: from, $lte: to },
-      }),
+      $match: withOptionalProjectScope(
+        workspaceId,
+        {
+          archivedAt: null,
+          createdAt: { $gte: from, $lte: to },
+        },
+        projectId,
+      ),
     },
     {
       $group: {
@@ -231,14 +281,19 @@ export async function groupLeadsBySource(
 
 export async function groupPropertiesByStatus(
   workspaceId: string,
+  projectId?: string,
 ): Promise<GroupCount[]> {
   await connectDb();
 
   const results = await PropertyModel.aggregate<GroupCount>([
     {
-      $match: withWorkspaceScope(workspaceId, {
-        archivedAt: null,
-      }),
+      $match: withOptionalProjectScope(
+        workspaceId,
+        {
+          archivedAt: null,
+        },
+        projectId,
+      ),
     },
     {
       $group: {
@@ -260,6 +315,7 @@ export async function groupPropertiesByStatus(
 
 export async function groupOpportunitiesByStatus(
   workspaceId: string,
+  projectId?: string,
 ): Promise<Array<GroupCount & { values: CurrencySum[] }>> {
   await connectDb();
 
@@ -269,9 +325,13 @@ export async function groupOpportunitiesByStatus(
     values: Array<{ currency: string; amount: number }>;
   }>([
     {
-      $match: withWorkspaceScope(workspaceId, {
-        archivedAt: null,
-      }),
+      $match: withOptionalProjectScope(
+        workspaceId,
+        {
+          archivedAt: null,
+        },
+        projectId,
+      ),
     },
     {
       $group: {

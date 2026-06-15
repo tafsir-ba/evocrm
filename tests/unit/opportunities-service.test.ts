@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { leadRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/opportunities", () => ({
   findOpportunityById: vi.fn(),
   createOpportunity: vi.fn(),
@@ -39,6 +41,10 @@ vi.mock("@/server/repositories/workspaces", () => ({
   findWorkspaceById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/projects", () => ({
+  findProjectById: vi.fn(),
+}));
+
 vi.mock("@/server/services/dictionary-items", () => ({
   listDictionaryItemsForWorkspace: vi.fn(),
 }));
@@ -50,6 +56,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findLeadById } from "@/server/repositories/leads";
 import { findPropertyById } from "@/server/repositories/properties";
+import { findProjectById } from "@/server/repositories/projects";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import {
   archiveOpportunity,
@@ -67,6 +74,8 @@ import {
 const baseOpportunity = {
   id: "opp-1",
   workspaceId: "ws-1",
+  ...opportunityRecordExtras,
+  projectId: "project-1",
   leadId: "lead-1",
   propertyId: "prop-1",
   statusId: "status-open",
@@ -96,6 +105,7 @@ describe("opportunity service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+      projectId: "project-1",
       archivedAt: null,
       fullName: "John Smith",
       firstName: "John",
@@ -131,11 +141,11 @@ describe("opportunity service", () => {
     vi.mocked(findPropertyById).mockResolvedValue({
       id: "prop-1",
       workspaceId: "ws-1",
+      projectId: "project-1",
       archivedAt: null,
       currency: "CHF",
       title: "Lake View Apartment",
       reference: "LV-12",
-      projectId: null,
       statusId: "prop-status",
       typeId: null,
       ownerId: null,
@@ -155,6 +165,26 @@ describe("opportunity service", () => {
       tags: [],
       attributes: {},
       createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Default Project",
+      reference: "default",
+      projectType: null,
+      defaultDripCampaignId: null,
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -303,6 +333,7 @@ describe("opportunity service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+      ...leadRecordExtras,
       archivedAt: new Date(),
       fullName: "John Smith",
       firstName: "John",

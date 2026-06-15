@@ -60,7 +60,7 @@ export const propertyListQuerySchema = z.object({
 
 export const createPropertyInputSchema = z
   .object({
-    projectId: objectIdSchema.optional(),
+    projectId: objectIdSchema,
     statusId: objectIdSchema,
     typeId: objectIdSchema.optional(),
     ownerId: objectIdSchema.optional(),

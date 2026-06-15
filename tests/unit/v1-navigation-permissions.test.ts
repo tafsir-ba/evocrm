@@ -45,6 +45,7 @@ describe("permission-aware navigation", () => {
   it("never includes forbidden primary nav labels", () => {
     const navigation = buildPermissionAwareNavigation("demo", [
       "dashboard:read",
+      "project:read",
       "lead:read",
       "property:read",
       "opportunity:read",

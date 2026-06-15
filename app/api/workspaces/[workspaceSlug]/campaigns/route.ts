@@ -44,6 +44,7 @@ export async function GET(request: Request, context: RouteContext) {
       includeArchived: query.includeArchived,
       status: query.status,
       audienceType: query.audienceType,
+      projectId: query.projectId,
       search: query.search,
     });
 

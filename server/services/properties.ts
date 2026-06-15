@@ -17,6 +17,7 @@ import {
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import { assertValidProjectFilter } from "@/server/services/project-scope";
 import type { CreatePropertyInput, UpdatePropertyInput } from "@/server/validation/properties";
 
 export type PropertyDictionarySummary = {
@@ -140,7 +141,7 @@ async function validatePropertyProjectId(
   projectId: string | null | undefined,
 ): Promise<void> {
   if (!projectId) {
-    return;
+    throw new AppError("VALIDATION_ERROR", "Project is required.");
   }
 
   const project = await findProjectById(workspaceId, projectId);
@@ -324,6 +325,7 @@ export async function listPropertiesForWorkspace(
   workspaceId: string,
   filter: PropertyListFilter = {},
 ): Promise<{ properties: PropertyListItem[]; total: number }> {
+  await assertValidProjectFilter(workspaceId, filter.projectId);
   const { properties, total } = await findProperties(workspaceId, filter);
 
   const enriched = await Promise.all(
@@ -369,7 +371,7 @@ export async function createPropertyForWorkspace(
   const property = await createProperty({
     workspaceId,
     createdBy: actorId,
-    projectId: input.projectId ?? null,
+    projectId: input.projectId,
     statusId: input.statusId,
     typeId: input.typeId ?? null,
     ownerId: input.ownerId ?? null,

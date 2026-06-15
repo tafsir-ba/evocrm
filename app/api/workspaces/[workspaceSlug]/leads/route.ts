@@ -40,6 +40,7 @@ export async function GET(request: Request, context: RouteContext) {
       pageSize: query.pageSize,
       includeArchived: query.includeArchived,
       search: query.search,
+      projectId: query.projectId,
       statusId: query.statusId,
       sourceId: query.sourceId,
       assignedTo: query.assignedTo,

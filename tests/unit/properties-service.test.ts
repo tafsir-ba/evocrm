@@ -55,7 +55,7 @@ import {
 const baseProperty = {
   id: "property-1",
   workspaceId: "ws-1",
-  projectId: null,
+  projectId: "project-1",
   statusId: "status-1",
   typeId: null,
   ownerId: null,
@@ -102,13 +102,32 @@ describe("property service", () => {
       updatedAt: new Date(),
     });
     vi.mocked(findPropertyByReference).mockResolvedValue(null);
-    vi.mocked(findProjectById).mockResolvedValue(null);
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Default Project",
+      reference: "default",
+      projectType: null,
+      defaultDripCampaignId: null,
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   });
 
   it("sets workspaceId and createdBy server-side on create", async () => {
     vi.mocked(createProperty).mockResolvedValue(baseProperty);
 
     await createPropertyForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       title: "Green View Apartment 12",
       statusId: "status-1",
     }, "CHF");
@@ -117,7 +136,8 @@ describe("property service", () => {
       expect.objectContaining({
         workspaceId: "ws-1",
         createdBy: "user-1",
-        title: "Green View Apartment 12",
+        projectId: "project-1",
+      title: "Green View Apartment 12",
       }),
     );
   });
@@ -126,6 +146,7 @@ describe("property service", () => {
     vi.mocked(createProperty).mockResolvedValue(baseProperty);
 
     await createPropertyForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       title: "Green View Apartment 12",
       statusId: "status-1",
     }, "CHF");
@@ -141,6 +162,7 @@ describe("property service", () => {
     vi.mocked(createProperty).mockResolvedValue(baseProperty);
 
     await createPropertyForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
       title: "Green View Apartment 12",
       statusId: "status-1",
       reference: "  GV-APT-12  ",
@@ -158,6 +180,7 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
+        projectId: "project-1",
         title: "Another Property",
         statusId: "status-1",
         reference: "GV-APT-12",
@@ -174,6 +197,7 @@ describe("property service", () => {
     });
 
     await createPropertyForWorkspace("ws-2", "user-1", {
+      projectId: "project-1",
       title: "Green View Apartment 12",
       statusId: "status-1",
       reference: "GV-APT-12",
@@ -194,6 +218,8 @@ describe("property service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: "GV",
+      projectType: null,
+      defaultDripCampaignId: null,
       statusId: null,
       address: null,
       city: "Geneva",
@@ -209,9 +235,9 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
+        projectId: "project-1",
         title: "Green View Apartment 12",
         statusId: "status-1",
-        projectId: "project-1",
       }, "CHF"),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
@@ -235,7 +261,8 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
-        title: "Green View Apartment 12",
+        projectId: "project-1",
+      title: "Green View Apartment 12",
         statusId: "status-1",
       }, "CHF"),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
@@ -279,7 +306,8 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
-        title: "Green View Apartment 12",
+        projectId: "project-1",
+      title: "Green View Apartment 12",
         statusId: "status-1",
         typeId: "type-1",
       }, "CHF"),
@@ -300,7 +328,8 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
-        title: "Green View Apartment 12",
+        projectId: "project-1",
+      title: "Green View Apartment 12",
         statusId: "status-1",
         tags: ["tag-1"],
       }, "CHF"),
@@ -324,7 +353,8 @@ describe("property service", () => {
 
     await expect(
       createPropertyForWorkspace("ws-1", "user-1", {
-        title: "Green View Apartment 12",
+        projectId: "project-1",
+      title: "Green View Apartment 12",
         statusId: "status-1",
         assignedTo: "user-99",
       }, "CHF"),

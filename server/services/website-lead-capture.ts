@@ -25,6 +25,7 @@ import {
   createLeadForWorkspace,
   normalizeLeadEmail,
 } from "@/server/services/leads";
+import { findProjects } from "@/server/repositories/projects";
 import type { WebsiteLeadCaptureInput } from "@/server/validation/website-lead-capture";
 
 export type WebsiteLeadCaptureResult = {
@@ -32,6 +33,19 @@ export type WebsiteLeadCaptureResult = {
   duplicate: boolean;
   idempotent: boolean;
 };
+
+async function resolveWebsiteLeadProjectId(workspaceId: string): Promise<string> {
+  const projects = await findProjects(workspaceId, { includeArchived: false });
+
+  if (projects.length === 0) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "At least one active project is required before website leads can be captured.",
+    );
+  }
+
+  return projects[0].id;
+}
 
 function resolveIdempotencyKey(input: WebsiteLeadCaptureInput): string | null {
   const key = input.idempotencyKey?.trim() || input.externalId?.trim();
@@ -217,12 +231,14 @@ export async function captureWebsiteLead(
 
   const statusId = await resolveDefaultLeadStatusId(workspaceId);
   const sourceId = await resolveWebsiteLeadSourceId(workspaceId);
+  const projectId = await resolveWebsiteLeadProjectId(workspaceId);
   const attributes = buildIntegrationAttributes(integration, input, idempotencyKey);
 
   let result;
 
   try {
     result = await createLeadForWorkspace(workspaceId, integration.createdBy, {
+      projectId,
       statusId,
       sourceId: sourceId ?? undefined,
       firstName: input.firstName,

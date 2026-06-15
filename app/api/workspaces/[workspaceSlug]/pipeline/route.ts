@@ -26,6 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
     const query = queryResult.data;
     const pipeline = await getPipelineForWorkspace(workspace.id, {
       search: query.search,
+      projectId: query.projectId,
       statusId: query.statusId,
       assignedTo: query.assignedTo,
       ownerId: query.ownerId,

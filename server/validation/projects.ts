@@ -17,6 +17,13 @@ const referenceSchema = z
     "Reference must contain only letters, numbers, dots, underscores, or hyphens.",
   );
 
+const projectTypeSchema = z.enum([
+  "development",
+  "resale_mandate",
+  "rental_project",
+  "other",
+]);
+
 export const projectListQuerySchema = z.object({
   includeArchived: z
     .union([z.literal("true"), z.literal("false")])
@@ -24,12 +31,19 @@ export const projectListQuerySchema = z.object({
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
   assignedTo: objectIdSchema.optional(),
+  withCounts: z
+    .union([z.literal("true"), z.literal("false")])
+    .optional()
+    .transform((value) => value === "true"),
 });
 
 export const createProjectInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     reference: referenceSchema.optional(),
+    projectType: projectTypeSchema.optional(),
+    defaultDripCampaignId: objectIdSchema.nullable().optional(),
+    statusId: objectIdSchema.optional(),
     address: z.string().trim().max(200).optional(),
     city: z.string().trim().max(120).optional(),
     country: z.string().trim().max(120).optional(),
@@ -43,6 +57,9 @@ export const updateProjectInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     reference: referenceSchema.nullable().optional(),
+    projectType: projectTypeSchema.nullable().optional(),
+    defaultDripCampaignId: objectIdSchema.nullable().optional(),
+    statusId: objectIdSchema.nullable().optional(),
     address: z.string().trim().max(200).nullable().optional(),
     city: z.string().trim().max(120).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),

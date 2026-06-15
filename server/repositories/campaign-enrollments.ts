@@ -13,6 +13,9 @@ export type CampaignEnrollmentRecord = {
   campaignId: string;
   leadId: string | null;
   opportunityId: string | null;
+  projectId: string | null;
+  enrollmentSource: "manual" | "project_auto_enroll" | "rule_based_auto_enrollment";
+  enrollmentReason: Record<string, unknown> | null;
   status: "active" | "paused" | "completed" | "unsubscribed" | "failed";
   currentStep: number;
   nextSendAt: Date;
@@ -34,6 +37,12 @@ function toEnrollmentRecord(
     campaignId: document.campaignId.toString(),
     leadId: document.leadId?.toString() ?? null,
     opportunityId: document.opportunityId?.toString() ?? null,
+    projectId: document.projectId?.toString() ?? null,
+    enrollmentSource:
+      (document.enrollmentSource as CampaignEnrollmentRecord["enrollmentSource"]) ??
+      "manual",
+    enrollmentReason:
+      (document.enrollmentReason as Record<string, unknown> | null) ?? null,
     status: document.status as CampaignEnrollmentRecord["status"],
     currentStep: document.currentStep,
     nextSendAt: document.nextSendAt,
@@ -188,6 +197,9 @@ export type CreateEnrollmentInput = {
   campaignId: string;
   leadId?: string | null;
   opportunityId?: string | null;
+  projectId?: string | null;
+  enrollmentSource?: CampaignEnrollmentRecord["enrollmentSource"];
+  enrollmentReason?: Record<string, unknown> | null;
   currentStep: number;
   nextSendAt: Date;
 };
@@ -203,6 +215,9 @@ export async function createCampaignEnrollment(
     campaignId: input.campaignId,
     leadId: input.leadId ?? null,
     opportunityId: input.opportunityId ?? null,
+    projectId: input.projectId ?? null,
+    enrollmentSource: input.enrollmentSource ?? "manual",
+    enrollmentReason: input.enrollmentReason ?? null,
     status: "active",
     currentStep: input.currentStep,
     nextSendAt: input.nextSendAt,

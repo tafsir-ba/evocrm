@@ -16,9 +16,11 @@ import {
   type OpportunityRecord,
 } from "@/server/repositories/opportunities";
 import { findProperties, findPropertyById } from "@/server/repositories/properties";
+import { findProjectById } from "@/server/repositories/projects";
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import { assertValidProjectFilter } from "@/server/services/project-scope";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
 import type {
@@ -67,7 +69,14 @@ export type OpportunityPropertySummary = {
   currency: string;
 };
 
+export type OpportunityProjectSummary = {
+  id: string;
+  name: string;
+  reference: string | null;
+};
+
 export type OpportunityListItem = OpportunityRecord & {
+  project: OpportunityProjectSummary | null;
   status: OpportunityDictionarySummary | null;
   lostReason: OpportunityDictionarySummary | null;
   lead: OpportunityLeadSummary | null;
@@ -171,7 +180,7 @@ async function validateLostReasonId(
 async function validateLeadForOpportunity(
   workspaceId: string,
   leadId: string,
-): Promise<void> {
+): Promise<{ projectId: string }> {
   const lead = await findLeadById(workspaceId, leadId);
 
   if (!lead || lead.archivedAt) {
@@ -180,12 +189,14 @@ async function validateLeadForOpportunity(
       "Lead must exist in this workspace and not be archived.",
     );
   }
+
+  return { projectId: lead.projectId };
 }
 
 async function validatePropertyForOpportunity(
   workspaceId: string,
   propertyId: string,
-): Promise<{ currency: string }> {
+): Promise<{ currency: string; projectId: string }> {
   const property = await findPropertyById(workspaceId, propertyId);
 
   if (!property || property.archivedAt) {
@@ -195,7 +206,21 @@ async function validatePropertyForOpportunity(
     );
   }
 
-  return { currency: property.currency };
+  return { currency: property.currency, projectId: property.projectId };
+}
+
+function assertMatchingOpportunityProjects(
+  leadProjectId: string,
+  propertyProjectId: string,
+): string {
+  if (leadProjectId !== propertyProjectId) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Lead and property must belong to the same project.",
+    );
+  }
+
+  return leadProjectId;
 }
 
 async function validateOpportunityTags(
@@ -322,6 +347,22 @@ async function resolvePropertySummary(
   };
 }
 
+async function resolveProjectSummary(
+  workspaceId: string,
+  projectId: string,
+): Promise<OpportunityProjectSummary | null> {
+  const project = await findProjectById(workspaceId, projectId);
+  if (!project) {
+    return null;
+  }
+
+  return {
+    id: project.id,
+    name: project.name,
+    reference: project.reference,
+  };
+}
+
 async function resolveTagsSummary(
   workspaceId: string,
   tagIds: string[],
@@ -341,7 +382,7 @@ async function resolveTagsSummary(
 async function enrichOpportunityListItem(
   opportunity: OpportunityRecord,
 ): Promise<OpportunityListItem> {
-  const [status, lostReason, lead, property, tagsResolved, assignedUser] =
+  const [status, lostReason, lead, property, project, tagsResolved, assignedUser] =
     await Promise.all([
       resolveDictionarySummary(
         opportunity.workspaceId,
@@ -355,6 +396,7 @@ async function enrichOpportunityListItem(
       ),
       resolveLeadSummary(opportunity.workspaceId, opportunity.leadId),
       resolvePropertySummary(opportunity.workspaceId, opportunity.propertyId),
+      resolveProjectSummary(opportunity.workspaceId, opportunity.projectId),
       resolveTagsSummary(opportunity.workspaceId, opportunity.tags),
       resolveUserSummary(opportunity.assignedTo),
     ]);
@@ -365,6 +407,7 @@ async function enrichOpportunityListItem(
     lostReason,
     lead,
     property,
+    project,
     tagsResolved,
     assignedUser,
   };
@@ -463,6 +506,7 @@ export async function listOpportunitiesForWorkspace(
   workspaceId: string,
   filter: OpportunityListServiceFilter = {},
 ): Promise<{ opportunities: OpportunityListItem[]; total: number }> {
+  await assertValidProjectFilter(workspaceId, filter.projectId);
   const resolvedFilter = await buildListFilter(workspaceId, filter);
   const { opportunities, total } = await findOpportunities(workspaceId, resolvedFilter);
 
@@ -491,8 +535,12 @@ export async function createOpportunityForWorkspace(
   actorId: string,
   input: CreateOpportunityInput,
 ): Promise<OpportunityDetail> {
-  await validateLeadForOpportunity(workspaceId, input.leadId);
-  await validatePropertyForOpportunity(workspaceId, input.propertyId);
+  const lead = await validateLeadForOpportunity(workspaceId, input.leadId);
+  const property = await validatePropertyForOpportunity(workspaceId, input.propertyId);
+  const projectId = assertMatchingOpportunityProjects(
+    lead.projectId,
+    property.projectId,
+  );
   const status = await validateOpportunityStatusId(workspaceId, input.statusId);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assignee");
@@ -522,6 +570,7 @@ export async function createOpportunityForWorkspace(
 
   const opportunity = await createOpportunity({
     workspaceId,
+    projectId,
     leadId: input.leadId,
     propertyId: input.propertyId,
     statusId: input.statusId,
@@ -611,6 +660,18 @@ export async function updateOpportunityForWorkspace(
 
   if (input.leadId !== undefined) updatePayload.leadId = input.leadId;
   if (input.propertyId !== undefined) updatePayload.propertyId = input.propertyId;
+
+  const nextLeadId = input.leadId ?? existing.leadId;
+  const nextPropertyId = input.propertyId ?? existing.propertyId;
+  if (input.leadId !== undefined || input.propertyId !== undefined) {
+    const lead = await validateLeadForOpportunity(workspaceId, nextLeadId);
+    const property = await validatePropertyForOpportunity(workspaceId, nextPropertyId);
+    updatePayload.projectId = assertMatchingOpportunityProjects(
+      lead.projectId,
+      property.projectId,
+    );
+  }
+
   if (input.ownerId !== undefined) updatePayload.ownerId = input.ownerId;
   if (input.assignedTo !== undefined) updatePayload.assignedTo = input.assignedTo;
   if (input.value !== undefined) updatePayload.value = input.value;
@@ -843,6 +904,7 @@ export async function listAllOpportunitiesForWorkspace(
   workspaceId: string,
   filter: Omit<OpportunityListServiceFilter, "page" | "pageSize"> = {},
 ): Promise<OpportunityListItem[]> {
+  await assertValidProjectFilter(workspaceId, filter.projectId);
   const resolvedFilter = await buildListFilter(workspaceId, filter);
   const opportunities = await findAllOpportunities(workspaceId, resolvedFilter);
 

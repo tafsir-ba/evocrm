@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { projectRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/projects", () => ({
   findProjectByReference: vi.fn(),
   createProject: vi.fn(),
@@ -43,6 +45,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: "GV",
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: "Geneva",
@@ -79,6 +82,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Existing",
       reference: "GV",
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -118,6 +122,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: "GV",
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -135,6 +140,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -163,6 +169,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -180,6 +187,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -205,6 +213,7 @@ describe("project service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
