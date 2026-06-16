@@ -107,3 +107,38 @@ export function buildTimezoneOptions(currentValue?: string) {
 
   return options;
 }
+
+export function isAllowedCurrency(code: string): boolean {
+  const normalized = code.trim().toUpperCase();
+  return CURRENCY_CODES.includes(normalized as CurrencyCode);
+}
+
+export function isValidIanaTimezone(timeZone: string): boolean {
+  const normalized = timeZone.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: normalized });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isAllowedTimezone(timeZone: string): boolean {
+  const normalized = timeZone.trim();
+  return (
+    TIMEZONE_IDS.includes(normalized as TimezoneId) || isValidIanaTimezone(normalized)
+  );
+}
+
+export function isSupportedCurrency(code: string): boolean {
+  return isAllowedCurrency(code);
+}
+
+export function isSupportedTimezone(timeZone: string): boolean {
+  const normalized = timeZone.trim();
+  return TIMEZONE_IDS.includes(normalized as TimezoneId);
+}

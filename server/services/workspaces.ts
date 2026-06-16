@@ -25,12 +25,17 @@ import {
   seedDefaultRolesForWorkspace,
 } from "@/server/services/roles";
 import { ensureDefaultDictionaries } from "@/server/services/default-dictionaries";
+import {
+  supportedCurrencySchema,
+  supportedTimezoneSchema,
+} from "@/server/validation/locale";
+import { workspaceTypeSchema } from "@/server/validation/workspace-settings";
 
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
-  type: z.string().trim().min(1).max(64).default("agency"),
-  timezone: z.string().trim().min(1).max(64).default("UTC"),
-  defaultCurrency: z.string().trim().min(3).max(3).default("USD"),
+  type: workspaceTypeSchema.default("agency"),
+  timezone: supportedTimezoneSchema.default("UTC"),
+  defaultCurrency: supportedCurrencySchema.default("USD"),
 });
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>;

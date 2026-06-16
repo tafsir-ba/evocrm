@@ -1,19 +1,13 @@
 import "server-only";
 
 import { SURFACE_UNITS } from "@/lib/surface-unit";
+import { supportedCurrencySchema } from "@/server/validation/locale";
 import { z } from "zod";
 
 const objectIdSchema = z
   .string()
   .trim()
   .regex(/^[a-fA-F0-9]{24}$/, "Invalid ID.");
-
-const currencySchema = z
-  .string()
-  .trim()
-  .min(3)
-  .max(3)
-  .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO code.");
 
 const attributesSchema = z
   .record(z.unknown())
@@ -68,7 +62,7 @@ export const createPropertyInputSchema = z
     title: z.string().trim().min(1).max(200),
     reference: z.string().trim().max(80).optional(),
     price: z.number().min(0).optional(),
-    currency: currencySchema.optional(),
+    currency: supportedCurrencySchema.optional(),
     address: z.string().trim().max(300).optional(),
     city: z.string().trim().max(120).optional(),
     country: z.string().trim().max(120).optional(),
@@ -95,7 +89,7 @@ export const updatePropertyInputSchema = z
     title: z.string().trim().min(1).max(200).optional(),
     reference: z.string().trim().max(80).nullable().optional(),
     price: z.number().min(0).nullable().optional(),
-    currency: currencySchema.optional(),
+    currency: supportedCurrencySchema.optional(),
     address: z.string().trim().max(300).nullable().optional(),
     city: z.string().trim().max(120).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),

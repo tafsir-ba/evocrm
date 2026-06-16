@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { supportedCurrencySchema } from "@/server/validation/locale";
+
 const objectIdSchema = z
   .string()
   .trim()
@@ -41,7 +43,7 @@ export const createOpportunityInputSchema = z
     ownerId: objectIdSchema.optional(),
     assignedTo: objectIdSchema.optional(),
     value: z.number().min(0).optional(),
-    currency: z.string().trim().min(3).max(3).optional(),
+    currency: supportedCurrencySchema.optional(),
     expectedCloseDate: z.coerce.date().optional(),
     lostReasonId: objectIdSchema.nullable().optional(),
     lostReasonText: z.string().trim().max(500).nullable().optional(),
@@ -58,7 +60,7 @@ export const updateOpportunityInputSchema = z
     ownerId: objectIdSchema.nullable().optional(),
     assignedTo: objectIdSchema.nullable().optional(),
     value: z.number().min(0).nullable().optional(),
-    currency: z.string().trim().min(3).max(3).optional(),
+    currency: supportedCurrencySchema.optional(),
     expectedCloseDate: z.coerce.date().nullable().optional(),
     lostReasonId: objectIdSchema.nullable().optional(),
     lostReasonText: z.string().trim().max(500).nullable().optional(),
