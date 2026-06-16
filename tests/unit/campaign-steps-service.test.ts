@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createCampaignStepForWorkspace,
+  normalizeStepContent,
   updateCampaignStepForWorkspace,
 } from "@/server/services/campaign-steps";
 
@@ -202,5 +203,16 @@ describe("campaign step service readiness enforcement", () => {
     });
 
     expect(updateCampaignStep).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeStepContent", () => {
+  it("normalizes double-brace variable tokens in stored step content", () => {
+    expect(
+      normalizeStepContent({
+        contentMode: "plain_text",
+        body: "Hi {{first_name}}\n{unsubscribe_url}",
+      }).body,
+    ).toBe("Hi {first_name}\n{unsubscribe_url}");
   });
 });

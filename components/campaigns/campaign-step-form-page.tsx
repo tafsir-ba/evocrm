@@ -19,7 +19,6 @@ import {
   CAMPAIGN_EMAIL_VARIABLES,
   emailBodyHasUnsubscribe,
   normalizeCampaignSendTime,
-  normalizeCampaignVariableTokens,
   validateCampaignHtml,
 } from "@/lib/campaign-email";
 import { formatWorkspaceTimezoneLabel } from "@/lib/workspace-datetime";
@@ -40,6 +39,36 @@ type StepFormState = {
   bodyText: string;
   status: "draft" | "ready" | "active" | "paused";
 };
+
+type CampaignStepApiRecord = {
+  name?: string | null;
+  order: number;
+  delayDays: number;
+  sendTime: string;
+  subject?: string | null;
+  previewText?: string | null;
+  contentMode?: ContentMode;
+  body?: string | null;
+  bodyHtml?: string | null;
+  bodyText?: string | null;
+  status?: StepFormState["status"];
+};
+
+function mapStepToFormState(step: CampaignStepApiRecord): StepFormState {
+  return {
+    name: step.name ?? step.subject ?? "",
+    order: String(step.order),
+    delayDays: String(step.delayDays),
+    sendTime: step.sendTime,
+    subject: step.subject ?? "",
+    previewText: step.previewText ?? "",
+    contentMode: step.contentMode ?? "plain_text",
+    body: step.body ?? "",
+    bodyHtml: step.bodyHtml ?? "",
+    bodyText: step.bodyText ?? "",
+    status: step.status ?? "draft",
+  };
+}
 
 type SaveIntent = "preserve" | "draft" | "ready";
 
@@ -126,19 +155,7 @@ export function CampaignStepFormPage({
             current: step.order,
             total: steps.length,
           });
-          setForm({
-            name: step.name ?? step.subject ?? "",
-            order: String(step.order),
-            delayDays: String(step.delayDays),
-            sendTime: step.sendTime,
-            subject: step.subject ?? "",
-            previewText: step.previewText ?? "",
-            contentMode: step.contentMode ?? "plain_text",
-            body: step.body ?? "",
-            bodyHtml: step.bodyHtml ?? "",
-            bodyText: step.bodyText ?? "",
-            status: step.status ?? "draft",
-          });
+          setForm(mapStepToFormState(step));
           return;
         }
 
@@ -186,17 +203,13 @@ export function CampaignStepFormPage({
     const contentMode = form.contentMode;
     const body =
       contentMode === "html"
-        ? normalizeCampaignVariableTokens(form.bodyText || form.body)
+        ? form.bodyText || form.body
         : contentMode === "rich_text"
-          ? normalizeCampaignVariableTokens(form.body)
-          : normalizeCampaignVariableTokens(form.body);
+          ? form.body
+          : form.body;
     const bodyHtml =
-      contentMode === "html" || contentMode === "rich_text"
-        ? form.bodyHtml
-          ? normalizeCampaignVariableTokens(form.bodyHtml)
-          : null
-        : null;
-    const bodyText = normalizeCampaignVariableTokens(form.bodyText || form.body);
+      contentMode === "html" || contentMode === "rich_text" ? form.bodyHtml || null : null;
+    const bodyText = form.bodyText || form.body;
 
     const trimmedName = form.name.trim();
     const normalizedSendTime = normalizeCampaignSendTime(form.sendTime);
@@ -211,10 +224,8 @@ export function CampaignStepFormPage({
       delayDays: parseInt(form.delayDays, 10),
       sendTime: normalizedSendTime,
       contentMode,
-      subject: normalizeCampaignVariableTokens(form.subject.trim()),
-      previewText: form.previewText.trim()
-        ? normalizeCampaignVariableTokens(form.previewText.trim())
-        : null,
+      subject: form.subject.trim(),
+      previewText: form.previewText.trim() || null,
       body: body.trim(),
       bodyHtml,
       bodyText: bodyText.trim() || null,
@@ -300,7 +311,15 @@ export function CampaignStepFormPage({
 
       if (intent !== "preserve") {
         setForm((current) => ({ ...current, status: intent }));
-      } else {
+      }
+
+      const savedStep = payload.data?.step;
+      if (savedStep && typeof savedStep === "object") {
+        setForm((current) => ({
+          ...current,
+          ...mapStepToFormState(savedStep as CampaignStepApiRecord),
+        }));
+      } else if (intent === "preserve") {
         const savedSendTime = payload.data?.step?.sendTime;
         if (typeof savedSendTime === "string") {
           setForm((current) => ({ ...current, sendTime: savedSendTime }));

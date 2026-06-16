@@ -75,7 +75,10 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     if (!result.success) {
-      throw new AppError("VALIDATION_ERROR", "Could not send the test email.");
+      throw new AppError(
+        "VALIDATION_ERROR",
+        result.error ?? "Could not send the test email.",
+      );
     }
 
     return successResponse({ sent: true, messageId: result.messageId });
