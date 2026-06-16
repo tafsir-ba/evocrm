@@ -236,6 +236,9 @@ describe("rescheduleEnrollmentsForCampaignSchedule", () => {
   });
 
   it("recalculates nextSendAt for active enrollments when step timing changes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-17T16:40:00.000Z"));
+
     const createdAt = new Date("2026-06-17T14:00:00.000Z");
     const staleNextSendAt = new Date("2026-06-17T18:37:00.000Z");
 
@@ -292,5 +295,7 @@ describe("rescheduleEnrollmentsForCampaignSchedule", () => {
         nextSendAt: new Date("2026-06-17T16:42:00.000Z"),
       }),
     );
+
+    vi.useRealTimers();
   });
 });

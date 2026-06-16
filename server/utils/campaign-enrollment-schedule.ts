@@ -20,7 +20,7 @@ export type CampaignStepScheduleInput = {
 export function buildEnrollmentScheduledSteps(
   enrollment: Pick<
     CampaignEnrollmentRecord,
-    "currentStep" | "nextSendAt" | "status"
+    "currentStep" | "status" | "createdAt" | "lastSentAt"
   >,
   steps: CampaignStepScheduleInput[],
   timeZone = "UTC",
@@ -47,7 +47,7 @@ export function buildEnrollmentScheduledSteps(
   const isPaused = enrollment.status === "paused";
 
   const schedule: EnrollmentScheduledStep[] = [];
-  let sendAnchor = enrollment.nextSendAt;
+  let timelineAnchor = enrollment.lastSentAt ?? enrollment.createdAt;
 
   for (const step of sortedSteps) {
     if (step.order < enrollment.currentStep) {
@@ -57,21 +57,6 @@ export function buildEnrollmentScheduledSteps(
         scheduledAt: null,
         state: "sent",
       });
-      continue;
-    }
-
-    if (step.order === enrollment.currentStep) {
-      schedule.push({
-        stepOrder: step.order,
-        subject: step.subject,
-        scheduledAt: enrollment.nextSendAt,
-        state: terminalStates.has(enrollment.status)
-          ? "cancelled"
-          : isPaused
-            ? "paused"
-            : "pending",
-      });
-      sendAnchor = enrollment.nextSendAt;
       continue;
     }
 
@@ -85,17 +70,33 @@ export function buildEnrollmentScheduledSteps(
       continue;
     }
 
-    sendAnchor = computeNextSendAt(sendAnchor, step.delayDays, {
+    const scheduledAt = computeNextSendAt(timelineAnchor, step.delayDays, {
       sendTime: step.sendTime,
       timeZone,
     });
+
     schedule.push({
       stepOrder: step.order,
       subject: step.subject,
-      scheduledAt: sendAnchor,
+      scheduledAt,
       state: isPaused ? "paused" : "pending",
     });
+
+    timelineAnchor = scheduledAt;
   }
 
   return schedule;
+}
+
+export function computeEnrollmentNextSendAt(
+  enrollment: Pick<CampaignEnrollmentRecord, "createdAt" | "lastSentAt" | "currentStep">,
+  step: Pick<CampaignStepScheduleInput, "delayDays" | "sendTime">,
+  timeZone: string,
+  now = new Date(),
+): Date {
+  const anchor = enrollment.lastSentAt ?? now;
+  return computeNextSendAt(anchor, step.delayDays, {
+    sendTime: step.sendTime,
+    timeZone,
+  });
 }

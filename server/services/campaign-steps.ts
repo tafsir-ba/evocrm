@@ -145,6 +145,18 @@ function scheduleFieldsChanged(
   );
 }
 
+function pickActiveCampaignScheduleUpdate(
+  input: UpdateCampaignStepInput,
+): UpdateCampaignStepInput {
+  return {
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.sendTime !== undefined ? { sendTime: input.sendTime } : {}),
+    ...(input.delayDays !== undefined ? { delayDays: input.delayDays } : {}),
+    ...(input.delayAmount !== undefined ? { delayAmount: input.delayAmount } : {}),
+    ...(input.delayUnit !== undefined ? { delayUnit: input.delayUnit } : {}),
+  };
+}
+
 function assertCampaignStepUpdateAllowed(
   campaignStatus: CampaignRecord["status"],
   existing: CampaignStepRecord,
@@ -301,12 +313,15 @@ export async function updateCampaignStepForWorkspace(
 
   assertCampaignStepUpdateAllowed(campaign.status, existing, input);
 
+  const scopedInput =
+    campaign.status === "active" ? pickActiveCampaignScheduleUpdate(input) : input;
+
   const documentIds =
-    input.documentIds !== undefined
-      ? await validateDocumentIds(workspaceId, input.documentIds)
+    scopedInput.documentIds !== undefined
+      ? await validateDocumentIds(workspaceId, scopedInput.documentIds)
       : undefined;
 
-  const normalizedInput = normalizeStepContent(input);
+  const normalizedInput = normalizeStepContent(scopedInput);
   const mergedStep: CampaignStepRecord = {
     ...existing,
     ...normalizedInput,

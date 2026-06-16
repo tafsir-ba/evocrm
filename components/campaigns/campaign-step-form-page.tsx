@@ -210,6 +210,15 @@ export function CampaignStepFormPage({
     }
 
     if (intent === "preserve") {
+      if (campaignStatus === "active") {
+        const trimmedName = form.name.trim();
+        return {
+          ...(trimmedName ? { name: trimmedName } : { name: null }),
+          delayDays: parseInt(form.delayDays, 10),
+          sendTime: normalizedSendTime,
+        };
+      }
+
       return payload;
     }
 

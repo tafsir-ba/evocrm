@@ -24,6 +24,7 @@ import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-s
 import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
 import {
   buildEnrollmentScheduledSteps,
+  computeEnrollmentNextSendAt,
   type EnrollmentScheduledStep,
 } from "@/server/utils/campaign-enrollment-schedule";
 import type {
@@ -532,6 +533,7 @@ export async function rescheduleEnrollmentsForCampaignSchedule(
   ]);
 
   const updatedIds: string[] = [];
+  const now = new Date();
 
   for (const enrollment of [...activeResult.enrollments, ...pausedResult.enrollments]) {
     const step = await findStepByOrder(workspaceId, campaignId, enrollment.currentStep);
@@ -540,11 +542,12 @@ export async function rescheduleEnrollmentsForCampaignSchedule(
       continue;
     }
 
-    const anchor = enrollment.lastSentAt ?? enrollment.createdAt;
-    const nextSendAt = computeNextSendAt(anchor, step.delayDays, {
-      sendTime: step.sendTime,
+    const nextSendAt = computeEnrollmentNextSendAt(
+      enrollment,
+      step,
       timeZone,
-    });
+      now,
+    );
 
     if (nextSendAt.getTime() === enrollment.nextSendAt.getTime()) {
       continue;
