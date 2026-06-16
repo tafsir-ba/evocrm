@@ -18,6 +18,7 @@ vi.mock("@/server/repositories/campaign-steps", () => ({
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   findEnrollmentById: vi.fn(),
+  findCampaignEnrollments: vi.fn(),
   updateCampaignEnrollment: vi.fn(),
 }));
 
@@ -40,13 +41,17 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   findEnrollmentById,
+  findCampaignEnrollments,
   updateCampaignEnrollment,
 } from "@/server/repositories/campaign-enrollments";
 import { findCampaignSteps, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findLeadById } from "@/server/repositories/leads";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
-import { updateCampaignEnrollmentForWorkspace } from "@/server/services/campaign-enrollments";
+import {
+  rescheduleEnrollmentsForCampaignSchedule,
+  updateCampaignEnrollmentForWorkspace,
+} from "@/server/services/campaign-enrollments";
 import { IMMEDIATE_SEND_DELAY_MS } from "@/server/utils/campaign-schedule";
 
 const pausedEnrollment = {
@@ -211,5 +216,81 @@ describe("campaign enrollment service", () => {
     );
 
     vi.useRealTimers();
+  });
+});
+
+describe("rescheduleEnrollmentsForCampaignSchedule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "CHF",
+      type: "agency",
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  });
+
+  it("recalculates nextSendAt for active enrollments when step timing changes", async () => {
+    const createdAt = new Date("2026-06-17T14:00:00.000Z");
+    const staleNextSendAt = new Date("2026-06-17T18:37:00.000Z");
+
+    vi.mocked(findCampaignEnrollments)
+      .mockResolvedValueOnce({
+        enrollments: [
+          {
+            ...enrollmentRecordExtras,
+            id: "enroll-1",
+            workspaceId: "ws-1",
+            campaignId: "camp-1",
+            leadId: "lead-1",
+            opportunityId: null,
+            status: "active",
+            currentStep: 1,
+            nextSendAt: staleNextSendAt,
+            lastSentAt: null,
+            completedAt: null,
+            unsubscribedAt: null,
+            failedAt: null,
+            failureReason: null,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        ],
+        total: 1,
+      })
+      .mockResolvedValueOnce({ enrollments: [], total: 0 });
+
+    vi.mocked(findStepByOrder).mockResolvedValue({
+      id: "step-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      order: 1,
+      delayDays: 0,
+      sendTime: "16:42",
+      fromName: "Test",
+      channel: "email",
+      subject: "Hello",
+      body: "Welcome",
+      documentIds: [],
+      createdAt,
+      updatedAt: createdAt,
+      ...campaignStepRecordExtras,
+    });
+
+    const updatedIds = await rescheduleEnrollmentsForCampaignSchedule("ws-1", "camp-1");
+
+    expect(updatedIds).toEqual(["enroll-1"]);
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({
+        nextSendAt: new Date("2026-06-17T16:42:00.000Z"),
+      }),
+    );
   });
 });

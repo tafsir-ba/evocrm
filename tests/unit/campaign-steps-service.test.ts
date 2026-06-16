@@ -23,12 +23,17 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/services/campaign-enrollments", () => ({
+  rescheduleEnrollmentsForCampaignSchedule: vi.fn(),
+}));
+
 import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   createCampaignStep,
   findCampaignStepById,
   updateCampaignStep,
 } from "@/server/repositories/campaign-steps";
+import { rescheduleEnrollmentsForCampaignSchedule } from "@/server/services/campaign-enrollments";
 
 const campaign = {
   id: "campaign-1",
@@ -145,6 +150,55 @@ describe("campaign step service readiness enforcement", () => {
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
       message: expect.stringContaining("unsubscribe"),
+    });
+
+    expect(updateCampaignStep).not.toHaveBeenCalled();
+  });
+
+  it("allows schedule-only updates while the campaign is active", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...campaign,
+      status: "active",
+    });
+    vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
+    vi.mocked(updateCampaignStep).mockResolvedValue({
+      ...readyStep,
+      sendTime: "16:42",
+    });
+
+    const updated = await updateCampaignStepForWorkspace(
+      "ws-1",
+      "user-1",
+      "campaign-1",
+      "step-1",
+      {
+        sendTime: "16:42",
+        delayDays: readyStep.delayDays,
+        subject: readyStep.subject,
+        body: readyStep.body,
+        bodyText: readyStep.bodyText,
+        contentMode: readyStep.contentMode,
+      },
+    );
+
+    expect(updated.sendTime).toBe("16:42");
+    expect(rescheduleEnrollmentsForCampaignSchedule).toHaveBeenCalledWith("ws-1", "campaign-1");
+  });
+
+  it("rejects content edits while the campaign is active", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...campaign,
+      status: "active",
+    });
+    vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
+
+    await expect(
+      updateCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", "step-1", {
+        subject: "Updated subject",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("Pause this campaign"),
     });
 
     expect(updateCampaignStep).not.toHaveBeenCalled();

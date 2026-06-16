@@ -520,6 +520,43 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
   return updatedIds;
 }
 
+export async function rescheduleEnrollmentsForCampaignSchedule(
+  workspaceId: string,
+  campaignId: string,
+): Promise<string[]> {
+  const workspace = await findWorkspaceById(workspaceId);
+  const timeZone = workspace?.timezone ?? "UTC";
+  const [activeResult, pausedResult] = await Promise.all([
+    findCampaignEnrollments(workspaceId, campaignId, { status: "active", pageSize: 500 }),
+    findCampaignEnrollments(workspaceId, campaignId, { status: "paused", pageSize: 500 }),
+  ]);
+
+  const updatedIds: string[] = [];
+
+  for (const enrollment of [...activeResult.enrollments, ...pausedResult.enrollments]) {
+    const step = await findStepByOrder(workspaceId, campaignId, enrollment.currentStep);
+
+    if (!step) {
+      continue;
+    }
+
+    const anchor = enrollment.lastSentAt ?? enrollment.createdAt;
+    const nextSendAt = computeNextSendAt(anchor, step.delayDays, {
+      sendTime: step.sendTime,
+      timeZone,
+    });
+
+    if (nextSendAt.getTime() === enrollment.nextSendAt.getTime()) {
+      continue;
+    }
+
+    await updateCampaignEnrollment(workspaceId, enrollment.id, { nextSendAt });
+    updatedIds.push(enrollment.id);
+  }
+
+  return updatedIds;
+}
+
 export async function updateCampaignEnrollmentForWorkspace(
   workspaceId: string,
   actorId: string,

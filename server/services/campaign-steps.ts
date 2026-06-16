@@ -12,10 +12,9 @@ import {
   updateCampaignStep,
   type CampaignStepRecord,
 } from "@/server/repositories/campaign-steps";
-import { findCampaignById } from "@/server/repositories/campaigns";
-import {
-  assertCampaignEditable,
-} from "@/server/services/campaigns";
+import { findCampaignById, type CampaignRecord } from "@/server/repositories/campaigns";
+import { assertCampaignEditable } from "@/server/services/campaigns";
+import { rescheduleEnrollmentsForCampaignSchedule } from "@/server/services/campaign-enrollments";
 import type {
   CreateCampaignStepInput,
   ReorderCampaignStepsInput,
@@ -82,6 +81,92 @@ function buildStepRecordForReadinessCheck(
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+}
+
+function stepContentFieldsChanged(
+  existing: CampaignStepRecord,
+  input: UpdateCampaignStepInput,
+): boolean {
+  if (input.order !== undefined && input.order !== existing.order) {
+    return true;
+  }
+
+  if (input.status !== undefined && input.status !== existing.status) {
+    return true;
+  }
+
+  if (input.contentMode !== undefined && input.contentMode !== existing.contentMode) {
+    return true;
+  }
+
+  if (input.subject !== undefined && input.subject !== existing.subject) {
+    return true;
+  }
+
+  if (input.previewText !== undefined && input.previewText !== existing.previewText) {
+    return true;
+  }
+
+  if (input.body !== undefined && input.body !== existing.body) {
+    return true;
+  }
+
+  if (input.bodyHtml !== undefined && input.bodyHtml !== existing.bodyHtml) {
+    return true;
+  }
+
+  if (input.bodyText !== undefined && input.bodyText !== existing.bodyText) {
+    return true;
+  }
+
+  if (input.fromName !== undefined && input.fromName !== existing.fromName) {
+    return true;
+  }
+
+  if (
+    input.documentIds !== undefined &&
+    JSON.stringify(input.documentIds) !== JSON.stringify(existing.documentIds)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function scheduleFieldsChanged(
+  existing: CampaignStepRecord,
+  input: UpdateCampaignStepInput,
+): boolean {
+  return (
+    (input.sendTime !== undefined && input.sendTime !== existing.sendTime) ||
+    (input.delayDays !== undefined && input.delayDays !== existing.delayDays) ||
+    (input.delayAmount !== undefined && input.delayAmount !== existing.delayAmount) ||
+    (input.delayUnit !== undefined && input.delayUnit !== existing.delayUnit)
+  );
+}
+
+function assertCampaignStepUpdateAllowed(
+  campaignStatus: CampaignRecord["status"],
+  existing: CampaignStepRecord,
+  input: UpdateCampaignStepInput,
+): void {
+  if (campaignStatus === "archived") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Archived campaigns cannot be edited. Restore the campaign first.",
+    );
+  }
+
+  if (campaignStatus === "draft" || campaignStatus === "paused") {
+    return;
+  }
+
+  if (campaignStatus === "active" && stepContentFieldsChanged(existing, input)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Pause this campaign to edit email content. You can still update send time and delay while the campaign is active.",
+    );
+  }
 }
 
 function stepSnapshot(step: CampaignStepRecord): Record<string, unknown> {
@@ -208,13 +293,13 @@ export async function updateCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
-  assertCampaignEditable(campaign.status);
-
   const existing = await findCampaignStepById(workspaceId, campaignId, stepId);
 
   if (!existing) {
     throw new AppError("NOT_FOUND", "Campaign step not found.");
   }
+
+  assertCampaignStepUpdateAllowed(campaign.status, existing, input);
 
   const documentIds =
     input.documentIds !== undefined
@@ -263,6 +348,10 @@ export async function updateCampaignStepForWorkspace(
     before: stepSnapshot(existing),
     after: stepSnapshot(updated),
   });
+
+  if (scheduleFieldsChanged(existing, normalizedInput)) {
+    await rescheduleEnrollmentsForCampaignSchedule(workspaceId, campaignId);
+  }
 
   return updated;
 }

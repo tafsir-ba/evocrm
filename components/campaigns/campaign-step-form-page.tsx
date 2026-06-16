@@ -72,6 +72,7 @@ export function CampaignStepFormPage({
   const formId = "campaign-step-form";
 
   const [campaignName, setCampaignName] = useState("");
+  const [campaignStatus, setCampaignStatus] = useState<string>("draft");
   const [stepPosition, setStepPosition] = useState({ current: 1, total: 1 });
   const [form, setForm] = useState<StepFormState>(emptyStepForm);
   const [loading, setLoading] = useState(true);
@@ -109,6 +110,7 @@ export function CampaignStepFormPage({
         const campaign = campaignPayload.data?.campaign;
         const steps = stepsPayload.data?.steps ?? [];
         setCampaignName(campaign?.name ?? "Campaign");
+        setCampaignStatus(campaign?.status ?? "draft");
 
         if (isEdit && stepId) {
           const step = steps.find((item: { id: string }) => item.id === stepId);
@@ -229,6 +231,10 @@ export function CampaignStepFormPage({
   }
 
   async function saveStep(intent: SaveIntent) {
+    if (submitting) {
+      return;
+    }
+
     setFormError(null);
     setFormMessage(null);
 
@@ -277,7 +283,9 @@ export function CampaignStepFormPage({
         intent === "ready"
           ? "Email marked as ready."
           : intent === "preserve"
-            ? "Changes saved."
+            ? campaignStatus === "active"
+              ? "Schedule updated. Enrolled recipients were rescheduled."
+              : "Changes saved."
             : "Draft saved.",
       );
     } catch {
@@ -357,6 +365,7 @@ export function CampaignStepFormPage({
       title={isEdit ? form.name || "Edit email" : "Add email step"}
       description={`Campaign: ${campaignName} · Step ${stepPosition.current} of ${stepPosition.total}`}
       closeHref={closeHref}
+      maxWidth="full"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-2">
@@ -396,8 +405,15 @@ export function CampaignStepFormPage({
       >
         {formError ? <p className="text-[13px] text-[var(--color-danger)]">{formError}</p> : null}
 
-        <Card>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {campaignStatus === "active" ? (
+          <p className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[12.5px] text-[var(--color-ink-muted)]">
+            This campaign is active. You can update send time and delay here; pause the campaign
+            to edit email content.
+          </p>
+        ) : null}
+
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,0.9fr)] gap-4">
+          <Card className="space-y-3">
             <div>
               <Label htmlFor="step-name">Email name</Label>
               <Input
@@ -431,88 +447,85 @@ export function CampaignStepFormPage({
                 }
               />
               <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
-                Uses workspace timezone: {formatWorkspaceTimezoneLabel(workspace.timezone)}.
+                {formatWorkspaceTimezoneLabel(workspace.timezone)}
               </p>
             </div>
-          </div>
-        </Card>
-
-        <Card className="space-y-4">
-          <div>
-            <Label htmlFor="step-subject">Subject</Label>
-            <Input
-              id="step-subject"
-              value={form.subject}
-              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-              maxLength={500}
-            />
-          </div>
-          <div>
-            <Label htmlFor="step-preview-text">Preview text</Label>
-            <Input
-              id="step-preview-text"
-              value={form.previewText}
-              onChange={(e) => setForm((f) => ({ ...f, previewText: e.target.value }))}
-              maxLength={500}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(["plain_text", "rich_text", "html"] as const).map((mode) => (
-              <Button
-                key={mode}
-                type="button"
-                size="sm"
-                variant={form.contentMode === mode ? "primary" : "secondary"}
-                onClick={() => setForm((f) => ({ ...f, contentMode: mode }))}
-              >
-                {mode === "plain_text"
-                  ? "Plain text"
-                  : mode === "rich_text"
-                    ? "Rich text"
-                    : "HTML"}
-              </Button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {CAMPAIGN_EMAIL_VARIABLES.map((variable) => (
-              <Button
-                key={variable.key}
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => insertVariable(variable.token, activeBodyField)}
-              >
-                {variable.label}
-              </Button>
-            ))}
-          </div>
-
-          {form.contentMode === "html" ? (
             <div>
-              <Label htmlFor="step-body-html">HTML body</Label>
-              <Textarea
-                id="step-body-html"
-                value={form.bodyHtml}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    bodyHtml: e.target.value,
-                    bodyText: e.target.value.replace(/<[^>]+>/g, " "),
-                  }))
-                }
-                rows={12}
-                className="min-h-[16rem] font-mono text-[12.5px]"
+              <Label htmlFor="step-subject">Subject</Label>
+              <Input
+                id="step-subject"
+                value={form.subject}
+                onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+                maxLength={500}
               />
-              {htmlWarnings.map((warning) => (
-                <p key={warning.code} className="text-[12px] text-[var(--color-warning)] mt-2">
-                  {warning.message}
-                </p>
+            </div>
+            <div>
+              <Label htmlFor="step-preview-text">Preview text</Label>
+              <Input
+                id="step-preview-text"
+                value={form.previewText}
+                onChange={(e) => setForm((f) => ({ ...f, previewText: e.target.value }))}
+                maxLength={500}
+              />
+            </div>
+          </Card>
+
+          <Card className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {(["plain_text", "rich_text", "html"] as const).map((mode) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  size="sm"
+                  variant={form.contentMode === mode ? "primary" : "secondary"}
+                  onClick={() => setForm((f) => ({ ...f, contentMode: mode }))}
+                >
+                  {mode === "plain_text"
+                    ? "Plain text"
+                    : mode === "rich_text"
+                      ? "Rich text"
+                      : "HTML"}
+                </Button>
               ))}
             </div>
-          ) : form.contentMode === "rich_text" ? (
-            <div className="space-y-3">
+
+            <div className="flex flex-wrap gap-2">
+              {CAMPAIGN_EMAIL_VARIABLES.map((variable) => (
+                <Button
+                  key={variable.key}
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => insertVariable(variable.token, activeBodyField)}
+                >
+                  {variable.label}
+                </Button>
+              ))}
+            </div>
+
+            {form.contentMode === "html" ? (
+              <div>
+                <Label htmlFor="step-body-html">HTML body</Label>
+                <Textarea
+                  id="step-body-html"
+                  value={form.bodyHtml}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      bodyHtml: e.target.value,
+                      bodyText: e.target.value.replace(/<[^>]+>/g, " "),
+                    }))
+                  }
+                  rows={8}
+                  className="min-h-[10rem] font-mono text-[12.5px]"
+                />
+                {htmlWarnings.map((warning) => (
+                  <p key={warning.code} className="text-[12px] text-[var(--color-warning)] mt-2">
+                    {warning.message}
+                  </p>
+                ))}
+              </div>
+            ) : form.contentMode === "rich_text" ? (
               <div>
                 <Label htmlFor="step-body-rich">Rich text body</Label>
                 <Textarea
@@ -526,72 +539,73 @@ export function CampaignStepFormPage({
                       bodyText: e.target.value,
                     }))
                   }
-                  rows={10}
-                  className="min-h-[14rem]"
+                  rows={8}
+                  className="min-h-[10rem]"
                 />
               </div>
-            </div>
-          ) : (
-            <div>
-              <Label htmlFor="step-body">Plain text body</Label>
-              <Textarea
-                id="step-body"
-                value={form.body}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    body: e.target.value,
-                    bodyText: e.target.value,
-                  }))
-                }
-                rows={10}
-                className="min-h-[14rem]"
-              />
-            </div>
-          )}
+            ) : (
+              <div>
+                <Label htmlFor="step-body">Plain text body</Label>
+                <Textarea
+                  id="step-body"
+                  value={form.body}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      body: e.target.value,
+                      bodyText: e.target.value,
+                    }))
+                  }
+                  rows={8}
+                  className="min-h-[10rem]"
+                />
+              </div>
+            )}
 
-          {missingUnsubscribe ? (
-            <p className="text-[12px] text-[var(--color-ink-muted)]">
-              Include {"{unsubscribe_url}"} before marking this email as ready. Use{" "}
-              <strong>Save</strong> to update send time or content without changing status.
-            </p>
-          ) : null}
-        </Card>
-
-        <Card>
-          <h3 className="text-[14px] font-semibold text-[var(--color-ink)] mb-3">Rendered preview</h3>
-          <div
-            className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-4 text-[13px] leading-relaxed"
-            dangerouslySetInnerHTML={{
-              __html:
-                form.contentMode === "html"
-                  ? form.bodyHtml || "<p>No content yet.</p>"
-                  : (form.bodyHtml || form.body).replace(/\n/g, "<br />") || "No content yet.",
-            }}
-          />
-        </Card>
-
-        {isEdit ? (
-          <Card>
-            <h3 className="text-[14px] font-semibold text-[var(--color-ink)] mb-3">Test email</h3>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={submitting || !testEmail.trim()}
-                onClick={() => void handleTestEmail()}
-              >
-                Send test email
-              </Button>
-            </div>
+            {missingUnsubscribe ? (
+              <p className="text-[12px] text-[var(--color-ink-muted)]">
+                Include {"{unsubscribe_url}"} before marking this email as ready.
+              </p>
+            ) : null}
           </Card>
-        ) : null}
+
+          <div className="space-y-4">
+            <Card>
+              <h3 className="text-[14px] font-semibold text-[var(--color-ink)] mb-2">Preview</h3>
+              <div
+                className="max-h-[14rem] overflow-y-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-[13px] leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    form.contentMode === "html"
+                      ? form.bodyHtml || "<p>No content yet.</p>"
+                      : (form.bodyHtml || form.body).replace(/\n/g, "<br />") || "No content yet.",
+                }}
+              />
+            </Card>
+
+            {isEdit ? (
+              <Card>
+                <h3 className="text-[14px] font-semibold text-[var(--color-ink)] mb-2">Test email</h3>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={submitting || !testEmail.trim()}
+                    onClick={() => void handleTestEmail()}
+                  >
+                    Send test email
+                  </Button>
+                </div>
+              </Card>
+            ) : null}
+          </div>
+        </div>
       </form>
     </FocusedFormLayout>
   );

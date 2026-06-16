@@ -23,7 +23,7 @@ export function FocusedFormLayout({
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
-  maxWidth?: "lg" | "2xl" | "3xl";
+  maxWidth?: "lg" | "2xl" | "3xl" | "full";
 }) {
   const resolvedBack = back ?? (closeHref ? { href: closeHref, label: "Back" } : undefined);
   const resolvedCloseHref = closeHref ?? back?.href;
@@ -32,6 +32,8 @@ export function FocusedFormLayout({
       ? "max-w-lg"
       : maxWidth === "3xl"
         ? "max-w-3xl"
+        : maxWidth === "full"
+          ? "max-w-none w-full"
         : "max-w-2xl";
 
   return (
