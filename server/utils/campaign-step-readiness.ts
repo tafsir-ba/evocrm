@@ -35,7 +35,9 @@ export function assertCampaignStepReady(step: CampaignStepRecord): void {
 
   if (step.contentMode === "html" && step.bodyHtml) {
     const unsafe = validateCampaignHtml(step.bodyHtml).filter(
-      (warning) => warning.code === "unsafe_tags",
+      (warning) =>
+        warning.code === "unsafe_tags" ||
+        warning.code === "unsafe_javascript",
     );
     if (unsafe.length > 0) {
       throw new AppError(

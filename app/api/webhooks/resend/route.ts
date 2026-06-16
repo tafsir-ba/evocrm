@@ -5,6 +5,7 @@ import { findCampaignSendByProviderMessageId } from "@/server/repositories/campa
 import { findLeadById } from "@/server/repositories/leads";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
+import { Webhook } from "svix";
 
 type ResendWebhookPayload = {
   type?: string;
@@ -30,13 +31,34 @@ const EVENT_TYPE_MAP: Record<string, "delivered" | "bounced" | "complained" | "o
 export async function POST(request: Request) {
   try {
     const env = getEnv();
-    const signature = request.headers.get("svix-signature");
+    const rawBody = await request.text();
 
-    if (env.RESEND_WEBHOOK_SECRET && !signature) {
-      throw new AppError("FORBIDDEN", "Invalid webhook signature.", { expose: false });
+    if (!env.RESEND_WEBHOOK_SECRET) {
+      if (env.NODE_ENV === "production") {
+        throw new AppError("FORBIDDEN", "Webhook secret is not configured.", { expose: false });
+      }
+    } else {
+      const svixId = request.headers.get("svix-id");
+      const svixTimestamp = request.headers.get("svix-timestamp");
+      const svixSignature = request.headers.get("svix-signature");
+
+      if (!svixId || !svixTimestamp || !svixSignature) {
+        throw new AppError("FORBIDDEN", "Invalid webhook signature.", { expose: false });
+      }
+
+      const webhook = new Webhook(env.RESEND_WEBHOOK_SECRET);
+      try {
+        webhook.verify(rawBody, {
+          "svix-id": svixId,
+          "svix-timestamp": svixTimestamp,
+          "svix-signature": svixSignature,
+        });
+      } catch {
+        throw new AppError("FORBIDDEN", "Invalid webhook signature.", { expose: false });
+      }
     }
 
-    const payload = (await request.json()) as ResendWebhookPayload;
+    const payload = JSON.parse(rawBody) as ResendWebhookPayload;
     const eventType = payload.type ? EVENT_TYPE_MAP[payload.type] : undefined;
 
     if (!eventType || !payload.data?.email_id) {

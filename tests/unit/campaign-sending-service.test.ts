@@ -46,6 +46,10 @@ vi.mock("@/server/repositories/properties", () => ({
   findPropertyById: vi.fn(),
 }));
 
+vi.mock("@/server/services/sending-domains", () => ({
+  assertVerifiedSenderEmail: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/workspaces", () => ({
   findWorkspaceById: vi.fn(),
 }));
@@ -72,6 +76,7 @@ import { findCampaignById } from "@/server/repositories/campaigns";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findLeadById } from "@/server/repositories/leads";
 import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
+import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
 
 const enrollment = {
@@ -114,6 +119,23 @@ describe("campaign sending service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(findSuppressionByEmail).mockResolvedValue(null);
+    vi.mocked(assertVerifiedSenderEmail).mockResolvedValue({
+      id: "domain-1",
+      workspaceId: "ws-1",
+      domain: "example.com",
+      provider: "resend",
+      providerDomainId: "provider-domain-1",
+      status: "verified",
+      spfStatus: "valid",
+      dkimStatus: "valid",
+      dmarcStatus: "valid",
+      defaultSenderEmail: "test@example.com",
+      dnsRecords: [],
+      lastCheckedAt: null,
+      verifiedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     vi.mocked(findDueEnrollments).mockResolvedValue([enrollment]);
     vi.mocked(findCampaignById).mockResolvedValue({
       id: "camp-1",

@@ -109,7 +109,11 @@ export async function evaluateCampaignReadiness(
 
   const htmlWarnings = activeSteps.flatMap((step) =>
     step.contentMode === "html" && step.bodyHtml
-      ? validateCampaignHtml(step.bodyHtml).filter((warning) => warning.code === "unsafe_tags")
+      ? validateCampaignHtml(step.bodyHtml).filter(
+          (warning) =>
+            warning.code === "unsafe_tags" ||
+            warning.code === "unsafe_javascript",
+        )
       : [],
   );
 

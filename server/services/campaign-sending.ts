@@ -31,6 +31,7 @@ import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
 import { applyCampaignVariables } from "@/lib/campaign-email";
 import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
+import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type SendDueSummary = {
   processed: number;
@@ -296,6 +297,34 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Campaign sender email is not configured.",
+    });
+
+    return singleOutcomeResult("skipped");
+  }
+
+  if (!campaign.sendingDomainId) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Campaign sending domain is not configured.",
+    });
+
+    return singleOutcomeResult("skipped");
+  }
+
+  try {
+    await assertVerifiedSenderEmail(
+      workspaceId,
+      campaign.sendingDomainId,
+      campaign.senderEmail,
+    );
+  } catch {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Campaign sender domain is no longer verified.",
     });
 
     return singleOutcomeResult("skipped");
