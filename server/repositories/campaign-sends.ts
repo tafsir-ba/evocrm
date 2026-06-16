@@ -123,6 +123,27 @@ export async function findCampaignSendByProviderMessageId(
   return document ? toCampaignSendRecord(document as CampaignSendDocument) : null;
 }
 
+export async function findCampaignSendsByEnrollmentIds(
+  workspaceId: string,
+  enrollmentIds: string[],
+): Promise<CampaignSendRecord[]> {
+  if (enrollmentIds.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+
+  const documents = await CampaignSendModel.find(
+    withWorkspaceScope(workspaceId, {
+      enrollmentId: { $in: enrollmentIds },
+    }),
+  )
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return documents.map((doc) => toCampaignSendRecord(doc as CampaignSendDocument));
+}
+
 export async function findSentCampaignSendForEnrollmentStep(
   workspaceId: string,
   enrollmentId: string,

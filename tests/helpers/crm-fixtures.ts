@@ -35,11 +35,12 @@ export const campaignRecordExtras: Pick<
 
 export const enrollmentRecordExtras: Pick<
   CampaignEnrollmentRecord,
-  "projectId" | "enrollmentSource" | "enrollmentReason"
+  "projectId" | "enrollmentSource" | "enrollmentReason" | "sendClaimExpiresAt"
 > = {
   projectId: null,
   enrollmentSource: "manual",
   enrollmentReason: null,
+  sendClaimExpiresAt: null,
 };
 
 export const campaignStepRecordExtras: Pick<

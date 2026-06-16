@@ -26,6 +26,7 @@ export type CampaignEnrollmentRecord = {
   unsubscribedAt: Date | null;
   failedAt: Date | null;
   failureReason: string | null;
+  sendClaimExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -53,6 +54,7 @@ function toEnrollmentRecord(
     unsubscribedAt: document.unsubscribedAt ?? null,
     failedAt: document.failedAt ?? null,
     failureReason: document.failureReason ?? null,
+    sendClaimExpiresAt: document.sendClaimExpiresAt ?? null,
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   };

@@ -51,6 +51,10 @@ vi.mock("@/server/repositories/properties", () => ({
   findPropertyById: vi.fn(),
 }));
 
+vi.mock("@/server/services/campaign-enrollment-reconcile", () => ({
+  reconcileEnrollmentBeforeSend: vi.fn(async (_workspaceId, enrollment) => enrollment),
+}));
+
 vi.mock("@/server/services/sending-domains", () => ({
   assertVerifiedSenderEmail: vi.fn(),
 }));

@@ -23,11 +23,16 @@ import { listOpportunitiesForWorkspace } from "@/server/services/opportunities";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
+import { reconcileEnrollmentWithSendLogs } from "@/server/services/campaign-enrollment-reconcile";
+import { findCampaignSendsByEnrollmentIds } from "@/server/repositories/campaign-sends";
 import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
 import {
   buildEnrollmentScheduledSteps,
   computeEnrollmentNextSendAt,
+  mapLatestSendLogsByStepOrder,
+  type CampaignStepScheduleInput,
   type EnrollmentScheduledStep,
+  type EnrollmentStepSendLog,
 } from "@/server/utils/campaign-enrollment-schedule";
 import type {
   CreateCampaignEnrollmentInput,
@@ -87,7 +92,22 @@ async function enrichEnrollmentWithCampaignSteps(
     findCampaignSteps(workspaceId, campaignId),
     getWorkspaceTimeZone(workspaceId),
   ]);
-  return enrichEnrollment(workspaceId, enrollment, steps, timeZone);
+  const stepInputs: CampaignStepScheduleInput[] = steps.map((step) => ({
+    id: step.id,
+    order: step.order,
+    delayDays: step.delayDays,
+    sendTime: step.sendTime,
+    subject: step.subject,
+  }));
+  const sends = await findCampaignSendsByEnrollmentIds(workspaceId, [enrollment.id]);
+
+  return enrichEnrollment(
+    workspaceId,
+    enrollment,
+    stepInputs,
+    timeZone,
+    mapLatestSendLogsByStepOrder(stepInputs, sends),
+  );
 }
 
 async function syncEnrollmentNextSendAtIfNeeded(
@@ -137,8 +157,9 @@ async function syncEnrollmentNextSendAtIfNeeded(
 async function enrichEnrollment(
   workspaceId: string,
   enrollment: CampaignEnrollmentRecord,
-  steps: Array<{ order: number; delayDays: number; sendTime: string; subject: string }> = [],
+  steps: CampaignStepScheduleInput[] = [],
   timeZone = "UTC",
+  sendLogsByStepOrder: Map<number, EnrollmentStepSendLog> = new Map(),
 ): Promise<CampaignEnrollmentDetail> {
   const warnings: string[] = [];
   let leadName: string | null = null;
@@ -177,7 +198,13 @@ async function enrichEnrollment(
 
   const syncedEnrollment = await syncEnrollmentNextSendAtIfNeeded(
     workspaceId,
-    enrollment,
+    await reconcileEnrollmentWithSendLogs(
+      workspaceId,
+      enrollment,
+      steps,
+      sendLogsByStepOrder,
+      timeZone,
+    ),
     steps,
     timeZone,
   );
@@ -189,7 +216,12 @@ async function enrichEnrollment(
     leadEmailConsentStatus,
     opportunityLabel,
     warnings,
-    scheduledSteps: buildEnrollmentScheduledSteps(syncedEnrollment, steps, timeZone),
+    scheduledSteps: buildEnrollmentScheduledSteps(
+      syncedEnrollment,
+      steps,
+      sendLogsByStepOrder,
+      timeZone,
+    ),
   };
 }
 
@@ -296,8 +328,39 @@ export async function listCampaignEnrollmentsForWorkspace(
     getWorkspaceTimeZone(workspaceId),
   ]);
 
+  const stepInputs: CampaignStepScheduleInput[] = steps.map((step) => ({
+    id: step.id,
+    order: step.order,
+    delayDays: step.delayDays,
+    sendTime: step.sendTime,
+    subject: step.subject,
+  }));
+
+  const sends = await findCampaignSendsByEnrollmentIds(
+    workspaceId,
+    enrollments.map((enrollment) => enrollment.id),
+  );
+  const sendsByEnrollmentId = new Map<string, typeof sends>();
+
+  for (const send of sends) {
+    const existing = sendsByEnrollmentId.get(send.enrollmentId) ?? [];
+    existing.push(send);
+    sendsByEnrollmentId.set(send.enrollmentId, existing);
+  }
+
   const enriched = await Promise.all(
-    enrollments.map((enrollment) => enrichEnrollment(workspaceId, enrollment, steps, timeZone)),
+    enrollments.map((enrollment) =>
+      enrichEnrollment(
+        workspaceId,
+        enrollment,
+        stepInputs,
+        timeZone,
+        mapLatestSendLogsByStepOrder(
+          stepInputs,
+          sendsByEnrollmentId.get(enrollment.id) ?? [],
+        ),
+      ),
+    ),
   );
 
   return { enrollments: enriched, total };
@@ -600,34 +663,61 @@ export async function rescheduleEnrollmentsForCampaignSchedule(
 ): Promise<string[]> {
   const workspace = await findWorkspaceById(workspaceId);
   const timeZone = workspace?.timezone ?? "UTC";
+  const steps = await findCampaignSteps(workspaceId, campaignId);
+  const stepInputs: CampaignStepScheduleInput[] = steps.map((step) => ({
+    id: step.id,
+    order: step.order,
+    delayDays: step.delayDays,
+    sendTime: step.sendTime,
+    subject: step.subject,
+  }));
   const enrollments = [
     ...(await listAllCampaignEnrollments(workspaceId, campaignId, { status: "active" })),
     ...(await listAllCampaignEnrollments(workspaceId, campaignId, { status: "paused" })),
+    ...(await listAllCampaignEnrollments(workspaceId, campaignId, { status: "completed" })),
   ];
+
+  const sends = await findCampaignSendsByEnrollmentIds(
+    workspaceId,
+    enrollments.map((enrollment) => enrollment.id),
+  );
 
   const updatedIds: string[] = [];
   const now = new Date();
 
   for (const enrollment of enrollments) {
-    const step = await findStepByOrder(workspaceId, campaignId, enrollment.currentStep);
+    const enrollmentSends = sends.filter((send) => send.enrollmentId === enrollment.id);
+    const sendLogs = mapLatestSendLogsByStepOrder(stepInputs, enrollmentSends);
+    const reconciled = await reconcileEnrollmentWithSendLogs(
+      workspaceId,
+      enrollment,
+      stepInputs,
+      sendLogs,
+      timeZone,
+    );
+
+    if (reconciled.id !== enrollment.id || reconciled.status !== enrollment.status) {
+      updatedIds.push(reconciled.id);
+    }
+
+    if (reconciled.status !== "active" && reconciled.status !== "paused") {
+      continue;
+    }
+
+    const step = steps.find((item) => item.order === reconciled.currentStep);
 
     if (!step) {
       continue;
     }
 
-    const nextSendAt = computeEnrollmentNextSendAt(
-      enrollment,
-      step,
-      timeZone,
-      now,
-    );
+    const nextSendAt = computeEnrollmentNextSendAt(reconciled, step, timeZone, now);
 
-    if (nextSendAt.getTime() === enrollment.nextSendAt.getTime()) {
+    if (nextSendAt.getTime() === reconciled.nextSendAt.getTime()) {
       continue;
     }
 
-    await updateCampaignEnrollment(workspaceId, enrollment.id, { nextSendAt });
-    updatedIds.push(enrollment.id);
+    await updateCampaignEnrollment(workspaceId, reconciled.id, { nextSendAt });
+    updatedIds.push(reconciled.id);
   }
 
   return updatedIds;

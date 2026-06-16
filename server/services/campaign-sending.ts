@@ -34,6 +34,7 @@ import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
 import { applyCampaignVariables } from "@/lib/campaign-email";
 import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
+import { reconcileEnrollmentBeforeSend } from "@/server/services/campaign-enrollment-reconcile";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type SendDueSummary = {
@@ -532,7 +533,11 @@ async function summarizeEnrollmentProcessing(
 
   for (const enrollment of enrollments) {
     try {
-      const result = await processEnrollment(enrollment);
+      const reconciled = await reconcileEnrollmentBeforeSend(
+        enrollment.workspaceId,
+        enrollment,
+      );
+      const result = await processEnrollment(reconciled);
       summary.processed += result.processed;
       summary.sent += result.sent;
       summary.skipped += result.skipped;

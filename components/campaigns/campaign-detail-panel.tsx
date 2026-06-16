@@ -64,7 +64,16 @@ type EnrollmentScheduledStep = {
   stepOrder: number;
   subject: string;
   scheduledAt: string | null;
-  state: "sent" | "pending" | "paused" | "cancelled";
+  state:
+    | "sent"
+    | "scheduled"
+    | "queued"
+    | "sending"
+    | "pending"
+    | "paused"
+    | "cancelled"
+    | "failed"
+    | "skipped";
 };
 
 type Enrollment = {
@@ -748,10 +757,34 @@ export function CampaignDetailPanel({
                             {" — "}
                             {scheduledStep.state === "sent" ? (
                               <span className="text-[var(--color-ink-muted)]">Sent</span>
+                            ) : scheduledStep.state === "sending" ? (
+                              <span className="text-[var(--color-warning)]">Sending</span>
+                            ) : scheduledStep.state === "queued" ? (
+                              <span className="text-[var(--color-ink-muted)]">Queued</span>
+                            ) : scheduledStep.state === "failed" ? (
+                              <span className="text-[var(--color-danger)]">Failed</span>
+                            ) : scheduledStep.state === "skipped" ? (
+                              <span className="text-[var(--color-warning)]">Skipped</span>
                             ) : scheduledStep.state === "paused" ? (
                               <span className="text-[var(--color-warning)]">Paused</span>
                             ) : scheduledStep.state === "cancelled" ? (
                               <span className="text-[var(--color-ink-muted)]">Cancelled</span>
+                            ) : scheduledStep.state === "scheduled" && scheduledStep.scheduledAt ? (
+                              <>
+                                <span className="text-[var(--color-ink-muted)]">Scheduled </span>
+                                {formatDateTimeInWorkspaceTimezone(
+                                  scheduledStep.scheduledAt,
+                                  workspaceTimezone,
+                                )}
+                              </>
+                            ) : scheduledStep.state === "pending" && scheduledStep.scheduledAt ? (
+                              <>
+                                <span className="text-[var(--color-ink-muted)]">Due </span>
+                                {formatDateTimeInWorkspaceTimezone(
+                                  scheduledStep.scheduledAt,
+                                  workspaceTimezone,
+                                )}
+                              </>
                             ) : scheduledStep.scheduledAt ? (
                               formatDateTimeInWorkspaceTimezone(
                                 scheduledStep.scheduledAt,

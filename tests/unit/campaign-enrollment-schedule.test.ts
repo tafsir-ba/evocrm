@@ -3,7 +3,29 @@ import { describe, expect, it } from "vitest";
 import {
   buildEnrollmentScheduledSteps,
   computeEnrollmentNextSendAt,
+  mapLatestSendLogsByStepOrder,
 } from "@/server/utils/campaign-enrollment-schedule";
+
+const steps = [
+  {
+    id: "step-1",
+    order: 1,
+    delayDays: 0,
+    sendTime: "12:00",
+    subject: "drip 1",
+  },
+  {
+    id: "step-2",
+    order: 2,
+    delayDays: 1,
+    sendTime: "12:00",
+    subject: "drip 2",
+  },
+];
+
+const enrollmentTiming = {
+  sendClaimExpiresAt: null as Date | null,
+};
 
 describe("campaign enrollment schedule", () => {
   it("projects all remaining drip steps from enrollment timing anchors", () => {
@@ -11,140 +33,202 @@ describe("campaign enrollment schedule", () => {
 
     const schedule = buildEnrollmentScheduledSteps(
       {
+        ...enrollmentTiming,
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
         nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
         status: "active",
       },
-      [
-        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
-        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
-      ],
+      steps,
+      new Map(),
       "UTC",
       now,
     );
 
-    expect(schedule).toHaveLength(2);
-    expect(schedule[0]).toMatchObject({
-      stepOrder: 1,
-      subject: "drip 1",
-      state: "pending",
-    });
+    expect(schedule[0]?.state).toBe("scheduled");
     expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:00:00.000Z");
-    expect(schedule[1]).toMatchObject({
-      stepOrder: 2,
-      subject: "drip 2",
-      state: "pending",
-    });
+    expect(schedule[1]?.state).toBe("scheduled");
     expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
   });
 
-  it("reflects stored nextSendAt for the current step and projects follow-ups", () => {
-    const now = new Date("2026-06-17T14:00:00.000Z");
-
-    const schedule = buildEnrollmentScheduledSteps(
-      {
-        currentStep: 1,
-        createdAt: now,
-        lastSentAt: null,
-        nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
-        status: "active",
-      },
-      [
-        { order: 1, delayDays: 0, sendTime: "16:45", subject: "drip 1" },
-        { order: 2, delayDays: 0, sendTime: "16:46", subject: "drip 2" },
-      ],
-      "UTC",
-      now,
-    );
-
-    expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-17T16:45:00.000Z");
-    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-17T16:46:00.000Z");
-  });
-
-  it("marks prior steps as sent after the enrollment advances", () => {
+  it("marks a step sent only when the send log confirms provider dispatch", () => {
     const lastSentAt = new Date("2026-06-14T12:00:00.000Z");
+    const sendLogs = mapLatestSendLogsByStepOrder(steps, [
+      {
+        campaignStepId: "step-1",
+        status: "sent",
+        providerMessageId: "msg-1",
+        sentAt: lastSentAt,
+        scheduledFor: lastSentAt,
+        createdAt: lastSentAt,
+      },
+    ]);
 
     const schedule = buildEnrollmentScheduledSteps(
       {
+        ...enrollmentTiming,
         currentStep: 2,
         createdAt: new Date("2026-06-14T10:00:00.000Z"),
         lastSentAt,
         nextSendAt: new Date("2026-06-15T12:00:00.000Z"),
         status: "active",
       },
-      [
-        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
-        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
-      ],
+      steps,
+      sendLogs,
       "UTC",
       lastSentAt,
     );
 
     expect(schedule[0]?.state).toBe("sent");
-    expect(schedule[0]?.scheduledAt).toBeNull();
-    expect(schedule[1]?.state).toBe("pending");
-    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
+    expect(schedule[1]?.state).toBe("scheduled");
   });
 
-  it("chains zero-delay follow-up steps shortly after the prior step slot", () => {
-    const now = new Date("2026-06-14T10:00:00.000Z");
+  it("does not mark future steps as sent when currentStep advanced without send logs", () => {
+    const now = new Date("2026-06-18T18:39:00.000Z");
+    const sendLogs = mapLatestSendLogsByStepOrder(
+      [
+        { id: "step-1", order: 1 },
+        { id: "step-2", order: 2 },
+        { id: "step-3", order: 3 },
+        { id: "step-4", order: 4 },
+      ],
+      [
+        {
+          campaignStepId: "step-1",
+          status: "sent",
+          providerMessageId: "msg-1",
+          sentAt: new Date("2026-06-18T18:37:00.000Z"),
+          scheduledFor: new Date("2026-06-18T18:37:00.000Z"),
+          createdAt: new Date("2026-06-18T18:37:00.000Z"),
+        },
+        {
+          campaignStepId: "step-2",
+          status: "sent",
+          providerMessageId: "msg-2",
+          sentAt: new Date("2026-06-18T18:37:00.000Z"),
+          scheduledFor: new Date("2026-06-18T18:37:00.000Z"),
+          createdAt: new Date("2026-06-18T18:37:00.000Z"),
+        },
+      ],
+    );
 
     const schedule = buildEnrollmentScheduledSteps(
       {
-        currentStep: 1,
-        createdAt: now,
-        lastSentAt: null,
-        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
+        ...enrollmentTiming,
+        currentStep: 4,
+        createdAt: new Date("2026-06-18T18:30:00.000Z"),
+        lastSentAt: new Date("2026-06-18T18:37:00.000Z"),
+        nextSendAt: new Date("2026-06-18T18:45:00.000Z"),
         status: "active",
       },
       [
-        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
-        { order: 2, delayDays: 0, sendTime: "12:00", subject: "drip 2" },
+        { id: "step-1", order: 1, delayDays: 0, sendTime: "20:37", subject: "test 1" },
+        { id: "step-2", order: 2, delayDays: 0, sendTime: "20:37", subject: "test 2" },
+        { id: "step-3", order: 3, delayDays: 0, sendTime: "20:40", subject: "test 1" },
+        { id: "step-4", order: 4, delayDays: 0, sendTime: "20:45", subject: "test 1" },
       ],
-      "UTC",
+      sendLogs,
+      "Europe/Zurich",
       now,
     );
 
-    expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:00:00.000Z");
-    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:01:00.000Z");
+    expect(schedule[0]?.state).toBe("sent");
+    expect(schedule[1]?.state).toBe("sent");
+    expect(schedule[2]?.state).toBe("scheduled");
+    expect(schedule[3]?.state).toBe("scheduled");
   });
 
-  it("uses stored nextSendAt for overdue current steps instead of recomputing from now", () => {
-    const now = new Date("2026-06-17T17:00:00.000Z");
+  it("does not mark every step sent for completed enrollments without send logs", () => {
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        ...enrollmentTiming,
+        currentStep: 3,
+        createdAt: new Date("2026-06-14T10:00:00.000Z"),
+        lastSentAt: new Date("2026-06-14T12:00:00.000Z"),
+        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
+        status: "completed",
+      },
+      [
+        ...steps,
+        {
+          id: "step-3",
+          order: 3,
+          delayDays: 0,
+          sendTime: "20:40",
+          subject: "drip 3",
+        },
+      ],
+      mapLatestSendLogsByStepOrder(steps, [
+        {
+          campaignStepId: "step-1",
+          status: "sent",
+          providerMessageId: "msg-1",
+          sentAt: new Date("2026-06-14T12:00:00.000Z"),
+          scheduledFor: new Date("2026-06-14T12:00:00.000Z"),
+          createdAt: new Date("2026-06-14T12:00:00.000Z"),
+        },
+      ]),
+      "UTC",
+      new Date("2026-06-14T12:30:00.000Z"),
+    );
+
+    expect(schedule[0]?.state).toBe("sent");
+    expect(schedule[1]?.state).toBe("scheduled");
+    expect(schedule[2]?.state).toBe("pending");
+  });
+
+  it("marks the current step as sending when a send claim is active", () => {
+    const now = new Date("2026-06-14T12:00:00.000Z");
 
     const schedule = buildEnrollmentScheduledSteps(
       {
+        ...enrollmentTiming,
+        sendClaimExpiresAt: new Date("2026-06-14T12:05:00.000Z"),
         currentStep: 1,
-        createdAt: new Date("2026-06-17T14:00:00.000Z"),
+        createdAt: now,
         lastSentAt: null,
-        nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
+        nextSendAt: now,
         status: "active",
       },
-      [{ order: 1, delayDays: 0, sendTime: "16:45", subject: "drip 1" }],
+      steps,
+      new Map(),
       "UTC",
       now,
     );
 
-    expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-17T16:45:00.000Z");
+    expect(schedule[0]?.state).toBe("sending");
   });
 
-  it("matches the current step projection used for rescheduling", () => {
-    const now = new Date("2026-06-17T16:40:00.000Z");
-    const enrollment = {
-      currentStep: 1,
-      createdAt: new Date("2026-06-17T14:00:00.000Z"),
-      lastSentAt: null,
-      nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
-      status: "active" as const,
-    };
-    const step = { order: 1, delayDays: 0, sendTime: "16:45", subject: "drip 1" };
+  it("marks queued send logs separately from scheduled steps", () => {
+    const now = new Date("2026-06-14T12:00:00.000Z");
+    const sendLogs = mapLatestSendLogsByStepOrder(steps, [
+      {
+        campaignStepId: "step-1",
+        status: "queued",
+        providerMessageId: null,
+        sentAt: null,
+        scheduledFor: now,
+        createdAt: now,
+      },
+    ]);
 
-    const schedule = buildEnrollmentScheduledSteps(enrollment, [step], "UTC", now);
-    const nextSendAt = computeEnrollmentNextSendAt(enrollment, step, "UTC", now);
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        ...enrollmentTiming,
+        currentStep: 1,
+        createdAt: now,
+        lastSentAt: null,
+        nextSendAt: now,
+        status: "active",
+      },
+      steps,
+      sendLogs,
+      "UTC",
+      now,
+    );
 
-    expect(schedule[0]?.scheduledAt?.toISOString()).toBe(nextSendAt.toISOString());
+    expect(schedule[0]?.state).toBe("queued");
   });
 
   it("marks pending schedule steps as paused when enrollment is paused", () => {
@@ -152,16 +236,15 @@ describe("campaign enrollment schedule", () => {
 
     const schedule = buildEnrollmentScheduledSteps(
       {
+        ...enrollmentTiming,
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
         nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
         status: "paused",
       },
-      [
-        { order: 1, delayDays: 0, sendTime: "12:00", subject: "drip 1" },
-        { order: 2, delayDays: 1, sendTime: "12:00", subject: "drip 2" },
-      ],
+      steps,
+      new Map(),
       "UTC",
       now,
     );
