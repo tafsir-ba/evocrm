@@ -172,12 +172,17 @@ export function CampaignStepFormPage({
       contentMode === "html" || contentMode === "rich_text" ? form.bodyHtml || null : null;
     const bodyText = form.bodyText || form.body;
 
-    return {
+    const trimmedName = form.name.trim();
+
+    const payload = {
       order: parseInt(form.order, 10),
-      name: form.name.trim(),
+      ...(trimmedName
+        ? { name: trimmedName }
+        : isEdit
+          ? { name: null }
+          : {}),
       delayDays: parseInt(form.delayDays, 10),
       sendTime: form.sendTime,
-      channel: "email" as const,
       status,
       contentMode,
       subject: form.subject.trim(),
@@ -186,6 +191,22 @@ export function CampaignStepFormPage({
       bodyHtml,
       bodyText: bodyText.trim() || null,
     };
+
+    return isEdit ? payload : { ...payload, channel: "email" as const };
+  }
+
+  function formatSaveError(payload: { error?: { message?: string; details?: Record<string, string[]> } }) {
+    const details = payload.error?.details;
+    if (details) {
+      const detailMessages = Object.entries(details).flatMap(([field, messages]) =>
+        messages.map((message) => (field === "_root" ? message : `${field}: ${message}`)),
+      );
+      if (detailMessages.length > 0) {
+        return detailMessages.join(" ");
+      }
+    }
+
+    return payload.error?.message ?? "Failed to save step.";
   }
 
   async function saveStep(status: StepFormState["status"]) {
@@ -203,7 +224,7 @@ export function CampaignStepFormPage({
       const payload = await response.json();
 
       if (!response.ok) {
-        setFormError(payload.error?.message ?? "Failed to save step.");
+        setFormError(formatSaveError(payload));
         return;
       }
 
