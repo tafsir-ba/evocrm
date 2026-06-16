@@ -14,6 +14,7 @@ import {
   calculateCampaignDayOffset,
   formatStepDelayLabel,
 } from "@/lib/campaign-email";
+import { formatApiErrorMessage } from "@/lib/format-api-error";
 import { IconPlus } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -195,7 +196,7 @@ export function CampaignJourneySection({
       });
       const payload = await response.json();
       if (!response.ok) {
-        onActionError(payload.error?.message ?? "Failed to save sender settings.");
+        onActionError(formatApiErrorMessage(payload, "Failed to save sender settings."));
         return;
       }
       onStepsChange();
@@ -411,6 +412,11 @@ export function CampaignJourneySection({
                 </span>
                 <span className={item.passed ? "text-[var(--color-ink)]" : "text-[var(--color-ink-muted)]"}>
                   {item.label}
+                  {!item.passed && item.requiredFix ? (
+                    <span className="block text-[12px] text-[var(--color-danger)] mt-0.5">
+                      {item.requiredFix}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             ))}

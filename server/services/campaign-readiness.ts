@@ -20,6 +20,19 @@ export type CampaignReadinessReport = {
   requiredFixes: string[];
 };
 
+export function isEnrollmentRulesReady(
+  campaign: Pick<
+    CampaignRecord,
+    "autoEnrollmentEnabled" | "enrollmentTrigger" | "enrollmentRules"
+  >,
+): boolean {
+  if (!campaign.autoEnrollmentEnabled || campaign.enrollmentTrigger === "manual_only") {
+    return true;
+  }
+
+  return campaign.enrollmentRules.conditions.length > 0;
+}
+
 export async function evaluateCampaignReadiness(
   workspaceId: string,
   campaign: CampaignRecord,
@@ -37,10 +50,7 @@ export async function evaluateCampaignReadiness(
     {
       key: "enrollment_rules",
       label: "Enrollment rules configured",
-      passed:
-        !campaign.autoEnrollmentEnabled ||
-        (campaign.enrollmentRules.conditions.length > 0 &&
-          campaign.enrollmentTrigger !== "manual_only"),
+      passed: isEnrollmentRulesReady(campaign),
       requiredFix: "Configure enrollment rules or disable auto-enrollment.",
     },
     {

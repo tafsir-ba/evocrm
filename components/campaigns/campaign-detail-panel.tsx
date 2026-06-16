@@ -23,6 +23,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconMail, IconPlus } from "@/lib/icons";
+import { formatApiErrorMessage } from "@/lib/format-api-error";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Campaign = {
@@ -135,6 +136,8 @@ export function CampaignDetailPanel({
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [launchReady, setLaunchReady] = useState(false);
+  const [launchRequiredFixes, setLaunchRequiredFixes] = useState<string[]>([]);
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [previewStep, setPreviewStep] = useState<CampaignStep | null>(null);
@@ -148,12 +151,14 @@ export function CampaignDetailPanel({
     setForbidden(false);
 
     try {
-      const [campaignRes, stepsRes, enrollRes, sendsRes, candidatesRes] = await Promise.all([
+      const [campaignRes, stepsRes, enrollRes, sendsRes, candidatesRes, readinessRes] =
+        await Promise.all([
         fetch(apiBase),
         fetch(`${apiBase}/steps`),
         fetch(`${apiBase}/enrollments`),
         fetch(`${apiBase}/sends`),
         fetch(`${apiBase}/enrollment-candidates`),
+        fetch(`${apiBase}/readiness`),
       ]);
 
       if (campaignRes.status === 403) {
@@ -161,13 +166,14 @@ export function CampaignDetailPanel({
         return;
       }
 
-      const [campaignPayload, stepsPayload, enrollPayload, sendsPayload, candidatesPayload] =
+      const [campaignPayload, stepsPayload, enrollPayload, sendsPayload, candidatesPayload, readinessPayload] =
         await Promise.all([
           campaignRes.json(),
           stepsRes.json(),
           enrollRes.json(),
           sendsRes.json(),
           candidatesRes.json(),
+          readinessRes.json(),
         ]);
 
       if (!campaignRes.ok) {
@@ -198,6 +204,14 @@ export function CampaignDetailPanel({
       setEnrollments(enrollRes.ok ? (enrollPayload.data ?? []) : []);
       setEnrollmentCandidates(candidatesRes.ok ? (candidatesPayload.data ?? []) : []);
       setSends(sendsRes.ok ? (sendsPayload.data ?? []) : []);
+      if (readinessRes.ok) {
+        const readiness = readinessPayload.data?.readiness;
+        setLaunchReady(Boolean(readiness?.ready));
+        setLaunchRequiredFixes(readiness?.requiredFixes ?? []);
+      } else {
+        setLaunchReady(false);
+        setLaunchRequiredFixes([]);
+      }
       setLoadWarning(warnings.length > 0 ? warnings.join(" ") : null);
     } catch {
       setLoadError("Failed to load campaign.");
@@ -256,6 +270,15 @@ export function CampaignDetailPanel({
   }
 
   async function handleActivate() {
+    if (!launchReady) {
+      setActionError(
+        launchRequiredFixes.length > 0
+          ? launchRequiredFixes.join(" ")
+          : "Complete the campaign readiness checklist before activating.",
+      );
+      return;
+    }
+
     setActionPending(true);
     setActionError(null);
 
@@ -268,7 +291,7 @@ export function CampaignDetailPanel({
       const payload = await response.json();
 
       if (!response.ok) {
-        setActionError(payload.error?.message ?? "Activation failed.");
+        setActionError(formatApiErrorMessage(payload, "Activation failed."));
         return;
       }
 
@@ -504,7 +527,10 @@ export function CampaignDetailPanel({
                   </Button>
                 )}
                 {campaign.status === "draft" && steps.length > 0 && (
-                  <Button disabled={actionPending} onClick={() => void handleActivate()}>
+                  <Button
+                    disabled={actionPending || !launchReady}
+                    onClick={() => void handleActivate()}
+                  >
                     Activate
                   </Button>
                 )}
