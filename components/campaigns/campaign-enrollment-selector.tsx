@@ -31,6 +31,7 @@ type CampaignEnrollmentSelectorProps = {
   onSelectionChange: (ids: string[]) => void;
   excludedTargetIds?: string[];
   disabled?: boolean;
+  selectionDisabled?: boolean;
 };
 
 export function getActiveEnrollmentTargetIds(
@@ -84,6 +85,7 @@ export function CampaignEnrollmentSelector({
   onSelectionChange,
   excludedTargetIds = [],
   disabled = false,
+  selectionDisabled = false,
 }: CampaignEnrollmentSelectorProps) {
   const [search, setSearch] = useState("");
   const [leads, setLeads] = useState<LeadEnrollmentOption[]>([]);
@@ -174,7 +176,7 @@ export function CampaignEnrollmentSelector({
   const excludedSet = useMemo(() => new Set(excludedTargetIds), [excludedTargetIds]);
 
   function toggleSelection(id: string) {
-    if (disabled || excludedSet.has(id)) {
+    if (disabled || selectionDisabled || excludedSet.has(id)) {
       return;
     }
 
@@ -200,6 +202,12 @@ export function CampaignEnrollmentSelector({
 
   return (
     <div className="space-y-3">
+      {selectionDisabled ? (
+        <p className="text-[12px] text-[var(--color-ink-muted)]">
+          Activate this campaign to enroll recipients. You can search available{" "}
+          {audienceType === "leads" ? "leads" : "opportunities"} below.
+        </p>
+      ) : null}
       <Input
         value={search}
         onChange={(event) => setSearch(event.target.value)}
@@ -243,7 +251,7 @@ export function CampaignEnrollmentSelector({
                   <label
                     className={cn(
                       "flex items-start gap-3 px-3 py-2.5",
-                      alreadyEnrolled
+                      alreadyEnrolled || selectionDisabled
                         ? "opacity-60 cursor-not-allowed"
                         : "cursor-pointer hover:bg-[var(--color-canvas)]",
                       disabled && "opacity-60 cursor-not-allowed",
@@ -253,7 +261,7 @@ export function CampaignEnrollmentSelector({
                       type="checkbox"
                       className="mt-1"
                       checked={checked}
-                      disabled={disabled || alreadyEnrolled}
+                      disabled={disabled || selectionDisabled || alreadyEnrolled}
                       onChange={() => toggleSelection(lead.id)}
                     />
                     <span className="min-w-0 flex-1">
@@ -295,7 +303,7 @@ export function CampaignEnrollmentSelector({
                 <label
                   className={cn(
                     "flex items-start gap-3 px-3 py-2.5",
-                    alreadyEnrolled
+                    alreadyEnrolled || selectionDisabled
                       ? "opacity-60 cursor-not-allowed"
                       : "cursor-pointer hover:bg-[var(--color-canvas)]",
                     disabled && "opacity-60 cursor-not-allowed",
@@ -305,7 +313,7 @@ export function CampaignEnrollmentSelector({
                     type="checkbox"
                     className="mt-1"
                     checked={checked}
-                    disabled={disabled || alreadyEnrolled}
+                    disabled={disabled || selectionDisabled || alreadyEnrolled}
                     onChange={() => toggleSelection(opportunity.id)}
                   />
                   <span className="min-w-0 flex-1">

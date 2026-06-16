@@ -92,7 +92,7 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     });
   });
 
-  it("returns leads created on or after campaign creation that are not enrolled", async () => {
+  it("returns unenrolled leads for the workspace", async () => {
     vi.mocked(findLeads).mockResolvedValue({
       leads: [sampleLead],
       total: 1,
@@ -101,7 +101,6 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     const result = await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1");
 
     expect(findLeads).toHaveBeenCalledWith("ws-1", {
-      createdFrom: campaignCreatedAt,
       search: undefined,
       excludeIds: [],
       page: 1,
@@ -227,7 +226,6 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     const result = await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1");
 
     expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith("ws-1", {
-      createdFrom: campaignCreatedAt,
       search: undefined,
       excludeIds: [],
       page: 1,

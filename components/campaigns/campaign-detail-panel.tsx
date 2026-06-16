@@ -235,6 +235,8 @@ export function CampaignDetailPanel({
   const stepsEditable =
     canUpdate && campaign && (campaign.status === "draft" || campaign.status === "paused");
   const canManageEnrollments = canUpdate && campaign && campaign.status === "active";
+  const canBrowseEnrollments =
+    canUpdate && campaign && campaign.status !== "archived";
 
   const excludedEnrollmentTargetIds = useMemo(() => {
     if (!campaign) {
@@ -605,7 +607,7 @@ export function CampaignDetailPanel({
           <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
             Activate this campaign before enrolling recipients.
             {enrollmentCandidates.length > 0
-              ? ` ${enrollmentCandidates.length} ${campaign.audienceType === "leads" ? "lead" : "opportunity"}${enrollmentCandidates.length === 1 ? "" : "s"} created since this campaign was set up can be enrolled after activation.`
+              ? ` ${enrollmentCandidates.length} ${campaign.audienceType === "leads" ? "lead" : "opportunity"}${enrollmentCandidates.length === 1 ? "" : "s"} can be enrolled after activation.`
               : ""}
           </div>
         )}
@@ -665,7 +667,7 @@ export function CampaignDetailPanel({
           </div>
         )}
 
-        {canManageEnrollments && (
+        {canBrowseEnrollments ? (
           <div className="mb-4 space-y-3">
             <CampaignEnrollmentSelector
               workspaceSlug={workspaceSlug}
@@ -674,16 +676,19 @@ export function CampaignDetailPanel({
               onSelectionChange={handleEnrollmentSelectionChange}
               excludedTargetIds={excludedEnrollmentTargetIds}
               disabled={actionPending}
+              selectionDisabled={!canManageEnrollments}
             />
-            <CampaignEnrollmentActions
-              selectedIds={selectedEnrollmentIds}
-              onEnroll={() => void handleEnroll()}
-              enrolling={actionPending}
-              disabled={actionPending}
-              error={enrollError}
-            />
+            {canManageEnrollments ? (
+              <CampaignEnrollmentActions
+                selectedIds={selectedEnrollmentIds}
+                onEnroll={() => void handleEnroll()}
+                enrolling={actionPending}
+                disabled={actionPending}
+                error={enrollError}
+              />
+            ) : null}
           </div>
-        )}
+        ) : null}
         {enrollments.length === 0 ? (
           <EmptyState
             compact

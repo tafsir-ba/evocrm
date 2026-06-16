@@ -168,7 +168,6 @@ export async function listEnrollmentCandidatesForWorkspace(
 
   if (campaign.audienceType === "leads") {
     const { leads, total } = await findLeads(workspaceId, {
-      createdFrom: campaign.createdAt,
       search: filter.search,
       excludeIds: leadIds,
       page,
@@ -190,7 +189,6 @@ export async function listEnrollmentCandidatesForWorkspace(
   }
 
   const { opportunities, total } = await listOpportunitiesForWorkspace(workspaceId, {
-    createdFrom: campaign.createdAt,
     search: filter.search,
     excludeIds: opportunityIds,
     page,

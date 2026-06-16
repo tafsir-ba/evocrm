@@ -228,6 +228,15 @@ export function CampaignStepFormPage({
   async function saveStep(intent: SaveIntent) {
     setFormError(null);
     setFormMessage(null);
+
+    const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
+    if (intent === "ready" && !emailBodyHasUnsubscribe(bodyContent)) {
+      setFormError(
+        "Include {unsubscribe_url} in the email body before marking this email as ready.",
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -364,7 +373,10 @@ export function CampaignStepFormPage({
             <Button variant="secondary" disabled={submitting} onClick={() => void saveStep("draft")}>
               Save draft
             </Button>
-            <Button disabled={submitting} onClick={() => void saveStep("ready")}>
+            <Button
+              disabled={submitting || missingUnsubscribe}
+              onClick={() => void saveStep("ready")}
+            >
               Mark as ready
             </Button>
           </div>

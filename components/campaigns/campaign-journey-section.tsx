@@ -12,6 +12,7 @@ import { Input, Label } from "@/components/ui/input";
 import {
   buildCampaignSummary,
   calculateCampaignDayOffset,
+  emailBodyHasUnsubscribe,
   formatStepDelayLabel,
 } from "@/lib/campaign-email";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
@@ -474,6 +475,9 @@ export function CampaignJourneySection({
               const stepLabel = step.name || step.subject || `Email ${step.order}`;
               const missingSubject = !step.subject.trim();
               const missingBody = !step.body.trim();
+              const missingUnsubscribe =
+                (step.status === "ready" || step.status === "active") &&
+                !emailBodyHasUnsubscribe(step.body);
 
               return (
                 <div key={step.id}>
@@ -519,6 +523,11 @@ export function CampaignJourneySection({
                         {(missingSubject || missingBody) && step.status === "draft" ? (
                           <p className="text-[12px] text-[var(--color-danger)] mt-2">
                             {missingSubject ? "Missing subject" : "Missing email content"}
+                          </p>
+                        ) : null}
+                        {missingUnsubscribe ? (
+                          <p className="text-[12px] text-[var(--color-danger)] mt-2">
+                            Missing {"{unsubscribe_url}"} — edit this email before activating.
                           </p>
                         ) : null}
                       </div>
