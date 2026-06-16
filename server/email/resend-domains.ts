@@ -38,8 +38,44 @@ function getResendClient(): Resend {
   return resendClient;
 }
 
-function mapProviderError(message: string): string {
+type ProviderError = {
+  message?: string;
+  name?: string;
+} | null;
+
+function normalizeDomainName(domain: string): string {
+  return domain.toLowerCase().trim();
+}
+
+function isAlreadyRegisteredError(error: ProviderError): boolean {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    message.includes("registered already") ||
+    message.includes("already been registered") ||
+    message.includes("already exists")
+  );
+}
+
+function mapProviderError(error: ProviderError, fallbackMessage: string): string {
+  const message = error?.message?.trim() || fallbackMessage;
   const normalized = message.toLowerCase();
+  const errorName = (error?.name ?? "").toLowerCase();
+
+  if (
+    errorName.includes("missing_api_key") ||
+    errorName.includes("invalid_api_key") ||
+    normalized.includes("api key") ||
+    normalized.includes("missing api key")
+  ) {
+    return "Resend API key is missing or invalid. Update RESEND_API_KEY in production and redeploy.";
+  }
+
+  if (
+    normalized.includes("registered already") ||
+    normalized.includes("already been registered")
+  ) {
+    return "This domain is already registered in another Resend account. Use the correct Resend account or ask Resend support to release the domain.";
+  }
 
   if (normalized.includes("not verified") || normalized.includes("domain_not_verified")) {
     return "This domain is not verified yet. Please make sure all DNS records were added correctly.";
@@ -57,17 +93,35 @@ function mapProviderError(message: string): string {
     return "This sending domain could not be found. Please remove it and add it again.";
   }
 
-  return "We could not complete this domain action. Please try again.";
+  if (normalized.includes("rate limit")) {
+    return "Resend is rate-limiting domain requests right now. Please wait a moment and try again.";
+  }
+
+  return `Resend rejected this request: ${message}`;
 }
 
 export async function createProviderDomain(domain: string): Promise<ProviderDomain> {
   const resend = getResendClient();
-  const result = await resend.domains.create({ name: domain.toLowerCase().trim() });
+  const normalizedDomain = normalizeDomainName(domain);
+  const result = await resend.domains.create({ name: normalizedDomain });
+
+  if ((result.error || !result.data) && isAlreadyRegisteredError(result.error)) {
+    const listResult = await resend.domains.list();
+    const existingDomain = listResult.error
+      ? null
+      : (listResult.data?.data ?? []).find(
+          (providerDomain) => normalizeDomainName(providerDomain.name) === normalizedDomain,
+        );
+
+    if (existingDomain) {
+      return getProviderDomain(existingDomain.id);
+    }
+  }
 
   if (result.error || !result.data) {
     throw new AppError(
       "VALIDATION_ERROR",
-      mapProviderError(result.error?.message ?? "Could not add this domain."),
+      mapProviderError(result.error, "Could not add this domain."),
     );
   }
 
@@ -98,7 +152,7 @@ export async function getProviderDomain(providerDomainId: string): Promise<Provi
   if (result.error || !result.data) {
     throw new AppError(
       "NOT_FOUND",
-      mapProviderError(result.error?.message ?? "This sending domain could not be found."),
+      mapProviderError(result.error, "This sending domain could not be found."),
     );
   }
 
@@ -129,7 +183,7 @@ export async function verifyProviderDomain(providerDomainId: string): Promise<Pr
   if (verifyResult.error) {
     throw new AppError(
       "VALIDATION_ERROR",
-      mapProviderError(verifyResult.error.message ?? "Could not verify this domain yet."),
+      mapProviderError(verifyResult.error, "Could not verify this domain yet."),
     );
   }
 
@@ -143,7 +197,7 @@ export async function deleteProviderDomain(providerDomainId: string): Promise<vo
   if (result.error) {
     throw new AppError(
       "VALIDATION_ERROR",
-      mapProviderError(result.error.message ?? "Could not remove this domain."),
+      mapProviderError(result.error, "Could not remove this domain."),
     );
   }
 }
