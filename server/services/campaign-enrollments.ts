@@ -88,6 +88,39 @@ async function enrichEnrollmentWithCampaignSteps(
   return enrichEnrollment(workspaceId, enrollment, steps, timeZone);
 }
 
+async function syncEnrollmentNextSendAtIfNeeded(
+  workspaceId: string,
+  enrollment: CampaignEnrollmentRecord,
+  steps: Array<{ order: number; delayDays: number; sendTime: string; subject: string }>,
+  timeZone: string,
+): Promise<CampaignEnrollmentRecord> {
+  if (enrollment.status !== "active" && enrollment.status !== "paused") {
+    return enrollment;
+  }
+
+  const currentStep = steps.find((step) => step.order === enrollment.currentStep);
+
+  if (!currentStep) {
+    return enrollment;
+  }
+
+  const projectedNextSendAt = computeEnrollmentNextSendAt(
+    enrollment,
+    currentStep,
+    timeZone,
+  );
+
+  if (projectedNextSendAt.getTime() === enrollment.nextSendAt.getTime()) {
+    return enrollment;
+  }
+
+  const updated = await updateCampaignEnrollment(workspaceId, enrollment.id, {
+    nextSendAt: projectedNextSendAt,
+  });
+
+  return updated ?? enrollment;
+}
+
 async function enrichEnrollment(
   workspaceId: string,
   enrollment: CampaignEnrollmentRecord,
@@ -129,14 +162,21 @@ async function enrichEnrollment(
     opportunityLabel = opportunity ? `Opportunity ${opportunity.id.slice(-6)}` : null;
   }
 
+  const syncedEnrollment = await syncEnrollmentNextSendAtIfNeeded(
+    workspaceId,
+    enrollment,
+    steps,
+    timeZone,
+  );
+
   return {
-    ...enrollment,
+    ...syncedEnrollment,
     leadName,
     leadEmail,
     leadEmailConsentStatus,
     opportunityLabel,
     warnings,
-    scheduledSteps: buildEnrollmentScheduledSteps(enrollment, steps, timeZone),
+    scheduledSteps: buildEnrollmentScheduledSteps(syncedEnrollment, steps, timeZone),
   };
 }
 

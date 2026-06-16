@@ -19,6 +19,7 @@ describe("campaign email helpers", () => {
 
   it("detects unsubscribe content", () => {
     expect(emailBodyHasUnsubscribe("Thanks\n{unsubscribe_url}")).toBe(true);
+    expect(emailBodyHasUnsubscribe("Thanks\n{{unsubscribe_url}}")).toBe(true);
     expect(emailBodyHasUnsubscribe('<a href="https://example.com/unsubscribe">Unsubscribe</a>')).toBe(
       true,
     );

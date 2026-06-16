@@ -55,7 +55,7 @@ const UNSAFE_TAG_PATTERN =
   /<(script|iframe|embed|object|form|input|button|link|meta|base)\b/i;
 
 export function emailBodyHasUnsubscribe(content: string): boolean {
-  if (content.includes("{unsubscribe_url}")) {
+  if (content.includes("{unsubscribe_url}") || content.includes("{{unsubscribe_url}}")) {
     return true;
   }
 

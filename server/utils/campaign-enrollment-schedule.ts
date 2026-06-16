@@ -24,6 +24,7 @@ export function buildEnrollmentScheduledSteps(
   >,
   steps: CampaignStepScheduleInput[],
   timeZone = "UTC",
+  now = new Date(),
 ): EnrollmentScheduledStep[] {
   const sortedSteps = [...steps].sort((left, right) => left.order - right.order);
 
@@ -47,7 +48,7 @@ export function buildEnrollmentScheduledSteps(
   const isPaused = enrollment.status === "paused";
 
   const schedule: EnrollmentScheduledStep[] = [];
-  let timelineAnchor = enrollment.lastSentAt ?? enrollment.createdAt;
+  let timelineAnchor = enrollment.lastSentAt ?? now;
 
   for (const step of sortedSteps) {
     if (step.order < enrollment.currentStep) {
