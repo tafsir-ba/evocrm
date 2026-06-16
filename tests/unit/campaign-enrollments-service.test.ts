@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildTestLeadRecord,
   campaignRecordExtras,
   campaignStepRecordExtras,
   enrollmentRecordExtras,
-  leadRecordExtras,
 } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/campaigns", () => ({
@@ -138,41 +138,7 @@ describe("campaign enrollment service", () => {
       updatedAt: new Date(),
       ...campaignStepRecordExtras,
     });
-    vi.mocked(findLeadById).mockResolvedValue({
-      id: "lead-1",
-      workspaceId: "ws-1",
-  ...leadRecordExtras,
-      statusId: "s1",
-      sourceId: null,
-      ownerId: null,
-      assignedTo: null,
-      firstName: "Jane",
-      lastName: "Doe",
-      fullName: "Jane Doe",
-      email: "jane@example.com",
-      emailNormalized: "jane@example.com",
-      phone: null,
-      phoneNormalized: null,
-      language: null,
-      preferredContactMethod: null,
-      budgetMin: null,
-      budgetMax: null,
-      preferredAreas: [],
-  propertyTypeInterests: [],
-  transactionIntent: null,
-  usagePurpose: null,
-      notes: null,
-      tags: [],
-      attributes: {},
-      emailConsentStatus: "subscribed",
-      emailUnsubscribedAt: null,
-      emailUnsubscribeReason: null,
-      lastContactedAt: null,
-      createdBy: "user-1",
-      archivedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(findLeadById).mockResolvedValue(buildTestLeadRecord());
     vi.mocked(sendCampaignEnrollmentsImmediately).mockResolvedValue({
       processed: 1,
       sent: 1,
@@ -330,16 +296,15 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    vi.mocked(findLeadById).mockResolvedValue({
-      id: "lead-1",
-      workspaceId: "ws-1",
-      fullName: "Test Lead",
-      email: "lead@example.com",
-      ...leadRecordExtras,
-      archivedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "Test Lead",
+        firstName: "Test",
+        lastName: "Lead",
+        email: "lead@example.com",
+        emailNormalized: "lead@example.com",
+      }),
+    );
     vi.mocked(findCampaignSteps).mockResolvedValue([
       {
         id: "step-1",
