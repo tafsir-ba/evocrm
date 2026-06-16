@@ -1,6 +1,6 @@
 import "server-only";
 
-import { validateCampaignHtml } from "@/lib/campaign-email";
+import { validateCampaignHtml, emailBodyHasUnsubscribe } from "@/lib/campaign-email";
 import { AppError } from "@/server/errors";
 import type { CampaignStepRecord } from "@/server/repositories/campaign-steps";
 
@@ -14,7 +14,7 @@ function stepHasContent(step: Pick<CampaignStepRecord, "contentMode" | "body" | 
 
 function stepHasUnsubscribe(step: Pick<CampaignStepRecord, "body" | "bodyHtml" | "bodyText">): boolean {
   const content = `${step.body} ${step.bodyHtml ?? ""} ${step.bodyText ?? ""}`;
-  return content.includes("{unsubscribe_url}") || /unsubscribe/i.test(content);
+  return emailBodyHasUnsubscribe(content);
 }
 
 export function assertCampaignStepReady(step: CampaignStepRecord): void {

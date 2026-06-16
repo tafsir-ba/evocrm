@@ -4,7 +4,7 @@ import { AppError } from "@/server/errors";
 import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findVerifiedSendingDomainById } from "@/server/repositories/sending-domains";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
-import { validateCampaignHtml } from "@/lib/campaign-email";
+import { validateCampaignHtml, emailBodyHasUnsubscribe } from "@/lib/campaign-email";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignReadinessItem = {
@@ -91,7 +91,7 @@ export async function evaluateCampaignReadiness(
       label: "Unsubscribe support included",
       passed: activeSteps.every((step) => {
         const content = `${step.body} ${step.bodyHtml ?? ""} ${step.bodyText ?? ""}`;
-        return content.includes("{unsubscribe_url}") || /unsubscribe/i.test(content);
+        return emailBodyHasUnsubscribe(content);
       }),
       requiredFix: "Include {unsubscribe_url} in each active email step.",
     },

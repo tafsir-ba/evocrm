@@ -24,6 +24,66 @@ import type {
 import { stripHtmlToPlainText } from "@/lib/campaign-email";
 import { assertCampaignStepReady } from "@/server/utils/campaign-step-readiness";
 
+function stepContentMeaningfullyChanged(
+  existing: CampaignStepRecord,
+  merged: CampaignStepRecord,
+): boolean {
+  return (
+    existing.subject !== merged.subject ||
+    existing.body !== merged.body ||
+    existing.bodyHtml !== merged.bodyHtml ||
+    existing.bodyText !== merged.bodyText ||
+    existing.contentMode !== merged.contentMode
+  );
+}
+
+function shouldAssertStepReadiness(
+  existing: CampaignStepRecord,
+  normalizedInput: UpdateCampaignStepInput,
+  mergedStep: CampaignStepRecord,
+): boolean {
+  if (normalizedInput.status === "ready") {
+    return true;
+  }
+
+  const resultingStatus = normalizedInput.status ?? existing.status;
+
+  return (
+    (resultingStatus === "ready" || resultingStatus === "active") &&
+    stepContentMeaningfullyChanged(existing, mergedStep)
+  );
+}
+
+function buildStepRecordForReadinessCheck(
+  workspaceId: string,
+  campaignId: string,
+  input: CreateCampaignStepInput,
+): CampaignStepRecord {
+  return {
+    id: "pending",
+    workspaceId,
+    campaignId,
+    order: input.order,
+    name: input.name ?? null,
+    delayDays: input.delayDays,
+    delayAmount: input.delayAmount ?? input.delayDays,
+    delayUnit: input.delayUnit ?? "days",
+    sendTime: input.sendTime,
+    fromName: input.fromName ?? null,
+    channel: "email",
+    status: "ready",
+    contentMode: input.contentMode ?? "plain_text",
+    subject: input.subject ?? "",
+    previewText: input.previewText ?? null,
+    body: input.body ?? "",
+    bodyHtml: input.bodyHtml ?? null,
+    bodyText: input.bodyText ?? null,
+    documentIds: input.documentIds ?? [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 function stepSnapshot(step: CampaignStepRecord): Record<string, unknown> {
   return {
     id: step.id,
@@ -98,6 +158,12 @@ export async function createCampaignStepForWorkspace(
   const documentIds = await validateDocumentIds(workspaceId, input.documentIds);
   const normalizedInput = normalizeStepContent(input);
 
+  if (normalizedInput.status === "ready") {
+    assertCampaignStepReady(
+      buildStepRecordForReadinessCheck(workspaceId, campaignId, normalizedInput),
+    );
+  }
+
   const step = await createCampaignStep(workspaceId, {
     campaignId,
     order: normalizedInput.order,
@@ -162,7 +228,7 @@ export async function updateCampaignStepForWorkspace(
     ...(documentIds !== undefined ? { documentIds } : {}),
   };
 
-  if (normalizedInput.status === "ready") {
+  if (shouldAssertStepReadiness(existing, normalizedInput, mergedStep)) {
     assertCampaignStepReady(mergedStep);
   }
 

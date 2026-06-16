@@ -54,6 +54,18 @@ export type HtmlValidationWarning = {
 const UNSAFE_TAG_PATTERN =
   /<(script|iframe|embed|object|form|input|button|link|meta|base)\b/i;
 
+export function emailBodyHasUnsubscribe(content: string): boolean {
+  if (content.includes("{unsubscribe_url}")) {
+    return true;
+  }
+
+  if (/<a\b[^>]*href=["'][^"']*unsubscribe/i.test(content)) {
+    return true;
+  }
+
+  return /https?:\/\/\S*unsubscribe/i.test(content);
+}
+
 export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   const warnings: HtmlValidationWarning[] = [];
 
@@ -91,7 +103,7 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
     });
   }
 
-  if (!html.includes("{unsubscribe_url}") && !/unsubscribe/i.test(html)) {
+  if (!emailBodyHasUnsubscribe(html)) {
     warnings.push({
       code: "missing_unsubscribe",
       message: "Consider including an unsubscribe link using {unsubscribe_url}.",
@@ -122,10 +134,6 @@ export function normalizeCampaignSendTime(value: string): string {
 
 export function isValidCampaignSendTime(value: string): boolean {
   return SEND_TIME_PATTERN.test(normalizeCampaignSendTime(value));
-}
-
-export function emailBodyHasUnsubscribe(content: string): boolean {
-  return content.includes("{unsubscribe_url}") || /unsubscribe/i.test(content);
 }
 
 export function formatStepDelayLabel(

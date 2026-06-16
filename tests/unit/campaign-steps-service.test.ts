@@ -1,0 +1,152 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  createCampaignStepForWorkspace,
+  updateCampaignStepForWorkspace,
+} from "@/server/services/campaign-steps";
+
+vi.mock("@/server/repositories/campaigns", () => ({
+  findCampaignById: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/campaign-steps", () => ({
+  createCampaignStep: vi.fn(),
+  findCampaignStepById: vi.fn(),
+  updateCampaignStep: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/documents", () => ({
+  findDocumentById: vi.fn(),
+}));
+
+vi.mock("@/server/audit/create-audit-log", () => ({
+  createAuditLog: vi.fn(),
+}));
+
+import { findCampaignById } from "@/server/repositories/campaigns";
+import {
+  createCampaignStep,
+  findCampaignStepById,
+  updateCampaignStep,
+} from "@/server/repositories/campaign-steps";
+
+const campaign = {
+  id: "campaign-1",
+  workspaceId: "ws-1",
+  name: "Test campaign",
+  status: "draft" as const,
+  audienceType: "leads" as const,
+  projectIds: [],
+  autoEnrollmentEnabled: false,
+  enrollmentTrigger: "manual_only" as const,
+  enrollmentRules: { logic: "AND" as const, conditions: [] },
+  frequency: null,
+  defaultFromName: null,
+  senderName: "EvoHome",
+  senderEmail: null,
+  sendingDomainId: null,
+  createdBy: "user-1",
+  ownerId: null,
+  archivedAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+const readyStep = {
+  id: "step-1",
+  workspaceId: "ws-1",
+  campaignId: "campaign-1",
+  order: 1,
+  name: "Email 1",
+  delayDays: 0,
+  delayAmount: 0,
+  delayUnit: "days" as const,
+  sendTime: "09:00",
+  fromName: "EvoHome",
+  channel: "email" as const,
+  status: "ready" as const,
+  contentMode: "plain_text" as const,
+  subject: "Hello",
+  previewText: null,
+  body: "Thanks for joining.\n{unsubscribe_url}",
+  bodyHtml: null,
+  bodyText: "Thanks for joining.\n{unsubscribe_url}",
+  documentIds: [],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+describe("campaign step service readiness enforcement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(findCampaignById).mockResolvedValue(campaign);
+  });
+
+  it("rejects create requests that mark a step ready without unsubscribe support", async () => {
+    vi.mocked(createCampaignStep).mockResolvedValue({
+      ...readyStep,
+      id: "step-new",
+      status: "ready",
+      body: "Hello only",
+      bodyText: "Hello only",
+    });
+
+    await expect(
+      createCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", {
+        order: 1,
+        delayDays: 0,
+        sendTime: "09:00",
+        channel: "email",
+        status: "ready",
+        subject: "Hello",
+        body: "Hello only",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("unsubscribe"),
+    });
+
+    expect(createCampaignStep).not.toHaveBeenCalled();
+  });
+
+  it("allows send-time-only updates on ready steps without re-validating unsubscribe", async () => {
+    vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
+    vi.mocked(updateCampaignStep).mockResolvedValue({
+      ...readyStep,
+      sendTime: "15:59",
+    });
+
+    const updated = await updateCampaignStepForWorkspace(
+      "ws-1",
+      "user-1",
+      "campaign-1",
+      "step-1",
+      {
+        sendTime: "15:59",
+        subject: readyStep.subject,
+        body: readyStep.body,
+        bodyText: readyStep.bodyText,
+        contentMode: readyStep.contentMode,
+      },
+    );
+
+    expect(updated.sendTime).toBe("15:59");
+    expect(updateCampaignStep).toHaveBeenCalled();
+  });
+
+  it("rejects content edits on ready steps that remove unsubscribe support", async () => {
+    vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
+
+    await expect(
+      updateCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", "step-1", {
+        body: "Updated body only",
+        bodyText: "Updated body only",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("unsubscribe"),
+    });
+
+    expect(updateCampaignStep).not.toHaveBeenCalled();
+  });
+});
