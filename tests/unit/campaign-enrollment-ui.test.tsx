@@ -57,6 +57,40 @@ describe("campaign enrollment helpers", () => {
     ).toEqual(["507f1f77bcf86cd799439011"]);
   });
 
+  it("disables selection when campaign is not active", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: "507f1f77bcf86cd799439011",
+              fullName: "Tafsir Ba",
+              email: "tafsir@example.com",
+              phone: null,
+            },
+          ],
+        }),
+      }),
+    );
+
+    render(
+      <CampaignEnrollmentSelector
+        workspaceSlug="demo"
+        audienceType="leads"
+        selectedIds={[]}
+        onSelectionChange={vi.fn()}
+        selectionDisabled
+      />,
+    );
+
+    expect(
+      await screen.findByText(/Activate this campaign to enroll recipients/i),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox")).toBeDisabled();
+  });
+
   it("disables already-enrolled lead checkbox", async () => {
     vi.stubGlobal(
       "fetch",

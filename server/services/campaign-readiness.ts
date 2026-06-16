@@ -5,6 +5,7 @@ import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findVerifiedSendingDomainById } from "@/server/repositories/sending-domains";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
 import { validateCampaignHtml, emailBodyHasUnsubscribe } from "@/lib/campaign-email";
+import { isCampaignStepLaunchReady } from "@/lib/campaign-step-readiness";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignReadinessItem = {
@@ -74,9 +75,7 @@ export async function evaluateCampaignReadiness(
     {
       key: "steps_ready",
       label: "All active steps marked ready",
-      passed:
-        activeSteps.length > 0 &&
-        activeSteps.every((step) => step.status === "ready" || step.status === "active"),
+      passed: activeSteps.length > 0 && activeSteps.every(isCampaignStepLaunchReady),
       requiredFix: "Mark all active email steps as ready.",
     },
     {

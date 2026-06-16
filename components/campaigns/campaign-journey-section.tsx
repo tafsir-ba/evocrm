@@ -12,9 +12,9 @@ import { Input, Label } from "@/components/ui/input";
 import {
   buildCampaignSummary,
   calculateCampaignDayOffset,
-  emailBodyHasUnsubscribe,
   formatStepDelayLabel,
 } from "@/lib/campaign-email";
+import { getCampaignStepLaunchIssues } from "@/lib/campaign-step-readiness";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
 import { IconPlus } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -28,6 +28,9 @@ export type JourneyStep = {
   status: "draft" | "ready" | "active" | "paused";
   subject: string;
   body: string;
+  contentMode?: string;
+  bodyHtml?: string | null;
+  bodyText?: string | null;
 };
 
 type ReadinessItem = {
@@ -475,9 +478,17 @@ export function CampaignJourneySection({
               const stepLabel = step.name || step.subject || `Email ${step.order}`;
               const missingSubject = !step.subject.trim();
               const missingBody = !step.body.trim();
-              const missingUnsubscribe =
-                (step.status === "ready" || step.status === "active") &&
-                !emailBodyHasUnsubscribe(step.body);
+              const launchIssues =
+                step.status === "ready" || step.status === "active"
+                  ? getCampaignStepLaunchIssues({
+                      status: step.status,
+                      subject: step.subject,
+                      contentMode: step.contentMode ?? "plain_text",
+                      body: step.body,
+                      bodyHtml: step.bodyHtml ?? null,
+                      bodyText: step.bodyText ?? null,
+                    })
+                  : [];
 
               return (
                 <div key={step.id}>
@@ -525,9 +536,9 @@ export function CampaignJourneySection({
                             {missingSubject ? "Missing subject" : "Missing email content"}
                           </p>
                         ) : null}
-                        {missingUnsubscribe ? (
+                        {launchIssues.length > 0 ? (
                           <p className="text-[12px] text-[var(--color-danger)] mt-2">
-                            Missing {"{unsubscribe_url}"} — edit this email before activating.
+                            {launchIssues[0]} Edit this email before activating.
                           </p>
                         ) : null}
                       </div>
