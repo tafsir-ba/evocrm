@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus } from "@/lib/icons";
+import { formatDnsHostFqdn } from "@/lib/sending-domain-dns";
 
 type DnsRecord = {
   record: string;
@@ -526,7 +527,8 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                   <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">DNS records</h4>
                   <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
                     Add these records exactly as shown in your DNS host (GoDaddy, Cloudflare,
-                    Namecheap, etc.).
+                    Namecheap, etc.). Use the full host name shown below. Remove older duplicate
+                    records for the same host before checking verification again.
                   </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -556,7 +558,10 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                             <div className="text-[11px] text-[var(--color-ink-muted)]">{record.record}</div>
                           </td>
                           <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink)] font-mono">
-                            {record.name}
+                            <div>{record.name}</div>
+                            <div className="text-[11px] text-[var(--color-ink-muted)] mt-0.5">
+                              {formatDnsHostFqdn(record.name, selectedDomain.domain)}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink)] font-mono max-w-[360px] break-all">
                             {record.value}
