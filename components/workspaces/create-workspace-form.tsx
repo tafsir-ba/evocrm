@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { CurrencySelect, TimezoneSelect } from "@/components/domain/locale-selectors";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { Input, Label, Select } from "@/components/ui/input";
 import { workspaceNavPath } from "@/lib/workspace-paths";
 
 export function CreateWorkspaceForm() {
@@ -66,30 +67,33 @@ export function CreateWorkspaceForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="workspace-type">Type</Label>
-        <Input
+        <Select
           id="workspace-type"
           value={type}
           onChange={(event) => setType(event.target.value)}
-          placeholder="agency"
-        />
+        >
+          <option value="agency">Agency</option>
+          <option value="developer">Developer</option>
+          <option value="brokerage">Brokerage</option>
+          <option value="other">Other</option>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="workspace-timezone">Timezone</Label>
-          <Input
+          <TimezoneSelect
             id="workspace-timezone"
             value={timezone}
-            onChange={(event) => setTimezone(event.target.value)}
+            onChange={setTimezone}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="workspace-currency">Currency</Label>
-          <Input
+          <CurrencySelect
             id="workspace-currency"
             value={defaultCurrency}
-            onChange={(event) => setDefaultCurrency(event.target.value.toUpperCase())}
-            maxLength={3}
+            onChange={setDefaultCurrency}
           />
         </div>
       </div>

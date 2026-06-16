@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import { CurrencySelect } from "@/components/domain/locale-selectors";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import {
   FocusedFormActions,
@@ -402,16 +403,10 @@ export function OpportunityFormPage({
           </div>
           <div>
             <Label htmlFor="opp-currency">Currency</Label>
-            <Input
+            <CurrencySelect
               id="opp-currency"
               value={form.currency}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  currency: event.target.value.toUpperCase(),
-                }))
-              }
-              maxLength={3}
+              onChange={(currency) => setForm((current) => ({ ...current, currency }))}
             />
           </div>
         </div>

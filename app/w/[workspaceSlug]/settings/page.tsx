@@ -16,6 +16,7 @@ import {
   IconTag,
   IconUser,
 } from "@/lib/icons";
+import { formatTimezoneLabel } from "@/lib/locale-options";
 import { hasPermission } from "@/server/permissions/permissions";
 import { listDictionariesForWorkspace } from "@/server/services/dictionaries";
 import { listProjectsForWorkspace } from "@/server/services/projects";
@@ -170,7 +171,7 @@ export default async function SettingsPage({ params }: { params: Params }) {
             <Info label="Workspace name" value={workspace.name} />
             <Info label="Slug" value={workspace.slug} />
             <Info label="Default currency" value={workspace.defaultCurrency} />
-            <Info label="Time zone" value={workspace.timezone} />
+            <Info label="Time zone" value={formatTimezoneLabel(workspace.timezone)} />
           </div>
         </Card>
       </section>

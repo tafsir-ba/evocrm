@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { DeleteWorkspaceButton } from "@/components/workspaces/workspace-manage";
+import { CurrencySelect, TimezoneSelect } from "@/components/domain/locale-selectors";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
@@ -180,23 +181,19 @@ export function WorkspaceSettingsPanel({
             </select>
           </Field>
           <Field label="Time zone">
-            <Input
+            <TimezoneSelect
               value={form.timezone}
-              onChange={(event) => setForm((prev) => ({ ...prev, timezone: event.target.value }))}
+              onChange={(timezone) => setForm((prev) => ({ ...prev, timezone }))}
               disabled={!canUpdate}
             />
           </Field>
           <Field label="Default currency">
-            <Input
+            <CurrencySelect
               value={form.defaultCurrency}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  defaultCurrency: event.target.value.toUpperCase(),
-                }))
+              onChange={(defaultCurrency) =>
+                setForm((prev) => ({ ...prev, defaultCurrency }))
               }
               disabled={!canUpdate}
-              maxLength={3}
             />
           </Field>
         </div>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import { CurrencySelect } from "@/components/domain/locale-selectors";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import {
@@ -409,16 +410,10 @@ export function PropertyFormPage({
           </div>
           <div>
             <Label htmlFor="currency">Currency</Label>
-            <Input
+            <CurrencySelect
               id="currency"
               value={form.currency}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  currency: event.target.value.toUpperCase(),
-                }))
-              }
-              maxLength={3}
+              onChange={(currency) => setForm((current) => ({ ...current, currency }))}
             />
           </div>
         </div>
