@@ -18,18 +18,50 @@ export type CampaignVariableContext = {
   unsubscribeUrl?: string | null;
 };
 
+const CAMPAIGN_VARIABLE_CONTEXT_KEYS: Record<
+  CampaignEmailVariableKey,
+  keyof CampaignVariableContext
+> = {
+  first_name: "firstName",
+  last_name: "lastName",
+  project_name: "projectName",
+  property_name: "propertyName",
+  property_url: "propertyUrl",
+  unsubscribe_url: "unsubscribeUrl",
+};
+
+export const CAMPAIGN_EMAIL_PREVIEW_CONTEXT: CampaignVariableContext = {
+  firstName: "Alex",
+  lastName: "Example",
+  projectName: "Sample project",
+  propertyName: "Sample property",
+  propertyUrl: "https://example.com/properties/sample",
+  unsubscribeUrl: "https://example.com/unsubscribe",
+};
+
+export function normalizeCampaignVariableTokens(content: string): string {
+  let normalized = content;
+
+  for (const variable of CAMPAIGN_EMAIL_VARIABLES) {
+    normalized = normalized.replaceAll(`{{${variable.key}}}`, variable.token);
+  }
+
+  return normalized;
+}
+
 export function applyCampaignVariables(
   content: string,
   context: CampaignVariableContext,
 ): string {
-  return content
-    .replaceAll("{first_name}", context.firstName ?? "")
-    .replaceAll("{last_name}", context.lastName ?? "")
-    .replaceAll("{project_name}", context.projectName ?? "")
-    .replaceAll("{property_name}", context.propertyName ?? "")
-    .replaceAll("{property_url}", context.propertyUrl ?? "")
-    .replaceAll("{{unsubscribe_url}}", context.unsubscribeUrl ?? "")
-    .replaceAll("{unsubscribe_url}", context.unsubscribeUrl ?? "");
+  let result = content;
+
+  for (const variable of CAMPAIGN_EMAIL_VARIABLES) {
+    const value = context[CAMPAIGN_VARIABLE_CONTEXT_KEYS[variable.key]] ?? "";
+    result = result.replaceAll(`{{${variable.key}}}`, value);
+    result = result.replaceAll(variable.token, value);
+  }
+
+  return result;
 }
 
 export function stripHtmlToPlainText(html: string): string {
@@ -56,7 +88,9 @@ const UNSAFE_TAG_PATTERN =
   /<(script|iframe|embed|object|form|input|button|link|meta|base)\b/i;
 
 export function emailBodyHasUnsubscribe(content: string): boolean {
-  if (content.includes("{unsubscribe_url}") || content.includes("{{unsubscribe_url}}")) {
+  const normalized = normalizeCampaignVariableTokens(content);
+
+  if (normalized.includes("{unsubscribe_url}")) {
     return true;
   }
 

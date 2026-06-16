@@ -20,7 +20,7 @@ import type {
   ReorderCampaignStepsInput,
   UpdateCampaignStepInput,
 } from "@/server/validation/campaign-steps";
-import { stripHtmlToPlainText } from "@/lib/campaign-email";
+import { normalizeCampaignVariableTokens, stripHtmlToPlainText } from "@/lib/campaign-email";
 import { assertCampaignStepReady } from "@/server/utils/campaign-step-readiness";
 
 function stepContentMeaningfullyChanged(
@@ -496,28 +496,45 @@ export async function duplicateCampaignStepForWorkspace(
 export function normalizeStepContent<T extends UpdateCampaignStepInput | CreateCampaignStepInput>(
   input: T,
 ): T {
-  if (input.contentMode === "html" && input.bodyHtml && !input.bodyText) {
+  const normalizedInput = {
+    ...input,
+    ...(input.body !== undefined ? { body: normalizeCampaignVariableTokens(input.body) } : {}),
+    ...(input.bodyHtml !== undefined && input.bodyHtml !== null
+      ? { bodyHtml: normalizeCampaignVariableTokens(input.bodyHtml) }
+      : {}),
+    ...(input.bodyText !== undefined && input.bodyText !== null
+      ? { bodyText: normalizeCampaignVariableTokens(input.bodyText) }
+      : {}),
+    ...(input.subject !== undefined
+      ? { subject: normalizeCampaignVariableTokens(input.subject) }
+      : {}),
+    ...(input.previewText !== undefined && input.previewText !== null
+      ? { previewText: normalizeCampaignVariableTokens(input.previewText) }
+      : {}),
+  } as T;
+
+  if (normalizedInput.contentMode === "html" && normalizedInput.bodyHtml && !normalizedInput.bodyText) {
     return {
-      ...input,
-      bodyText: stripHtmlToPlainText(input.bodyHtml),
-      body: stripHtmlToPlainText(input.bodyHtml),
+      ...normalizedInput,
+      bodyText: stripHtmlToPlainText(normalizedInput.bodyHtml),
+      body: stripHtmlToPlainText(normalizedInput.bodyHtml),
     };
   }
 
-  if (input.contentMode === "plain_text" && input.body && !input.bodyText) {
+  if (normalizedInput.contentMode === "plain_text" && normalizedInput.body && !normalizedInput.bodyText) {
     return {
-      ...input,
-      bodyText: input.body,
+      ...normalizedInput,
+      bodyText: normalizedInput.body,
     };
   }
 
-  if (input.contentMode === "rich_text" && input.bodyHtml && !input.body) {
+  if (normalizedInput.contentMode === "rich_text" && normalizedInput.bodyHtml && !normalizedInput.body) {
     return {
-      ...input,
-      body: stripHtmlToPlainText(input.bodyHtml),
-      bodyText: stripHtmlToPlainText(input.bodyHtml),
+      ...normalizedInput,
+      body: stripHtmlToPlainText(normalizedInput.bodyHtml),
+      bodyText: stripHtmlToPlainText(normalizedInput.bodyHtml),
     };
   }
 
-  return input;
+  return normalizedInput;
 }

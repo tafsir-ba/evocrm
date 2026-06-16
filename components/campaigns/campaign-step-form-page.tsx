@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   FocusedFormActions,
@@ -14,9 +14,12 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  applyCampaignVariables,
+  CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
   CAMPAIGN_EMAIL_VARIABLES,
   emailBodyHasUnsubscribe,
   normalizeCampaignSendTime,
+  normalizeCampaignVariableTokens,
   validateCampaignHtml,
 } from "@/lib/campaign-email";
 import { formatWorkspaceTimezoneLabel } from "@/lib/workspace-datetime";
@@ -81,6 +84,7 @@ export function CampaignStepFormPage({
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [testEmail, setTestEmail] = useState("");
+  const bodyFieldRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -169,17 +173,30 @@ export function CampaignStepFormPage({
     return validateCampaignHtml(form.bodyHtml);
   }, [form.bodyHtml, form.contentMode]);
 
+  const previewHtml = useMemo(() => {
+    const raw =
+      form.contentMode === "html"
+        ? form.bodyHtml || "<p>No content yet.</p>"
+        : (form.bodyHtml || form.body).replace(/\n/g, "<br />") || "No content yet.";
+
+    return applyCampaignVariables(raw, CAMPAIGN_EMAIL_PREVIEW_CONTEXT);
+  }, [form.body, form.bodyHtml, form.contentMode]);
+
   function buildPayload(intent: SaveIntent) {
     const contentMode = form.contentMode;
     const body =
       contentMode === "html"
-        ? form.bodyText || form.body
+        ? normalizeCampaignVariableTokens(form.bodyText || form.body)
         : contentMode === "rich_text"
-          ? form.body
-          : form.body;
+          ? normalizeCampaignVariableTokens(form.body)
+          : normalizeCampaignVariableTokens(form.body);
     const bodyHtml =
-      contentMode === "html" || contentMode === "rich_text" ? form.bodyHtml || null : null;
-    const bodyText = form.bodyText || form.body;
+      contentMode === "html" || contentMode === "rich_text"
+        ? form.bodyHtml
+          ? normalizeCampaignVariableTokens(form.bodyHtml)
+          : null
+        : null;
+    const bodyText = normalizeCampaignVariableTokens(form.bodyText || form.body);
 
     const trimmedName = form.name.trim();
     const normalizedSendTime = normalizeCampaignSendTime(form.sendTime);
@@ -194,8 +211,10 @@ export function CampaignStepFormPage({
       delayDays: parseInt(form.delayDays, 10),
       sendTime: normalizedSendTime,
       contentMode,
-      subject: form.subject.trim(),
-      previewText: form.previewText.trim() || null,
+      subject: normalizeCampaignVariableTokens(form.subject.trim()),
+      previewText: form.previewText.trim()
+        ? normalizeCampaignVariableTokens(form.previewText.trim())
+        : null,
       body: body.trim(),
       bodyHtml,
       bodyText: bodyText.trim() || null,
@@ -335,10 +354,38 @@ export function CampaignStepFormPage({
   }
 
   function insertVariable(token: string, field: "body" | "bodyHtml") {
-    setForm((current) => ({
-      ...current,
-      [field]: `${current[field]}${token}`,
-    }));
+    setForm((current) => {
+      const source = current[field];
+      const element = bodyFieldRef.current;
+      const start = element?.selectionStart ?? source.length;
+      const end = element?.selectionEnd ?? source.length;
+      let before = source.slice(0, start);
+      const after = source.slice(end);
+
+      if (before.endsWith("{") && token.startsWith("{")) {
+        before = before.slice(0, -1);
+      }
+
+      const inserted = `${before}${token}${after}`;
+
+      if (field === "bodyHtml") {
+        return {
+          ...current,
+          bodyHtml: inserted,
+          bodyText: inserted.replace(/<[^>]+>/g, " "),
+        };
+      }
+
+      return {
+        ...current,
+        body: inserted,
+        bodyText: inserted,
+        bodyHtml:
+          current.contentMode === "rich_text"
+            ? inserted.replace(/\n/g, "<br />")
+            : current.bodyHtml,
+      };
+    });
   }
 
   if (loading) {
@@ -517,6 +564,7 @@ export function CampaignStepFormPage({
                 <Label htmlFor="step-body-html">HTML body</Label>
                 <Textarea
                   id="step-body-html"
+                  ref={bodyFieldRef}
                   value={form.bodyHtml}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -539,6 +587,7 @@ export function CampaignStepFormPage({
                 <Label htmlFor="step-body-rich">Rich text body</Label>
                 <Textarea
                   id="step-body-rich"
+                  ref={bodyFieldRef}
                   value={form.body}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -557,6 +606,7 @@ export function CampaignStepFormPage({
                 <Label htmlFor="step-body">Plain text body</Label>
                 <Textarea
                   id="step-body"
+                  ref={bodyFieldRef}
                   value={form.body}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -583,12 +633,7 @@ export function CampaignStepFormPage({
               <h3 className="text-[14px] font-semibold text-[var(--color-ink)] mb-2">Preview</h3>
               <div
                 className="max-h-[14rem] overflow-y-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-[13px] leading-relaxed"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    form.contentMode === "html"
-                      ? form.bodyHtml || "<p>No content yet.</p>"
-                      : (form.bodyHtml || form.body).replace(/\n/g, "<br />") || "No content yet.",
-                }}
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
               />
             </Card>
 

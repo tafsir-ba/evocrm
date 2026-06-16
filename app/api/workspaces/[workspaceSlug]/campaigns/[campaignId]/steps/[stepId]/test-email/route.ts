@@ -6,7 +6,7 @@ import { findCampaignById } from "@/server/repositories/campaigns";
 import { buildCampaignEmailHtml, sendCampaignEmail } from "@/server/email/resend";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
-import { applyCampaignVariables } from "@/lib/campaign-email";
+import { applyCampaignVariables, CAMPAIGN_EMAIL_PREVIEW_CONTEXT } from "@/lib/campaign-email";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { AppError } from "@/server/errors";
 
@@ -47,9 +47,13 @@ export async function POST(request: Request, context: RouteContext) {
     await assertVerifiedSenderEmail(workspace.id, campaign.sendingDomainId, campaign.senderEmail);
 
     const previewUrl = "#";
-    const resolvedBody = applyCampaignVariables(step.body, { unsubscribeUrl: previewUrl });
+    const previewContext = {
+      ...CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+      unsubscribeUrl: previewUrl,
+    };
+    const resolvedBody = applyCampaignVariables(step.body, previewContext);
     const resolvedHtml = step.bodyHtml
-      ? applyCampaignVariables(step.bodyHtml, { unsubscribeUrl: previewUrl })
+      ? applyCampaignVariables(step.bodyHtml, previewContext)
       : null;
     const html = buildCampaignEmailHtml(resolvedBody, previewUrl, {
       htmlBody: resolvedHtml,

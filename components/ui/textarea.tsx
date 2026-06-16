@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { TextareaHTMLAttributes } from "react";
+import { forwardRef, type TextareaHTMLAttributes } from "react";
 
 const baseField =
   "w-full bg-white border border-[var(--color-line)] rounded-md text-[13.5px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] " +
@@ -8,11 +8,15 @@ const baseField =
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-export function Textarea({ className, ...rest }: TextareaProps) {
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  { className, ...rest },
+  ref,
+) {
   return (
     <textarea
+      ref={ref}
       {...rest}
       className={cn(baseField, "py-2 px-3 min-h-[88px] leading-relaxed", className)}
     />
   );
-}
+});

@@ -5,6 +5,7 @@ import {
   emailBodyHasUnsubscribe,
   isValidCampaignSendTime,
   normalizeCampaignSendTime,
+  normalizeCampaignVariableTokens,
 } from "@/lib/campaign-email";
 
 describe("campaign email helpers", () => {
@@ -29,9 +30,22 @@ describe("campaign email helpers", () => {
     );
   });
 
+  it("merges double-brace name variables", () => {
+    expect(
+      applyCampaignVariables("Hi {{first_name}}", {
+        firstName: "Alex",
+      }),
+    ).toBe("Hi Alex");
+  });
+
+  it("normalizes double-brace tokens to canonical single-brace form", () => {
+    expect(normalizeCampaignVariableTokens("Hi {{first_name}}")).toBe("Hi {first_name}");
+  });
+
   it("detects unsubscribe content", () => {
     expect(emailBodyHasUnsubscribe("Thanks\n{unsubscribe_url}")).toBe(true);
     expect(emailBodyHasUnsubscribe("Thanks\n{{unsubscribe_url}}")).toBe(true);
+    expect(emailBodyHasUnsubscribe("Thanks\n{unsubscribe_url}")).toBe(true);
     expect(emailBodyHasUnsubscribe('<a href="https://example.com/unsubscribe">Unsubscribe</a>')).toBe(
       true,
     );
