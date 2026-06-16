@@ -4,6 +4,7 @@ import {
   addMinutesToCampaignSendTime,
   applyCampaignVariables,
   emailBodyHasUnsubscribe,
+  getZeroDelaySendTimePredecessorIssue,
   getZeroDelaySendTimeSequenceIssue,
   isValidCampaignSendTime,
   normalizeCampaignSendTime,
@@ -61,6 +62,36 @@ describe("campaign email helpers", () => {
         { order: 2, delayDays: 0, sendTime: "20:13" },
       ]),
     ).toContain("Step 2");
+  });
+
+  it("allows saving a later step when an earlier pair is out of order", () => {
+    const steps = [
+      { order: 1, delayDays: 0, sendTime: "20:11" },
+      { order: 2, delayDays: 0, sendTime: "20:15" },
+      { order: 3, delayDays: 0, sendTime: "20:13" },
+      { order: 4, delayDays: 0, sendTime: "20:15" },
+    ];
+
+    expect(getZeroDelaySendTimeSequenceIssue(steps)).toContain("Step 3");
+    expect(
+      getZeroDelaySendTimePredecessorIssue(
+        { order: 5, delayDays: 0, sendTime: "20:30" },
+        [...steps, { order: 5, delayDays: 0, sendTime: "20:30" }],
+      ),
+    ).toBeNull();
+  });
+
+  it("blocks saving a step that violates its predecessor", () => {
+    expect(
+      getZeroDelaySendTimePredecessorIssue(
+        { order: 3, delayDays: 0, sendTime: "20:13" },
+        [
+          { order: 1, delayDays: 0, sendTime: "20:11" },
+          { order: 2, delayDays: 0, sendTime: "20:15" },
+          { order: 3, delayDays: 0, sendTime: "20:13" },
+        ],
+      ),
+    ).toContain("Step 3");
   });
 
   it("adds minutes to campaign send time", () => {

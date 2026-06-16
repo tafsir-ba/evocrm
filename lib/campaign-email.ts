@@ -219,6 +219,34 @@ export function getZeroDelaySendTimeSequenceIssue(
   return null;
 }
 
+/** Blocks save only when the step being saved violates its immediate predecessor. */
+export function getZeroDelaySendTimePredecessorIssue(
+  step: { order: number; delayDays: number; sendTime: string },
+  steps: Array<{ order: number; delayDays: number; sendTime: string }>,
+): string | null {
+  const sorted = [...steps].sort((left, right) => left.order - right.order);
+  const index = sorted.findIndex((item) => item.order === step.order);
+
+  if (index <= 0) {
+    return null;
+  }
+
+  const previous = sorted[index - 1];
+
+  if (!previous || previous.delayDays !== 0 || step.delayDays !== 0) {
+    return null;
+  }
+
+  const previousTime = normalizeCampaignSendTime(previous.sendTime);
+  const stepTime = normalizeCampaignSendTime(step.sendTime);
+
+  if (stepTime <= previousTime) {
+    return `Step ${step.order} (${stepTime}) must send after step ${previous.order} (${previousTime}) when both are same-day zero-delay emails.`;
+  }
+
+  return null;
+}
+
 export function calculateCampaignDayOffset(
   steps: Array<{ order: number; delayDays: number }>,
   targetOrder: number,
