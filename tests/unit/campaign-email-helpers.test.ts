@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCampaignVariables,
   emailBodyHasUnsubscribe,
   isValidCampaignSendTime,
   normalizeCampaignSendTime,
@@ -15,6 +16,17 @@ describe("campaign email helpers", () => {
   it("validates normalized send time", () => {
     expect(isValidCampaignSendTime("15:59:00")).toBe(true);
     expect(isValidCampaignSendTime("25:00")).toBe(false);
+  });
+
+  it("merges unsubscribe_url in both token formats", () => {
+    const context = { unsubscribeUrl: "https://example.com/unsub" };
+
+    expect(applyCampaignVariables("Link: {unsubscribe_url}", context)).toBe(
+      "Link: https://example.com/unsub",
+    );
+    expect(applyCampaignVariables("Link: {{unsubscribe_url}}", context)).toBe(
+      "Link: https://example.com/unsub",
+    );
   });
 
   it("detects unsubscribe content", () => {

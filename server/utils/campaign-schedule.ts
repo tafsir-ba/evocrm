@@ -67,7 +67,8 @@ function scheduleAtLocalDateTime(
 
 /**
  * Schedules a step at enrolment anchor + delay days + wall-clock send time (workspace TZ).
- * If that instant is not after the anchor, rolls forward to the next day at send time.
+ * Zero-delay steps send about one minute after the anchor when today's slot already passed.
+ * Delayed steps roll forward to the next day when the target slot is not after the anchor.
  */
 export function computeStepSendAt(
   anchor: Date,
@@ -85,6 +86,10 @@ export function computeStepSendAt(
   }
 
   if (scheduled <= anchor) {
+    if (delayDays <= 0) {
+      return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    }
+
     const bumpedDate = addCalendarDaysInTimezone(scheduled, 1, timeZone);
     scheduled = scheduleAtLocalDateTime(bumpedDate, sendTime, timeZone) ?? scheduled;
   }

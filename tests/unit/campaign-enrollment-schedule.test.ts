@@ -85,7 +85,7 @@ describe("campaign enrollment schedule", () => {
     expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
   });
 
-  it("chains zero-delay follow-up steps at the next send-time slot", () => {
+  it("chains zero-delay follow-up steps shortly after the prior step slot", () => {
     const now = new Date("2026-06-14T10:00:00.000Z");
 
     const schedule = buildEnrollmentScheduledSteps(
@@ -103,7 +103,8 @@ describe("campaign enrollment schedule", () => {
       now,
     );
 
-    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
+    expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:00:00.000Z");
+    expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:01:00.000Z");
   });
 
   it("matches the current step projection used for rescheduling", () => {

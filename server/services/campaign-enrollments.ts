@@ -110,7 +110,7 @@ async function syncEnrollmentNextSendAtIfNeeded(
     timeZone,
   );
 
-  if (projectedNextSendAt.getTime() === enrollment.nextSendAt.getTime()) {
+  if (projectedNextSendAt.getTime() >= enrollment.nextSendAt.getTime()) {
     return enrollment;
   }
 
@@ -118,7 +118,22 @@ async function syncEnrollmentNextSendAtIfNeeded(
     nextSendAt: projectedNextSendAt,
   });
 
-  return updated ?? enrollment;
+  const result = updated ?? enrollment;
+
+  if (
+    updated &&
+    result.status === "active" &&
+    currentStep.delayDays <= 0
+  ) {
+    void sendCampaignEnrollmentsImmediately(
+      workspaceId,
+      enrollment.campaignId,
+      "enrollment",
+      [result.id],
+    ).catch(() => undefined);
+  }
+
+  return result;
 }
 
 async function enrichEnrollment(

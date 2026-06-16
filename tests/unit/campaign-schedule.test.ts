@@ -32,14 +32,24 @@ describe("campaign schedule", () => {
     expect(nextSendAt.toISOString()).toBe("2026-06-15T09:00:00.000Z");
   });
 
-  it("rolls send time to the next day when today's slot already passed", () => {
+  it("sends immediately when a zero-delay send time already passed today", () => {
     const anchor = new Date("2026-06-14T15:00:00.000Z");
     const nextSendAt = computeNextSendAt(anchor, 0, {
       sendTime: "09:00",
       timeZone: "UTC",
     });
 
-    expect(nextSendAt.toISOString()).toBe("2026-06-15T09:00:00.000Z");
+    expect(nextSendAt.getTime()).toBe(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+  });
+
+  it("schedules later today when zero-delay send time is still ahead", () => {
+    const anchor = new Date("2026-06-14T10:00:00.000Z");
+    const nextSendAt = computeNextSendAt(anchor, 0, {
+      sendTime: "17:06",
+      timeZone: "UTC",
+    });
+
+    expect(nextSendAt.toISOString()).toBe("2026-06-14T17:06:00.000Z");
   });
 
   it("reschedules overdue sends for immediate pickup", () => {

@@ -28,6 +28,7 @@ export function applyCampaignVariables(
     .replaceAll("{project_name}", context.projectName ?? "")
     .replaceAll("{property_name}", context.propertyName ?? "")
     .replaceAll("{property_url}", context.propertyUrl ?? "")
+    .replaceAll("{{unsubscribe_url}}", context.unsubscribeUrl ?? "")
     .replaceAll("{unsubscribe_url}", context.unsubscribeUrl ?? "");
 }
 
