@@ -235,17 +235,21 @@ export async function deleteProviderDomain(providerDomainId: string): Promise<vo
   }
 }
 
-export function mapProviderDomainToUpdate(providerDomain: ProviderDomain) {
+export function mapProviderDomainToUpdate(
+  providerDomain: ProviderDomain,
+  options?: { existingVerifiedAt?: Date | null },
+) {
   const health = deriveDomainHealth(providerDomain.records);
+  const nextStatus = mapProviderDomainStatus(providerDomain.status);
 
   return {
-    status: mapProviderDomainStatus(providerDomain.status),
+    status: nextStatus,
     dnsRecords: providerDomain.records,
     spfStatus: health.spfStatus,
     dkimStatus: health.dkimStatus,
     dmarcStatus: health.dmarcStatus,
     lastCheckedAt: new Date(),
     verifiedAt:
-      mapProviderDomainStatus(providerDomain.status) === "verified" ? new Date() : null,
+      nextStatus === "verified" ? (options?.existingVerifiedAt ?? new Date()) : null,
   };
 }

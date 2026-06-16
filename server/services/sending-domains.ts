@@ -114,7 +114,7 @@ export async function refreshSendingDomainForWorkspace(
   const updated = await updateSendingDomain(
     workspaceId,
     domainId,
-    mapProviderDomainToUpdate(providerDomain),
+    mapProviderDomainToUpdate(providerDomain, { existingVerifiedAt: domain.verifiedAt }),
   );
 
   if (!updated) {
@@ -143,7 +143,7 @@ export async function verifySendingDomainForWorkspace(
   const updated = await updateSendingDomain(
     workspaceId,
     domainId,
-    mapProviderDomainToUpdate(providerDomain),
+    mapProviderDomainToUpdate(providerDomain, { existingVerifiedAt: domain.verifiedAt }),
   );
 
   if (!updated) {

@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus } from "@/lib/icons";
-import { formatDnsHostFqdn } from "@/lib/sending-domain-dns";
+import { formatDnsHostFqdn, providerIncludesDmarcRecord } from "@/lib/sending-domain-dns";
 
 type DnsRecord = {
   record: string;
@@ -98,9 +98,11 @@ const DOMAIN_STATUS_BANNER: Record<
 function HealthIndicator({
   label,
   status,
+  statusLabel,
 }: {
   label: string;
   status: DnsRecord["status"];
+  statusLabel?: string;
 }) {
   return (
     <div className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink)]">
@@ -109,7 +111,7 @@ function HealthIndicator({
         aria-hidden
       />
       <span>
-        {label}: {RECORD_STATUS_LABELS[status]}
+        {label}: {statusLabel ?? RECORD_STATUS_LABELS[status]}
       </span>
     </div>
   );
@@ -453,7 +455,15 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
                       <HealthIndicator label="SPF" status={selectedDomain.spfStatus} />
                       <HealthIndicator label="DKIM" status={selectedDomain.dkimStatus} />
-                      <HealthIndicator label="DMARC" status={selectedDomain.dmarcStatus} />
+                      {providerIncludesDmarcRecord(selectedDomain.dnsRecords) ? (
+                        <HealthIndicator label="DMARC" status={selectedDomain.dmarcStatus} />
+                      ) : (
+                        <HealthIndicator
+                          label="DMARC"
+                          status="valid"
+                          statusLabel="Optional"
+                        />
+                      )}
                     </div>
                     {selectedDomain.lastCheckedAt ? (
                       <p className="text-[12px] text-[var(--color-ink-faint)] mt-1">
