@@ -44,6 +44,25 @@ function extractEmailAddress(from: string): string {
   return match ? match[1].trim() : from.trim();
 }
 
+/** Resend only allows ASCII letters, numbers, underscores, and dashes in tag values. */
+export function sanitizeResendTagValue(value: string): string {
+  const sanitized = value.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return sanitized.length > 0 ? sanitized : "unknown";
+}
+
+export function sanitizeResendTags(
+  tags?: Array<{ name: string; value: string }>,
+): Array<{ name: string; value: string }> | undefined {
+  if (!tags || tags.length === 0) {
+    return tags;
+  }
+
+  return tags.map((tag) => ({
+    name: sanitizeResendTagValue(tag.name),
+    value: sanitizeResendTagValue(tag.value),
+  }));
+}
+
 function formatFromHeader(fromName: string, emailFrom: string): string {
   const address = extractEmailAddress(emailFrom);
   const safeName = fromName.replace(/["<>]/g, "").trim();
@@ -78,7 +97,7 @@ export async function sendCampaignEmail(
       html: input.html,
       text: input.text,
       replyTo: env.EMAIL_REPLY_TO,
-      tags: input.tags,
+      tags: sanitizeResendTags(input.tags),
     });
 
     if (result.error) {

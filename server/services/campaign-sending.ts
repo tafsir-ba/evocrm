@@ -365,7 +365,6 @@ async function processEnrollment(
       { name: "campaign_id", value: campaign.id },
       { name: "campaign_step_id", value: step.id },
       { name: "contact_id", value: lead.id },
-      { name: "to", value: lead.email },
     ],
   });
 
