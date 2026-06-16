@@ -122,11 +122,7 @@ async function syncEnrollmentNextSendAtIfNeeded(
 
   const result = updated ?? enrollment;
 
-  if (
-    updated &&
-    result.status === "active" &&
-    currentStep.delayDays <= 0
-  ) {
+  if (updated && result.status === "active" && result.nextSendAt <= new Date()) {
     void sendCampaignEnrollmentsImmediately(
       workspaceId,
       enrollment.campaignId,
@@ -445,7 +441,7 @@ export async function createCampaignEnrollmentForWorkspace(
     after: enrollmentSnapshot(enrollment),
   });
 
-  if (campaign.status === "active" && firstStep.delayDays <= 0) {
+  if (campaign.status === "active" && enrollment.nextSendAt <= new Date()) {
     void sendCampaignEnrollmentsImmediately(
       workspaceId,
       campaignId,
@@ -540,7 +536,7 @@ export async function enrollLeadInCampaignWithContext(input: {
     },
   });
 
-  if (firstStep.delayDays <= 0) {
+  if (enrollment.nextSendAt <= new Date()) {
     void sendCampaignEnrollmentsImmediately(
       input.workspaceId,
       input.campaignId,

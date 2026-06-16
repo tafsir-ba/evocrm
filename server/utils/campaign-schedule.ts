@@ -67,7 +67,8 @@ function scheduleAtLocalDateTime(
 
 /**
  * Schedules a step at enrolment anchor + delay days + wall-clock send time (workspace TZ).
- * Zero-delay steps send about one minute after the anchor when today's slot already passed.
+ * Zero-delay steps use the exact configured send time when it is still ahead today.
+ * When today's slot already passed, zero-delay steps send about one minute after the anchor.
  * Delayed steps roll forward to the next day when the target slot is not after the anchor.
  */
 export function computeStepSendAt(
@@ -92,10 +93,6 @@ export function computeStepSendAt(
 
     const bumpedDate = addCalendarDaysInTimezone(scheduled, 1, timeZone);
     scheduled = scheduleAtLocalDateTime(bumpedDate, sendTime, timeZone) ?? scheduled;
-  }
-
-  if (delayDays <= 0 && scheduled.getTime() - anchor.getTime() < IMMEDIATE_SEND_DELAY_MS) {
-    return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
   }
 
   return scheduled;
@@ -123,7 +120,7 @@ export function computeRescheduledSendAt(
   options: { overdue: boolean; sendTime?: string; timeZone?: string },
 ): Date {
   if (options.overdue) {
-    return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    return anchor;
   }
 
   return computeNextSendAt(anchor, stepDelayDays, {
@@ -132,14 +129,6 @@ export function computeRescheduledSendAt(
   });
 }
 
-export function isScheduledSendDue(
-  nextSendAt: Date,
-  stepDelayDays: number,
-  now = new Date(),
-): boolean {
-  if (nextSendAt <= now) {
-    return true;
-  }
-
-  return stepDelayDays <= 0;
+export function isScheduledSendDue(nextSendAt: Date, now = new Date()): boolean {
+  return nextSendAt <= now;
 }

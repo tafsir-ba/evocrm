@@ -187,7 +187,7 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
-  if (!isScheduledSendDue(enrollment.nextSendAt, step.delayDays)) {
+  if (!isScheduledSendDue(enrollment.nextSendAt)) {
     return singleOutcomeResult("skipped");
   }
 
@@ -466,18 +466,24 @@ async function processEnrollment(
     const workspace = await findWorkspaceById(workspaceId);
     const timeZone = workspace?.timezone ?? "UTC";
 
+    const nextSendAt = computeNextSendAt(now, nextStep.delayDays, {
+      sendTime: nextStep.sendTime,
+      timeZone,
+    });
+
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       currentStep: nextStep.order,
-      nextSendAt: computeNextSendAt(now, nextStep.delayDays, {
-        sendTime: nextStep.sendTime,
-        timeZone,
-      }),
+      nextSendAt,
       lastSentAt: now,
       sendClaimExpiresAt: null,
     });
     shouldReleaseSendClaim = false;
 
-    if (nextStep.delayDays <= 0 && chainDepth < MAX_ZERO_DELAY_CHAIN) {
+    if (
+      nextStep.delayDays <= 0 &&
+      chainDepth < MAX_ZERO_DELAY_CHAIN &&
+      nextSendAt <= now
+    ) {
       const refreshed = await findEnrollmentByIdOnly(workspaceId, enrollment.id);
 
       if (refreshed && refreshed.status === "active") {
@@ -552,14 +558,11 @@ function filterEnrollmentsForImmediateSend(
       return false;
     }
 
-    // Explicit enrollment/activation passes may send zero-delay steps before nextSendAt.
-    // See docs/api-contracts.md scheduling notes.
-    if (idFilter) {
-      return true;
-    }
-
-    if (mode === "activation" || mode === "enrollment") {
-      return enrollment.lastSentAt === null;
+    if (
+      (mode === "activation" || mode === "enrollment") &&
+      enrollment.lastSentAt !== null
+    ) {
+      return false;
     }
 
     return enrollment.nextSendAt <= now;

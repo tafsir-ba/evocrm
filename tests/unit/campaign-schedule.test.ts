@@ -56,7 +56,7 @@ describe("campaign schedule", () => {
     const anchor = new Date("2026-06-14T12:00:00.000Z");
     const nextSendAt = computeRescheduledSendAt(anchor, 3, { overdue: true });
 
-    expect(nextSendAt.getTime()).toBe(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    expect(nextSendAt.getTime()).toBe(anchor.getTime());
   });
 
   it("reschedules overdue sends immediately even when send time is configured", () => {
@@ -67,13 +67,23 @@ describe("campaign schedule", () => {
       timeZone: "UTC",
     });
 
-    expect(nextSendAt.getTime()).toBe(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    expect(nextSendAt.getTime()).toBe(anchor.getTime());
   });
 
-  it("keeps future delayed sends blocked until due", () => {
+  it("keeps future sends blocked until due", () => {
     const future = new Date("2026-06-20T12:00:00.000Z");
+    const now = new Date("2026-06-14T12:00:00.000Z");
 
-    expect(isScheduledSendDue(future, 3)).toBe(false);
-    expect(isScheduledSendDue(future, 0)).toBe(true);
+    expect(isScheduledSendDue(future, now)).toBe(false);
+  });
+
+  it("uses the exact configured send time when enrolling shortly before the slot", () => {
+    const anchor = new Date("2026-06-14T17:28:30.000Z");
+    const nextSendAt = computeNextSendAt(anchor, 0, {
+      sendTime: "17:29",
+      timeZone: "UTC",
+    });
+
+    expect(nextSendAt.toISOString()).toBe("2026-06-14T17:29:00.000Z");
   });
 });

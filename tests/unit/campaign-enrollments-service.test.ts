@@ -55,8 +55,6 @@ import {
   rescheduleEnrollmentsForCampaignSchedule,
   updateCampaignEnrollmentForWorkspace,
 } from "@/server/services/campaign-enrollments";
-import { IMMEDIATE_SEND_DELAY_MS } from "@/server/utils/campaign-schedule";
-
 const pausedEnrollment = {
   id: "enroll-1",
   workspaceId: "ws-1",
@@ -162,7 +160,7 @@ describe("campaign enrollment service", () => {
       .mockResolvedValueOnce({
         ...pausedEnrollment,
         status: "active",
-        nextSendAt: new Date(resumedAt.getTime() + IMMEDIATE_SEND_DELAY_MS),
+        nextSendAt: resumedAt,
       });
 
     await updateCampaignEnrollmentForWorkspace("ws-1", "user-1", "camp-1", "enroll-1", {
@@ -174,7 +172,7 @@ describe("campaign enrollment service", () => {
       "ws-1",
       "enroll-1",
       expect.objectContaining({
-        nextSendAt: new Date(resumedAt.getTime() + IMMEDIATE_SEND_DELAY_MS),
+        nextSendAt: resumedAt,
       }),
     );
     expect(sendCampaignEnrollmentsImmediately).toHaveBeenCalledWith(
@@ -330,7 +328,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
     });
   });
 
-  it("brings forward stale far-future nextSendAt and triggers immediate send", async () => {
+  it("brings forward stale far-future nextSendAt without triggering future immediate send", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-18T15:08:00.000Z"));
 
@@ -386,12 +384,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
     expect(updateCampaignEnrollment).toHaveBeenCalledWith("ws-1", "enroll-1", {
       nextSendAt: correctedNextSendAt,
     });
-    expect(sendCampaignEnrollmentsImmediately).toHaveBeenCalledWith(
-      "ws-1",
-      "camp-1",
-      "enrollment",
-      ["enroll-1"],
-    );
+    expect(sendCampaignEnrollmentsImmediately).not.toHaveBeenCalled();
 
     vi.useRealTimers();
   });

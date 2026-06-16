@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   campaignRecordExtras,
@@ -127,6 +127,10 @@ const step = {
 };
 
 describe("campaign sending service", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(findSuppressionByEmail).mockResolvedValue(null);
@@ -471,15 +475,25 @@ describe("campaign sending service", () => {
     );
   });
 
-  it("chains consecutive zero-delay steps in one processing run", async () => {
+  it("does not chain zero-delay steps when the next step is scheduled in the future", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T17:28:00.000Z"));
+
     const step2 = {
       ...step,
       id: "step-2",
       order: 2,
       subject: "Follow-up",
       body: "Second email",
+      sendTime: "17:30",
     };
 
+    vi.mocked(findDueEnrollments).mockResolvedValue([
+      {
+        ...enrollment,
+        nextSendAt: new Date("2026-06-14T17:28:00.000Z"),
+      },
+    ]);
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
@@ -528,14 +542,15 @@ describe("campaign sending service", () => {
     vi.mocked(findEnrollmentByIdOnly).mockResolvedValue({
       ...enrollment,
       currentStep: 2,
-      lastSentAt: new Date(),
+      nextSendAt: new Date("2026-06-14T17:30:00.000Z"),
+      lastSentAt: new Date("2026-06-14T17:28:00.000Z"),
     });
 
     const summary = await sendDueCampaignEmails(50);
 
-    expect(summary.sent).toBe(2);
-    expect(summary.processed).toBe(2);
-    expect(sendCampaignEmail).toHaveBeenCalledTimes(2);
+    expect(summary.sent).toBe(1);
+    expect(summary.processed).toBe(1);
+    expect(sendCampaignEmail).toHaveBeenCalledTimes(1);
   });
 
   it("records failed email and defers retry", async () => {
