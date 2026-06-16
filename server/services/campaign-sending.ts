@@ -8,9 +8,12 @@ import {
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
 import {
-  findCampaignEnrollments,
+  claimEnrollmentForSend,
+  findActiveEnrollmentsByIds,
   findDueEnrollments,
   findEnrollmentByIdOnly,
+  listAllCampaignEnrollments,
+  releaseEnrollmentSendClaim,
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
 } from "@/server/repositories/campaign-enrollments";
@@ -21,7 +24,7 @@ import {
 } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
-import { createCampaignSend } from "@/server/repositories/campaign-sends";
+import { createCampaignSend, findSentCampaignSendForEnrollmentStep } from "@/server/repositories/campaign-sends";
 import {
   createUnsubscribeToken,
   buildUnsubscribeUrl,
@@ -188,6 +191,30 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
+  const claimedEnrollment = await claimEnrollmentForSend(
+    workspaceId,
+    enrollment.id,
+    enrollment.currentStep,
+  );
+
+  if (!claimedEnrollment) {
+    return singleOutcomeResult("skipped");
+  }
+
+  enrollment = claimedEnrollment;
+  let shouldReleaseSendClaim = true;
+
+  try {
+    const existingSend = await findSentCampaignSendForEnrollmentStep(
+      workspaceId,
+      enrollment.id,
+      step.id,
+    );
+
+    if (existingSend) {
+      return singleOutcomeResult("skipped");
+    }
+
   if (!enrollment.leadId) {
     await recordSkippedSend({
       workspaceId,
@@ -252,7 +279,9 @@ async function processEnrollment(
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       status: "unsubscribed",
       unsubscribedAt: new Date(),
+      sendClaimExpiresAt: null,
     });
+    shouldReleaseSendClaim = false;
 
     return singleOutcomeResult("skipped");
   }
@@ -444,7 +473,9 @@ async function processEnrollment(
         timeZone,
       }),
       lastSentAt: now,
+      sendClaimExpiresAt: null,
     });
+    shouldReleaseSendClaim = false;
 
     if (nextStep.delayDays <= 0 && chainDepth < MAX_ZERO_DELAY_CHAIN) {
       const refreshed = await findEnrollmentByIdOnly(workspaceId, enrollment.id);
@@ -461,7 +492,9 @@ async function processEnrollment(
       status: "completed",
       completedAt: now,
       lastSentAt: now,
+      sendClaimExpiresAt: null,
     });
+    shouldReleaseSendClaim = false;
 
     await createAuditLog({
       workspaceId,
@@ -473,6 +506,11 @@ async function processEnrollment(
   }
 
   return singleOutcomeResult("sent");
+  } finally {
+    if (shouldReleaseSendClaim) {
+      await releaseEnrollmentSendClaim(workspaceId, enrollment.id);
+    }
+  }
 }
 
 async function summarizeEnrollmentProcessing(
@@ -514,6 +552,8 @@ function filterEnrollmentsForImmediateSend(
       return false;
     }
 
+    // Explicit enrollment/activation passes may send zero-delay steps before nextSendAt.
+    // See docs/api-contracts.md scheduling notes.
     if (idFilter) {
       return true;
     }
@@ -532,10 +572,10 @@ export async function sendCampaignEnrollmentsImmediately(
   mode: "activation" | "resume" | "enrollment",
   enrollmentIds?: string[],
 ): Promise<SendDueSummary> {
-  const { enrollments } = await findCampaignEnrollments(workspaceId, campaignId, {
-    status: "active",
-    pageSize: 500,
-  });
+  const enrollments =
+    enrollmentIds && enrollmentIds.length > 0
+      ? await findActiveEnrollmentsByIds(workspaceId, enrollmentIds)
+      : await listAllCampaignEnrollments(workspaceId, campaignId, { status: "active" });
 
   const eligible = filterEnrollmentsForImmediateSend(enrollments, mode, enrollmentIds);
 

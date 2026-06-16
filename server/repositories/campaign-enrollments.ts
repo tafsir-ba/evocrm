@@ -1,5 +1,7 @@
 import "server-only";
 
+import mongoose from "mongoose";
+
 import { connectDb } from "@/server/db/mongoose";
 import {
   CampaignEnrollmentModel,
@@ -56,7 +58,21 @@ function toEnrollmentRecord(
   };
 }
 
+export const ENROLLMENT_BATCH_PAGE_SIZE = 500;
+export const ENROLLMENT_SEND_CLAIM_LEASE_MS = 5 * 60 * 1000;
+
+export class DuplicateCampaignEnrollmentError extends Error {
+  constructor(message = "Enrollment already exists for this campaign target.") {
+    super(message);
+    this.name = "DuplicateCampaignEnrollmentError";
+  }
+}
+
 export const NON_TERMINAL_ENROLLMENT_STATUSES = ["active", "paused"] as const;
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return error instanceof mongoose.mongo.MongoServerError && error.code === 11000;
+}
 
 export type CampaignEnrollmentListFilter = {
   status?: CampaignEnrollmentRecord["status"];
@@ -97,6 +113,54 @@ export async function findCampaignEnrollments(
     ),
     total,
   };
+}
+
+export async function listAllCampaignEnrollments(
+  workspaceId: string,
+  campaignId: string,
+  filter: Omit<CampaignEnrollmentListFilter, "page" | "pageSize"> = {},
+  pageSize = ENROLLMENT_BATCH_PAGE_SIZE,
+): Promise<CampaignEnrollmentRecord[]> {
+  const all: CampaignEnrollmentRecord[] = [];
+  let page = 1;
+
+  while (true) {
+    const { enrollments, total } = await findCampaignEnrollments(workspaceId, campaignId, {
+      ...filter,
+      page,
+      pageSize,
+    });
+
+    all.push(...enrollments);
+
+    if (enrollments.length === 0 || page * pageSize >= total) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return all;
+}
+
+export async function findActiveEnrollmentsByIds(
+  workspaceId: string,
+  enrollmentIds: string[],
+): Promise<CampaignEnrollmentRecord[]> {
+  if (enrollmentIds.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+
+  const documents = await CampaignEnrollmentModel.find(
+    withWorkspaceScope(workspaceId, {
+      _id: { $in: enrollmentIds },
+      status: "active",
+    }),
+  ).lean();
+
+  return documents.map((doc) => toEnrollmentRecord(doc as CampaignEnrollmentDocument));
 }
 
 export async function findEnrollmentById(
@@ -210,25 +274,34 @@ export async function createCampaignEnrollment(
 ): Promise<CampaignEnrollmentRecord> {
   await connectDb();
 
-  const document = await CampaignEnrollmentModel.create({
-    workspaceId,
-    campaignId: input.campaignId,
-    leadId: input.leadId ?? null,
-    opportunityId: input.opportunityId ?? null,
-    projectId: input.projectId ?? null,
-    enrollmentSource: input.enrollmentSource ?? "manual",
-    enrollmentReason: input.enrollmentReason ?? null,
-    status: "active",
-    currentStep: input.currentStep,
-    nextSendAt: input.nextSendAt,
-    lastSentAt: null,
-    completedAt: null,
-    unsubscribedAt: null,
-    failedAt: null,
-    failureReason: null,
-  });
+  try {
+    const document = await CampaignEnrollmentModel.create({
+      workspaceId,
+      campaignId: input.campaignId,
+      leadId: input.leadId ?? null,
+      opportunityId: input.opportunityId ?? null,
+      projectId: input.projectId ?? null,
+      enrollmentSource: input.enrollmentSource ?? "manual",
+      enrollmentReason: input.enrollmentReason ?? null,
+      status: "active",
+      currentStep: input.currentStep,
+      nextSendAt: input.nextSendAt,
+      lastSentAt: null,
+      completedAt: null,
+      unsubscribedAt: null,
+      failedAt: null,
+      failureReason: null,
+      sendClaimExpiresAt: null,
+    });
 
-  return toEnrollmentRecord(document.toObject() as CampaignEnrollmentDocument);
+    return toEnrollmentRecord(document.toObject() as CampaignEnrollmentDocument);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw new DuplicateCampaignEnrollmentError();
+    }
+
+    throw error;
+  }
 }
 
 export async function updateCampaignEnrollment(
@@ -243,6 +316,7 @@ export async function updateCampaignEnrollment(
     unsubscribedAt: Date | null;
     failedAt: Date | null;
     failureReason: string | null;
+    sendClaimExpiresAt: Date | null;
   }>,
 ): Promise<CampaignEnrollmentRecord | null> {
   await connectDb();
@@ -343,4 +417,46 @@ export async function findEnrollmentByIdOnly(
   ).lean();
 
   return document ? toEnrollmentRecord(document as CampaignEnrollmentDocument) : null;
+}
+
+export async function claimEnrollmentForSend(
+  workspaceId: string,
+  enrollmentId: string,
+  currentStep: number,
+  now = new Date(),
+  leaseMs = ENROLLMENT_SEND_CLAIM_LEASE_MS,
+): Promise<CampaignEnrollmentRecord | null> {
+  await connectDb();
+
+  const document = await CampaignEnrollmentModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: enrollmentId,
+      status: "active",
+      currentStep,
+      $or: [
+        { sendClaimExpiresAt: null },
+        { sendClaimExpiresAt: { $lte: now } },
+      ],
+    }),
+    {
+      $set: {
+        sendClaimExpiresAt: new Date(now.getTime() + leaseMs),
+      },
+    },
+    { new: true },
+  ).lean();
+
+  return document ? toEnrollmentRecord(document as CampaignEnrollmentDocument) : null;
+}
+
+export async function releaseEnrollmentSendClaim(
+  workspaceId: string,
+  enrollmentId: string,
+): Promise<void> {
+  await connectDb();
+
+  await CampaignEnrollmentModel.updateOne(
+    withWorkspaceScope(workspaceId, { _id: enrollmentId }),
+    { $set: { sendClaimExpiresAt: null } },
+  );
 }

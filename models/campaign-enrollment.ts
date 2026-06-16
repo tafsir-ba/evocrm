@@ -39,6 +39,7 @@ const campaignEnrollmentSchema = new Schema(
     unsubscribedAt: { type: Date, default: null },
     failedAt: { type: Date, default: null },
     failureReason: { type: String, trim: true, default: null },
+    sendClaimExpiresAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -50,9 +51,27 @@ campaignEnrollmentSchema.index({ workspaceId: 1, leadId: 1 });
 campaignEnrollmentSchema.index({ workspaceId: 1, opportunityId: 1 });
 campaignEnrollmentSchema.index({ workspaceId: 1, nextSendAt: 1 });
 campaignEnrollmentSchema.index({ workspaceId: 1, status: 1, nextSendAt: 1 });
-campaignEnrollmentSchema.index({ workspaceId: 1, campaignId: 1, leadId: 1 });
-campaignEnrollmentSchema.index({ workspaceId: 1, campaignId: 1, opportunityId: 1 });
 campaignEnrollmentSchema.index({ workspaceId: 1, projectId: 1 });
+campaignEnrollmentSchema.index(
+  { workspaceId: 1, campaignId: 1, leadId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      leadId: { $type: "objectId" },
+      status: { $in: ["active", "paused"] },
+    },
+  },
+);
+campaignEnrollmentSchema.index(
+  { workspaceId: 1, campaignId: 1, opportunityId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      opportunityId: { $type: "objectId" },
+      status: { $in: ["active", "paused"] },
+    },
+  },
+);
 
 export type CampaignEnrollmentDocument = InferSchemaType<
   typeof campaignEnrollmentSchema

@@ -26,6 +26,7 @@ const enrollmentConditionSchema = new Schema(
     field: { type: String, enum: ENROLLMENT_CONDITION_FIELDS, required: true },
     operator: { type: String, enum: ENROLLMENT_CONDITION_OPERATORS, required: true },
     value: { type: Schema.Types.Mixed, default: null },
+    customFieldKey: { type: String, trim: true, default: null },
   },
   { _id: false },
 );

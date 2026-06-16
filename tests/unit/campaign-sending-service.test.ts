@@ -17,13 +17,18 @@ vi.mock("@/server/repositories/campaign-steps", () => ({
 }));
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
+  claimEnrollmentForSend: vi.fn(),
+  findActiveEnrollmentsByIds: vi.fn(),
   findDueEnrollments: vi.fn(),
   findEnrollmentByIdOnly: vi.fn(),
+  listAllCampaignEnrollments: vi.fn(),
+  releaseEnrollmentSendClaim: vi.fn(),
   updateCampaignEnrollment: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/campaign-sends", () => ({
   createCampaignSend: vi.fn(),
+  findSentCampaignSendForEnrollmentStep: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/leads", () => ({
@@ -69,8 +74,14 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 import { sendCampaignEmail } from "@/server/email/resend";
-import { findDueEnrollments, findEnrollmentByIdOnly, updateCampaignEnrollment } from "@/server/repositories/campaign-enrollments";
-import { createCampaignSend } from "@/server/repositories/campaign-sends";
+import {
+  claimEnrollmentForSend,
+  findDueEnrollments,
+  findEnrollmentByIdOnly,
+  releaseEnrollmentSendClaim,
+  updateCampaignEnrollment,
+} from "@/server/repositories/campaign-enrollments";
+import { createCampaignSend, findSentCampaignSendForEnrollmentStep } from "@/server/repositories/campaign-sends";
 import { findNextStepAfterOrder, findStepByOrder } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
@@ -137,6 +148,9 @@ describe("campaign sending service", () => {
       updatedAt: new Date(),
     });
     vi.mocked(findDueEnrollments).mockResolvedValue([enrollment]);
+    vi.mocked(claimEnrollmentForSend).mockResolvedValue(enrollment);
+    vi.mocked(findSentCampaignSendForEnrollmentStep).mockResolvedValue(null);
+    vi.mocked(releaseEnrollmentSendClaim).mockResolvedValue(undefined);
     vi.mocked(findCampaignById).mockResolvedValue({
       id: "camp-1",
       workspaceId: "ws-1",

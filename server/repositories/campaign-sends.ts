@@ -122,3 +122,21 @@ export async function findCampaignSendByProviderMessageId(
 
   return document ? toCampaignSendRecord(document as CampaignSendDocument) : null;
 }
+
+export async function findSentCampaignSendForEnrollmentStep(
+  workspaceId: string,
+  enrollmentId: string,
+  campaignStepId: string,
+): Promise<CampaignSendRecord | null> {
+  await connectDb();
+
+  const document = await CampaignSendModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      enrollmentId,
+      campaignStepId,
+      status: "sent",
+    }),
+  ).lean();
+
+  return document ? toCampaignSendRecord(document as CampaignSendDocument) : null;
+}

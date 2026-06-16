@@ -6,11 +6,13 @@ import { findLeadById } from "@/server/repositories/leads";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import {
   createCampaignEnrollment,
+  DuplicateCampaignEnrollmentError,
   findActiveEnrollmentByLead,
   findActiveEnrollmentByOpportunity,
   findCampaignEnrollments,
   findEnrollmentById,
   findNonTerminalEnrollmentTargetIds,
+  listAllCampaignEnrollments,
   updateCampaignEnrollment,
   type CampaignEnrollmentRecord,
 } from "@/server/repositories/campaign-enrollments";
@@ -421,6 +423,17 @@ export async function createCampaignEnrollmentForWorkspace(
     enrollmentSource: "manual",
     currentStep: firstStep.order,
     nextSendAt,
+  }).catch((error) => {
+    if (error instanceof DuplicateCampaignEnrollmentError) {
+      throw new AppError(
+        "CONFLICT",
+        campaign.audienceType === "leads"
+          ? "This lead is already actively enrolled in this campaign."
+          : "This opportunity is already actively enrolled in this campaign.",
+      );
+    }
+
+    throw error;
   });
 
   await createAuditLog({
@@ -493,16 +506,26 @@ export async function enrollLeadInCampaignWithContext(input: {
     timeZone,
   });
 
-  const enrollment = await createCampaignEnrollment(input.workspaceId, {
-    campaignId: input.campaignId,
-    leadId: input.leadId,
-    opportunityId: null,
-    projectId: input.projectId ?? lead.projectId,
-    enrollmentSource: input.enrollmentSource,
-    enrollmentReason: input.enrollmentReason ?? null,
-    currentStep: firstStep.order,
-    nextSendAt,
-  });
+  let enrollment: CampaignEnrollmentRecord;
+
+  try {
+    enrollment = await createCampaignEnrollment(input.workspaceId, {
+      campaignId: input.campaignId,
+      leadId: input.leadId,
+      opportunityId: null,
+      projectId: input.projectId ?? lead.projectId,
+      enrollmentSource: input.enrollmentSource,
+      enrollmentReason: input.enrollmentReason ?? null,
+      currentStep: firstStep.order,
+      nextSendAt,
+    });
+  } catch (error) {
+    if (error instanceof DuplicateCampaignEnrollmentError) {
+      return null;
+    }
+
+    throw error;
+  }
 
   await createAuditLog({
     workspaceId: input.workspaceId,
@@ -541,9 +564,8 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
 ): Promise<string[]> {
   const workspace = await findWorkspaceById(workspaceId);
   const timeZone = workspace?.timezone ?? "UTC";
-  const { enrollments } = await findCampaignEnrollments(workspaceId, campaignId, {
+  const enrollments = await listAllCampaignEnrollments(workspaceId, campaignId, {
     status: "active",
-    pageSize: 500,
   });
 
   const updatedIds: string[] = [];
@@ -582,15 +604,15 @@ export async function rescheduleEnrollmentsForCampaignSchedule(
 ): Promise<string[]> {
   const workspace = await findWorkspaceById(workspaceId);
   const timeZone = workspace?.timezone ?? "UTC";
-  const [activeResult, pausedResult] = await Promise.all([
-    findCampaignEnrollments(workspaceId, campaignId, { status: "active", pageSize: 500 }),
-    findCampaignEnrollments(workspaceId, campaignId, { status: "paused", pageSize: 500 }),
-  ]);
+  const enrollments = [
+    ...(await listAllCampaignEnrollments(workspaceId, campaignId, { status: "active" })),
+    ...(await listAllCampaignEnrollments(workspaceId, campaignId, { status: "paused" })),
+  ];
 
   const updatedIds: string[] = [];
   const now = new Date();
 
-  for (const enrollment of [...activeResult.enrollments, ...pausedResult.enrollments]) {
+  for (const enrollment of enrollments) {
     const step = await findStepByOrder(workspaceId, campaignId, enrollment.currentStep);
 
     if (!step) {

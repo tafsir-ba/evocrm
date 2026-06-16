@@ -19,6 +19,7 @@ vi.mock("@/server/repositories/campaign-steps", () => ({
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   findEnrollmentById: vi.fn(),
   findCampaignEnrollments: vi.fn(),
+  listAllCampaignEnrollments: vi.fn(),
   updateCampaignEnrollment: vi.fn(),
 }));
 
@@ -42,6 +43,7 @@ import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   findEnrollmentById,
   findCampaignEnrollments,
+  listAllCampaignEnrollments,
   updateCampaignEnrollment,
 } from "@/server/repositories/campaign-enrollments";
 import { findCampaignSteps, findStepByOrder } from "@/server/repositories/campaign-steps";
@@ -209,31 +211,28 @@ describe("rescheduleEnrollmentsForCampaignSchedule", () => {
     const createdAt = new Date("2026-06-17T14:00:00.000Z");
     const staleNextSendAt = new Date("2026-06-17T18:37:00.000Z");
 
-    vi.mocked(findCampaignEnrollments)
-      .mockResolvedValueOnce({
-        enrollments: [
-          {
-            ...enrollmentRecordExtras,
-            id: "enroll-1",
-            workspaceId: "ws-1",
-            campaignId: "camp-1",
-            leadId: "lead-1",
-            opportunityId: null,
-            status: "active",
-            currentStep: 1,
-            nextSendAt: staleNextSendAt,
-            lastSentAt: null,
-            completedAt: null,
-            unsubscribedAt: null,
-            failedAt: null,
-            failureReason: null,
-            createdAt,
-            updatedAt: createdAt,
-          },
-        ],
-        total: 1,
-      })
-      .mockResolvedValueOnce({ enrollments: [], total: 0 });
+    vi.mocked(listAllCampaignEnrollments)
+      .mockResolvedValueOnce([
+        {
+          ...enrollmentRecordExtras,
+          id: "enroll-1",
+          workspaceId: "ws-1",
+          campaignId: "camp-1",
+          leadId: "lead-1",
+          opportunityId: null,
+          status: "active",
+          currentStep: 1,
+          nextSendAt: staleNextSendAt,
+          lastSentAt: null,
+          completedAt: null,
+          unsubscribedAt: null,
+          failedAt: null,
+          failureReason: null,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ])
+      .mockResolvedValueOnce([]);
 
     vi.mocked(findStepByOrder).mockResolvedValue({
       id: "step-1",
