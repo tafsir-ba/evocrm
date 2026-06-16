@@ -13,6 +13,7 @@ import {
   getEnrollmentSelectionError,
 } from "@/components/campaigns/campaign-enrollment-selector";
 import { CampaignJourneySection } from "@/components/campaigns/campaign-journey-section";
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,10 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconMail, IconPlus } from "@/lib/icons";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
+import {
+  formatDateTimeInWorkspaceTimezone,
+  formatWorkspaceTimezoneLabel,
+} from "@/lib/workspace-datetime";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Campaign = {
@@ -125,6 +130,8 @@ export function CampaignDetailPanel({
   canDelete,
 }: CampaignDetailPanelProps) {
   const router = useRouter();
+  const { workspace } = useWorkspaceShell();
+  const workspaceTimezone = workspace.timezone;
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [steps, setSteps] = useState<CampaignStep[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -601,7 +608,10 @@ export function CampaignDetailPanel({
 
       {/* Enrollments */}
       <Card className="mb-6">
-        <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">Enrollments</h2>
+        <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-1">Enrollments</h2>
+        <p className="mb-4 text-[12px] text-[var(--color-ink-muted)]">
+          Scheduled times use workspace timezone: {formatWorkspaceTimezoneLabel(workspaceTimezone)}.
+        </p>
 
         {campaign.status === "draft" && (
           <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
@@ -743,7 +753,10 @@ export function CampaignDetailPanel({
                             ) : scheduledStep.state === "cancelled" ? (
                               <span className="text-[var(--color-ink-muted)]">Cancelled</span>
                             ) : scheduledStep.scheduledAt ? (
-                              new Date(scheduledStep.scheduledAt).toLocaleString()
+                              formatDateTimeInWorkspaceTimezone(
+                                scheduledStep.scheduledAt,
+                                workspaceTimezone,
+                              )
                             ) : (
                               "—"
                             )}
@@ -797,10 +810,12 @@ export function CampaignDetailPanel({
                     <td className="py-2 pr-4">{send.stepSubject ?? "—"}</td>
                     <td className="py-2 pr-4 capitalize">{send.status}</td>
                     <td className="py-2 pr-4">
-                      {new Date(send.scheduledFor).toLocaleString()}
+                      {formatDateTimeInWorkspaceTimezone(send.scheduledFor, workspaceTimezone)}
                     </td>
                     <td className="py-2 pr-4">
-                      {send.sentAt ? new Date(send.sentAt).toLocaleString() : "—"}
+                      {send.sentAt
+                        ? formatDateTimeInWorkspaceTimezone(send.sentAt, workspaceTimezone)
+                        : "—"}
                     </td>
                     <td className="py-2 text-[11px] text-[var(--color-ink-muted)]">
                       {send.providerMessageId && `ID: ${send.providerMessageId}`}

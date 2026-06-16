@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatDateTimeInWorkspaceTimezone,
+  formatWorkspaceTimezoneLabel,
   fromDatetimeLocalInWorkspaceTimezone,
   toDatetimeLocalInWorkspaceTimezone,
 } from "@/lib/workspace-datetime";
@@ -32,5 +33,9 @@ describe("workspace datetime helpers", () => {
     );
 
     expect(formatted).not.toBe("—");
+  });
+
+  it("labels workspace timezone with abbreviation", () => {
+    expect(formatWorkspaceTimezoneLabel("Europe/Zurich")).toContain("Europe/Zurich");
   });
 });

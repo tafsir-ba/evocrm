@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +17,7 @@ import {
   formatStepDelayLabel,
 } from "@/lib/campaign-email";
 import { getCampaignStepLaunchIssues } from "@/lib/campaign-step-readiness";
+import { formatWorkspaceTimezoneLabel } from "@/lib/workspace-datetime";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
 import { IconPlus } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -88,6 +91,7 @@ export function CampaignJourneySection({
   onActionError,
 }: CampaignJourneySectionProps) {
   const router = useRouter();
+  const { workspace } = useWorkspaceShell();
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}`;
   const [orderedSteps, setOrderedSteps] = useState(steps);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -441,7 +445,7 @@ export function CampaignJourneySection({
           </p>
         </div>
 
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-1">
           <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Email sequence</h2>
           {stepsEditable ? (
             <Button
@@ -455,6 +459,9 @@ export function CampaignJourneySection({
             </Button>
           ) : null}
         </div>
+        <p className="mb-4 text-[12px] text-[var(--color-ink-muted)]">
+          Send times use workspace timezone: {formatWorkspaceTimezoneLabel(workspace.timezone)}.
+        </p>
 
         {orderedSteps.length === 0 ? (
           <EmptyState

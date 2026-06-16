@@ -6,6 +6,7 @@ import {
   FocusedFormActions,
   FocusedFormLayout,
 } from "@/components/layout/focused-form-layout";
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   normalizeCampaignSendTime,
   validateCampaignHtml,
 } from "@/lib/campaign-email";
+import { formatWorkspaceTimezoneLabel } from "@/lib/workspace-datetime";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type ContentMode = "plain_text" | "rich_text" | "html";
@@ -64,6 +66,7 @@ export function CampaignStepFormPage({
   stepId,
 }: CampaignStepFormPageProps) {
   const isEdit = Boolean(stepId);
+  const { workspace } = useWorkspaceShell();
   const closeHref = workspacePath(workspaceSlug, `dripping/${campaignId}`);
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}`;
   const formId = "campaign-step-form";
@@ -427,6 +430,9 @@ export function CampaignStepFormPage({
                   }))
                 }
               />
+              <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                Uses workspace timezone: {formatWorkspaceTimezoneLabel(workspace.timezone)}.
+              </p>
             </div>
           </div>
         </Card>

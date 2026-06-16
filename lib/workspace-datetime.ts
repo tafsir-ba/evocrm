@@ -13,6 +13,22 @@ function normalizeTimeZone(timeZone: string | undefined): string {
   }
 }
 
+export function formatWorkspaceTimezoneLabel(timeZone: string | undefined): string {
+  const zone = normalizeTimeZone(timeZone);
+
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      timeZone: zone,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const abbreviation = parts.find((part) => part.type === "timeZoneName")?.value;
+
+    return abbreviation ? `${zone} (${abbreviation})` : zone;
+  } catch {
+    return zone;
+  }
+}
+
 export function formatDateTimeInWorkspaceTimezone(
   value: string | Date | null | undefined,
   timeZone: string | undefined,
