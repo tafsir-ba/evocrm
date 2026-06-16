@@ -54,6 +54,10 @@ export default async function EditCampaignPage({ params }: { params: Params }) {
           name: campaign.name,
           audienceType: campaign.audienceType,
           defaultFromName: campaign.defaultFromName ?? "",
+          sending: {
+            sendingDomainId: campaign.sendingDomainId ?? "",
+            senderEmail: campaign.senderEmail ?? "",
+          },
           enrollment: {
             projectIds: campaign.projectIds,
             autoEnrollmentEnabled: campaign.autoEnrollmentEnabled,

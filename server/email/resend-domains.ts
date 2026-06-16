@@ -47,13 +47,36 @@ function normalizeDomainName(domain: string): string {
   return domain.toLowerCase().trim();
 }
 
-function isAlreadyRegisteredError(error: ProviderError): boolean {
+const IMPORTABLE_PROVIDER_STATUSES = new Set([
+  "pending",
+  "verified",
+  "not_started",
+  "temporary_failure",
+]);
+
+function isOtherAccountRegistrationError(error: ProviderError): boolean {
   const message = error?.message?.toLowerCase() ?? "";
   return (
     message.includes("registered already") ||
-    message.includes("already been registered") ||
-    message.includes("already exists")
+    message.includes("already been registered")
   );
+}
+
+function shouldAttemptProviderImport(error: ProviderError): boolean {
+  if (!error || (error.name ?? "").toLowerCase() !== "validation_error") {
+    return false;
+  }
+
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    isOtherAccountRegistrationError(error) ||
+    message.includes("already exists") ||
+    message.includes("domain already")
+  );
+}
+
+function isImportableProviderStatus(status: string): boolean {
+  return IMPORTABLE_PROVIDER_STATUSES.has(status);
 }
 
 function mapProviderError(error: ProviderError, fallbackMessage: string): string {
@@ -61,19 +84,19 @@ function mapProviderError(error: ProviderError, fallbackMessage: string): string
   const normalized = message.toLowerCase();
   const errorName = (error?.name ?? "").toLowerCase();
 
-  if (
-    errorName.includes("missing_api_key") ||
-    errorName.includes("invalid_api_key") ||
-    normalized.includes("api key") ||
-    normalized.includes("missing api key")
-  ) {
+  if (errorName === "missing_api_key" || errorName === "invalid_api_key") {
     return "Resend API key is missing or invalid. Update RESEND_API_KEY in production and redeploy.";
   }
 
-  if (
-    normalized.includes("registered already") ||
-    normalized.includes("already been registered")
-  ) {
+  if (errorName === "rate_limit_exceeded" || normalized.includes("rate limit")) {
+    return "Resend is rate-limiting domain requests right now. Please wait a moment and try again.";
+  }
+
+  if (errorName === "not_found" || normalized.includes("not found")) {
+    return "This sending domain could not be found. Please remove it and add it again.";
+  }
+
+  if (errorName === "validation_error" && isOtherAccountRegistrationError(error)) {
     return "This domain is already registered in another Resend account. Use the correct Resend account or ask Resend support to release the domain.";
   }
 
@@ -89,15 +112,11 @@ function mapProviderError(error: ProviderError, fallbackMessage: string): string
     return "Your SPF record does not match the required value. Please update it exactly as shown.";
   }
 
-  if (normalized.includes("not found")) {
-    return "This sending domain could not be found. Please remove it and add it again.";
+  if (normalized.includes("api key") || normalized.includes("missing api key")) {
+    return "Resend API key is missing or invalid. Update RESEND_API_KEY in production and redeploy.";
   }
 
-  if (normalized.includes("rate limit")) {
-    return "Resend is rate-limiting domain requests right now. Please wait a moment and try again.";
-  }
-
-  return `Resend rejected this request: ${message}`;
+  return `Could not complete this domain action: ${message}`;
 }
 
 export async function createProviderDomain(domain: string): Promise<ProviderDomain> {
@@ -105,7 +124,7 @@ export async function createProviderDomain(domain: string): Promise<ProviderDoma
   const normalizedDomain = normalizeDomainName(domain);
   const result = await resend.domains.create({ name: normalizedDomain });
 
-  if ((result.error || !result.data) && isAlreadyRegisteredError(result.error)) {
+  if ((result.error || !result.data) && shouldAttemptProviderImport(result.error)) {
     const listResult = await resend.domains.list();
     const existingDomain = listResult.error
       ? null
@@ -114,7 +133,21 @@ export async function createProviderDomain(domain: string): Promise<ProviderDoma
         );
 
     if (existingDomain) {
+      if (!isImportableProviderStatus(existingDomain.status)) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "This domain exists in Resend but verification failed. Fix the DNS records in Resend, then try again.",
+        );
+      }
+
       return getProviderDomain(existingDomain.id);
+    }
+
+    if (isOtherAccountRegistrationError(result.error)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        mapProviderError(result.error, "Could not add this domain."),
+      );
     }
   }
 

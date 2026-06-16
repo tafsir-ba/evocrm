@@ -5,6 +5,7 @@ import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findVerifiedSendingDomainById } from "@/server/repositories/sending-domains";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
 import { validateCampaignHtml } from "@/lib/campaign-email";
+import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignReadinessItem = {
   key: string;
@@ -105,6 +106,31 @@ export async function evaluateCampaignReadiness(
         ? undefined
         : "Verify your sending domain before launching this campaign.",
     };
+  }
+
+  if (campaign.sendingDomainId && campaign.senderEmail) {
+    try {
+      await assertVerifiedSenderEmail(
+        workspaceId,
+        campaign.sendingDomainId,
+        campaign.senderEmail,
+      );
+      items.push({
+        key: "sender_domain_match",
+        label: "Sender email matches verified domain",
+        passed: true,
+      });
+    } catch (error) {
+      items.push({
+        key: "sender_domain_match",
+        label: "Sender email matches verified domain",
+        passed: false,
+        requiredFix:
+          error instanceof AppError
+            ? error.message
+            : "Select a sender email that belongs to your verified domain.",
+      });
+    }
   }
 
   const htmlWarnings = activeSteps.flatMap((step) =>

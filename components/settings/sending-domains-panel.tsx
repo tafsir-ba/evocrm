@@ -36,9 +36,9 @@ type SendingDomain = {
 };
 
 const STATUS_LABELS: Record<SendingDomain["status"], string> = {
-  pending: "Pending",
-  verified: "Verified",
-  failed: "Failed",
+  pending: "DNS pending",
+  verified: "Domain ready",
+  failed: "Verification failed",
   needs_attention: "Needs attention",
 };
 
@@ -55,6 +55,63 @@ const RECORD_STATUS_LABELS: Record<DnsRecord["status"], string> = {
   valid: "Valid",
   invalid: "Invalid",
 };
+
+const RECORD_STATUS_DOT: Record<DnsRecord["status"], string> = {
+  valid: "bg-[var(--color-success)]",
+  invalid: "bg-[var(--color-danger)]",
+  pending: "bg-[var(--color-warn)]",
+  missing: "bg-[var(--color-ink-faint)]",
+};
+
+const DOMAIN_STATUS_BANNER: Record<
+  SendingDomain["status"],
+  { className: string; dotClassName: string; title: string; description: string }
+> = {
+  verified: {
+    className: "border-[var(--color-success-border)] bg-[var(--color-success-bg)]",
+    dotClassName: "bg-[var(--color-success)]",
+    title: "Domain ready",
+    description: "DNS is verified. Campaigns can send from this domain.",
+  },
+  pending: {
+    className: "border-[var(--color-warn-border)] bg-[var(--color-warn-bg)]",
+    dotClassName: "bg-[var(--color-warn)]",
+    title: "DNS pending",
+    description: "Add the DNS records below, then check verification.",
+  },
+  needs_attention: {
+    className: "border-[var(--color-warn-border)] bg-[var(--color-warn-bg)]",
+    dotClassName: "bg-[var(--color-warn)]",
+    title: "Needs attention",
+    description: "Some DNS records are still missing or pending.",
+  },
+  failed: {
+    className: "border-[var(--color-danger-border)] bg-[var(--color-danger-bg)]",
+    dotClassName: "bg-[var(--color-danger)]",
+    title: "Verification failed",
+    description: "DNS records did not verify. Review the records below and try again.",
+  },
+};
+
+function HealthIndicator({
+  label,
+  status,
+}: {
+  label: string;
+  status: DnsRecord["status"];
+}) {
+  return (
+    <div className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink)]">
+      <span
+        className={`h-2.5 w-2.5 shrink-0 rounded-full ${RECORD_STATUS_DOT[status]}`}
+        aria-hidden
+      />
+      <span>
+        {label}: {RECORD_STATUS_LABELS[status]}
+      </span>
+    </div>
+  );
+}
 
 type SendingDomainsPanelProps = {
   workspaceSlug: string;
@@ -274,9 +331,9 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                       selectedId === domain.id ? "bg-[var(--color-brand-50)]" : ""
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-3">
                       <p className="text-[13.5px] font-medium text-[var(--color-ink)]">{domain.domain}</p>
-                      <Badge tone={STATUS_TONES[domain.status]} size="sm">
+                      <Badge tone={STATUS_TONES[domain.status]} size="sm" dot>
                         {STATUS_LABELS[domain.status]}
                       </Badge>
                     </div>
@@ -291,17 +348,34 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
 
           {selectedDomain ? (
             <div className="space-y-4">
+              <div
+                className={`flex items-start gap-3 rounded-lg border px-4 py-3 ${DOMAIN_STATUS_BANNER[selectedDomain.status].className}`}
+              >
+                <span
+                  className={`mt-1 h-3.5 w-3.5 shrink-0 rounded-full ${DOMAIN_STATUS_BANNER[selectedDomain.status].dotClassName}`}
+                  aria-hidden
+                />
+                <div>
+                  <p className="text-[13.5px] font-semibold text-[var(--color-ink)]">
+                    {DOMAIN_STATUS_BANNER[selectedDomain.status].title}
+                  </p>
+                  <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5">
+                    {DOMAIN_STATUS_BANNER[selectedDomain.status].description}
+                  </p>
+                </div>
+              </div>
+
               <Card>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="text-[16px] font-semibold text-[var(--color-ink)]">
                       {selectedDomain.domain}
                     </h3>
-                    <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
-                      Domain health: SPF {RECORD_STATUS_LABELS[selectedDomain.spfStatus]} · DKIM{" "}
-                      {RECORD_STATUS_LABELS[selectedDomain.dkimStatus]} · DMARC{" "}
-                      {RECORD_STATUS_LABELS[selectedDomain.dmarcStatus]}
-                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                      <HealthIndicator label="SPF" status={selectedDomain.spfStatus} />
+                      <HealthIndicator label="DKIM" status={selectedDomain.dkimStatus} />
+                      <HealthIndicator label="DMARC" status={selectedDomain.dmarcStatus} />
+                    </div>
                     {selectedDomain.lastCheckedAt ? (
                       <p className="text-[12px] text-[var(--color-ink-faint)] mt-1">
                         Last checked {new Date(selectedDomain.lastCheckedAt).toLocaleString()}
@@ -380,6 +454,7 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                                     : "warn"
                               }
                               size="sm"
+                              dot
                             >
                               {RECORD_STATUS_LABELS[record.status]}
                             </Badge>

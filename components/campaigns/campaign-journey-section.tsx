@@ -89,6 +89,7 @@ export function CampaignJourneySection({
   const [actionPending, setActionPending] = useState(false);
   const [readinessItems, setReadinessItems] = useState<ReadinessItem[]>([]);
   const [domains, setDomains] = useState<SendingDomainOption[]>([]);
+  const [domainsForbidden, setDomainsForbidden] = useState(false);
   const [senderEmails, setSenderEmails] = useState<string[]>([]);
   const [localSenderName, setLocalSenderName] = useState(senderName ?? "");
   const [localSenderEmail, setLocalSenderEmail] = useState(senderEmail ?? "");
@@ -120,6 +121,14 @@ export function CampaignJourneySection({
     try {
       const response = await fetch(`/api/workspaces/${workspaceSlug}/sending-domains`);
       const payload = await response.json();
+
+      if (response.status === 403) {
+        setDomainsForbidden(true);
+        setDomains([]);
+        return;
+      }
+
+      setDomainsForbidden(false);
       if (response.ok) {
         setDomains(payload.data?.domains ?? []);
       }
@@ -317,7 +326,7 @@ export function CampaignJourneySection({
               id="sender-domain"
               className="mt-1 w-full h-9 rounded-md border border-[var(--color-line)] px-3 text-[13px]"
               value={localSendingDomainId}
-              disabled={!canUpdate || actionPending}
+              disabled={!canUpdate || actionPending || domainsForbidden}
               onChange={(event) => {
                 setLocalSendingDomainId(event.target.value);
                 setLocalSenderEmail("");
@@ -330,7 +339,19 @@ export function CampaignJourneySection({
                 </option>
               ))}
             </select>
-            {verifiedDomains.length === 0 ? (
+            {domainsForbidden ? (
+              <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">
+                You do not have permission to view sending domains. Ask a workspace owner to
+                configure them in{" "}
+                <Link
+                  href={workspacePath(workspaceSlug, "settings/sending-domains")}
+                  className="text-[var(--color-brand-600)] hover:underline"
+                >
+                  Settings → Sending Domains
+                </Link>
+                .
+              </p>
+            ) : verifiedDomains.length === 0 ? (
               <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">
                 No verified sending domain yet.{" "}
                 <Link

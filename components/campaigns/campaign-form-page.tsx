@@ -3,6 +3,10 @@
 import { useState } from "react";
 
 import {
+  CampaignSendingDomainField,
+  type CampaignSendingDomainValue,
+} from "@/components/campaigns/campaign-sending-domain-field";
+import {
   EnrollmentRulesBuilder,
   type EnrollmentRulesFormValue,
 } from "@/components/campaigns/enrollment-rules-builder";
@@ -18,6 +22,7 @@ type CampaignFormState = {
   audienceType: "leads" | "opportunities";
   frequency: string;
   defaultFromName: string;
+  sending: CampaignSendingDomainValue;
   enrollment: EnrollmentRulesFormValue;
 };
 
@@ -28,11 +33,17 @@ const emptyEnrollment: EnrollmentRulesFormValue = {
   enrollmentRules: { logic: "AND", conditions: [] },
 };
 
+const emptySending: CampaignSendingDomainValue = {
+  sendingDomainId: "",
+  senderEmail: "",
+};
+
 const emptyForm: CampaignFormState = {
   name: "",
   audienceType: "leads",
   frequency: "manual",
   defaultFromName: "",
+  sending: emptySending,
   enrollment: emptyEnrollment,
 };
 
@@ -58,6 +69,10 @@ export function CampaignFormPage({
   const [form, setForm] = useState<CampaignFormState>({
     ...emptyForm,
     ...initialValues,
+    sending: {
+      ...emptySending,
+      ...initialValues?.sending,
+    },
     enrollment: {
       ...emptyEnrollment,
       ...initialValues?.enrollment,
@@ -90,11 +105,18 @@ export function CampaignFormPage({
       enrollmentRules: form.enrollment.enrollmentRules,
     };
 
+    const senderFields = {
+      sendingDomainId: form.sending.sendingDomainId || undefined,
+      senderEmail: form.sending.senderEmail || undefined,
+      senderName: form.defaultFromName.trim() || undefined,
+    };
+
     const payload = {
       name: form.name.trim(),
       audienceType: form.audienceType,
       frequency: form.frequency.trim() || undefined,
       defaultFromName: form.defaultFromName.trim() || undefined,
+      ...senderFields,
       ...enrollmentPayload,
     };
 
@@ -108,6 +130,9 @@ export function CampaignFormPage({
             : {
                 name: payload.name,
                 defaultFromName: payload.defaultFromName || null,
+                senderName: payload.senderName || null,
+                sendingDomainId: form.sending.sendingDomainId || null,
+                senderEmail: form.sending.senderEmail || null,
                 ...enrollmentPayload,
               },
         ),
@@ -204,6 +229,13 @@ export function CampaignFormPage({
             Pre-fills new email steps. Each step can override this sender name.
           </p>
         </div>
+
+        <CampaignSendingDomainField
+          workspaceSlug={workspaceSlug}
+          value={form.sending}
+          disabled={submitting}
+          onChange={(sending) => setForm((current) => ({ ...current, sending }))}
+        />
 
         <EnrollmentRulesBuilder
           workspaceSlug={workspaceSlug}
