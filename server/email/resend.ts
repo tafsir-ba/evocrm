@@ -11,6 +11,8 @@ export type SendCampaignEmailInput = {
   html: string;
   text?: string;
   fromName: string;
+  fromEmail?: string;
+  tags?: Array<{ name: string; value: string }>;
 };
 
 export type SendCampaignEmailResult =
@@ -53,19 +55,30 @@ export async function sendCampaignEmail(
 ): Promise<SendCampaignEmailResult> {
   const env = getEnv();
 
-  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
+  if (!env.RESEND_API_KEY) {
+    return { success: false, error: "Email sending is not configured." };
+  }
+
+  if (!input.fromEmail && !env.EMAIL_FROM) {
     return { success: false, error: "Email sending is not configured." };
   }
 
   try {
     const resend = getResendClient();
+    const fromAddress = input.fromEmail ?? env.EMAIL_FROM;
+
+    if (!fromAddress) {
+      return { success: false, error: "Email sending is not configured." };
+    }
+
     const result = await resend.emails.send({
-      from: formatFromHeader(input.fromName, env.EMAIL_FROM),
+      from: formatFromHeader(input.fromName, fromAddress),
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
       replyTo: env.EMAIL_REPLY_TO,
+      tags: input.tags,
     });
 
     if (result.error) {
@@ -157,16 +170,27 @@ export async function sendFeedbackResolvedEmail(input: {
   });
 }
 
-export function buildCampaignEmailHtml(body: string, unsubscribeUrl: string): string {
-  const escapedBody = body
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\n/g, "<br />");
+export function buildCampaignEmailHtml(
+  body: string,
+  unsubscribeUrl: string,
+  options?: { htmlBody?: string | null; previewText?: string | null },
+): string {
+  const content = options?.htmlBody?.trim()
+    ? options.htmlBody
+    : body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br />");
+
+  const preview = options?.previewText
+    ? `<div style="display:none;max-height:0;overflow:hidden;">${options.previewText.replace(/</g, "&lt;")}</div>`
+    : "";
 
   return `
     <div style="font-family: sans-serif; line-height: 1.5; color: #111;">
-      <div>${escapedBody}</div>
+      ${preview}
+      <div>${content}</div>
       <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e5e5;" />
       <p style="font-size: 12px; color: #666;">
         <a href="${unsubscribeUrl}">Unsubscribe</a> from future campaign emails.

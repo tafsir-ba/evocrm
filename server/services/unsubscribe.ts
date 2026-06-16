@@ -11,6 +11,7 @@ import {
   verifyUnsubscribeToken,
   type UnsubscribeTokenPayload,
 } from "@/server/utils/unsubscribe-token";
+import { upsertEmailSuppression } from "@/server/repositories/email-suppressions";
 
 export type UnsubscribeResult = {
   success: boolean;
@@ -45,6 +46,15 @@ export async function processUnsubscribe(token: string): Promise<UnsubscribeResu
     emailUnsubscribedAt: now,
     emailUnsubscribeReason: "Campaign unsubscribe link",
   });
+
+  if (lead.email) {
+    await upsertEmailSuppression(workspaceId, {
+      email: lead.email,
+      contactId: leadId,
+      reason: "unsubscribed",
+      source: "campaign_unsubscribe",
+    });
+  }
 
   const enrollment = await findEnrollmentByIdOnly(workspaceId, enrollmentId);
 

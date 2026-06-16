@@ -68,6 +68,13 @@ const campaignSchema = new Schema(
     },
     frequency: { type: String, trim: true, default: null },
     defaultFromName: { type: String, trim: true, default: null },
+    senderName: { type: String, trim: true, default: null },
+    senderEmail: { type: String, trim: true, default: null },
+    sendingDomainId: {
+      type: Schema.Types.ObjectId,
+      ref: "SendingDomain",
+      default: null,
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     archivedAt: { type: Date, default: null },

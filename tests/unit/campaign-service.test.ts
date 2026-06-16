@@ -32,6 +32,11 @@ vi.mock("@/server/services/campaign-sending", () => ({
   sendCampaignEnrollmentsImmediately: vi.fn(),
 }));
 
+vi.mock("@/server/services/campaign-readiness", () => ({
+  assertCampaignLaunchReady: vi.fn(),
+  evaluateCampaignReadiness: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -104,7 +109,10 @@ describe("campaign service", () => {
     const result = await createCampaignForWorkspace("ws-1", "user-1", {
       name: "Buyer Follow-up",
       audienceType: "leads",
-  ...campaignRecordExtras,
+      projectIds: campaignRecordExtras.projectIds,
+      autoEnrollmentEnabled: campaignRecordExtras.autoEnrollmentEnabled,
+      enrollmentTrigger: campaignRecordExtras.enrollmentTrigger,
+      enrollmentRules: campaignRecordExtras.enrollmentRules,
       frequency: "manual",
     });
 
@@ -118,6 +126,9 @@ describe("campaign service", () => {
       enrollmentRules: { logic: "AND", conditions: [] },
       frequency: "manual",
       defaultFromName: null,
+      senderName: null,
+      senderEmail: null,
+      sendingDomainId: null,
       createdBy: "user-1",
       ownerId: null,
     });

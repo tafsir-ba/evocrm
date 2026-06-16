@@ -12,6 +12,10 @@ vi.mock("@/server/repositories/campaign-enrollments", () => ({
   updateCampaignEnrollment: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/email-suppressions", () => ({
+  upsertEmailSuppression: vi.fn(),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));

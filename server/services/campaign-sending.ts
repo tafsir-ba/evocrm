@@ -28,6 +28,9 @@ import {
 } from "@/server/utils/unsubscribe-token";
 import { addDays, computeNextSendAt, isScheduledSendDue } from "@/server/utils/campaign-schedule";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
+import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
+import { applyCampaignVariables } from "@/lib/campaign-email";
+import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
 
 export type SendDueSummary = {
   processed: number;
@@ -169,6 +172,17 @@ async function processEnrollment(
     return singleOutcomeResult("failed");
   }
 
+  if (step.status === "paused" || step.status === "draft") {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: `Step is ${step.status} and cannot send.`,
+    });
+
+    return singleOutcomeResult("skipped");
+  }
+
   if (!isScheduledSendDue(enrollment.nextSendAt, step.delayDays)) {
     return singleOutcomeResult("skipped");
   }
@@ -242,6 +256,20 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
+  if (lead.email) {
+    const suppression = await findSuppressionByEmail(workspaceId, lead.email);
+    if (suppression) {
+      await recordSkippedSend({
+        workspaceId,
+        enrollment,
+        stepId: step.id,
+        reason: `Recipient is suppressed (${suppression.reason}).`,
+      });
+
+      return singleOutcomeResult("skipped");
+    }
+  }
+
   const token = createUnsubscribeToken({
     workspaceId,
     leadId: lead.id,
@@ -249,7 +277,6 @@ async function processEnrollment(
     campaignId: campaign.id,
   });
   const unsubscribeUrl = buildUnsubscribeUrl(token);
-  const html = buildCampaignEmailHtml(step.body, unsubscribeUrl);
   const fromName = resolveCampaignStepFromName(step.fromName, campaign);
 
   if (!fromName) {
@@ -263,12 +290,54 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
+  if (!campaign.senderEmail?.trim()) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: "Campaign sender email is not configured.",
+    });
+
+    return singleOutcomeResult("skipped");
+  }
+
+  const variableContext = await buildCampaignVariableContext({
+    workspaceId,
+    enrollment,
+    lead,
+    unsubscribeUrl,
+  });
+  const resolvedSubject = applyCampaignVariables(step.subject, variableContext);
+  const resolvedBody = applyCampaignVariables(step.body, variableContext);
+  const resolvedHtmlBody = step.bodyHtml
+    ? applyCampaignVariables(step.bodyHtml, variableContext)
+    : null;
+  const html = buildCampaignEmailHtml(resolvedBody, unsubscribeUrl, {
+    htmlBody: resolvedHtmlBody,
+    previewText: step.previewText,
+  });
+
+  const plainText =
+    step.bodyText?.trim() ||
+    resolvedBody ||
+    `${resolvedBody}\n\nUnsubscribe: ${unsubscribeUrl}`;
+
   const sendResult = await sendCampaignEmail({
     to: lead.email,
-    subject: step.subject,
+    subject: resolvedSubject,
     html,
-    text: `${step.body}\n\nUnsubscribe: ${unsubscribeUrl}`,
+    text: plainText.includes("Unsubscribe")
+      ? plainText
+      : `${plainText}\n\nUnsubscribe: ${unsubscribeUrl}`,
     fromName,
+    fromEmail: campaign.senderEmail,
+    tags: [
+      { name: "workspace_id", value: workspaceId },
+      { name: "campaign_id", value: campaign.id },
+      { name: "campaign_step_id", value: step.id },
+      { name: "contact_id", value: lead.id },
+      { name: "to", value: lead.email },
+    ],
   });
 
   const now = new Date();

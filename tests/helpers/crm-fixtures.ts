@@ -1,3 +1,4 @@
+import type { CampaignStepRecord } from "@/server/repositories/campaign-steps";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
 import type { CampaignEnrollmentRecord } from "@/server/repositories/campaign-enrollments";
 import type { ProjectRecord } from "@/server/repositories/projects";
@@ -18,11 +19,17 @@ export const campaignRecordExtras: Pick<
   | "autoEnrollmentEnabled"
   | "enrollmentTrigger"
   | "enrollmentRules"
+  | "senderName"
+  | "senderEmail"
+  | "sendingDomainId"
 > = {
   projectIds: [],
   autoEnrollmentEnabled: false,
   enrollmentTrigger: "manual_only",
   enrollmentRules: { logic: "AND", conditions: [] },
+  senderName: null,
+  senderEmail: null,
+  sendingDomainId: null,
 };
 
 export const enrollmentRecordExtras: Pick<
@@ -32,6 +39,27 @@ export const enrollmentRecordExtras: Pick<
   projectId: null,
   enrollmentSource: "manual",
   enrollmentReason: null,
+};
+
+export const campaignStepRecordExtras: Pick<
+  CampaignStepRecord,
+  | "name"
+  | "delayAmount"
+  | "delayUnit"
+  | "status"
+  | "contentMode"
+  | "previewText"
+  | "bodyHtml"
+  | "bodyText"
+> = {
+  name: "Welcome email",
+  delayAmount: 0,
+  delayUnit: "days",
+  status: "ready",
+  contentMode: "plain_text",
+  previewText: null,
+  bodyHtml: null,
+  bodyText: null,
 };
 
 export const leadRecordExtras = {

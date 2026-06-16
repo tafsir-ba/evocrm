@@ -1,0 +1,408 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { Input } from "@/components/ui/input";
+import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
+import { IconPlus } from "@/lib/icons";
+
+type DnsRecord = {
+  record: string;
+  name: string;
+  type: string;
+  value: string;
+  priority: number | null;
+  ttl: string | null;
+  status: "missing" | "pending" | "valid" | "invalid";
+};
+
+type SendingDomain = {
+  id: string;
+  domain: string;
+  status: "pending" | "verified" | "failed" | "needs_attention";
+  spfStatus: DnsRecord["status"];
+  dkimStatus: DnsRecord["status"];
+  dmarcStatus: DnsRecord["status"];
+  defaultSenderEmail: string | null;
+  dnsRecords: DnsRecord[];
+  lastCheckedAt: string | null;
+  verifiedAt: string | null;
+};
+
+const STATUS_LABELS: Record<SendingDomain["status"], string> = {
+  pending: "Pending",
+  verified: "Verified",
+  failed: "Failed",
+  needs_attention: "Needs attention",
+};
+
+const STATUS_TONES: Record<SendingDomain["status"], "muted" | "success" | "danger" | "warn"> = {
+  pending: "warn",
+  verified: "success",
+  failed: "danger",
+  needs_attention: "warn",
+};
+
+const RECORD_STATUS_LABELS: Record<DnsRecord["status"], string> = {
+  missing: "Missing",
+  pending: "Pending",
+  valid: "Valid",
+  invalid: "Invalid",
+};
+
+type SendingDomainsPanelProps = {
+  workspaceSlug: string;
+  canUpdate: boolean;
+};
+
+export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomainsPanelProps) {
+  const apiBase = `/api/workspaces/${workspaceSlug}/sending-domains`;
+  const [domains, setDomains] = useState<SendingDomain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newDomain, setNewDomain] = useState("");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const selectedDomain = useMemo(
+    () => domains.find((domain) => domain.id === selectedId) ?? null,
+    [domains, selectedId],
+  );
+
+  const loadDomains = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setForbidden(false);
+
+    try {
+      const response = await fetch(apiBase);
+      const payload = await response.json();
+
+      if (response.status === 403) {
+        setForbidden(true);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Failed to load sending domains.");
+      }
+
+      const nextDomains = payload.data.domains as SendingDomain[];
+      setDomains(nextDomains);
+      setSelectedId((current) => current ?? nextDomains[0]?.id ?? null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase]);
+
+  useEffect(() => {
+    void loadDomains();
+  }, [loadDomains]);
+
+  async function handleAddDomain() {
+    if (!newDomain.trim()) {
+      return;
+    }
+
+    setSubmitting(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: newDomain.trim() }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Could not add this domain.");
+      }
+
+      const domain = payload.data.domain as SendingDomain;
+      setNewDomain("");
+      setSelectedId(domain.id);
+      setActionMessage("Domain added. Add the DNS records below, then check verification.");
+      await loadDomains();
+    } catch (submitError) {
+      setActionMessage(
+        submitError instanceof Error ? submitError.message : "Could not add this domain.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleVerify(domainId: string) {
+    setSubmitting(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(`${apiBase}/${domainId}/verify`, { method: "POST" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error?.message ??
+            "We could not verify this domain yet. Please check that the DNS records below were added exactly as shown.",
+        );
+      }
+
+      setActionMessage("Verification check started. DNS changes can take time to propagate.");
+      await loadDomains();
+    } catch (verifyError) {
+      setActionMessage(
+        verifyError instanceof Error ? verifyError.message : "Could not verify this domain.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRefresh(domainId: string) {
+    setSubmitting(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(`${apiBase}/${domainId}/refresh`, { method: "POST" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Could not refresh domain status.");
+      }
+
+      setActionMessage("Domain status refreshed.");
+      await loadDomains();
+    } catch (refreshError) {
+      setActionMessage(
+        refreshError instanceof Error ? refreshError.message : "Could not refresh domain status.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function copyValue(value: string) {
+    await navigator.clipboard.writeText(value);
+    setActionMessage("Copied to clipboard.");
+  }
+
+  if (forbidden) {
+    return (
+      <PermissionDenied
+        title="Permission denied"
+        description="You do not have permission to view sending domains."
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Could not load sending domains"
+        description={error}
+        primaryAction={{ label: "Retry", onClick: () => void loadDomains() }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex-1">
+            <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Add sending domain</h2>
+            <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+              Verify a domain you own so campaigns can send from your business email addresses.
+            </p>
+            {canUpdate ? (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={newDomain}
+                  onChange={(event) => setNewDomain(event.target.value)}
+                  placeholder="example.com"
+                  aria-label="Domain name"
+                />
+                <Button onClick={() => void handleAddDomain()} disabled={submitting || !newDomain.trim()}>
+                  <IconPlus size={14} />
+                  Add domain
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+
+      {actionMessage ? (
+        <p className="text-[12.5px] text-[var(--color-ink-muted)]">{actionMessage}</p>
+      ) : null}
+
+      {domains.length === 0 ? (
+        <EmptyState
+          title="No sending domains yet"
+          description="Add and verify a domain before campaigns can send from your business email addresses."
+        />
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4">
+          <Card padded={false}>
+            <ul className="divide-y divide-[var(--color-line)]">
+              {domains.map((domain) => (
+                <li key={domain.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(domain.id)}
+                    className={`w-full px-4 py-3 text-left hover:bg-[var(--color-canvas)] ${
+                      selectedId === domain.id ? "bg-[var(--color-brand-50)]" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13.5px] font-medium text-[var(--color-ink)]">{domain.domain}</p>
+                      <Badge tone={STATUS_TONES[domain.status]} size="sm">
+                        {STATUS_LABELS[domain.status]}
+                      </Badge>
+                    </div>
+                    <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
+                      {domain.defaultSenderEmail ?? `hello@${domain.domain}`}
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {selectedDomain ? (
+            <div className="space-y-4">
+              <Card>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-[16px] font-semibold text-[var(--color-ink)]">
+                      {selectedDomain.domain}
+                    </h3>
+                    <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+                      Domain health: SPF {RECORD_STATUS_LABELS[selectedDomain.spfStatus]} · DKIM{" "}
+                      {RECORD_STATUS_LABELS[selectedDomain.dkimStatus]} · DMARC{" "}
+                      {RECORD_STATUS_LABELS[selectedDomain.dmarcStatus]}
+                    </p>
+                    {selectedDomain.lastCheckedAt ? (
+                      <p className="text-[12px] text-[var(--color-ink-faint)] mt-1">
+                        Last checked {new Date(selectedDomain.lastCheckedAt).toLocaleString()}
+                      </p>
+                    ) : null}
+                  </div>
+                  {canUpdate ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void handleRefresh(selectedDomain.id)}
+                        disabled={submitting}
+                      >
+                        Refresh status
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => void handleVerify(selectedDomain.id)}
+                        disabled={submitting}
+                      >
+                        Check verification
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card padded={false}>
+                <div className="px-5 py-4 border-b border-[var(--color-line)]">
+                  <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">DNS records</h4>
+                  <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+                    Add these records exactly as shown in your DNS host (GoDaddy, Cloudflare,
+                    Namecheap, etc.).
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left">
+                    <thead className="bg-[var(--color-canvas)]">
+                      <tr>
+                        <th className="px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                          Type
+                        </th>
+                        <th className="px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                          Host
+                        </th>
+                        <th className="px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                          Value
+                        </th>
+                        <th className="px-4 py-2 text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                          Status
+                        </th>
+                        <th className="px-4 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--color-line)]">
+                      {selectedDomain.dnsRecords.map((record) => (
+                        <tr key={`${record.type}-${record.name}-${record.value}`}>
+                          <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink)]">
+                            {record.type}
+                            <div className="text-[11px] text-[var(--color-ink-muted)]">{record.record}</div>
+                          </td>
+                          <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink)] font-mono">
+                            {record.name}
+                          </td>
+                          <td className="px-4 py-3 text-[12.5px] text-[var(--color-ink)] font-mono max-w-[360px] break-all">
+                            {record.value}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              tone={
+                                record.status === "valid"
+                                  ? "success"
+                                  : record.status === "invalid"
+                                    ? "danger"
+                                    : "warn"
+                              }
+                              size="sm"
+                            >
+                              {RECORD_STATUS_LABELS[record.status]}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void copyValue(record.value)}
+                            >
+                              Copy
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}

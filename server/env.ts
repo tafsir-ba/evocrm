@@ -38,6 +38,7 @@ const envSchema = z.object({
 
   // Phase 10 — Email / cron
   RESEND_API_KEY: optionalNonEmptyString,
+  RESEND_WEBHOOK_SECRET: optionalNonEmptyString,
   EMAIL_FROM: optionalNonEmptyString,
   EMAIL_REPLY_TO: optionalNonEmptyString,
   CRON_SECRET: optionalNonEmptyString,

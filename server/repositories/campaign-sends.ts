@@ -112,3 +112,13 @@ export async function createCampaignSend(
 
   return toCampaignSendRecord(document.toObject() as CampaignSendDocument);
 }
+
+export async function findCampaignSendByProviderMessageId(
+  providerMessageId: string,
+): Promise<CampaignSendRecord | null> {
+  await connectDb();
+
+  const document = await CampaignSendModel.findOne({ providerMessageId }).lean();
+
+  return document ? toCampaignSendRecord(document as CampaignSendDocument) : null;
+}

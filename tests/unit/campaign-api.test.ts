@@ -152,7 +152,10 @@ describe("campaign API routes", () => {
         body: JSON.stringify({
           name: "Buyer Follow-up",
           audienceType: "leads",
-  ...campaignRecordExtras,
+          projectIds: campaignRecordExtras.projectIds,
+          autoEnrollmentEnabled: campaignRecordExtras.autoEnrollmentEnabled,
+          enrollmentTrigger: campaignRecordExtras.enrollmentTrigger,
+          enrollmentRules: campaignRecordExtras.enrollmentRules,
         }),
       }),
       { params: Promise.resolve({ workspaceSlug: "demo" }) },

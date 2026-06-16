@@ -12,6 +12,7 @@ import {
   getActiveEnrollmentTargetIds,
   getEnrollmentSelectionError,
 } from "@/components/campaigns/campaign-enrollment-selector";
+import { CampaignJourneySection } from "@/components/campaigns/campaign-journey-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,11 @@ type Campaign = {
   audienceType: "leads" | "opportunities";
   frequency: string | null;
   defaultFromName: string | null;
+  senderName: string | null;
+  senderEmail: string | null;
+  sendingDomainId: string | null;
+  autoEnrollmentEnabled?: boolean;
+  enrollmentTrigger?: string;
   stepCount: number;
   enrollmentCount: number;
 };
@@ -38,9 +44,11 @@ type Campaign = {
 type CampaignStep = {
   id: string;
   order: number;
+  name: string | null;
   delayDays: number;
   sendTime: string;
-  fromName: string;
+  fromName: string | null;
+  status: "draft" | "ready" | "active" | "paused";
   subject: string;
   body: string;
   documentIds: string[];
@@ -541,85 +549,27 @@ export function CampaignDetailPanel({
         </div>
       )}
 
-      {/* Steps */}
-      <Card className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Email steps</h2>
-          {stepsEditable && (
-            <Button
-              size="sm"
-              leadingIcon={<IconPlus size={14} />}
-              onClick={() =>
-                router.push(workspacePath(workspaceSlug, `dripping/${campaignId}/steps/new`))
-              }
-            >
-              Add step
-            </Button>
-          )}
-        </div>
-        {steps.length === 0 ? (
-          <EmptyState
-            compact
-            title="No steps yet"
-            description="Add at least one email step before enrolling recipients."
-          />
-        ) : (
-          <ol className="space-y-3">
-            {steps.map((step) => (
-              <li
-                key={step.id}
-                className="flex items-start gap-3 p-3 rounded-lg border border-[var(--color-line)]"
-              >
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-[var(--color-canvas)] border border-[var(--color-line)] text-[12px] font-semibold">
-                  {step.order}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[var(--color-ink)]">{step.subject}</p>
-                  <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5">
-                    Day {step.delayDays} · {step.sendTime} · From {step.fromName}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => setPreviewStep(step)}>
-                    Preview
-                  </Button>
-                  {stepsEditable && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          router.push(
-                            workspacePath(
-                              workspaceSlug,
-                              `dripping/${campaignId}/steps/${step.id}/edit`,
-                            ),
-                          )
-                        }
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={actionPending}
-                        onClick={() => void handleDeleteStep(step.id)}
-                      >
-                        Delete
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-        {!stepsEditable && campaign.status === "active" && (
-          <p className="mt-3 text-[12px] text-[var(--color-ink-muted)]">
-            Pause the campaign to edit steps.
-          </p>
-        )}
-      </Card>
+      {/* Campaign journey */}
+      <CampaignJourneySection
+        workspaceSlug={workspaceSlug}
+        campaignId={campaignId}
+        campaignName={campaign.name}
+        campaignStatus={campaign.status}
+        audienceType={campaign.audienceType}
+        senderName={campaign.senderName ?? campaign.defaultFromName}
+        senderEmail={campaign.senderEmail}
+        sendingDomainId={campaign.sendingDomainId}
+        enrollmentLabel={
+          campaign.autoEnrollmentEnabled
+            ? `${campaign.enrollmentTrigger?.replaceAll("_", " ") ?? "rules match"}`
+            : "manual enrollment is used"
+        }
+        steps={steps}
+        stepsEditable={Boolean(stepsEditable)}
+        canUpdate={canUpdate}
+        onStepsChange={() => void loadAll()}
+        onActionError={setActionError}
+      />
 
       {/* Enrollments */}
       <Card className="mb-6">

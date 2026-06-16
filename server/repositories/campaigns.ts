@@ -41,6 +41,9 @@ export type CampaignRecord = {
   enrollmentRules: EnrollmentRules;
   frequency: string | null;
   defaultFromName: string | null;
+  senderName: string | null;
+  senderEmail: string | null;
+  sendingDomainId: string | null;
   createdBy: string;
   ownerId: string | null;
   archivedAt: Date | null;
@@ -71,6 +74,9 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
     enrollmentRules: toEnrollmentRules(document),
     frequency: document.frequency ?? null,
     defaultFromName: document.defaultFromName ?? null,
+    senderName: document.senderName ?? document.defaultFromName ?? null,
+    senderEmail: document.senderEmail ?? null,
+    sendingDomainId: document.sendingDomainId?.toString() ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
     archivedAt: document.archivedAt ?? null,
@@ -187,6 +193,9 @@ export type CreateCampaignInput = {
   enrollmentRules?: EnrollmentRules;
   frequency?: string | null;
   defaultFromName?: string | null;
+  senderName?: string | null;
+  senderEmail?: string | null;
+  sendingDomainId?: string | null;
   createdBy: string;
   ownerId?: string | null;
 };
@@ -207,7 +216,10 @@ export async function createCampaign(
     enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
     enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: input.frequency ?? null,
-    defaultFromName: input.defaultFromName?.trim() ?? null,
+    defaultFromName: input.defaultFromName?.trim() ?? input.senderName?.trim() ?? null,
+    senderName: input.senderName?.trim() ?? input.defaultFromName?.trim() ?? null,
+    senderEmail: input.senderEmail?.trim().toLowerCase() ?? null,
+    sendingDomainId: input.sendingDomainId ?? null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
     archivedAt: null,
@@ -228,6 +240,9 @@ export async function updateCampaign(
     enrollmentRules: EnrollmentRules;
     frequency: string | null;
     defaultFromName: string | null;
+    senderName: string | null;
+    senderEmail: string | null;
+    sendingDomainId: string | null;
     ownerId: string | null;
     archivedAt: Date | null;
   }>,

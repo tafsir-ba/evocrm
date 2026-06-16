@@ -75,6 +75,9 @@ export const createCampaignInputSchema = z
     enrollmentRules: enrollmentRulesSchema.optional(),
     frequency: z.string().trim().max(120).optional(),
     defaultFromName: z.string().trim().min(1).max(120).optional(),
+    senderName: z.string().trim().min(1).max(120).optional(),
+    senderEmail: z.string().email().optional(),
+    sendingDomainId: objectIdSchema.optional(),
     ownerId: objectIdSchema.optional(),
   })
   .strict();
@@ -88,6 +91,9 @@ export const updateCampaignInputSchema = z
     enrollmentRules: enrollmentRulesSchema.optional(),
     frequency: z.string().trim().max(120).nullable().optional(),
     defaultFromName: z.string().trim().min(1).max(120).nullable().optional(),
+    senderName: z.string().trim().min(1).max(120).nullable().optional(),
+    senderEmail: z.string().email().nullable().optional(),
+    sendingDomainId: objectIdSchema.nullable().optional(),
     ownerId: objectIdSchema.nullable().optional(),
     status: campaignUpdateStatusSchema.optional(),
   })

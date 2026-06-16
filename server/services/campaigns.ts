@@ -26,16 +26,15 @@ import { findProjectById } from "@/server/repositories/projects";
 import { findTagById } from "@/server/repositories/tags";
 import { findMembership } from "@/server/repositories/memberships";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
+import { assertCampaignLaunchReady } from "@/server/services/campaign-readiness";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import type {
   CreateCampaignInput,
   UpdateCampaignInput,
 } from "@/server/validation/campaigns";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import {
-  assertValidProjectFilter,
-  validateActiveProjectId,
-} from "@/server/services/project-scope";
+import { assertValidProjectFilter, validateActiveProjectId } from "@/server/services/project-scope";
+import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignListItem = CampaignRecord & {
   stepCount: number;
@@ -52,8 +51,59 @@ function campaignSnapshot(campaign: CampaignRecord): Record<string, unknown> {
     audienceType: campaign.audienceType,
     frequency: campaign.frequency,
     defaultFromName: campaign.defaultFromName,
+    senderName: campaign.senderName,
+    senderEmail: campaign.senderEmail,
+    sendingDomainId: campaign.sendingDomainId,
     ownerId: campaign.ownerId,
   };
+}
+
+function mergeCampaignUpdate(
+  existing: CampaignRecord,
+  input: UpdateCampaignInput,
+): CampaignRecord {
+  return {
+    ...existing,
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.projectIds !== undefined ? { projectIds: input.projectIds } : {}),
+    ...(input.autoEnrollmentEnabled !== undefined
+      ? { autoEnrollmentEnabled: input.autoEnrollmentEnabled }
+      : {}),
+    ...(input.enrollmentTrigger !== undefined
+      ? { enrollmentTrigger: input.enrollmentTrigger }
+      : {}),
+    ...(input.enrollmentRules !== undefined ? { enrollmentRules: input.enrollmentRules } : {}),
+    ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
+    ...(input.defaultFromName !== undefined ? { defaultFromName: input.defaultFromName } : {}),
+    ...(input.senderName !== undefined ? { senderName: input.senderName } : {}),
+    ...(input.senderEmail !== undefined ? { senderEmail: input.senderEmail } : {}),
+    ...(input.sendingDomainId !== undefined ? { sendingDomainId: input.sendingDomainId } : {}),
+    ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+  };
+}
+
+async function validateCampaignSenderInput(
+  workspaceId: string,
+  input: Pick<UpdateCampaignInput, "senderEmail" | "sendingDomainId">,
+): Promise<void> {
+  const hasSenderEmail =
+    input.senderEmail !== undefined && input.senderEmail !== null && input.senderEmail !== "";
+  const hasSendingDomain =
+    input.sendingDomainId !== undefined &&
+    input.sendingDomainId !== null &&
+    input.sendingDomainId !== "";
+
+  if (hasSenderEmail !== hasSendingDomain) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Sender email and sending domain must be configured together.",
+    );
+  }
+
+  if (hasSenderEmail && hasSendingDomain && input.senderEmail && input.sendingDomainId) {
+    await assertVerifiedSenderEmail(workspaceId, input.sendingDomainId, input.senderEmail);
+  }
 }
 
 async function enrichCampaign(
@@ -197,7 +247,10 @@ export async function createCampaignForWorkspace(
     enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
     enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: input.frequency ?? null,
-    defaultFromName: input.defaultFromName ?? null,
+    defaultFromName: input.defaultFromName ?? input.senderName ?? null,
+    senderName: input.senderName ?? input.defaultFromName ?? null,
+    senderEmail: input.senderEmail ?? null,
+    sendingDomainId: input.sendingDomainId ?? null,
     createdBy: actorId,
     ownerId: input.ownerId ?? null,
   });
@@ -272,6 +325,8 @@ export async function updateCampaignForWorkspace(
           "Campaign must have at least one step before activation.",
         );
       }
+
+      await assertCampaignLaunchReady(workspaceId, mergeCampaignUpdate(existing, input));
     }
   }
 
@@ -281,6 +336,7 @@ export async function updateCampaignForWorkspace(
 
   await validateCampaignProjectIds(workspaceId, input.projectIds);
   await validateEnrollmentRules(workspaceId, input.enrollmentRules);
+  await validateCampaignSenderInput(workspaceId, input);
 
   const updated = await updateCampaign(workspaceId, campaignId, {
     ...(input.name !== undefined ? { name: input.name } : {}),
@@ -294,6 +350,9 @@ export async function updateCampaignForWorkspace(
     ...(input.enrollmentRules !== undefined ? { enrollmentRules: input.enrollmentRules } : {}),
     ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
     ...(input.defaultFromName !== undefined ? { defaultFromName: input.defaultFromName } : {}),
+    ...(input.senderName !== undefined ? { senderName: input.senderName } : {}),
+    ...(input.senderEmail !== undefined ? { senderEmail: input.senderEmail } : {}),
+    ...(input.sendingDomainId !== undefined ? { sendingDomainId: input.sendingDomainId } : {}),
     ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
   });
@@ -413,6 +472,8 @@ export async function resumeCampaignForWorkspace(
   if (existing.status !== "paused") {
     throw new AppError("VALIDATION_ERROR", "Only paused campaigns can be resumed.");
   }
+
+  await assertCampaignLaunchReady(workspaceId, existing);
 
   const updated = await updateCampaign(workspaceId, campaignId, { status: "active" });
 

@@ -10,6 +10,7 @@ import {
   IconChevronRight,
   IconFolder,
   IconHash,
+  IconMail,
   IconPlug,
   IconShieldUser,
   IconTag,
@@ -105,6 +106,14 @@ export default async function SettingsPage({ params }: { params: Params }) {
       desc: "Website lead capture and external connections",
       Icon: IconPlug,
       href: "integrations",
+      visible: true,
+    },
+    {
+      key: "sending-domains",
+      label: "Sending Domains",
+      desc: "Verify domains for campaign email sending",
+      Icon: IconMail,
+      href: "sending-domains",
       visible: true,
     },
   ].filter((section) => section.visible);

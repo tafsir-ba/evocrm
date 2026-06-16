@@ -30,6 +30,7 @@ campaignSendSchema.index({ workspaceId: 1, campaignStepId: 1 });
 campaignSendSchema.index({ workspaceId: 1, status: 1 });
 campaignSendSchema.index({ workspaceId: 1, scheduledFor: 1 });
 campaignSendSchema.index({ workspaceId: 1, sentAt: 1 });
+campaignSendSchema.index({ providerMessageId: 1 }, { sparse: true });
 
 export type CampaignSendDocument = InferSchemaType<typeof campaignSendSchema> & {
   _id: mongoose.Types.ObjectId;

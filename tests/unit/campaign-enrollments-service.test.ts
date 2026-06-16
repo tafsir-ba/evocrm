@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   campaignRecordExtras,
+  campaignStepRecordExtras,
   enrollmentRecordExtras,
   leadRecordExtras,
 } from "@/tests/helpers/crm-fixtures";
@@ -112,6 +113,7 @@ describe("campaign enrollment service", () => {
         documentIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
+        ...campaignStepRecordExtras,
       },
     ]);
     vi.mocked(findStepByOrder).mockResolvedValue({
@@ -128,6 +130,7 @@ describe("campaign enrollment service", () => {
       documentIds: [],
       createdAt: new Date(),
       updatedAt: new Date(),
+      ...campaignStepRecordExtras,
     });
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",

@@ -19,16 +19,33 @@ export type CampaignStepRecord = {
   workspaceId: string;
   campaignId: string;
   order: number;
+  name: string | null;
   delayDays: number;
+  delayAmount: number | null;
+  delayUnit: "days" | "hours";
   sendTime: string;
-  fromName: string;
+  fromName: string | null;
   channel: "email";
+  status: "draft" | "ready" | "active" | "paused";
+  contentMode: "rich_text" | "plain_text" | "html";
   subject: string;
+  previewText: string | null;
   body: string;
+  bodyHtml: string | null;
+  bodyText: string | null;
   documentIds: string[];
   createdAt: Date;
   updatedAt: Date;
 };
+
+function resolveStepStatus(document: CampaignStepDocument): CampaignStepRecord["status"] {
+  if (document.status) {
+    return document.status as CampaignStepRecord["status"];
+  }
+
+  const hasContent = Boolean(document.subject?.trim() && document.body?.trim());
+  return hasContent ? "ready" : "draft";
+}
 
 function toCampaignStepRecord(document: CampaignStepDocument): CampaignStepRecord {
   return {
@@ -36,12 +53,20 @@ function toCampaignStepRecord(document: CampaignStepDocument): CampaignStepRecor
     workspaceId: document.workspaceId.toString(),
     campaignId: document.campaignId.toString(),
     order: document.order,
+    name: document.name ?? document.subject ?? null,
     delayDays: document.delayDays,
+    delayAmount: document.delayAmount ?? document.delayDays,
+    delayUnit: (document.delayUnit as CampaignStepRecord["delayUnit"]) ?? "days",
     sendTime: document.sendTime ?? "09:00",
-    fromName: document.fromName ?? "",
+    fromName: document.fromName ?? null,
     channel: "email",
-    subject: document.subject,
-    body: document.body,
+    status: resolveStepStatus(document),
+    contentMode: (document.contentMode as CampaignStepRecord["contentMode"]) ?? "plain_text",
+    subject: document.subject ?? "",
+    previewText: document.previewText ?? null,
+    body: document.body ?? "",
+    bodyHtml: document.bodyHtml ?? null,
+    bodyText: document.bodyText ?? null,
     documentIds: (document.documentIds ?? []).map((id) => id.toString()),
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
@@ -91,11 +116,19 @@ export async function countCampaignSteps(
 export type CreateCampaignStepInput = {
   campaignId: string;
   order: number;
+  name?: string | null;
   delayDays: number;
+  delayAmount?: number;
+  delayUnit?: "days" | "hours";
   sendTime: string;
-  fromName: string;
-  subject: string;
-  body: string;
+  fromName?: string | null;
+  status?: CampaignStepRecord["status"];
+  contentMode?: CampaignStepRecord["contentMode"];
+  subject?: string;
+  previewText?: string | null;
+  body?: string;
+  bodyHtml?: string | null;
+  bodyText?: string | null;
   documentIds?: string[];
 };
 
@@ -105,17 +138,31 @@ export async function createCampaignStep(
 ): Promise<CampaignStepRecord> {
   await connectDb();
 
+  const subject = input.subject?.trim() ?? "";
+  const body = input.body?.trim() ?? "";
+  const status =
+    input.status ??
+    (subject && body ? "ready" : "draft");
+
   try {
     const document = await CampaignStepModel.create({
       workspaceId,
       campaignId: input.campaignId,
       order: input.order,
+      name: input.name?.trim() ?? (subject || `Email ${input.order}`),
       delayDays: input.delayDays,
+      delayAmount: input.delayAmount ?? input.delayDays,
+      delayUnit: input.delayUnit ?? "days",
       sendTime: input.sendTime,
-      fromName: input.fromName.trim(),
+      fromName: input.fromName?.trim() ?? null,
       channel: "email",
-      subject: input.subject.trim(),
-      body: input.body.trim(),
+      status,
+      contentMode: input.contentMode ?? "plain_text",
+      subject,
+      previewText: input.previewText?.trim() ?? null,
+      body,
+      bodyHtml: input.bodyHtml ?? null,
+      bodyText: input.bodyText ?? null,
       documentIds: input.documentIds ?? [],
     });
 
@@ -138,11 +185,19 @@ export async function updateCampaignStep(
   stepId: string,
   input: Partial<{
     order: number;
+    name: string | null;
     delayDays: number;
+    delayAmount: number;
+    delayUnit: "days" | "hours";
     sendTime: string;
-    fromName: string;
+    fromName: string | null;
+    status: CampaignStepRecord["status"];
+    contentMode: CampaignStepRecord["contentMode"];
     subject: string;
+    previewText: string | null;
     body: string;
+    bodyHtml: string | null;
+    bodyText: string | null;
     documentIds: string[];
   }>,
 ): Promise<CampaignStepRecord | null> {
@@ -238,4 +293,42 @@ export async function findFirstCampaignStep(
     .lean();
 
   return document ? toCampaignStepRecord(document as CampaignStepDocument) : null;
+}
+
+export async function reorderCampaignSteps(
+  workspaceId: string,
+  campaignId: string,
+  stepIds: string[],
+): Promise<CampaignStepRecord[]> {
+  await connectDb();
+
+  const existing = await findCampaignSteps(workspaceId, campaignId);
+
+  if (existing.length !== stepIds.length) {
+    throw new AppError("VALIDATION_ERROR", "All campaign steps must be included when reordering.");
+  }
+
+  const existingIds = new Set(existing.map((step) => step.id));
+  for (const stepId of stepIds) {
+    if (!existingIds.has(stepId)) {
+      throw new AppError("VALIDATION_ERROR", "Invalid step in reorder request.");
+    }
+  }
+
+  const tempBase = existing.length + 100;
+  for (const [index, stepId] of stepIds.entries()) {
+    await CampaignStepModel.updateOne(
+      withWorkspaceScope(workspaceId, { _id: stepId, campaignId }),
+      { $set: { order: tempBase + index } },
+    );
+  }
+
+  for (const [index, stepId] of stepIds.entries()) {
+    await CampaignStepModel.updateOne(
+      withWorkspaceScope(workspaceId, { _id: stepId, campaignId }),
+      { $set: { order: index + 1 } },
+    );
+  }
+
+  return findCampaignSteps(workspaceId, campaignId);
 }
