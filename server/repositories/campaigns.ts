@@ -310,3 +310,17 @@ export async function deleteCampaignById(
 
   return result.deletedCount > 0;
 }
+
+export async function countCampaignsBySendingDomainId(
+  workspaceId: string,
+  sendingDomainId: string,
+): Promise<number> {
+  await connectDb();
+
+  return CampaignModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      sendingDomainId,
+      archivedAt: null,
+    }),
+  );
+}

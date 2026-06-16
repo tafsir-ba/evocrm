@@ -26,7 +26,10 @@ export const updateSendingDomainInputSchema = z
   .object({
     defaultSenderEmail: z.string().email().nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field must be provided.",
+  });
 
 export const senderEmailQuerySchema = z.object({
   sendingDomainId: objectIdSchema,

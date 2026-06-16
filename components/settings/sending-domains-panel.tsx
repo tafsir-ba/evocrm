@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus } from "@/lib/icons";
@@ -128,11 +129,19 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
   const [newDomain, setNewDomain] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editSenderEmail, setEditSenderEmail] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const selectedDomain = useMemo(
     () => domains.find((domain) => domain.id === selectedId) ?? null,
     [domains, selectedId],
   );
+
+  useEffect(() => {
+    setEditSenderEmail(
+      selectedDomain?.defaultSenderEmail ?? (selectedDomain ? `hello@${selectedDomain.domain}` : ""),
+    );
+  }, [selectedDomain]);
 
   const loadDomains = useCallback(async () => {
     setLoading(true);
@@ -154,7 +163,12 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
 
       const nextDomains = payload.data.domains as SendingDomain[];
       setDomains(nextDomains);
-      setSelectedId((current) => current ?? nextDomains[0]?.id ?? null);
+      setSelectedId((current) => {
+        if (current && nextDomains.some((domain) => domain.id === current)) {
+          return current;
+        }
+        return nextDomains[0]?.id ?? null;
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
@@ -252,6 +266,70 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
   async function copyValue(value: string) {
     await navigator.clipboard.writeText(value);
     setActionMessage("Copied to clipboard.");
+  }
+
+  async function handleSaveSettings(domainId: string) {
+    if (!editSenderEmail.trim()) {
+      setActionMessage("Enter a default sender email.");
+      return;
+    }
+
+    setSubmitting(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(`${apiBase}/${domainId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultSenderEmail: editSenderEmail.trim() }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Could not save domain settings.");
+      }
+
+      setActionMessage("Domain settings saved.");
+      await loadDomains();
+    } catch (saveError) {
+      setActionMessage(
+        saveError instanceof Error ? saveError.message : "Could not save domain settings.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteDomain(domainId: string) {
+    setSubmitting(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch(`${apiBase}/${domainId}`, { method: "DELETE" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Could not remove this domain.");
+      }
+
+      setDeleteModalOpen(false);
+      setSelectedId(null);
+      setActionMessage("Domain removed.");
+      await loadDomains();
+    } catch (deleteError) {
+      setActionMessage(
+        deleteError instanceof Error ? deleteError.message : "Could not remove this domain.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function closeDeleteModal() {
+    if (submitting) {
+      return;
+    }
+    setDeleteModalOpen(false);
   }
 
   if (forbidden) {
@@ -399,10 +477,49 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
                       >
                         Check verification
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setDeleteModalOpen(true)}
+                        disabled={submitting}
+                      >
+                        Remove domain
+                      </Button>
                     </div>
                   ) : null}
                 </div>
               </Card>
+
+              {canUpdate ? (
+                <Card>
+                  <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
+                    Domain settings
+                  </h4>
+                  <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+                    Set the default sender address used when campaigns send from this domain.
+                  </p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <Label htmlFor="default-sender-email">Default sender email</Label>
+                      <Input
+                        id="default-sender-email"
+                        type="email"
+                        value={editSenderEmail}
+                        onChange={(event) => setEditSenderEmail(event.target.value)}
+                        placeholder={`hello@${selectedDomain.domain}`}
+                        disabled={submitting}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => void handleSaveSettings(selectedDomain.id)}
+                      disabled={submitting || !editSenderEmail.trim()}
+                    >
+                      Save settings
+                    </Button>
+                  </div>
+                </Card>
+              ) : null}
 
               <Card padded={false}>
                 <div className="px-5 py-4 border-b border-[var(--color-line)]">
@@ -478,6 +595,35 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
           ) : null}
         </div>
       )}
+
+      {selectedDomain ? (
+        <Modal
+          open={deleteModalOpen}
+          onClose={closeDeleteModal}
+          title="Remove sending domain?"
+          className="max-w-lg"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={closeDeleteModal} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleDeleteDomain(selectedDomain.id)}
+                disabled={submitting}
+              >
+                {submitting ? "Removing…" : "Remove domain"}
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            This removes <strong>{selectedDomain.domain}</strong> from this workspace and from your
+            email provider. Campaigns using this domain will need a different sending domain before
+            they can send again.
+          </p>
+        </Modal>
+      ) : null}
     </div>
   );
 }

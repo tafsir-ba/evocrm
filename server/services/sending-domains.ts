@@ -9,6 +9,7 @@ import {
   mapProviderDomainToUpdate,
   verifyProviderDomain,
 } from "@/server/email/resend-domains";
+import { countCampaignsBySendingDomainId } from "@/server/repositories/campaigns";
 import {
   createSendingDomain,
   deleteSendingDomain,
@@ -199,6 +200,16 @@ export async function deleteSendingDomainForWorkspace(
   domainId: string,
 ): Promise<void> {
   const domain = await getSendingDomainForWorkspace(workspaceId, domainId);
+  const campaignCount = await countCampaignsBySendingDomainId(workspaceId, domainId);
+
+  if (campaignCount > 0) {
+    throw new AppError(
+      "CONFLICT",
+      campaignCount === 1
+        ? "This domain is used by 1 campaign. Change its sending domain before removing it."
+        : `This domain is used by ${campaignCount} campaigns. Change their sending domains before removing it.`,
+    );
+  }
 
   try {
     await deleteProviderDomain(domain.providerDomainId);
