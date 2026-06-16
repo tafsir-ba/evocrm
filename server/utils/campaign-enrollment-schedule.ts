@@ -20,7 +20,7 @@ export type CampaignStepScheduleInput = {
 export function buildEnrollmentScheduledSteps(
   enrollment: Pick<
     CampaignEnrollmentRecord,
-    "currentStep" | "status" | "createdAt" | "lastSentAt"
+    "currentStep" | "status" | "createdAt" | "lastSentAt" | "nextSendAt"
   >,
   steps: CampaignStepScheduleInput[],
   timeZone = "UTC",
@@ -48,7 +48,7 @@ export function buildEnrollmentScheduledSteps(
   const isPaused = enrollment.status === "paused";
 
   const schedule: EnrollmentScheduledStep[] = [];
-  let timelineAnchor = enrollment.lastSentAt ?? now;
+  let timelineAnchor = enrollment.lastSentAt ?? enrollment.nextSendAt ?? now;
 
   for (const step of sortedSteps) {
     if (step.order < enrollment.currentStep) {
@@ -71,10 +71,13 @@ export function buildEnrollmentScheduledSteps(
       continue;
     }
 
-    const scheduledAt = computeNextSendAt(timelineAnchor, step.delayDays, {
-      sendTime: step.sendTime,
-      timeZone,
-    });
+    const scheduledAt =
+      step.order === enrollment.currentStep
+        ? enrollment.nextSendAt
+        : computeNextSendAt(timelineAnchor, step.delayDays, {
+            sendTime: step.sendTime,
+            timeZone,
+          });
 
     schedule.push({
       stepOrder: step.order,

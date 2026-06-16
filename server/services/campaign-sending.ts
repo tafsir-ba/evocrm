@@ -106,6 +106,7 @@ async function recordSkippedSend(params: {
   stepId: string;
   reason: string;
   actorId?: string;
+  deferDays?: number;
 }): Promise<void> {
   await createCampaignSend(params.workspaceId, {
     campaignId: params.enrollment.campaignId,
@@ -127,6 +128,15 @@ async function recordSkippedSend(params: {
     entityId: params.enrollment.id,
     after: { reason: params.reason, enrollmentId: params.enrollment.id },
   });
+
+  if (params.deferDays !== undefined) {
+    await deferEnrollmentRetry(
+      params.workspaceId,
+      params.enrollment.id,
+      new Date(),
+      params.deferDays,
+    );
+  }
 }
 
 async function processEnrollment(
@@ -182,6 +192,7 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: `Step is ${step.status} and cannot send.`,
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
 
     return singleOutcomeResult("skipped");
@@ -221,13 +232,8 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Enrollment has no associated lead.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
-    await deferEnrollmentRetry(
-      workspaceId,
-      enrollment.id,
-      new Date(),
-      SKIP_RETRY_DELAY_DAYS,
-    );
 
     return singleOutcomeResult("skipped");
   }
@@ -240,13 +246,8 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Lead not found.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
-    await deferEnrollmentRetry(
-      workspaceId,
-      enrollment.id,
-      new Date(),
-      SKIP_RETRY_DELAY_DAYS,
-    );
 
     return singleOutcomeResult("skipped");
   }
@@ -257,13 +258,8 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Lead has no email address.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
-    await deferEnrollmentRetry(
-      workspaceId,
-      enrollment.id,
-      new Date(),
-      SKIP_RETRY_DELAY_DAYS,
-    );
 
     return singleOutcomeResult("skipped");
   }
@@ -294,6 +290,7 @@ async function processEnrollment(
         enrollment,
         stepId: step.id,
         reason: `Recipient is suppressed (${suppression.reason}).`,
+        deferDays: SKIP_RETRY_DELAY_DAYS,
       });
 
       return singleOutcomeResult("skipped");
@@ -315,6 +312,7 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Step from name is missing.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
 
     return singleOutcomeResult("skipped");
@@ -326,6 +324,7 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Campaign sender email is not configured.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
 
     return singleOutcomeResult("skipped");
@@ -337,6 +336,7 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Campaign sending domain is not configured.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
 
     return singleOutcomeResult("skipped");
@@ -354,6 +354,7 @@ async function processEnrollment(
       enrollment,
       stepId: step.id,
       reason: "Campaign sender domain is no longer verified.",
+      deferDays: SKIP_RETRY_DELAY_DAYS,
     });
 
     return singleOutcomeResult("skipped");

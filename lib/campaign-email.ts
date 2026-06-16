@@ -176,12 +176,8 @@ export function formatStepDelayLabel(
   delayDays: number,
   sendTime: string,
 ): string {
-  if (order === 1 && delayDays === 0) {
-    return `Send immediately at ${sendTime}`;
-  }
-
   if (delayDays === 0) {
-    return `Send immediately at ${sendTime}`;
+    return `Send at ${sendTime}`;
   }
 
   const dayLabel = delayDays === 1 ? "1 day" : `${delayDays} days`;

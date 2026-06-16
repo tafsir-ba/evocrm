@@ -377,11 +377,11 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 
 **Scheduling:** Zero-delay steps without a send time schedule `nextSendAt` one minute after enrollment, campaign activation, or overdue enrollment resume. Zero-delay steps with a configured send time use that exact wall-clock time in the workspace timezone when the slot is still ahead today; if today's slot already passed, they schedule about one minute after the anchor. All sends wait until `nextSendAt <= now` — activation, enrollment, and resume only trigger an immediate backend send pass for enrollments that are already due. Consecutive zero-delay steps only chain in the same pass when the next step's `nextSendAt` is also due. Steps with `delayDays > 0` rely on `POST /api/cron/campaigns/send-due` (must be scheduled in production with `CRON_SECRET`). Overdue paused enrollments reschedule to immediate pickup (`nextSendAt = now`), not a fresh full step delay.
 
-**Enrollment UI:** Campaign detail uses searchable multi-select lead/opportunity selectors backed by workspace `GET /leads` and `GET /opportunities`. The UI submits canonical entity IDs — not names, emails, or raw text labels. Enrollment list responses include `scheduledSteps[]` (backend-projected send times for all remaining drip steps from the current `nextSendAt` anchor).
+**Enrollment UI:** Campaign detail uses searchable multi-select lead/opportunity selectors backed by workspace `GET /leads` and `GET /opportunities`. The UI submits canonical entity IDs — not names, emails, or raw text labels. Enrollment list responses include `scheduledSteps[]` (backend-projected send times for all remaining drip steps; the current step uses stored `nextSendAt`, follow-up steps chain from that anchor).
 
 **Missing email / unsubscribed:** Sends are skipped and logged as `CampaignSend.status = skipped`.
 
-**Step edits:** Allowed only when campaign is `draft` or `paused`.
+**Step edits:** Email content edits are allowed only when the campaign is `draft` or `paused`. Active campaigns still allow schedule-only step updates (`sendTime`, `delayDays`, `delayAmount`, `delayUnit`, `name`) and trigger enrollment rescheduling.
 
 **UI routes:** `/w/[workspaceSlug]/dripping`, `/w/[workspaceSlug]/dripping/[campaignId]`
 

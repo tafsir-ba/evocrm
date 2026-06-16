@@ -14,6 +14,7 @@ describe("campaign enrollment schedule", () => {
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
+        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
         status: "active",
       },
       [
@@ -39,7 +40,7 @@ describe("campaign enrollment schedule", () => {
     expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-15T12:00:00.000Z");
   });
 
-  it("reflects updated step send times without relying on stored nextSendAt", () => {
+  it("reflects stored nextSendAt for the current step and projects follow-ups", () => {
     const now = new Date("2026-06-17T14:00:00.000Z");
 
     const schedule = buildEnrollmentScheduledSteps(
@@ -47,6 +48,7 @@ describe("campaign enrollment schedule", () => {
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
+        nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
         status: "active",
       },
       [
@@ -69,6 +71,7 @@ describe("campaign enrollment schedule", () => {
         currentStep: 2,
         createdAt: new Date("2026-06-14T10:00:00.000Z"),
         lastSentAt,
+        nextSendAt: new Date("2026-06-15T12:00:00.000Z"),
         status: "active",
       },
       [
@@ -93,6 +96,7 @@ describe("campaign enrollment schedule", () => {
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
+        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
         status: "active",
       },
       [
@@ -107,12 +111,32 @@ describe("campaign enrollment schedule", () => {
     expect(schedule[1]?.scheduledAt?.toISOString()).toBe("2026-06-14T12:01:00.000Z");
   });
 
+  it("uses stored nextSendAt for overdue current steps instead of recomputing from now", () => {
+    const now = new Date("2026-06-17T17:00:00.000Z");
+
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        currentStep: 1,
+        createdAt: new Date("2026-06-17T14:00:00.000Z"),
+        lastSentAt: null,
+        nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
+        status: "active",
+      },
+      [{ order: 1, delayDays: 0, sendTime: "16:45", subject: "drip 1" }],
+      "UTC",
+      now,
+    );
+
+    expect(schedule[0]?.scheduledAt?.toISOString()).toBe("2026-06-17T16:45:00.000Z");
+  });
+
   it("matches the current step projection used for rescheduling", () => {
     const now = new Date("2026-06-17T16:40:00.000Z");
     const enrollment = {
       currentStep: 1,
       createdAt: new Date("2026-06-17T14:00:00.000Z"),
       lastSentAt: null,
+      nextSendAt: new Date("2026-06-17T16:45:00.000Z"),
       status: "active" as const,
     };
     const step = { order: 1, delayDays: 0, sendTime: "16:45", subject: "drip 1" };
@@ -131,6 +155,7 @@ describe("campaign enrollment schedule", () => {
         currentStep: 1,
         createdAt: now,
         lastSentAt: null,
+        nextSendAt: new Date("2026-06-14T12:00:00.000Z"),
         status: "paused",
       },
       [
