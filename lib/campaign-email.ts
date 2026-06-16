@@ -112,6 +112,22 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   return warnings;
 }
 
+const SEND_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+export function normalizeCampaignSendTime(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^([01]\d|2[0-3]):([0-5]\d)/);
+  return match ? `${match[1]}:${match[2]}` : trimmed;
+}
+
+export function isValidCampaignSendTime(value: string): boolean {
+  return SEND_TIME_PATTERN.test(normalizeCampaignSendTime(value));
+}
+
+export function emailBodyHasUnsubscribe(content: string): boolean {
+  return content.includes("{unsubscribe_url}") || /unsubscribe/i.test(content);
+}
+
 export function formatStepDelayLabel(
   order: number,
   delayDays: number,

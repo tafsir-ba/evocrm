@@ -51,4 +51,16 @@ describe("campaign step validation", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("rejects send time with seconds", () => {
+    const result = updateCampaignStepInputSchema.safeParse({ sendTime: "15:59:00" });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts HH:mm send time", () => {
+    const result = updateCampaignStepInputSchema.safeParse({ sendTime: "15:59" });
+
+    expect(result.success).toBe(true);
+  });
 });

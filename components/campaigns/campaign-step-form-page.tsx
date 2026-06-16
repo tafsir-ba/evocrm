@@ -14,6 +14,8 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CAMPAIGN_EMAIL_VARIABLES,
+  emailBodyHasUnsubscribe,
+  normalizeCampaignSendTime,
   validateCampaignHtml,
 } from "@/lib/campaign-email";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -33,6 +35,8 @@ type StepFormState = {
   bodyText: string;
   status: "draft" | "ready" | "active" | "paused";
 };
+
+type SaveIntent = "preserve" | "draft" | "ready";
 
 const emptyStepForm: StepFormState = {
   name: "",
@@ -160,7 +164,7 @@ export function CampaignStepFormPage({
     return validateCampaignHtml(form.bodyHtml);
   }, [form.bodyHtml, form.contentMode]);
 
-  function buildPayload(status: StepFormState["status"]) {
+  function buildPayload(intent: SaveIntent) {
     const contentMode = form.contentMode;
     const body =
       contentMode === "html"
@@ -173,6 +177,7 @@ export function CampaignStepFormPage({
     const bodyText = form.bodyText || form.body;
 
     const trimmedName = form.name.trim();
+    const normalizedSendTime = normalizeCampaignSendTime(form.sendTime);
 
     const payload = {
       order: parseInt(form.order, 10),
@@ -182,8 +187,7 @@ export function CampaignStepFormPage({
           ? { name: null }
           : {}),
       delayDays: parseInt(form.delayDays, 10),
-      sendTime: form.sendTime,
-      status,
+      sendTime: normalizedSendTime,
       contentMode,
       subject: form.subject.trim(),
       previewText: form.previewText.trim() || null,
@@ -192,7 +196,19 @@ export function CampaignStepFormPage({
       bodyText: bodyText.trim() || null,
     };
 
-    return isEdit ? payload : { ...payload, channel: "email" as const };
+    if (!isEdit) {
+      return {
+        ...payload,
+        status: intent === "ready" ? "ready" : "draft",
+        channel: "email" as const,
+      };
+    }
+
+    if (intent === "preserve") {
+      return payload;
+    }
+
+    return { ...payload, status: intent };
   }
 
   function formatSaveError(payload: { error?: { message?: string; details?: Record<string, string[]> } }) {
@@ -209,7 +225,7 @@ export function CampaignStepFormPage({
     return payload.error?.message ?? "Failed to save step.";
   }
 
-  async function saveStep(status: StepFormState["status"]) {
+  async function saveStep(intent: SaveIntent) {
     setFormError(null);
     setFormMessage(null);
     setSubmitting(true);
@@ -219,7 +235,7 @@ export function CampaignStepFormPage({
       const response = await fetch(url, {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(status)),
+        body: JSON.stringify(buildPayload(intent)),
       });
       const payload = await response.json();
 
@@ -236,8 +252,22 @@ export function CampaignStepFormPage({
         return;
       }
 
-      setForm((current) => ({ ...current, status }));
-      setFormMessage(status === "ready" ? "Email marked as ready." : "Draft saved.");
+      if (intent !== "preserve") {
+        setForm((current) => ({ ...current, status: intent }));
+      } else {
+        const savedSendTime = payload.data?.step?.sendTime;
+        if (typeof savedSendTime === "string") {
+          setForm((current) => ({ ...current, sendTime: savedSendTime }));
+        }
+      }
+
+      setFormMessage(
+        intent === "ready"
+          ? "Email marked as ready."
+          : intent === "preserve"
+            ? "Changes saved."
+            : "Draft saved.",
+      );
     } catch {
       setFormError("Failed to save step.");
     } finally {
@@ -307,6 +337,8 @@ export function CampaignStepFormPage({
   }
 
   const activeBodyField = form.contentMode === "html" ? "bodyHtml" : "body";
+  const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
+  const missingUnsubscribe = !emailBodyHasUnsubscribe(bodyContent);
 
   return (
     <FocusedFormLayout
@@ -324,6 +356,11 @@ export function CampaignStepFormPage({
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            {isEdit ? (
+              <Button disabled={submitting} onClick={() => void saveStep("preserve")}>
+                Save
+              </Button>
+            ) : null}
             <Button variant="secondary" disabled={submitting} onClick={() => void saveStep("draft")}>
               Save draft
             </Button>
@@ -338,7 +375,7 @@ export function CampaignStepFormPage({
         id={formId}
         onSubmit={(event) => {
           event.preventDefault();
-          void saveStep("draft");
+          void saveStep(isEdit ? "preserve" : "draft");
         }}
         className="space-y-6"
       >
@@ -371,7 +408,12 @@ export function CampaignStepFormPage({
                 id="step-send-time"
                 type="time"
                 value={form.sendTime}
-                onChange={(e) => setForm((f) => ({ ...f, sendTime: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    sendTime: normalizeCampaignSendTime(e.target.value),
+                  }))
+                }
               />
             </div>
           </div>
@@ -489,6 +531,13 @@ export function CampaignStepFormPage({
               />
             </div>
           )}
+
+          {missingUnsubscribe ? (
+            <p className="text-[12px] text-[var(--color-ink-muted)]">
+              Include {"{unsubscribe_url}"} before marking this email as ready. Use{" "}
+              <strong>Save</strong> to update send time or content without changing status.
+            </p>
+          ) : null}
         </Card>
 
         <Card>
