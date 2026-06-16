@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addMinutesToCampaignSendTime,
   applyCampaignVariables,
   emailBodyHasUnsubscribe,
+  getZeroDelaySendTimeSequenceIssue,
   isValidCampaignSendTime,
   normalizeCampaignSendTime,
   normalizeCampaignVariableTokens,
@@ -45,11 +47,24 @@ describe("campaign email helpers", () => {
   it("detects unsubscribe content", () => {
     expect(emailBodyHasUnsubscribe("Thanks\n{unsubscribe_url}")).toBe(true);
     expect(emailBodyHasUnsubscribe("Thanks\n{{unsubscribe_url}}")).toBe(true);
-    expect(emailBodyHasUnsubscribe("Thanks\n{unsubscribe_url}")).toBe(true);
     expect(emailBodyHasUnsubscribe('<a href="https://example.com/unsubscribe">Unsubscribe</a>')).toBe(
       true,
     );
     expect(emailBodyHasUnsubscribe("test{{first_name}}")).toBe(false);
     expect(emailBodyHasUnsubscribe("No unsubscribe here")).toBe(false);
+  });
+
+  it("detects out-of-order zero-delay send times", () => {
+    expect(
+      getZeroDelaySendTimeSequenceIssue([
+        { order: 1, delayDays: 0, sendTime: "20:15" },
+        { order: 2, delayDays: 0, sendTime: "20:13" },
+      ]),
+    ).toContain("Step 2");
+  });
+
+  it("adds minutes to campaign send time", () => {
+    expect(addMinutesToCampaignSendTime("20:15", 1)).toBe("20:16");
+    expect(addMinutesToCampaignSendTime("23:59", 1)).toBe("00:00");
   });
 });

@@ -13,6 +13,7 @@ vi.mock("@/server/repositories/campaigns", () => ({
 vi.mock("@/server/repositories/campaign-steps", () => ({
   createCampaignStep: vi.fn(),
   findCampaignStepById: vi.fn(),
+  findCampaignSteps: vi.fn(),
   updateCampaignStep: vi.fn(),
 }));
 
@@ -32,6 +33,7 @@ import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   createCampaignStep,
   findCampaignStepById,
+  findCampaignSteps,
   updateCampaignStep,
 } from "@/server/repositories/campaign-steps";
 import { rescheduleEnrollmentsForCampaignSchedule } from "@/server/services/campaign-enrollments";
@@ -86,6 +88,7 @@ describe("campaign step service readiness enforcement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(findCampaignById).mockResolvedValue(campaign);
+    vi.mocked(findCampaignSteps).mockResolvedValue([readyStep]);
   });
 
   it("rejects create requests that mark a step ready without unsubscribe support", async () => {

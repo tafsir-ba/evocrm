@@ -15,6 +15,7 @@ import {
   buildCampaignSummary,
   calculateCampaignDayOffset,
   formatStepDelayLabel,
+  getZeroDelaySendTimeSequenceIssue,
 } from "@/lib/campaign-email";
 import { getCampaignStepLaunchIssues } from "@/lib/campaign-step-readiness";
 import { formatWorkspaceTimezoneLabel } from "@/lib/workspace-datetime";
@@ -174,6 +175,11 @@ export function CampaignJourneySection({
     }
     return calculateCampaignDayOffset(orderedSteps, orderedSteps[orderedSteps.length - 1].order);
   }, [orderedSteps]);
+
+  const scheduleSequenceIssue = useMemo(
+    () => getZeroDelaySendTimeSequenceIssue(orderedSteps),
+    [orderedSteps],
+  );
 
   const summary = buildCampaignSummary({
     stepCount: orderedSteps.length,
@@ -462,6 +468,12 @@ export function CampaignJourneySection({
         <p className="mb-4 text-[12px] text-[var(--color-ink-muted)]">
           Send times use workspace timezone: {formatWorkspaceTimezoneLabel(workspace.timezone)}.
         </p>
+        {scheduleSequenceIssue ? (
+          <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+            {scheduleSequenceIssue} Later same-day emails with an earlier send time will not fire at
+            that exact clock time.
+          </p>
+        ) : null}
 
         {orderedSteps.length === 0 ? (
           <EmptyState

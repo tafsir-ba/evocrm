@@ -184,6 +184,41 @@ export function formatStepDelayLabel(
   return `Wait ${dayLabel}, then send at ${sendTime}`;
 }
 
+export function addMinutesToCampaignSendTime(sendTime: string, minutes: number): string {
+  const normalized = normalizeCampaignSendTime(sendTime);
+  const [hour, minute] = normalized.split(":").map(Number);
+  const totalMinutes = hour * 60 + minute + minutes;
+  const wrapped = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const nextHour = Math.floor(wrapped / 60);
+  const nextMinute = wrapped % 60;
+
+  return `${String(nextHour).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}`;
+}
+
+export function getZeroDelaySendTimeSequenceIssue(
+  steps: Array<{ order: number; delayDays: number; sendTime: string }>,
+): string | null {
+  const sorted = [...steps].sort((left, right) => left.order - right.order);
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    const previous = sorted[index - 1];
+    const step = sorted[index];
+
+    if (!previous || previous.delayDays !== 0 || step.delayDays !== 0) {
+      continue;
+    }
+
+    const previousTime = normalizeCampaignSendTime(previous.sendTime);
+    const stepTime = normalizeCampaignSendTime(step.sendTime);
+
+    if (stepTime <= previousTime) {
+      return `Step ${step.order} (${stepTime}) must send after step ${previous.order} (${previousTime}) when both are same-day zero-delay emails.`;
+    }
+  }
+
+  return null;
+}
+
 export function calculateCampaignDayOffset(
   steps: Array<{ order: number; delayDays: number }>,
   targetOrder: number,

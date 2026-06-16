@@ -20,8 +20,38 @@ import type {
   ReorderCampaignStepsInput,
   UpdateCampaignStepInput,
 } from "@/server/validation/campaign-steps";
-import { normalizeCampaignVariableTokens, stripHtmlToPlainText } from "@/lib/campaign-email";
+import {
+  addMinutesToCampaignSendTime,
+  getZeroDelaySendTimeSequenceIssue,
+  normalizeCampaignVariableTokens,
+  stripHtmlToPlainText,
+} from "@/lib/campaign-email";
 import { assertCampaignStepReady } from "@/server/utils/campaign-step-readiness";
+
+function assertStepScheduleSequence(
+  steps: Array<{ order: number; delayDays: number; sendTime: string }>,
+): void {
+  const issue = getZeroDelaySendTimeSequenceIssue(steps);
+
+  if (issue) {
+    throw new AppError("VALIDATION_ERROR", issue);
+  }
+}
+
+async function assertCampaignStepSequenceValid(
+  workspaceId: string,
+  campaignId: string,
+): Promise<void> {
+  const steps = await findCampaignSteps(workspaceId, campaignId);
+  assertStepScheduleSequence(steps);
+}
+
+async function syncEnrollmentSchedulesAfterStepStructureChange(
+  workspaceId: string,
+  campaignId: string,
+): Promise<void> {
+  await rescheduleEnrollmentsForCampaignSchedule(workspaceId, campaignId);
+}
 
 function stepContentMeaningfullyChanged(
   existing: CampaignStepRecord,
@@ -261,6 +291,16 @@ export async function createCampaignStepForWorkspace(
     );
   }
 
+  const existingSteps = await findCampaignSteps(workspaceId, campaignId);
+  assertStepScheduleSequence([
+    ...existingSteps,
+    {
+      order: normalizedInput.order,
+      delayDays: normalizedInput.delayDays,
+      sendTime: normalizedInput.sendTime,
+    },
+  ]);
+
   const step = await createCampaignStep(workspaceId, {
     campaignId,
     order: normalizedInput.order,
@@ -288,6 +328,9 @@ export async function createCampaignStepForWorkspace(
     entityId: step.id,
     after: stepSnapshot(step),
   });
+
+  await assertCampaignStepSequenceValid(workspaceId, campaignId);
+  await syncEnrollmentSchedulesAfterStepStructureChange(workspaceId, campaignId);
 
   return step;
 }
@@ -332,6 +375,24 @@ export async function updateCampaignStepForWorkspace(
     assertCampaignStepReady(mergedStep);
   }
 
+  if (
+    scheduleFieldsChanged(existing, normalizedInput) ||
+    (normalizedInput.order !== undefined && normalizedInput.order !== existing.order)
+  ) {
+    const allSteps = await findCampaignSteps(workspaceId, campaignId);
+    assertStepScheduleSequence(
+      allSteps.map((step) =>
+        step.id === existing.id
+          ? {
+              order: mergedStep.order,
+              delayDays: mergedStep.delayDays,
+              sendTime: mergedStep.sendTime,
+            }
+          : step,
+      ),
+    );
+  }
+
   const updated = await updateCampaignStep(workspaceId, campaignId, stepId, {
     ...(normalizedInput.order !== undefined ? { order: normalizedInput.order } : {}),
     ...(normalizedInput.name !== undefined ? { name: normalizedInput.name } : {}),
@@ -365,7 +426,14 @@ export async function updateCampaignStepForWorkspace(
   });
 
   if (scheduleFieldsChanged(existing, normalizedInput)) {
+    await assertCampaignStepSequenceValid(workspaceId, campaignId);
     await rescheduleEnrollmentsForCampaignSchedule(workspaceId, campaignId);
+  } else if (
+    normalizedInput.order !== undefined &&
+    normalizedInput.order !== existing.order
+  ) {
+    await assertCampaignStepSequenceValid(workspaceId, campaignId);
+    await syncEnrollmentSchedulesAfterStepStructureChange(workspaceId, campaignId);
   }
 
   return updated;
@@ -409,6 +477,9 @@ export async function deleteCampaignStepForWorkspace(
     entityId: stepId,
     before: stepSnapshot(existing),
   });
+
+  await assertCampaignStepSequenceValid(workspaceId, campaignId);
+  await syncEnrollmentSchedulesAfterStepStructureChange(workspaceId, campaignId);
 }
 
 export async function reorderCampaignStepsForWorkspace(
@@ -436,6 +507,9 @@ export async function reorderCampaignStepsForWorkspace(
     after: { stepIds: input.stepIds },
   });
 
+  await assertCampaignStepSequenceValid(workspaceId, campaignId);
+  await syncEnrollmentSchedulesAfterStepStructureChange(workspaceId, campaignId);
+
   return steps;
 }
 
@@ -461,6 +535,10 @@ export async function duplicateCampaignStepForWorkspace(
 
   const allSteps = await findCampaignSteps(workspaceId, campaignId);
   const nextOrder = allSteps.length + 1;
+  const sendTime =
+    existing.delayDays <= 0
+      ? addMinutesToCampaignSendTime(existing.sendTime, 1)
+      : existing.sendTime;
 
   const duplicate = await createCampaignStep(workspaceId, {
     campaignId,
@@ -469,7 +547,7 @@ export async function duplicateCampaignStepForWorkspace(
     delayDays: existing.delayDays,
     delayAmount: existing.delayAmount ?? existing.delayDays,
     delayUnit: existing.delayUnit,
-    sendTime: existing.sendTime,
+    sendTime,
     fromName: existing.fromName,
     status: "draft",
     contentMode: existing.contentMode,
@@ -489,6 +567,9 @@ export async function duplicateCampaignStepForWorkspace(
     entityId: duplicate.id,
     after: stepSnapshot(duplicate),
   });
+
+  await assertCampaignStepSequenceValid(workspaceId, campaignId);
+  await syncEnrollmentSchedulesAfterStepStructureChange(workspaceId, campaignId);
 
   return duplicate;
 }
