@@ -59,7 +59,15 @@ export const leadListQuerySchema = z.object({
   createdTo: z.coerce.date().optional(),
 });
 
-export const createLeadInputSchema = z
+const createLeadBudgetRefinement = {
+  refine: (value: { budgetMin?: number; budgetMax?: number }) =>
+    value.budgetMin === undefined ||
+    value.budgetMax === undefined ||
+    value.budgetMax >= value.budgetMin,
+  message: "budgetMax must be greater than or equal to budgetMin.",
+} as const;
+
+const createLeadInputObjectSchema = z
   .object({
     projectId: objectIdSchema,
     statusId: objectIdSchema,
@@ -82,15 +90,20 @@ export const createLeadInputSchema = z
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,
     emailConsentStatus: emailConsentStatusSchema.optional(),
+    createdAt: z.coerce.date().optional(),
   })
-  .strict()
-  .refine(
-    (value) =>
-      value.budgetMin === undefined ||
-      value.budgetMax === undefined ||
-      value.budgetMax >= value.budgetMin,
-    { message: "budgetMax must be greater than or equal to budgetMin." },
-  );
+  .strict();
+
+export const createLeadInputSchema = createLeadInputObjectSchema.refine(
+  createLeadBudgetRefinement.refine,
+  { message: createLeadBudgetRefinement.message },
+);
+
+export const createLeadApiInputSchema = createLeadInputObjectSchema
+  .omit({ createdAt: true })
+  .refine(createLeadBudgetRefinement.refine, {
+    message: createLeadBudgetRefinement.message,
+  });
 
 export const updateLeadInputSchema = z
   .object({
@@ -132,5 +145,6 @@ export const updateLeadInputSchema = z
   );
 
 export type CreateLeadInput = z.infer<typeof createLeadInputSchema>;
+export type CreateLeadApiInput = z.infer<typeof createLeadApiInputSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadInputSchema>;
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;

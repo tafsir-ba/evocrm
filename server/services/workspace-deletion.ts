@@ -14,6 +14,8 @@ import { DocumentModel } from "@/models/document";
 import { FeedbackModel } from "@/models/feedback";
 import { IntegrationModel } from "@/models/integration";
 import { IntegrationLogModel } from "@/models/integration-log";
+import { ImportJobModel } from "@/models/import-job";
+import { ImportRowResultModel } from "@/models/import-row-result";
 import { LeadModel } from "@/models/lead";
 import { MembershipModel } from "@/models/membership";
 import { OpportunityModel } from "@/models/opportunity";
@@ -23,6 +25,8 @@ import { RoleModel } from "@/models/role";
 import { TagModel } from "@/models/tag";
 import { AppError } from "@/server/errors";
 import { connectDb } from "@/server/db/mongoose";
+import { deleteImportFileBuffer } from "@/server/imports/import-file-storage";
+import type { ImportFileStorageProvider } from "@/server/imports/import-file-storage";
 import { requireWorkspaceOwner } from "@/server/permissions/owner-protection";
 import {
   deleteWorkspaceById,
@@ -79,6 +83,22 @@ async function deleteWorkspaceData(workspaceId: string): Promise<void> {
   );
 
   await Promise.allSettled(feedbackStorageKeys.map((storageKey) => deleteObject(storageKey)));
+
+  const importJobs = await ImportJobModel.find({ workspaceId: workspaceObjectId })
+    .select("storageKey storageProvider")
+    .lean<Array<{ storageKey: string; storageProvider: ImportFileStorageProvider }>>();
+
+  await Promise.allSettled(
+    importJobs.map((job) =>
+      deleteImportFileBuffer({
+        storageKey: job.storageKey,
+        storageProvider: job.storageProvider,
+      }),
+    ),
+  );
+
+  await ImportRowResultModel.deleteMany({ workspaceId: workspaceObjectId });
+  await ImportJobModel.deleteMany({ workspaceId: workspaceObjectId });
 
   await CampaignSendModel.deleteMany({ workspaceId: workspaceObjectId });
   await CampaignEnrollmentModel.deleteMany({ workspaceId: workspaceObjectId });

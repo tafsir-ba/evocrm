@@ -336,6 +336,7 @@ export async function createLead(input: {
   attributes?: Record<string, unknown>;
   emailConsentStatus?: string;
   createdBy: string;
+  createdAt?: Date;
 }): Promise<LeadRecord> {
   await connectDb();
   try {
@@ -367,6 +368,9 @@ export async function createLead(input: {
       emailConsentStatus: input.emailConsentStatus ?? "unknown",
       createdBy: input.createdBy,
       archivedAt: null,
+      ...(input.createdAt
+        ? { createdAt: input.createdAt, updatedAt: input.createdAt }
+        : {}),
     });
     return toLeadRecord(document.toObject() as LeadDocument);
   } catch (error) {

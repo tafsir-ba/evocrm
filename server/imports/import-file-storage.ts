@@ -10,6 +10,7 @@ import {
   getObjectBuffer,
   isSpacesConfigured,
   uploadObject,
+  deleteObject,
 } from "@/server/storage/spaces";
 
 const GRIDFS_BUCKET = "import_files";
@@ -64,6 +65,18 @@ export async function loadImportFileBuffer(input: {
   }
 
   return loadFromGridFs(input.storageKey);
+}
+
+export async function deleteImportFileBuffer(input: {
+  storageKey: string;
+  storageProvider: ImportFileStorageProvider;
+}): Promise<void> {
+  if (input.storageProvider === "spaces") {
+    await deleteObject(input.storageKey);
+    return;
+  }
+
+  await deleteFromGridFs(input.storageKey);
 }
 
 async function saveToGridFs(

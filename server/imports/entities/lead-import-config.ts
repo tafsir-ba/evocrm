@@ -17,6 +17,7 @@ import {
   normalizePhoneValue,
   parseCommaSeparatedList,
   parseOptionalCurrency,
+  parseOptionalDate,
   parseOptionalNumber,
   resolveDictionaryId,
   resolveMemberId,
@@ -150,8 +151,22 @@ const LEAD_FIELDS: ImportFieldConfig[] = [
   {
     key: "notes",
     label: "Notes",
-    aliases: ["notes", "comments", "remarks"],
+    aliases: ["notes", "comments", "remarks", "membership notes"],
     type: "string",
+  },
+  {
+    key: "createdAt",
+    label: "Created Date",
+    aliases: [
+      "create date",
+      "created date",
+      "creation date",
+      "date created",
+      "created at",
+      "created",
+    ],
+    type: "date",
+    helpText: "Original lead creation date from the source system.",
   },
   {
     key: "tags",
@@ -249,6 +264,18 @@ async function buildLeadCreateInput(
 
   if (input.tags !== undefined) {
     input.tags = resolveTagIds(context.tagLookup, input.tags);
+  }
+
+  if (input.createdAt !== undefined && input.createdAt !== "") {
+    const parsedCreatedAt = parseOptionalDate(input.createdAt);
+    if (!parsedCreatedAt) {
+      throw new AppError("VALIDATION_ERROR", "Invalid created date.", {
+        details: { field: "createdAt" },
+      });
+    }
+    input.createdAt = parsedCreatedAt;
+  } else {
+    delete input.createdAt;
   }
 
   const parsed = createLeadInputSchema.safeParse(input);

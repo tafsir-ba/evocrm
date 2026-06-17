@@ -44,6 +44,7 @@ import {
   releaseImportJobToReady,
   updateImportJobMapping,
   updateImportJobParseResult,
+  updateImportJobProcessingValidation,
   updateImportJobValidation,
   type ImportJobRecord,
 } from "@/server/repositories/import-jobs";
@@ -405,6 +406,13 @@ export async function executeImportJobForWorkspace(
       defaultCurrency,
       actorId,
     );
+
+    await updateImportJobProcessingValidation(importJobId, workspaceId, {
+      validRows: validation.summary.validRows,
+      warningRows: validation.summary.warningRows,
+      errorRows: validation.summary.errorRows,
+      validationIssues: summarizeImportIssues(validation.issues),
+    });
 
     if (input.mode === "strict" && validation.summary.errorRows > 0) {
       await releaseImportJobToReady(importJobId, workspaceId, {

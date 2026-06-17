@@ -80,10 +80,23 @@ vi.mock("@/models/feedback", () => ({
     deleteMany: vi.fn(),
   },
 }));
+vi.mock("@/models/import-job", () => ({
+  ImportJobModel: {
+    find: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([]) }) }),
+    deleteMany: vi.fn(),
+  },
+}));
+vi.mock("@/models/import-row-result", () => ({
+  ImportRowResultModel: { deleteMany: vi.fn() },
+}));
+vi.mock("@/server/imports/import-file-storage", () => ({
+  deleteImportFileBuffer: vi.fn(),
+}));
 
 import { requireWorkspaceOwner } from "@/server/permissions/owner-protection";
 import { DocumentModel } from "@/models/document";
 import { FeedbackModel } from "@/models/feedback";
+import { ImportJobModel } from "@/models/import-job";
 import {
   deleteWorkspaceById,
   findWorkspaceById,
@@ -105,6 +118,7 @@ describe("workspace deletion service", () => {
     vi.mocked(requireWorkspaceOwner).mockReset();
     vi.mocked(DocumentModel.find).mockReturnValue(mockLeanQuery([]) as never);
     vi.mocked(FeedbackModel.find).mockReturnValue(mockLeanQuery([]) as never);
+    vi.mocked(ImportJobModel.find).mockReturnValue(mockLeanQuery([]) as never);
   });
 
   it("rejects when confirmation name does not match", async () => {

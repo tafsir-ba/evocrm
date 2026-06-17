@@ -79,6 +79,7 @@ export function ImportWizard({
 
   const [step, setStep] = useState<WizardStep>("upload");
   const [loading, setLoading] = useState(false);
+  const [configLoading, setConfigLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [config, setConfig] = useState<ImportEntityConfigResponse | null>(null);
@@ -165,6 +166,7 @@ export function ImportWizard({
   const resetWizard = useCallback(() => {
     setStep("upload");
     setLoading(false);
+    setConfigLoading(false);
     setError(null);
     setImportId(null);
     setFileName(null);
@@ -187,6 +189,8 @@ export function ImportWizard({
     }
 
     async function loadConfig() {
+      setConfigLoading(true);
+      setError(null);
       try {
         const [configRes, projectsRes, membersRes] = await Promise.all([
           fetch(`${apiBase}/config?entityType=${entityType}`),
@@ -242,6 +246,8 @@ export function ImportWizard({
         setDictionaries(Object.fromEntries(dictionaryEntries));
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load config.");
+      } finally {
+        setConfigLoading(false);
       }
     }
 
@@ -447,7 +453,7 @@ export function ImportWizard({
               variant="secondary"
               onClick={() => void handleExecute("strict")}
               loading={loading}
-              disabled={!validationSummary || validationSummary.errorRows === 0}
+              disabled={!validationSummary || validationSummary.errorRows > 0}
             >
               Strict import
             </Button>
@@ -500,6 +506,8 @@ export function ImportWizard({
         {step === "upload" && (
           <UploadStep
             loading={loading}
+            configLoading={configLoading}
+            configError={Boolean(error)}
             fileInputRef={fileInputRef}
             onSelectFile={(file) => void handleUpload(file)}
           />
@@ -550,17 +558,22 @@ export function ImportWizard({
 
 function UploadStep({
   loading,
+  configLoading,
+  configError,
   fileInputRef,
   onSelectFile,
 }: {
   loading: boolean;
+  configLoading: boolean;
+  configError: boolean;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onSelectFile: (file: File) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const uploadDisabled = loading || configLoading || configError;
 
   function handleFile(file: File) {
-    if (loading) {
+    if (uploadDisabled) {
       return;
     }
     onSelectFile(file);
@@ -571,10 +584,13 @@ function UploadStep({
       <p className="text-[13px] text-[var(--color-ink-muted)]">
         Upload a CSV or Excel file. Other document formats will be supported later.
       </p>
+      {configLoading && (
+        <p className="text-[12px] text-[var(--color-ink-muted)]">Loading import settings…</p>
+      )}
       <div
         role="button"
         tabIndex={0}
-        onClick={() => !loading && fileInputRef.current?.click()}
+        onClick={() => !uploadDisabled && fileInputRef.current?.click()}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             fileInputRef.current?.click();
@@ -582,13 +598,13 @@ function UploadStep({
         }}
         onDragEnter={(event) => {
           event.preventDefault();
-          if (!loading) {
+          if (!uploadDisabled) {
             setDragOver(true);
           }
         }}
         onDragOver={(event) => {
           event.preventDefault();
-          if (!loading) {
+          if (!uploadDisabled) {
             setDragOver(true);
           }
         }}
@@ -600,7 +616,7 @@ function UploadStep({
           event.preventDefault();
           setDragOver(false);
 
-          if (loading) {
+          if (uploadDisabled) {
             return;
           }
 
@@ -614,14 +630,14 @@ function UploadStep({
           dragOver
             ? "border-[var(--color-brand-600)] bg-[color-mix(in_srgb,var(--color-brand-600)_5%,white)]"
             : "border-[var(--color-line)] bg-[var(--color-canvas)] hover:border-[var(--color-brand-600)]",
-          loading ? "opacity-60 cursor-not-allowed" : "",
+          loading || configLoading || configError ? "opacity-60 cursor-not-allowed" : "",
         ].join(" ")}
       >
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[var(--color-brand-600)] shadow-sm">
           <IconUpload size={18} />
         </span>
         <p className="text-[13.5px] font-medium text-[var(--color-ink)]">
-          {loading ? "Uploading…" : "Drop a file here or click to browse"}
+          {loading ? "Uploading…" : configLoading ? "Preparing import…" : "Drop a file here or click to browse"}
         </p>
         <p className="text-[12px] text-[var(--color-ink-muted)]">
           CSV or Excel · max {formatImportFileSize(MAX_IMPORT_FILE_SIZE_BYTES)}
@@ -831,6 +847,7 @@ function ValidateStep({
               <tr>
                 <th className="px-3 py-2 text-left">Row</th>
                 <th className="px-3 py-2 text-left">Field</th>
+                <th className="px-3 py-2 text-left">Severity</th>
                 <th className="px-3 py-2 text-left">Message</th>
               </tr>
             </thead>
@@ -839,6 +856,7 @@ function ValidateStep({
                 <tr key={`${issue.rowNumber}-${index}`} className="border-t border-[var(--color-line)]">
                   <td className="px-3 py-2">{issue.rowNumber}</td>
                   <td className="px-3 py-2">{issue.field ?? "—"}</td>
+                  <td className="px-3 py-2 capitalize">{issue.severity}</td>
                   <td className="px-3 py-2 text-[var(--color-ink-soft)]">{issue.message}</td>
                 </tr>
               ))}

@@ -24,6 +24,7 @@ import {
   normalizeLookupKey,
   normalizeReferenceValue,
   parseOptionalCurrency,
+  parseOptionalDate,
   parseOptionalNumber,
   splitFullName,
 } from "@/server/imports/import-normalizers";
@@ -366,6 +367,20 @@ function validateRawRow(
         rowNumber,
         field: key,
         message: `Invalid number for ${field?.label ?? key}.`,
+        severity: "error",
+      });
+    }
+  }
+
+  for (const field of fields) {
+    if (field.type !== "date") continue;
+    if (row[field.key] === undefined || row[field.key] === "") continue;
+
+    if (parseOptionalDate(row[field.key]) === undefined) {
+      issues.push({
+        rowNumber,
+        field: field.key,
+        message: `Invalid date for ${field.label}.`,
         severity: "error",
       });
     }

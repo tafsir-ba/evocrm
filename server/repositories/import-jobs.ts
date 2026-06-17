@@ -167,6 +167,8 @@ export async function findImportJobById(
 
 const EXECUTABLE_IMPORT_STATUSES: ImportJobStatus[] = ["mapped", "ready"];
 
+export const STALE_IMPORT_PROCESSING_MS = 30 * 60 * 1000;
+
 export const MUTABLE_IMPORT_JOB_STATUSES: ImportJobStatus[] = ["draft", "mapped", "ready"];
 
 export async function claimImportJobForExecution(
@@ -175,15 +177,24 @@ export async function claimImportJobForExecution(
 ): Promise<ImportJobRecord | null> {
   await connectDb();
 
+  const staleBefore = new Date(Date.now() - STALE_IMPORT_PROCESSING_MS);
+
   const document = await ImportJobModel.findOneAndUpdate(
     withWorkspaceScope(workspaceId, {
       _id: importJobId,
-      status: { $in: EXECUTABLE_IMPORT_STATUSES },
+      $or: [
+        { status: { $in: EXECUTABLE_IMPORT_STATUSES } },
+        {
+          status: "processing",
+          startedAt: { $lte: staleBefore },
+        },
+      ],
     }),
     {
       $set: {
         status: "processing",
         startedAt: new Date(),
+        errorMessage: null,
       },
     },
     { new: true },
@@ -371,6 +382,34 @@ export async function updateImportJobValidation(
   }
 
   return toImportJobRecord(document);
+}
+
+export async function updateImportJobProcessingValidation(
+  importJobId: string,
+  workspaceId: string,
+  input: {
+    validRows: number;
+    warningRows: number;
+    errorRows: number;
+    validationIssues: ImportRowIssue[];
+  },
+): Promise<void> {
+  await connectDb();
+
+  await ImportJobModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: "processing",
+    }),
+    {
+      $set: {
+        validRows: input.validRows,
+        warningRows: input.warningRows,
+        errorRows: input.errorRows,
+        validationIssues: input.validationIssues,
+      },
+    },
+  );
 }
 
 export async function updateImportJobStatus(

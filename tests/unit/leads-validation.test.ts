@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createLeadApiInputSchema,
   createLeadInputSchema,
   leadListQuerySchema,
   updateLeadInputSchema,
@@ -24,6 +25,30 @@ describe("lead validation", () => {
       lastName: "Smith",
       statusId: "507f1f77bcf86cd799439011",
       workspaceId: "507f1f77bcf86cd799439012",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts createdAt on import create input", () => {
+    const result = createLeadInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "507f1f77bcf86cd799439011",
+      createdAt: "2026-06-16 01:59",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects createdAt on public API create input", () => {
+    const result = createLeadApiInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "507f1f77bcf86cd799439011",
+      createdAt: "2026-06-16 01:59",
     });
 
     expect(result.success).toBe(false);

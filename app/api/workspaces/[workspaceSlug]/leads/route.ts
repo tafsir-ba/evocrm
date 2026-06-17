@@ -9,7 +9,7 @@ import {
   validateSearchParams,
 } from "@/server/validation/request";
 import {
-  createLeadInputSchema,
+  createLeadApiInputSchema,
   leadListQuerySchema,
 } from "@/server/validation/leads";
 import {
@@ -71,7 +71,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
 
     const body: unknown = await request.json();
-    const input = parseRequestOrThrow(createLeadInputSchema, body);
+    const input = parseRequestOrThrow(createLeadApiInputSchema, body);
 
     const result = await createLeadForWorkspace(workspace.id, userId, input);
 

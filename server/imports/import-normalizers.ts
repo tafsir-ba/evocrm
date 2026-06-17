@@ -79,6 +79,47 @@ export function parseOptionalCurrency(value: unknown): number | undefined {
   return parsed;
 }
 
+export function parseOptionalDate(value: unknown): Date | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const parsed = new Date(excelEpoch + value * 24 * 60 * 60 * 1000);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  const stringValue = String(value).trim();
+  if (!stringValue) {
+    return undefined;
+  }
+
+  const normalized =
+    stringValue.includes(" ") && !stringValue.includes("T")
+      ? stringValue.replace(" ", "T")
+      : stringValue;
+
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  const dateOnlyMatch = /^(\d{4}-\d{2}-\d{2})$/.exec(stringValue);
+  if (dateOnlyMatch) {
+    const dateOnly = new Date(`${dateOnlyMatch[1]}T00:00:00`);
+    if (!Number.isNaN(dateOnly.getTime())) {
+      return dateOnly;
+    }
+  }
+
+  return undefined;
+}
+
 export function parseCommaSeparatedList(value: unknown): string[] {
   if (value === null || value === undefined || value === "") {
     return [];

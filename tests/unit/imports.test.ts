@@ -11,6 +11,7 @@ import {
   splitFullName,
   parseOptionalNumber,
   parseOptionalCurrency,
+  parseOptionalDate,
   escapeCsvCell,
 } from "@/server/imports/import-normalizers";
 import {
@@ -28,6 +29,11 @@ describe("import header matcher", () => {
   it("suggests lead email mapping", () => {
     const suggestion = suggestFieldForHeader("Email Address", leadImportConfig.fields);
     expect(suggestion).toBe("email");
+  });
+
+  it("suggests lead created date mapping", () => {
+    const suggestion = suggestFieldForHeader("Create Date", leadImportConfig.fields);
+    expect(suggestion).toBe("createdAt");
   });
 
   it("suggests property title mapping", () => {
@@ -68,6 +74,22 @@ describe("import normalizers", () => {
   it("parses numbers and currency", () => {
     expect(parseOptionalNumber("3")).toBe(3);
     expect(parseOptionalCurrency("€1,250,000")).toBe(1250000);
+  });
+
+  it("parses import date timestamps", () => {
+    const timestamp = parseOptionalDate("2026-06-16 01:59");
+    expect(timestamp?.getFullYear()).toBe(2026);
+    expect(timestamp?.getMonth()).toBe(5);
+    expect(timestamp?.getDate()).toBe(16);
+    expect(timestamp?.getHours()).toBe(1);
+    expect(timestamp?.getMinutes()).toBe(59);
+
+    const dateOnly = parseOptionalDate("2026-06-16");
+    expect(dateOnly?.getFullYear()).toBe(2026);
+    expect(dateOnly?.getMonth()).toBe(5);
+    expect(dateOnly?.getDate()).toBe(16);
+
+    expect(parseOptionalDate("not a date")).toBeUndefined();
   });
 
   it("escapes dangerous CSV values on export only", () => {

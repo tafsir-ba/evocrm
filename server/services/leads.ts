@@ -396,6 +396,7 @@ export async function createLeadForWorkspace(
     tags: input.tags ?? [],
     attributes: input.attributes ?? {},
     emailConsentStatus: input.emailConsentStatus ?? "unknown",
+    ...(input.createdAt ? { createdAt: input.createdAt } : {}),
   });
 
   await createAuditLog({

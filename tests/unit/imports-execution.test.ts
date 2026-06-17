@@ -9,6 +9,7 @@ vi.mock("@/server/repositories/import-jobs", () => ({
   releaseImportJobToReady: vi.fn(),
   failImportJob: vi.fn(),
   updateImportJobMapping: vi.fn(),
+  updateImportJobProcessingValidation: vi.fn(),
   MUTABLE_IMPORT_JOB_STATUSES: ["draft", "mapped", "ready"],
 }));
 
@@ -41,6 +42,7 @@ import {
   findImportJobById,
   releaseImportJobToReady,
   updateImportJobValidation,
+  updateImportJobProcessingValidation,
 } from "@/server/repositories/import-jobs";
 import { loadImportFileBuffer } from "@/server/imports/import-file-storage";
 import {
@@ -192,6 +194,13 @@ describe("import execution lifecycle", () => {
     expect(updateImportJobValidation).not.toHaveBeenCalled();
     expect(claimImportJobForExecution).toHaveBeenCalledBefore(
       vi.mocked(executeImportJob),
+    );
+    expect(updateImportJobProcessingValidation).toHaveBeenCalledWith(
+      importJobId,
+      workspaceId,
+      expect.objectContaining({
+        errorRows: 1,
+      }),
     );
   });
 
