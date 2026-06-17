@@ -163,6 +163,26 @@ export function ImportWizard({
     [mappedOrDefaultedFields],
   );
 
+  const unsatisfiedRequiredFields = useMemo(
+    () => requiredFields.filter((field) => !isRequiredFieldSatisfied(field.key)),
+    [isRequiredFieldSatisfied, requiredFields],
+  );
+
+  const allRequiredFieldsSatisfied = unsatisfiedRequiredFields.length === 0;
+
+  function formatImportApiError(
+    payload: { error?: { message?: string; details?: { issues?: ImportRowIssue[] } } },
+    fallback: string,
+  ): string {
+    const issues = payload.error?.details?.issues;
+
+    if (issues?.length) {
+      return issues.map((issue) => issue.message).join(" ");
+    }
+
+    return payload.error?.message ?? fallback;
+  }
+
   const resetWizard = useCallback(() => {
     setStep("upload");
     setLoading(false);
@@ -347,7 +367,9 @@ export function ImportWizard({
       const mappingPayload = await mappingResponse.json();
 
       if (!mappingResponse.ok) {
-        throw new Error(mappingPayload.error?.message ?? "Failed to save mapping.");
+        throw new Error(
+          formatImportApiError(mappingPayload, "Failed to save mapping."),
+        );
       }
 
       applyParsePreview(mappingPayload.data as ParsePreviewResponse, { preserveMappings: true });
@@ -443,7 +465,11 @@ export function ImportWizard({
           </Button>
         )}
         {step === "map" && (
-          <Button onClick={() => void handleSaveMappingAndValidate()} loading={loading}>
+          <Button
+            onClick={() => void handleSaveMappingAndValidate()}
+            loading={loading}
+            disabled={!allRequiredFieldsSatisfied}
+          >
             Validate import
           </Button>
         )}
@@ -524,6 +550,7 @@ export function ImportWizard({
             dictionaries={dictionaries}
             requiredFields={requiredFields}
             isRequiredFieldSatisfied={isRequiredFieldSatisfied}
+            unsatisfiedRequiredFields={unsatisfiedRequiredFields}
             hasHeaderRow={hasHeaderRow}
             sheetName={sheetName}
             rowCount={rowCount}
@@ -668,6 +695,7 @@ function MapStep({
   dictionaries,
   requiredFields,
   isRequiredFieldSatisfied,
+  unsatisfiedRequiredFields,
   hasHeaderRow,
   sheetName,
   rowCount,
@@ -686,6 +714,7 @@ function MapStep({
   dictionaries: Record<string, DictionaryItem[]>;
   requiredFields: ImportEntityConfigResponse["fields"];
   isRequiredFieldSatisfied: (fieldKey: string) => boolean;
+  unsatisfiedRequiredFields: ImportEntityConfigResponse["fields"];
   hasHeaderRow: boolean;
   sheetName: string | null;
   rowCount: number;
@@ -769,6 +798,12 @@ function MapStep({
             </Badge>
           ))}
         </div>
+        {unsatisfiedRequiredFields.length > 0 && (
+          <p className="mt-2 text-[12px] text-[#92400e]">
+            Map a column or set a default for:{" "}
+            {unsatisfiedRequiredFields.map((field) => field.label).join(", ")}.
+          </p>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[var(--color-line)]">
