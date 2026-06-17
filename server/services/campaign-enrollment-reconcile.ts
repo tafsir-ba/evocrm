@@ -10,6 +10,7 @@ import { findWorkspaceById } from "@/server/repositories/workspaces";
 import {
   computeEnrollmentNextSendAt,
   findFirstUnsentStepOrder,
+  findLatestConfirmedSentAt,
   mapLatestSendLogsByStepOrder,
   type CampaignStepScheduleInput,
   type EnrollmentStepSendLog,
@@ -25,7 +26,24 @@ export async function reconcileEnrollmentWithSendLogs(
   const firstUnsentOrder = findFirstUnsentStepOrder(steps, sendLogsByStepOrder);
 
   if (firstUnsentOrder === null) {
-    return enrollment;
+    if (enrollment.status !== "active" && enrollment.status !== "paused") {
+      return enrollment;
+    }
+
+    const latestSentAt = findLatestConfirmedSentAt(steps, sendLogsByStepOrder);
+
+    if (!latestSentAt) {
+      return enrollment;
+    }
+
+    const updated = await updateCampaignEnrollment(workspaceId, enrollment.id, {
+      status: "completed",
+      completedAt: latestSentAt,
+      lastSentAt: latestSentAt,
+      sendClaimExpiresAt: null,
+    });
+
+    return updated ?? enrollment;
   }
 
   const step = steps.find((item) => item.order === firstUnsentOrder);

@@ -269,4 +269,77 @@ describe("campaign enrollment schedule", () => {
 
     expect(nextSendAt.toISOString()).toBe("2026-06-17T16:45:00.000Z");
   });
+
+  it("prefers a confirmed sent log over a newer skipped log for the same step", () => {
+    const sentAt = new Date("2026-06-14T12:00:00.000Z");
+    const sendLogs = mapLatestSendLogsByStepOrder(steps, [
+      {
+        campaignStepId: "step-1",
+        status: "sent",
+        providerMessageId: "msg-1",
+        sentAt,
+        scheduledFor: sentAt,
+        createdAt: sentAt,
+      },
+      {
+        campaignStepId: "step-1",
+        status: "skipped",
+        providerMessageId: null,
+        sentAt: null,
+        scheduledFor: sentAt,
+        createdAt: new Date("2026-06-14T13:00:00.000Z"),
+      },
+    ]);
+
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        ...enrollmentTiming,
+        currentStep: 2,
+        createdAt: new Date("2026-06-14T10:00:00.000Z"),
+        lastSentAt: sentAt,
+        nextSendAt: new Date("2026-06-15T12:00:00.000Z"),
+        status: "active",
+      },
+      steps,
+      sendLogs,
+      "UTC",
+      sentAt,
+    );
+
+    expect(schedule[0]?.state).toBe("sent");
+  });
+
+  it("shows a deferred retry as scheduled for the current step after a skipped send", () => {
+    const attemptedAt = new Date("2026-06-14T12:00:00.000Z");
+    const retryAt = new Date("2026-06-15T12:00:00.000Z");
+    const now = new Date("2026-06-14T12:05:00.000Z");
+    const sendLogs = mapLatestSendLogsByStepOrder(steps, [
+      {
+        campaignStepId: "step-1",
+        status: "skipped",
+        providerMessageId: null,
+        sentAt: null,
+        scheduledFor: attemptedAt,
+        createdAt: attemptedAt,
+      },
+    ]);
+
+    const schedule = buildEnrollmentScheduledSteps(
+      {
+        ...enrollmentTiming,
+        currentStep: 1,
+        createdAt: new Date("2026-06-14T10:00:00.000Z"),
+        lastSentAt: null,
+        nextSendAt: retryAt,
+        status: "active",
+      },
+      steps,
+      sendLogs,
+      "UTC",
+      now,
+    );
+
+    expect(schedule[0]?.state).toBe("scheduled");
+    expect(schedule[0]?.scheduledAt?.toISOString()).toBe(retryAt.toISOString());
+  });
 });

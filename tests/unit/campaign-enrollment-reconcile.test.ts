@@ -156,4 +156,75 @@ describe("campaign enrollment reconcile", () => {
 
     vi.useRealTimers();
   });
+
+  it("marks active enrollments completed when every step has a confirmed send", async () => {
+    const sentAt = new Date("2026-06-18T18:37:00.000Z");
+    const enrollment = {
+      id: "enroll-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      leadId: "lead-1",
+      opportunityId: null,
+      ...enrollmentRecordExtras,
+      status: "active" as const,
+      currentStep: 2,
+      nextSendAt: sentAt,
+      lastSentAt: sentAt,
+      completedAt: null,
+      unsubscribedAt: null,
+      failedAt: null,
+      failureReason: null,
+      createdAt: new Date("2026-06-18T18:30:00.000Z"),
+      updatedAt: new Date("2026-06-18T18:30:00.000Z"),
+    };
+
+    vi.mocked(findCampaignSendsByEnrollmentIds).mockResolvedValue([
+      {
+        id: "send-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-1",
+        enrollmentId: "enroll-1",
+        leadId: "lead-1",
+        opportunityId: null,
+        status: "sent",
+        providerMessageId: "msg-1",
+        error: null,
+        scheduledFor: sentAt,
+        sentAt,
+        createdAt: sentAt,
+      },
+      {
+        id: "send-2",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-2",
+        enrollmentId: "enroll-1",
+        leadId: "lead-1",
+        opportunityId: null,
+        status: "sent",
+        providerMessageId: "msg-2",
+        error: null,
+        scheduledFor: sentAt,
+        sentAt,
+        createdAt: sentAt,
+      },
+    ]);
+
+    vi.mocked(updateCampaignEnrollment).mockResolvedValue({
+      ...enrollment,
+      status: "completed",
+      completedAt: sentAt,
+      lastSentAt: sentAt,
+    });
+
+    await reconcileEnrollmentBeforeSend("ws-1", enrollment);
+
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith("ws-1", "enroll-1", {
+      status: "completed",
+      completedAt: sentAt,
+      lastSentAt: sentAt,
+      sendClaimExpiresAt: null,
+    });
+  });
 });

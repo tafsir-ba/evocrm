@@ -33,6 +33,7 @@ export type EnrollmentStepSendLog = {
   providerMessageId: string | null;
   sentAt: Date | null;
   scheduledFor: Date;
+  createdAt: Date;
 };
 
 export function isConfirmedCampaignSend(
@@ -42,6 +43,44 @@ export function isConfirmedCampaignSend(
   providerMessageId: string;
 } {
   return sendLog?.status === "sent" && sendLog.providerMessageId !== null;
+}
+
+function toEnrollmentStepSendLog(
+  send: Pick<
+    CampaignSendRecord,
+    "status" | "providerMessageId" | "sentAt" | "scheduledFor" | "createdAt"
+  >,
+): EnrollmentStepSendLog {
+  return {
+    status: send.status,
+    providerMessageId: send.providerMessageId,
+    sentAt: send.sentAt,
+    scheduledFor: send.scheduledFor,
+    createdAt: send.createdAt,
+  };
+}
+
+function isDeferredRetryForCurrentStep(
+  enrollment: Pick<CampaignEnrollmentRecord, "currentStep" | "status" | "nextSendAt">,
+  stepOrder: number,
+  sendLog: EnrollmentStepSendLog | undefined,
+): boolean {
+  if (
+    sendLog?.status !== "skipped" &&
+    sendLog?.status !== "failed"
+  ) {
+    return false;
+  }
+
+  if (stepOrder !== enrollment.currentStep) {
+    return false;
+  }
+
+  if (enrollment.status !== "active" && enrollment.status !== "paused") {
+    return false;
+  }
+
+  return enrollment.nextSendAt.getTime() > sendLog.scheduledFor.getTime();
 }
 
 export function mapLatestSendLogsByStepOrder(
@@ -54,25 +93,40 @@ export function mapLatestSendLogsByStepOrder(
   >,
 ): Map<number, EnrollmentStepSendLog> {
   const stepIdToOrder = new Map(steps.map((step) => [step.id, step.order]));
-  const latestByOrder = new Map<number, EnrollmentStepSendLog>();
+  const logsByOrder = new Map<number, EnrollmentStepSendLog[]>();
 
-  const sortedSends = [...sends].sort(
-    (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
-  );
-
-  for (const send of sortedSends) {
+  for (const send of sends) {
     const order = stepIdToOrder.get(send.campaignStepId);
 
-    if (order === undefined || latestByOrder.has(order)) {
+    if (order === undefined) {
       continue;
     }
 
-    latestByOrder.set(order, {
-      status: send.status,
-      providerMessageId: send.providerMessageId,
-      sentAt: send.sentAt,
-      scheduledFor: send.scheduledFor,
-    });
+    const existing = logsByOrder.get(order) ?? [];
+    existing.push(toEnrollmentStepSendLog(send));
+    logsByOrder.set(order, existing);
+  }
+
+  const latestByOrder = new Map<number, EnrollmentStepSendLog>();
+
+  for (const [order, logs] of logsByOrder) {
+    const confirmedSends = logs.filter((log) => isConfirmedCampaignSend(log));
+
+    if (confirmedSends.length > 0) {
+      const latestConfirmed = [...confirmedSends].sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+      )[0];
+      latestByOrder.set(order, latestConfirmed);
+      continue;
+    }
+
+    const latestLog = [...logs].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+    )[0];
+
+    if (latestLog) {
+      latestByOrder.set(order, latestLog);
+    }
   }
 
   return latestByOrder;
@@ -123,7 +177,7 @@ export function buildEnrollmentScheduledSteps(
       continue;
     }
 
-    if (sendLog?.status === "failed") {
+    if (sendLog?.status === "failed" && !isDeferredRetryForCurrentStep(enrollment, step.order, sendLog)) {
       schedule.push({
         stepOrder: step.order,
         subject: step.subject,
@@ -134,7 +188,7 @@ export function buildEnrollmentScheduledSteps(
       continue;
     }
 
-    if (sendLog?.status === "skipped") {
+    if (sendLog?.status === "skipped" && !isDeferredRetryForCurrentStep(enrollment, step.order, sendLog)) {
       schedule.push({
         stepOrder: step.order,
         subject: step.subject,
@@ -231,4 +285,27 @@ export function findFirstUnsentStepOrder(
   }
 
   return null;
+}
+
+export function findLatestConfirmedSentAt(
+  steps: CampaignStepScheduleInput[],
+  sendLogsByStepOrder: Map<number, EnrollmentStepSendLog>,
+): Date | null {
+  let latestSentAt: Date | null = null;
+
+  for (const step of steps) {
+    const sendLog = sendLogsByStepOrder.get(step.order);
+
+    if (!isConfirmedCampaignSend(sendLog)) {
+      continue;
+    }
+
+    const sentAt = sendLog.sentAt ?? sendLog.scheduledFor;
+
+    if (!latestSentAt || sentAt.getTime() > latestSentAt.getTime()) {
+      latestSentAt = sentAt;
+    }
+  }
+
+  return latestSentAt;
 }
