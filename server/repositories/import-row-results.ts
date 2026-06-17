@@ -52,24 +52,43 @@ export async function replaceImportRowResults(
 ): Promise<void> {
   await connectDb();
 
-  await ImportRowResultModel.deleteMany(
-    withWorkspaceScope(workspaceId, { importJobId }),
-  );
-
   if (rowResults.length === 0) {
+    await ImportRowResultModel.deleteMany(
+      withWorkspaceScope(workspaceId, { importJobId }),
+    );
     return;
   }
 
-  await ImportRowResultModel.insertMany(
+  const rowNumbers = rowResults.map((result) => result.rowNumber);
+
+  await ImportRowResultModel.bulkWrite(
     rowResults.map((result) => ({
-      workspaceId,
-      importJobId,
-      rowNumber: result.rowNumber,
-      status: result.status,
-      entityId: result.entityId,
-      errors: result.errors,
-      warnings: result.warnings,
+      updateOne: {
+        filter: withWorkspaceScope(workspaceId, {
+          importJobId,
+          rowNumber: result.rowNumber,
+        }),
+        update: {
+          $set: {
+            workspaceId: new mongoose.Types.ObjectId(workspaceId),
+            importJobId: new mongoose.Types.ObjectId(importJobId),
+            rowNumber: result.rowNumber,
+            status: result.status,
+            entityId: result.entityId,
+            errors: result.errors,
+            warnings: result.warnings,
+          },
+        },
+        upsert: true,
+      },
     })),
+  );
+
+  await ImportRowResultModel.deleteMany(
+    withWorkspaceScope(workspaceId, {
+      importJobId,
+      rowNumber: { $nin: rowNumbers },
+    }),
   );
 }
 

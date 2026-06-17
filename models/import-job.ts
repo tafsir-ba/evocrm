@@ -55,6 +55,7 @@ const importJobSchema = new Schema(
     previewRows: { type: [[String]], default: [] },
     mappings: { type: [importMappingSchema], default: [] },
     defaults: { type: Schema.Types.Mixed, default: {} },
+    rowOverrides: { type: Schema.Types.Mixed, default: {} },
     totalRows: { type: Number, default: 0 },
     validRows: { type: Number, default: 0 },
     warningRows: { type: Number, default: 0 },

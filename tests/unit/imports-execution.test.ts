@@ -86,6 +86,7 @@ const baseJob = {
   warningRows: 0,
   errorRows: 0,
   validationIssues: [],
+  rowOverrides: {},
   createdCount: 0,
   skippedCount: 0,
   failedCount: 0,
@@ -113,6 +114,7 @@ const validationResult = {
   normalizedRows: [
     {
       rowNumber: 1,
+      rawRow: { email: "bad" },
       status: "error" as const,
       row: {},
       issues: [

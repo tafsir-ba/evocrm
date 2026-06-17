@@ -13,9 +13,16 @@ import {
   parseOptionalCurrency,
   parseOptionalDate,
   escapeCsvCell,
+  compactLookupKey,
+  registerImportLookupAliases,
+  resolveProjectId,
+  finalizeImportLookupField,
 } from "@/server/imports/import-normalizers";
+import { leadImportConfig } from "@/server/imports/entities/lead-import-config";
+import { AppError } from "@/server/errors";
 import {
   validateMappingConfiguration,
+  applyRowOverrides,
   mapRowFromSource,
 } from "@/server/imports/import-validator";
 import { detectDuplicateHeaders, normalizeImportCellValue } from "@/server/imports/import-file-parser";
@@ -98,6 +105,41 @@ describe("import normalizers", () => {
 
   it("preserves leading plus signs in import cell values", () => {
     expect(normalizeImportCellValue("+971501234567")).toBe("+971501234567");
+  });
+
+  it("matches compact project names without spaces", () => {
+    const projectLookup = new Map<string, string>();
+    const projectId = "507f1f77bcf86cd799439011";
+    registerImportLookupAliases(projectLookup, ["Grosvenor Vistas"], projectId);
+
+    expect(resolveProjectId(projectLookup, "grosvenorvistas")).toBe(projectId);
+    expect(compactLookupKey("Grosvenor Vistas")).toBe("grosvenorvistas");
+  });
+
+  it("throws a clear error for unknown lookup values", () => {
+    const projectLookup = new Map<string, string>();
+
+    expect(() =>
+      finalizeImportLookupField(
+        "grosvenorvistas",
+        resolveProjectId(projectLookup, "grosvenorvistas"),
+        "project",
+        "projectId",
+      ),
+    ).toThrow(AppError);
+
+    try {
+      finalizeImportLookupField(
+        "grosvenorvistas",
+        resolveProjectId(projectLookup, "grosvenorvistas"),
+        "project",
+        "projectId",
+      );
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).message).toBe('Unknown project "grosvenorvistas".');
+      expect((error as AppError).details).toEqual({ field: "projectId" });
+    }
   });
 });
 
@@ -192,6 +234,28 @@ describe("import mapping validation", () => {
     expect(row).not.toHaveProperty("notes");
     expect(row.projectId).toBe("507f1f77bcf86cd799439011");
   });
+
+  it("applies per-row overrides on top of mapped values", () => {
+    const row = mapRowFromSource(
+      ["", "Miller"],
+      ["First Name", "Last Name"],
+      [
+        { sourceColumnIndex: 0, targetField: "firstName" },
+        { sourceColumnIndex: 1, targetField: "lastName" },
+      ],
+      {
+        projectId: "507f1f77bcf86cd799439011",
+        statusId: "507f1f77bcf86cd799439012",
+      },
+    );
+
+    const corrected = applyRowOverrides(row, 91, {
+      "91": { firstName: "Malika" },
+    });
+
+    expect(corrected.firstName).toBe("Malika");
+    expect(corrected.lastName).toBe("Miller");
+  });
 });
 
 describe("import field configs", () => {
@@ -218,6 +282,38 @@ describe("import field configs", () => {
   it("includes property units alias on rooms", () => {
     const roomsField = propertyImportConfig.fields.find((field) => field.key === "rooms");
     expect(roomsField?.aliases).toContain("property units");
+  });
+
+  it("resolves hubspot-style project slugs during lead import", async () => {
+    const projectId = "507f1f77bcf86cd799439011";
+    const statusId = "507f1f77bcf86cd799439012";
+    const projectLookup = new Map<string, string>();
+    registerImportLookupAliases(projectLookup, ["Grosvenor Vistas"], projectId);
+
+    const dictionaryLookup = new Map<string, Map<string, string>>();
+    const statusLookup = new Map<string, string>();
+    registerImportLookupAliases(statusLookup, ["New"], statusId);
+    dictionaryLookup.set("lead_status", statusLookup);
+
+    const input = await leadImportConfig.buildCreateInput(
+      {
+        projectId: "grosvenorvistas",
+        statusId,
+        firstName: "Malika",
+        lastName: "Miller",
+      },
+      {
+        workspaceId: "workspace-id",
+        actorId: "actor-id",
+        defaultCurrency: "EUR",
+        dictionaryLookup,
+        projectLookup,
+        memberLookup: new Map(),
+        tagLookup: new Map(),
+      },
+    );
+
+    expect(input.projectId).toBe(projectId);
   });
 });
 

@@ -3,6 +3,7 @@ import type {
   ImportFieldConfigResponse,
   ImportMappingEntry,
   ImportRowIssue,
+  ImportRowOverrides,
 } from "@/lib/imports";
 
 export function validateImportMappingConfiguration(
@@ -58,7 +59,48 @@ export function validateImportMappingConfiguration(
     }
   }
 
+  for (const [key] of Object.entries(defaults)) {
+    if (!validFieldKeys.has(key)) {
+      issues.push({
+        rowNumber: 0,
+        field: key,
+        message: `Unknown default field "${key}".`,
+        severity: "error",
+      });
+    }
+  }
+
   return issues;
+}
+
+export function sanitizeRowOverrides(
+  fields: ImportFieldConfigResponse[],
+  rowOverrides: ImportRowOverrides,
+): ImportRowOverrides {
+  const validFieldKeys = new Set(fields.map((field) => field.key));
+  const sanitized: ImportRowOverrides = {};
+
+  for (const [rowKey, overrides] of Object.entries(rowOverrides)) {
+    const rowNumber = Number(rowKey);
+
+    if (!Number.isInteger(rowNumber) || rowNumber < 1) {
+      continue;
+    }
+
+    const cleaned: Record<string, string> = {};
+
+    for (const [fieldKey, value] of Object.entries(overrides)) {
+      if (validFieldKeys.has(fieldKey)) {
+        cleaned[fieldKey] = value;
+      }
+    }
+
+    if (Object.keys(cleaned).length > 0) {
+      sanitized[String(rowNumber)] = cleaned;
+    }
+  }
+
+  return sanitized;
 }
 
 export function sanitizeImportMappingPayload(input: {

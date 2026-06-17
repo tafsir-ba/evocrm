@@ -42,6 +42,11 @@ export const executeImportSchema = z.object({
   mode: z.enum(IMPORT_EXECUTE_MODES).default("valid_rows_only"),
 });
 
+export const validateImportSchema = z.object({
+  rowOverrides: z.record(z.record(z.string())).optional(),
+});
+
 export type SaveImportMappingInput = z.infer<typeof saveImportMappingSchema>;
 export type ParseImportInput = z.infer<typeof parseImportSchema>;
 export type ExecuteImportInput = z.infer<typeof executeImportSchema>;
+export type ValidateImportInput = z.infer<typeof validateImportSchema>;

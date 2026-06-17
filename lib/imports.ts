@@ -70,6 +70,15 @@ export type ImportMappingEntry = {
 
 export type ImportDefaults = Record<string, string>;
 
+/** Per-row field corrections applied after column mapping (row number as string key). */
+export type ImportRowOverrides = Record<string, Record<string, string>>;
+
+export type ImportErrorRowDetail = {
+  rowNumber: number;
+  values: Record<string, string>;
+  issues: ImportRowIssue[];
+};
+
 export type ImportRowIssue = {
   rowNumber: number;
   field?: string;

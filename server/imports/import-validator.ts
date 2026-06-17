@@ -4,6 +4,7 @@ import type {
   ImportDefaults,
   ImportMappingEntry,
   ImportRowIssue,
+  ImportRowOverrides,
   ImportValidationSummary,
 } from "@/lib/imports";
 import { validateImportMappingConfiguration } from "@/lib/import-mapping-validation";
@@ -22,7 +23,7 @@ import type {
 import {
   isValidEmail,
   normalizeEmailValue,
-  normalizeLookupKey,
+  registerImportLookupAliases,
   normalizeReferenceValue,
   parseOptionalCurrency,
   parseOptionalDate,
@@ -37,11 +38,36 @@ export type ImportValidationResult = {
   issues: ImportRowIssue[];
   normalizedRows: Array<{
     rowNumber: number;
+    rawRow: NormalizedImportRow;
     row: NormalizedImportRow;
     status: "valid" | "warning" | "error";
     issues: ImportRowIssue[];
   }>;
 };
+
+export function applyRowOverrides(
+  row: NormalizedImportRow,
+  rowNumber: number,
+  rowOverrides: ImportRowOverrides,
+): NormalizedImportRow {
+  const override = rowOverrides[String(rowNumber)];
+
+  if (!override || Object.keys(override).length === 0) {
+    return row;
+  }
+
+  const next: NormalizedImportRow = { ...row };
+
+  for (const [key, value] of Object.entries(override)) {
+    if (value === "") {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+  }
+
+  return next;
+}
 
 export async function buildImportContext(
   workspaceId: string,
@@ -69,8 +95,7 @@ export async function buildImportContext(
 
     for (const item of dictionaryItems) {
       if (item.type !== type || !item.isActive) continue;
-      lookup.set(normalizeLookupKey(item.label), item.id);
-      lookup.set(normalizeLookupKey(item.key), item.id);
+      registerImportLookupAliases(lookup, [item.label, item.key], item.id);
     }
 
     dictionaryLookup.set(type, lookup);
@@ -78,27 +103,25 @@ export async function buildImportContext(
 
   const projectLookup = new Map<string, string>();
   for (const project of projects) {
-    projectLookup.set(normalizeLookupKey(project.name), project.id);
-    if (project.reference) {
-      projectLookup.set(normalizeLookupKey(project.reference), project.id);
-    }
+    registerImportLookupAliases(
+      projectLookup,
+      [project.name, project.reference],
+      project.id,
+    );
     projectLookup.set(project.id, project.id);
   }
 
   const memberLookup = new Map<string, string>();
   for (const member of members) {
     memberLookup.set(member.userId, member.userId);
-    memberLookup.set(normalizeLookupKey(member.email), member.userId);
-    if (member.name) {
-      memberLookup.set(normalizeLookupKey(member.name), member.userId);
-    }
+    registerImportLookupAliases(memberLookup, [member.email, member.name], member.userId);
   }
 
   const tagEntityType = entityConfig.entityType === "lead" ? "lead" : "property";
   const tagLookup = new Map<string, string>();
   for (const tag of tags) {
     if (!tag.entityTypes.includes(tagEntityType)) continue;
-    tagLookup.set(normalizeLookupKey(tag.name), tag.id);
+    registerImportLookupAliases(tagLookup, [tag.name], tag.id);
   }
 
   return {
@@ -161,6 +184,7 @@ export async function validateImportRows(
   dataRows: string[][],
   mappings: ImportMappingEntry[],
   defaults: ImportDefaults,
+  rowOverrides: ImportRowOverrides = {},
 ): Promise<ImportValidationResult> {
   const issues: ImportRowIssue[] = [];
   const normalizedRows: ImportValidationResult["normalizedRows"] = [];
@@ -172,8 +196,13 @@ export async function validateImportRows(
   const propertyReferencesToCheck: string[] = [];
 
   if (entityConfig.entityType === "lead") {
-    for (const dataRow of dataRows) {
-      const rawRow = mapRowFromSource(dataRow, headers, mappings, defaults);
+    for (let index = 0; index < dataRows.length; index += 1) {
+      const dataRow = dataRows[index] ?? [];
+      const rawRow = applyRowOverrides(
+        mapRowFromSource(dataRow, headers, mappings, defaults),
+        index + 1,
+        rowOverrides,
+      );
       if (!rawRow.email || typeof rawRow.email !== "string") continue;
       try {
         leadEmailsToCheck.push(normalizeLeadEmail(rawRow.email).emailNormalized);
@@ -184,8 +213,13 @@ export async function validateImportRows(
   }
 
   if (entityConfig.entityType === "property") {
-    for (const dataRow of dataRows) {
-      const rawRow = mapRowFromSource(dataRow, headers, mappings, defaults);
+    for (let index = 0; index < dataRows.length; index += 1) {
+      const dataRow = dataRows[index] ?? [];
+      const rawRow = applyRowOverrides(
+        mapRowFromSource(dataRow, headers, mappings, defaults),
+        index + 1,
+        rowOverrides,
+      );
       const reference = normalizeReferenceValue(rawRow.reference);
       if (reference) {
         propertyReferencesToCheck.push(reference);
@@ -207,7 +241,11 @@ export async function validateImportRows(
     const rowNumber = index + 1;
     const dataRow = dataRows[index] ?? [];
     const rowIssues: ImportRowIssue[] = [];
-    const rawRow = mapRowFromSource(dataRow, headers, mappings, defaults);
+    const rawRow = applyRowOverrides(
+      mapRowFromSource(dataRow, headers, mappings, defaults),
+      rowNumber,
+      rowOverrides,
+    );
 
     validateRawRow(entityConfig.fields, rawRow, rowIssues, rowNumber);
 
@@ -261,6 +299,7 @@ export async function validateImportRows(
 
     normalizedRows.push({
       rowNumber,
+      rawRow,
       row: normalizedRow,
       status: hasError ? "error" : hasWarning ? "warning" : "valid",
       issues: rowIssues,

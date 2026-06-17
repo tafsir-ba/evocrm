@@ -4,17 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { Select } from "@/components/ui/input";
 import {
   formatImportFileSize,
   MAX_IMPORT_FILE_SIZE_BYTES,
   SUPPORTED_IMPORT_EXTENSIONS,
   type ImportEntityConfigResponse,
   type ImportEntityType,
+  type ImportErrorRowDetail,
   type ImportMappingEntry,
   type ImportPreviewRow,
   type ImportRowIssue,
+  type ImportRowOverrides,
   type ImportValidationSummary,
 } from "@/lib/imports";
 import {
@@ -104,6 +106,9 @@ export function ImportWizard({
 
   const [validationSummary, setValidationSummary] = useState<ImportValidationSummary | null>(null);
   const [validationIssues, setValidationIssues] = useState<ImportRowIssue[]>([]);
+  const [errorRowDetails, setErrorRowDetails] = useState<ImportErrorRowDetail[]>([]);
+  const [warningRowDetails, setWarningRowDetails] = useState<ImportErrorRowDetail[]>([]);
+  const [rowOverrides, setRowOverrides] = useState<ImportRowOverrides>({});
   const [importResult, setImportResult] = useState<{
     createdCount: number;
     skippedCount: number;
@@ -223,6 +228,9 @@ export function ImportWizard({
     setHasHeaderRow(true);
     setValidationSummary(null);
     setValidationIssues([]);
+    setErrorRowDetails([]);
+    setWarningRowDetails([]);
+    setRowOverrides({});
     setImportResult(null);
   }, []);
 
@@ -252,6 +260,8 @@ export function ImportWizard({
 
         setConfig(configPayload.data as ImportEntityConfigResponse);
 
+        const loadErrors: string[] = [];
+
         if (projectsRes.ok) {
           const projectList =
             (projectsPayload.data as { projects?: ProjectItem[] } | undefined)
@@ -262,10 +272,14 @@ export function ImportWizard({
               name: project.name,
             })),
           );
+        } else {
+          loadErrors.push("Failed to load projects.");
         }
 
         if (membersRes.ok) {
           setMembers(membersPayload.data.members as MemberItem[]);
+        } else {
+          loadErrors.push("Failed to load workspace members.");
         }
 
         const dictionaryTypes = new Set(
@@ -280,6 +294,11 @@ export function ImportWizard({
               `/api/workspaces/${workspaceSlug}/dictionary-items?type=${type}`,
             );
             const payload = await response.json();
+
+            if (!response.ok) {
+              loadErrors.push(`Failed to load ${type} dictionary items.`);
+            }
+
             return [
               type!,
               response.ok ? (payload.data.items as DictionaryItem[]) : [],
@@ -288,6 +307,10 @@ export function ImportWizard({
         );
 
         setDictionaries(Object.fromEntries(dictionaryEntries));
+
+        if (loadErrors.length > 0) {
+          setError(loadErrors.join(" "));
+        }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load config.");
       } finally {
@@ -377,6 +400,23 @@ export function ImportWizard({
     }
   }
 
+  function applyValidationResponse(data: {
+    summary: ImportValidationSummary;
+    issues: ImportRowIssue[];
+    errorRows?: ImportErrorRowDetail[];
+    warningRows?: ImportErrorRowDetail[];
+    rowOverrides?: ImportRowOverrides;
+  }) {
+    setValidationSummary(data.summary);
+    setValidationIssues(data.issues);
+    setErrorRowDetails(data.errorRows ?? []);
+    setWarningRowDetails(data.warningRows ?? []);
+    if (data.rowOverrides) {
+      setRowOverrides(data.rowOverrides);
+    }
+    setStep("validate");
+  }
+
   async function handleSaveMappingAndValidate() {
     if (!importId || !config) return;
 
@@ -413,21 +453,62 @@ export function ImportWizard({
 
       const validateResponse = await fetch(`${apiBase}/${importId}/validate`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
       const validatePayload = await validateResponse.json();
 
       if (!validateResponse.ok) {
-        throw new Error(validatePayload.error?.message ?? "Validation failed.");
+        throw new Error(
+          formatImportApiError(validatePayload, "Validation failed."),
+        );
       }
 
-      setValidationSummary(validatePayload.data.summary as ImportValidationSummary);
-      setValidationIssues(validatePayload.data.issues as ImportRowIssue[]);
-      setStep("validate");
+      applyValidationResponse(validatePayload.data);
     } catch (validateError) {
       setError(validateError instanceof Error ? validateError.message : "Validation failed.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleRevalidateWithFixes() {
+    if (!importId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const validateResponse = await fetch(`${apiBase}/${importId}/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowOverrides }),
+      });
+      const validatePayload = await validateResponse.json();
+
+      if (!validateResponse.ok) {
+        throw new Error(
+          formatImportApiError(validatePayload, "Validation failed."),
+        );
+      }
+
+      applyValidationResponse(validatePayload.data);
+    } catch (revalidateError) {
+      setError(
+        revalidateError instanceof Error ? revalidateError.message : "Validation failed.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function updateRowOverride(rowNumber: number, fieldKey: string, value: string) {
+    const rowKey = String(rowNumber);
+
+    setRowOverrides((current) => {
+      const nextRow = { ...(current[rowKey] ?? {}), [fieldKey]: value };
+      return { ...current, [rowKey]: nextRow };
+    });
   }
 
   async function handleExecute(mode: "valid_rows_only" | "strict") {
@@ -512,6 +593,16 @@ export function ImportWizard({
         )}
         {step === "validate" && (
           <>
+            {validationSummary && validationSummary.errorRows > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => void handleRevalidateWithFixes()}
+                loading={loading}
+                disabled={Object.keys(rowOverrides).length === 0}
+              >
+                Apply fixes
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={() => void handleExecute("strict")}
@@ -542,7 +633,11 @@ export function ImportWizard({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!loading) {
+          onClose();
+        }
+      }}
       title={`Import ${entityLabel}s`}
       className="max-w-5xl"
       footer={footer}
@@ -593,6 +688,7 @@ export function ImportWizard({
             sheetName={sheetName}
             rowCount={rowCount}
             parseWarnings={parseWarnings}
+            loading={loading}
             getMappingForColumn={getMappingForColumn}
             onMappingChange={updateMapping}
             onDefaultChange={(fieldKey, value) =>
@@ -602,8 +698,19 @@ export function ImportWizard({
           />
         )}
 
-        {step === "validate" && validationSummary && (
-          <ValidateStep summary={validationSummary} issues={validationIssues} />
+        {step === "validate" && validationSummary && config && (
+          <ValidateStep
+            summary={validationSummary}
+            issues={validationIssues}
+            errorRows={errorRowDetails}
+            warningRows={warningRowDetails}
+            config={config}
+            rowOverrides={rowOverrides}
+            projects={projects}
+            members={members}
+            dictionaries={dictionaries}
+            onFieldChange={updateRowOverride}
+          />
         )}
 
         {step === "results" && importResult && importId && (
@@ -739,6 +846,7 @@ function MapStep({
   sheetName,
   rowCount,
   parseWarnings,
+  loading,
   getMappingForColumn,
   onMappingChange,
   onDefaultChange,
@@ -759,6 +867,7 @@ function MapStep({
   sheetName: string | null;
   rowCount: number;
   parseWarnings: string[];
+  loading: boolean;
   getMappingForColumn: (index: number) => string | null;
   onMappingChange: (index: number, field: string | null) => void;
   onDefaultChange: (fieldKey: string, value: string) => void;
@@ -781,6 +890,7 @@ function MapStep({
           <input
             type="checkbox"
             checked={hasHeaderRow}
+            disabled={loading}
             onChange={(event) => onHasHeaderRowChange(event.target.checked)}
           />
           First row contains headers
@@ -797,6 +907,7 @@ function MapStep({
                 <Select
                   fieldSize="sm"
                   value={defaults[field.key] ?? ""}
+                  disabled={loading}
                   onChange={(event) => onDefaultChange(field.key, event.target.value)}
                 >
                   <option value="">No default</option>
@@ -868,6 +979,7 @@ function MapStep({
                       <Select
                         fieldSize="sm"
                         value={mappedField ?? ""}
+                        disabled={loading}
                         onChange={(event) =>
                           onMappingChange(
                             column.index,
@@ -909,10 +1021,31 @@ function MapStep({
 function ValidateStep({
   summary,
   issues,
+  errorRows,
+  warningRows,
+  config,
+  rowOverrides,
+  projects,
+  members,
+  dictionaries,
+  onFieldChange,
 }: {
   summary: ImportValidationSummary;
   issues: ImportRowIssue[];
+  errorRows: ImportErrorRowDetail[];
+  warningRows: ImportErrorRowDetail[];
+  config: ImportEntityConfigResponse;
+  rowOverrides: ImportRowOverrides;
+  projects: ProjectItem[];
+  members: MemberItem[];
+  dictionaries: Record<string, DictionaryItem[]>;
+  onFieldChange: (rowNumber: number, fieldKey: string, value: string) => void;
 }) {
+  const fieldMap = useMemo(
+    () => new Map(config.fields.map((field) => [field.key, field])),
+    [config.fields],
+  );
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -922,7 +1055,32 @@ function ValidateStep({
         <StatCard label="Errors" value={summary.errorRows} tone="danger" />
       </div>
 
-      {issues.length > 0 ? (
+      {errorRows.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            Fix the rows below, then click <span className="font-medium text-[var(--color-ink)]">Apply fixes</span> to re-validate.
+          </p>
+          {summary.errorRows > errorRows.length && (
+            <p className="text-[12px] text-[#92400e]">
+              Showing the first {errorRows.length} of {summary.errorRows} error rows. Remaining errors will still be skipped during import.
+            </p>
+          )}
+          <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+            {errorRows.map((errorRow) => (
+              <ImportErrorRowEditor
+                key={errorRow.rowNumber}
+                errorRow={errorRow}
+                fieldMap={fieldMap}
+                rowOverrides={rowOverrides}
+                projects={projects}
+                members={members}
+                dictionaries={dictionaries}
+                onFieldChange={onFieldChange}
+              />
+            ))}
+          </div>
+        </div>
+      ) : issues.length > 0 ? (
         <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--color-line)]">
           <table className="min-w-full text-[12px]">
             <thead className="bg-[var(--color-canvas)]">
@@ -945,12 +1103,220 @@ function ValidateStep({
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : null}
+
+      {warningRows.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[12px] font-medium text-[var(--color-ink)]">Warning rows</p>
+          {summary.warningRows > warningRows.length && (
+            <p className="text-[12px] text-[#92400e]">
+              Showing the first {warningRows.length} of {summary.warningRows} warning rows.
+            </p>
+          )}
+          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-[#fde68a] bg-[#fffbeb] p-3">
+            {warningRows.map((warningRow) => (
+              <div key={warningRow.rowNumber} className="space-y-1">
+                <p className="text-[12px] font-medium text-[var(--color-ink)]">
+                  Row {warningRow.rowNumber}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {warningRow.issues.map((issue, index) => (
+                    <Badge key={`${issue.field ?? "row"}-${index}`} tone="warn" size="sm">
+                      {issue.message}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {errorRows.length === 0 && issues.length === 0 && warningRows.length === 0 ? (
         <p className="text-[13px] text-[var(--color-ink-muted)]">
           All rows are ready to import.
         </p>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+function ImportErrorRowEditor({
+  errorRow,
+  fieldMap,
+  rowOverrides,
+  projects,
+  members,
+  dictionaries,
+  onFieldChange,
+}: {
+  errorRow: ImportErrorRowDetail;
+  fieldMap: Map<string, ImportEntityConfigResponse["fields"][number]>;
+  rowOverrides: ImportRowOverrides;
+  projects: ProjectItem[];
+  members: MemberItem[];
+  dictionaries: Record<string, DictionaryItem[]>;
+  onFieldChange: (rowNumber: number, fieldKey: string, value: string) => void;
+}) {
+  const editableFieldKeys = Array.from(
+    new Set(
+      errorRow.issues
+        .map((issue) => issue.field)
+        .filter((field): field is string => Boolean(field)),
+    ),
+  );
+
+  function getRowFieldValue(fieldKey: string): string {
+    return (
+      rowOverrides[String(errorRow.rowNumber)]?.[fieldKey] ??
+      errorRow.values[fieldKey] ??
+      ""
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[12px] font-medium text-[var(--color-ink)]">
+          Row {errorRow.rowNumber}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {errorRow.issues.map((issue, index) => (
+            <Badge key={`${issue.field ?? "row"}-${index}`} tone="warn" size="sm">
+              {issue.message}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {editableFieldKeys.map((fieldKey) => {
+          const field = fieldMap.get(fieldKey);
+          const currentValue = getRowFieldValue(fieldKey);
+          const sourceValue = errorRow.values[fieldKey] ?? "";
+
+          return (
+            <label key={fieldKey} className="space-y-1">
+              <span className="text-[11px] text-[var(--color-ink-muted)]">
+                {field?.label ?? fieldKey}
+              </span>
+              {field?.helpText && (
+                <span className="block text-[10px] text-[var(--color-ink-faint)]">
+                  {field.helpText}
+                </span>
+              )}
+              <ImportFieldEditor
+                field={field}
+                value={currentValue}
+                sourceValue={sourceValue}
+                projects={projects}
+                members={members}
+                dictionaries={dictionaries}
+                onChange={(value) => onFieldChange(errorRow.rowNumber, fieldKey, value)}
+              />
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function isObjectIdValue(value: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(value);
+}
+
+function ImportFieldEditor({
+  field,
+  value,
+  sourceValue,
+  projects,
+  members,
+  dictionaries,
+  onChange,
+}: {
+  field: ImportEntityConfigResponse["fields"][number] | undefined;
+  value: string;
+  sourceValue?: string;
+  projects: ProjectItem[];
+  members: MemberItem[];
+  dictionaries: Record<string, DictionaryItem[]>;
+  onChange: (value: string) => void;
+}) {
+  const unresolvedSource =
+    sourceValue && !isObjectIdValue(sourceValue) && value === sourceValue
+      ? sourceValue
+      : null;
+
+  if (field?.type === "project") {
+    const hasMatch = projects.some((project) => project.id === value);
+
+    return (
+      <div className="space-y-1">
+        {unresolvedSource && !hasMatch && (
+          <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
+        )}
+        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+          <option value="">Select project</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+    );
+  }
+
+  if (field?.type === "member") {
+    const hasMatch = members.some((member) => member.userId === value);
+
+    return (
+      <div className="space-y-1">
+        {unresolvedSource && !hasMatch && (
+          <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
+        )}
+        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+          <option value="">Select member</option>
+          {members.map((member) => (
+            <option key={member.userId} value={member.userId}>
+              {member.name ?? member.email}
+            </option>
+          ))}
+        </Select>
+      </div>
+    );
+  }
+
+  if (field?.dictionaryType) {
+    const items = dictionaries[field.dictionaryType] ?? [];
+    const hasMatch = items.some((item) => item.id === value);
+
+    return (
+      <div className="space-y-1">
+        {unresolvedSource && !hasMatch && (
+          <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
+        )}
+        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+          <option value="">Select {field.label.toLowerCase()}</option>
+          {items.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </Select>
+      </div>
+    );
+  }
+
+  return (
+    <Input
+      fieldSize="sm"
+      type={field?.type === "email" ? "email" : field?.type === "phone" ? "tel" : "text"}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={field?.label ?? "Value"}
+    />
   );
 }
 

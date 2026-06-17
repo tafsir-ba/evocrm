@@ -1,8 +1,50 @@
 import "server-only";
 
-import type { ImportRowIssue } from "@/lib/imports";
+import type { ImportErrorRowDetail, ImportRowIssue } from "@/lib/imports";
 import { escapeCsvCell } from "@/server/imports/import-normalizers";
+import type { ImportValidationResult } from "@/server/imports/import-validator";
+import type { NormalizedImportRow } from "@/server/imports/import-entity-config";
 import type { ImportRowResultRecord } from "@/server/repositories/import-jobs";
+
+const MAX_EDITABLE_ERROR_ROWS = 100;
+const MAX_VISIBLE_WARNING_ROWS = 100;
+
+function rowValuesToStrings(row: NormalizedImportRow): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    if (value === undefined || value === null) continue;
+    values[key] = String(value);
+  }
+
+  return values;
+}
+
+export function buildImportErrorRowDetails(
+  validation: ImportValidationResult,
+): ImportErrorRowDetail[] {
+  return validation.normalizedRows
+    .filter((row) => row.status === "error")
+    .slice(0, MAX_EDITABLE_ERROR_ROWS)
+    .map((row) => ({
+      rowNumber: row.rowNumber,
+      values: rowValuesToStrings(row.rawRow),
+      issues: row.issues.filter((issue) => issue.severity === "error"),
+    }));
+}
+
+export function buildImportWarningRowDetails(
+  validation: ImportValidationResult,
+): ImportErrorRowDetail[] {
+  return validation.normalizedRows
+    .filter((row) => row.status === "warning")
+    .slice(0, MAX_VISIBLE_WARNING_ROWS)
+    .map((row) => ({
+      rowNumber: row.rowNumber,
+      values: rowValuesToStrings(row.rawRow),
+      issues: row.issues.filter((issue) => issue.severity === "warning"),
+    }));
+}
 
 export function buildImportErrorCsv(
   rowResults: ImportRowResultRecord[],

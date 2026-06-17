@@ -6,6 +6,7 @@ import {
   USAGE_PURPOSES,
 } from "@/lib/lead-preferences";
 import { SURFACE_UNITS } from "@/lib/surface-unit";
+import { AppError } from "@/server/errors";
 import { normalizeLeadEmail, normalizeLeadPhone } from "@/server/services/leads";
 import { normalizePropertyReference } from "@/server/services/properties";
 
@@ -167,7 +168,27 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export function resolveDictionaryId(
+export function isImportObjectId(value: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(value);
+}
+
+export function compactLookupKey(value: string): string {
+  return normalizeLookupKey(value).replace(/[^a-z0-9]/g, "");
+}
+
+export function registerImportLookupAliases(
+  lookup: Map<string, string>,
+  labels: Array<string | null | undefined>,
+  id: string,
+): void {
+  for (const label of labels) {
+    if (!label) continue;
+    lookup.set(normalizeLookupKey(label), id);
+    lookup.set(compactLookupKey(label), id);
+  }
+}
+
+export function resolveLookupId(
   lookup: Map<string, string>,
   value: unknown,
 ): string | undefined {
@@ -175,32 +196,66 @@ export function resolveDictionaryId(
     return undefined;
   }
 
-  const normalized = String(value).trim().toLowerCase();
-  return lookup.get(normalized);
+  const stringValue = String(value).trim();
+
+  if (isImportObjectId(stringValue)) {
+    return stringValue;
+  }
+
+  const normalized = normalizeLookupKey(stringValue);
+  return (
+    lookup.get(stringValue) ??
+    lookup.get(normalized) ??
+    lookup.get(compactLookupKey(stringValue))
+  );
+}
+
+export function finalizeImportLookupField(
+  value: unknown,
+  resolved: string | undefined,
+  label: string,
+  fieldKey: string,
+): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const stringValue = String(value).trim();
+
+  if (resolved) {
+    return resolved;
+  }
+
+  if (isImportObjectId(stringValue)) {
+    return stringValue;
+  }
+
+  throw new AppError(
+    "VALIDATION_ERROR",
+    `Unknown ${label} "${stringValue}".`,
+    { details: { field: fieldKey } },
+  );
+}
+
+export function resolveDictionaryId(
+  lookup: Map<string, string>,
+  value: unknown,
+): string | undefined {
+  return resolveLookupId(lookup, value);
 }
 
 export function resolveProjectId(
   lookup: Map<string, string>,
   value: unknown,
 ): string | undefined {
-  if (value === null || value === undefined || value === "") {
-    return undefined;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  return lookup.get(normalized);
+  return resolveLookupId(lookup, value);
 }
 
 export function resolveMemberId(
   lookup: Map<string, string>,
   value: unknown,
 ): string | undefined {
-  if (value === null || value === undefined || value === "") {
-    return undefined;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  return lookup.get(normalized);
+  return resolveLookupId(lookup, value);
 }
 
 export function resolveTagIds(

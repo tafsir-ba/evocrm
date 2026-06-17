@@ -9,6 +9,7 @@ import type {
   NormalizedImportRow,
 } from "@/server/imports/import-entity-config";
 import {
+  finalizeImportLookupField,
   isPropertyTypeInterest,
   isTransactionIntent,
   isUsagePurpose,
@@ -199,31 +200,51 @@ async function buildLeadCreateInput(
 
   delete input.fullName;
 
-  if (input.projectId && typeof input.projectId === "string") {
-    const resolved = resolveProjectId(context.projectLookup, input.projectId);
-    if (resolved) input.projectId = resolved;
+  if (input.projectId !== undefined && input.projectId !== "") {
+    input.projectId = finalizeImportLookupField(
+      input.projectId,
+      resolveProjectId(context.projectLookup, input.projectId),
+      "project",
+      "projectId",
+    );
   }
 
-  if (input.statusId && typeof input.statusId === "string") {
+  if (input.statusId !== undefined && input.statusId !== "") {
     const lookup = context.dictionaryLookup.get("lead_status");
-    const resolved = lookup ? resolveDictionaryId(lookup, input.statusId) : undefined;
-    if (resolved) input.statusId = resolved;
+    input.statusId = finalizeImportLookupField(
+      input.statusId,
+      lookup ? resolveDictionaryId(lookup, input.statusId) : undefined,
+      "status",
+      "statusId",
+    );
   }
 
-  if (input.sourceId && typeof input.sourceId === "string") {
+  if (input.sourceId !== undefined && input.sourceId !== "") {
     const lookup = context.dictionaryLookup.get("lead_source");
-    const resolved = lookup ? resolveDictionaryId(lookup, input.sourceId) : undefined;
-    if (resolved) input.sourceId = resolved;
+    input.sourceId = finalizeImportLookupField(
+      input.sourceId,
+      lookup ? resolveDictionaryId(lookup, input.sourceId) : undefined,
+      "source",
+      "sourceId",
+    );
   }
 
-  if (input.ownerId && typeof input.ownerId === "string") {
-    const resolved = resolveMemberId(context.memberLookup, input.ownerId);
-    if (resolved) input.ownerId = resolved;
+  if (input.ownerId !== undefined && input.ownerId !== "") {
+    input.ownerId = finalizeImportLookupField(
+      input.ownerId,
+      resolveMemberId(context.memberLookup, input.ownerId),
+      "owner",
+      "ownerId",
+    );
   }
 
-  if (input.assignedTo && typeof input.assignedTo === "string") {
-    const resolved = resolveMemberId(context.memberLookup, input.assignedTo);
-    if (resolved) input.assignedTo = resolved;
+  if (input.assignedTo !== undefined && input.assignedTo !== "") {
+    input.assignedTo = finalizeImportLookupField(
+      input.assignedTo,
+      resolveMemberId(context.memberLookup, input.assignedTo),
+      "assignee",
+      "assignedTo",
+    );
   }
 
   if (input.email && typeof input.email === "string") {

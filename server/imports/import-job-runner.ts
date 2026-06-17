@@ -4,6 +4,7 @@ import type { ImportExecuteMode } from "@/lib/imports";
 import { AppError } from "@/server/errors";
 import type { ImportEntityConfig, ImportContext } from "@/server/imports/import-entity-config";
 import type { ImportValidationResult } from "@/server/imports/import-validator";
+import { findImportRowResults } from "@/server/repositories/import-row-results";
 import {
   updateImportJobExecution,
   type ImportJobRecord,
@@ -29,10 +30,23 @@ export async function executeImportJob(
   let skippedCount = 0;
   let failedCount = 0;
 
+  const existingResults = await findImportRowResults(job.workspaceId, job.id);
+  const existingByRow = new Map(
+    existingResults.map((result) => [result.rowNumber, result]),
+  );
+
   for (let index = 0; index < validation.normalizedRows.length; index += BATCH_SIZE) {
     const batch = validation.normalizedRows.slice(index, index + BATCH_SIZE);
 
     for (const rowResult of batch) {
+      const existing = existingByRow.get(rowResult.rowNumber);
+
+      if (existing?.status === "created") {
+        createdCount += 1;
+        rowResults.push(existing);
+        continue;
+      }
+
       if (rowResult.status === "error") {
         skippedCount += 1;
         rowResults.push({

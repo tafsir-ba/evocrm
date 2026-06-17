@@ -9,6 +9,7 @@ import type {
   PropertyImportInput,
 } from "@/server/imports/import-entity-config";
 import {
+  finalizeImportLookupField,
   isSurfaceUnit,
   normalizeLookupKey,
   normalizeReferenceValue,
@@ -168,31 +169,51 @@ async function buildPropertyCreateInput(
 ): Promise<PropertyImportInput> {
   const input: Record<string, unknown> = { ...row };
 
-  if (input.projectId && typeof input.projectId === "string") {
-    const resolved = resolveProjectId(context.projectLookup, input.projectId);
-    if (resolved) input.projectId = resolved;
+  if (input.projectId !== undefined && input.projectId !== "") {
+    input.projectId = finalizeImportLookupField(
+      input.projectId,
+      resolveProjectId(context.projectLookup, input.projectId),
+      "project",
+      "projectId",
+    );
   }
 
-  if (input.statusId && typeof input.statusId === "string") {
+  if (input.statusId !== undefined && input.statusId !== "") {
     const lookup = context.dictionaryLookup.get("property_status");
-    const resolved = lookup ? resolveDictionaryId(lookup, input.statusId) : undefined;
-    if (resolved) input.statusId = resolved;
+    input.statusId = finalizeImportLookupField(
+      input.statusId,
+      lookup ? resolveDictionaryId(lookup, input.statusId) : undefined,
+      "status",
+      "statusId",
+    );
   }
 
-  if (input.typeId && typeof input.typeId === "string") {
+  if (input.typeId !== undefined && input.typeId !== "") {
     const lookup = context.dictionaryLookup.get("property_type");
-    const resolved = lookup ? resolveDictionaryId(lookup, input.typeId) : undefined;
-    if (resolved) input.typeId = resolved;
+    input.typeId = finalizeImportLookupField(
+      input.typeId,
+      lookup ? resolveDictionaryId(lookup, input.typeId) : undefined,
+      "type",
+      "typeId",
+    );
   }
 
-  if (input.ownerId && typeof input.ownerId === "string") {
-    const resolved = resolveMemberId(context.memberLookup, input.ownerId);
-    if (resolved) input.ownerId = resolved;
+  if (input.ownerId !== undefined && input.ownerId !== "") {
+    input.ownerId = finalizeImportLookupField(
+      input.ownerId,
+      resolveMemberId(context.memberLookup, input.ownerId),
+      "owner",
+      "ownerId",
+    );
   }
 
-  if (input.assignedTo && typeof input.assignedTo === "string") {
-    const resolved = resolveMemberId(context.memberLookup, input.assignedTo);
-    if (resolved) input.assignedTo = resolved;
+  if (input.assignedTo !== undefined && input.assignedTo !== "") {
+    input.assignedTo = finalizeImportLookupField(
+      input.assignedTo,
+      resolveMemberId(context.memberLookup, input.assignedTo),
+      "assignee",
+      "assignedTo",
+    );
   }
 
   if (input.reference !== undefined) {

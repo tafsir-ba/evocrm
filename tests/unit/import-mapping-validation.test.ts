@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { validateImportMappingConfiguration } from "@/lib/import-mapping-validation";
+import {
+  sanitizeRowOverrides,
+  validateImportMappingConfiguration,
+} from "@/lib/import-mapping-validation";
 
 describe("import mapping validation", () => {
   const fields = [
@@ -60,5 +63,38 @@ describe("import mapping validation", () => {
         }),
       ]),
     );
+  });
+
+  it("flags unknown default fields", () => {
+    const issues = validateImportMappingConfiguration(
+      fields,
+      [{ sourceColumnIndex: 0, targetField: "firstName" }],
+      {
+        projectId: "507f1f77bcf86cd799439012",
+        statusId: "507f1f77bcf86cd799439011",
+        unknownField: "value",
+      },
+    );
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Unknown default field "unknownField".',
+        }),
+      ]),
+    );
+  });
+
+  it("sanitizes row overrides to known field keys", () => {
+    const sanitized = sanitizeRowOverrides(fields, {
+      "91": { firstName: "Malika", hackerField: "x" },
+      "0": { firstName: "Bad row" },
+      "359": { firstName: "A".repeat(120) },
+    });
+
+    expect(sanitized).toEqual({
+      "91": { firstName: "Malika" },
+      "359": { firstName: "A".repeat(120) },
+    });
   });
 });

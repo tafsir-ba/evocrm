@@ -8,6 +8,7 @@ import type {
   ImportJobStatus,
   ImportMappingEntry,
   ImportRowIssue,
+  ImportRowOverrides,
 } from "@/lib/imports";
 import type { ImportFileStorageProvider } from "@/server/imports/import-file-storage";
 import { ImportJobModel, type ImportJobDocument } from "@/models/import-job";
@@ -45,6 +46,7 @@ export type ImportJobRecord = {
   previewRows: string[][];
   mappings: ImportMappingEntry[];
   defaults: ImportDefaults;
+  rowOverrides: ImportRowOverrides;
   totalRows: number;
   validRows: number;
   warningRows: number;
@@ -88,6 +90,7 @@ function toImportJobRecord(
       targetField: mapping.targetField ?? null,
     })),
     defaults: (document.defaults ?? {}) as ImportDefaults,
+    rowOverrides: (document.rowOverrides ?? {}) as ImportRowOverrides,
     totalRows: document.totalRows ?? 0,
     validRows: document.validRows ?? 0,
     warningRows: document.warningRows ?? 0,
@@ -327,6 +330,7 @@ export async function updateImportJobMapping(
         status: "mapped",
         mappings: input.mappings,
         defaults: input.defaults,
+        rowOverrides: {},
         ...(input.hasHeaderRow !== undefined ? { hasHeaderRow: input.hasHeaderRow } : {}),
         ...(input.headerRowIndex !== undefined ? { headerRowIndex: input.headerRowIndex } : {}),
       },
@@ -353,6 +357,7 @@ export async function updateImportJobValidation(
     warningRows: number;
     errorRows: number;
     validationIssues: ImportRowIssue[];
+    rowOverrides?: ImportRowOverrides;
   },
 ): Promise<ImportJobRecord> {
   await connectDb();
@@ -369,6 +374,7 @@ export async function updateImportJobValidation(
         warningRows: input.warningRows,
         errorRows: input.errorRows,
         validationIssues: input.validationIssues,
+        ...(input.rowOverrides !== undefined ? { rowOverrides: input.rowOverrides } : {}),
       },
     },
     { new: true },
@@ -454,7 +460,7 @@ export async function updateImportJobExecution(
   await replaceImportRowResults(workspaceId, importJobId, input.rowResults);
 
   const document = await ImportJobModel.findOneAndUpdate(
-    withWorkspaceScope(workspaceId, { _id: importJobId }),
+    withWorkspaceScope(workspaceId, { _id: importJobId, status: "processing" }),
     {
       $set: {
         status: input.status,
@@ -468,7 +474,10 @@ export async function updateImportJobExecution(
   ).lean<ImportJobDocument>();
 
   if (!document) {
-    throw new AppError("NOT_FOUND", "Import job not found.");
+    throw new AppError(
+      "CONFLICT",
+      "Import job cannot be finalized in its current state.",
+    );
   }
 
   return toImportJobRecord(document, input.rowResults);

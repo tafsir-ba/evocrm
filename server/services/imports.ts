@@ -8,6 +8,7 @@ import {
   type ImportEntityType,
   type ImportExecuteMode,
   type ImportJobSummary,
+  type ImportRowOverrides,
 } from "@/lib/imports";
 import { AppError } from "@/server/errors";
 import {
@@ -22,7 +23,12 @@ import {
   validateImportFileMeta,
 } from "@/server/imports/import-file-parser";
 import { suggestMappingsForHeaders } from "@/server/imports/import-header-matcher";
-import { summarizeImportIssues } from "@/server/imports/import-results";
+import {
+  buildImportErrorRowDetails,
+  buildImportWarningRowDetails,
+  summarizeImportIssues,
+} from "@/server/imports/import-results";
+import { sanitizeImportMappingPayload, sanitizeRowOverrides } from "@/lib/import-mapping-validation";
 import {
   buildImportContext,
   mapRowFromSource,
@@ -52,6 +58,7 @@ import type {
   ExecuteImportInput,
   ParseImportInput,
   SaveImportMappingInput,
+  ValidateImportInput,
 } from "@/server/validation/imports";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 
@@ -72,6 +79,7 @@ async function computeImportJobValidation(
   workspaceId: string,
   defaultCurrency: string,
   actorId: string,
+  rowOverrides?: ImportRowOverrides,
 ): Promise<{
   validation: ImportValidationResult;
   dataRows: string[][];
@@ -95,6 +103,8 @@ async function computeImportJobValidation(
     job.headerRowIndex,
   );
 
+  const effectiveOverrides = rowOverrides ?? job.rowOverrides ?? {};
+
   const validation = await validateImportRows(
     entityConfig,
     context,
@@ -102,6 +112,7 @@ async function computeImportJobValidation(
     dataRows,
     job.mappings,
     job.defaults,
+    effectiveOverrides,
   );
 
   return { validation, dataRows, context };
@@ -300,11 +311,15 @@ export async function saveImportJobMapping(
   assertImportJobMutable(job.status, "updated");
 
   const entityConfig = getImportEntityConfig(job.entityType);
+  const sanitized = sanitizeImportMappingPayload({
+    mappings: input.mappings,
+    defaults: input.defaults,
+  });
 
   const mappingIssues = validateMappingConfiguration(
     entityConfig,
-    input.mappings,
-    input.defaults,
+    sanitized.mappings,
+    sanitized.defaults,
   );
 
   if (mappingIssues.length > 0) {
@@ -319,7 +334,11 @@ export async function saveImportJobMapping(
     (input.hasHeaderRow !== undefined && input.hasHeaderRow !== job.hasHeaderRow) ||
     (input.headerRowIndex !== undefined && input.headerRowIndex !== job.headerRowIndex);
 
-  const updatedJob = await updateImportJobMapping(job.id, workspaceId, input);
+  const updatedJob = await updateImportJobMapping(job.id, workspaceId, {
+    ...input,
+    mappings: sanitized.mappings,
+    defaults: sanitized.defaults,
+  });
 
   if (shouldReparse) {
     return parseImportJobFile(updatedJob, {
@@ -354,15 +373,24 @@ export async function validateImportJob(
   importJobId: string,
   defaultCurrency: string,
   actorId: string,
+  input?: ValidateImportInput,
 ) {
   const job = await requireImportJob(workspaceId, importJobId);
   assertImportJobMutable(job.status, "validated");
+
+  const entityConfig = getImportEntityConfig(job.entityType);
+  const configResponse = toImportEntityConfigResponse(entityConfig);
+  const rowOverrides = sanitizeRowOverrides(
+    configResponse.fields,
+    input?.rowOverrides ?? job.rowOverrides ?? {},
+  );
 
   const { validation, dataRows, context } = await computeImportJobValidation(
     job,
     workspaceId,
     defaultCurrency,
     actorId,
+    rowOverrides,
   );
 
   const updatedJob = await updateImportJobValidation(job.id, workspaceId, {
@@ -371,12 +399,16 @@ export async function validateImportJob(
     warningRows: validation.summary.warningRows,
     errorRows: validation.summary.errorRows,
     validationIssues: summarizeImportIssues(validation.issues),
+    rowOverrides,
   });
 
   return {
     job: toImportJobSummary(updatedJob),
     summary: validation.summary,
     issues: summarizeImportIssues(validation.issues),
+    errorRows: buildImportErrorRowDetails(validation),
+    warningRows: buildImportWarningRowDetails(validation),
+    rowOverrides,
     validation,
     dataRows,
     context,
