@@ -346,6 +346,9 @@ export async function createLeadForWorkspace(
   workspaceId: string,
   actorId: string,
   input: CreateLeadInput,
+  options?: {
+    triggerAutomation?: boolean;
+  },
 ): Promise<LeadMutationResult> {
   await validateActiveProjectId(workspaceId, input.projectId);
   await validateLeadStatusId(workspaceId, input.statusId);
@@ -408,12 +411,14 @@ export async function createLeadForWorkspace(
     after: leadSnapshot(lead),
   });
 
-  scheduleCampaignAutoEnrollmentForLead({
-    workspaceId,
-    leadId: lead.id,
-    trigger: "new_lead",
-    actorId,
-  });
+  if (options?.triggerAutomation !== false) {
+    scheduleCampaignAutoEnrollmentForLead({
+      workspaceId,
+      leadId: lead.id,
+      trigger: "new_lead",
+      actorId,
+    });
+  }
 
   return {
     lead: await enrichLeadRecord(lead),

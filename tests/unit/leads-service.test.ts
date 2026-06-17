@@ -53,6 +53,7 @@ import {
   updateLead,
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
+import { scheduleCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
 import {
   archiveLeadForWorkspace,
   createLeadForWorkspace,
@@ -170,6 +171,42 @@ describe("lead service", () => {
         createdBy: "user-1",
       }),
     );
+  });
+
+  it("schedules new_lead campaign automation by default", async () => {
+    vi.mocked(createLead).mockResolvedValue(baseLead);
+
+    await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "status-1",
+    });
+
+    expect(scheduleCampaignAutoEnrollmentForLead).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      trigger: "new_lead",
+      actorId: "user-1",
+    });
+  });
+
+  it("skips new_lead campaign automation when triggerAutomation is false", async () => {
+    vi.mocked(createLead).mockResolvedValue(baseLead);
+
+    await createLeadForWorkspace(
+      "ws-1",
+      "user-1",
+      {
+        projectId: "project-1",
+        firstName: "John",
+        lastName: "Smith",
+        statusId: "status-1",
+      },
+      { triggerAutomation: false },
+    );
+
+    expect(scheduleCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
   it("normalizes email on create", async () => {
