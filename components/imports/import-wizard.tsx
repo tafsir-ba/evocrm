@@ -205,8 +205,11 @@ export function ImportWizard({
         setConfig(configPayload.data as ImportEntityConfigResponse);
 
         if (projectsRes.ok) {
+          const projectList =
+            (projectsPayload.data as { projects?: ProjectItem[] } | undefined)
+              ?.projects ?? [];
           setProjects(
-            (projectsPayload.data as ProjectItem[]).map((project) => ({
+            projectList.map((project) => ({
               id: project.id,
               name: project.name,
             })),
