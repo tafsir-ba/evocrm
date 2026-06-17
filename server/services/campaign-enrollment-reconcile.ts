@@ -38,6 +38,7 @@ export async function reconcileEnrollmentWithSendLogs(
 
     const updated = await updateCampaignEnrollment(workspaceId, enrollment.id, {
       status: "completed",
+      currentStep: Math.max(...steps.map((item) => item.order)),
       completedAt: latestSentAt,
       lastSentAt: latestSentAt,
       sendClaimExpiresAt: null,
@@ -52,10 +53,10 @@ export async function reconcileEnrollmentWithSendLogs(
     return enrollment;
   }
 
-  const currentStepIsAhead = enrollment.currentStep > firstUnsentOrder;
+  const currentStepDrifted = enrollment.currentStep !== firstUnsentOrder;
   const completedWithRemainingSteps = enrollment.status === "completed";
 
-  if (!completedWithRemainingSteps && !currentStepIsAhead) {
+  if (!completedWithRemainingSteps && !currentStepDrifted) {
     return enrollment;
   }
 

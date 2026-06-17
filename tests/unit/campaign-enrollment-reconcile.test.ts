@@ -222,9 +222,66 @@ describe("campaign enrollment reconcile", () => {
 
     expect(updateCampaignEnrollment).toHaveBeenCalledWith("ws-1", "enroll-1", {
       status: "completed",
+      currentStep: 2,
       completedAt: sentAt,
       lastSentAt: sentAt,
       sendClaimExpiresAt: null,
     });
+  });
+
+  it("advances currentStep when enrollment lags behind the first unsent step", async () => {
+    const sentAt = new Date("2026-06-18T18:37:00.000Z");
+    const enrollment = {
+      id: "enroll-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      leadId: "lead-1",
+      opportunityId: null,
+      ...enrollmentRecordExtras,
+      status: "active" as const,
+      currentStep: 1,
+      nextSendAt: new Date("2026-06-18T18:40:00.000Z"),
+      lastSentAt: sentAt,
+      completedAt: null,
+      unsubscribedAt: null,
+      failedAt: null,
+      failureReason: null,
+      createdAt: new Date("2026-06-18T18:30:00.000Z"),
+      updatedAt: new Date("2026-06-18T18:30:00.000Z"),
+    };
+
+    vi.mocked(findCampaignSendsByEnrollmentIds).mockResolvedValue([
+      {
+        id: "send-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-1",
+        enrollmentId: "enroll-1",
+        leadId: "lead-1",
+        opportunityId: null,
+        status: "sent",
+        providerMessageId: "msg-1",
+        error: null,
+        scheduledFor: sentAt,
+        sentAt,
+        createdAt: sentAt,
+      },
+    ]);
+
+    vi.mocked(updateCampaignEnrollment).mockResolvedValue({
+      ...enrollment,
+      currentStep: 2,
+    });
+
+    await reconcileEnrollmentBeforeSend("ws-1", enrollment);
+
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({
+        currentStep: 2,
+        completedAt: null,
+      }),
+    );
   });
 });
