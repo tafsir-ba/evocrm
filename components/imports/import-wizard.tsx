@@ -20,6 +20,11 @@ import {
   type ImportValidationSummary,
 } from "@/lib/imports";
 import {
+  collectUnknownProjectNames,
+  suggestProjectNameFromImportValue,
+  suggestProjectReferenceFromImportValue,
+} from "@/lib/import-project-helpers";
+import {
   sanitizeImportMappingPayload,
   validateImportMappingConfiguration,
 } from "@/lib/import-mapping-validation";
@@ -63,6 +68,7 @@ type ImportWizardProps = {
   onClose: () => void;
   workspaceSlug: string;
   entityType: ImportEntityType;
+  canCreateProject?: boolean;
   onComplete?: () => void;
 };
 
@@ -78,9 +84,11 @@ export function ImportWizard({
   onClose,
   workspaceSlug,
   entityType,
+  canCreateProject = false,
   onComplete,
 }: ImportWizardProps) {
   const apiBase = `/api/workspaces/${workspaceSlug}/imports`;
+  const workspaceApiBase = `/api/workspaces/${workspaceSlug}`;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<WizardStep>("upload");
@@ -472,6 +480,41 @@ export function ImportWizard({
     }
   }
 
+  async function reloadProjects(): Promise<ProjectItem[]> {
+    const response = await fetch(`${workspaceApiBase}/projects`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error?.message ?? "Failed to load projects.");
+    }
+
+    const projectList =
+      (payload.data as { projects?: ProjectItem[] } | undefined)?.projects ?? [];
+    const nextProjects = projectList.map((project) => ({
+      id: project.id,
+      name: project.name,
+    }));
+    setProjects(nextProjects);
+    return nextProjects;
+  }
+
+  async function revalidateImport(overrides: ImportRowOverrides = rowOverrides) {
+    if (!importId) return;
+
+    const validateResponse = await fetch(`${apiBase}/${importId}/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowOverrides: overrides }),
+    });
+    const validatePayload = await validateResponse.json();
+
+    if (!validateResponse.ok) {
+      throw new Error(formatImportApiError(validatePayload, "Validation failed."));
+    }
+
+    applyValidationResponse(validatePayload.data);
+  }
+
   async function handleRevalidateWithFixes() {
     if (!importId) return;
 
@@ -479,24 +522,46 @@ export function ImportWizard({
     setError(null);
 
     try {
-      const validateResponse = await fetch(`${apiBase}/${importId}/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rowOverrides }),
-      });
-      const validatePayload = await validateResponse.json();
-
-      if (!validateResponse.ok) {
-        throw new Error(
-          formatImportApiError(validatePayload, "Validation failed."),
-        );
-      }
-
-      applyValidationResponse(validatePayload.data);
+      await revalidateImport(rowOverrides);
     } catch (revalidateError) {
       setError(
         revalidateError instanceof Error ? revalidateError.message : "Validation failed.",
       );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateProjectFromImport(input: {
+    importValue: string;
+    name: string;
+    reference: string;
+  }) {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${workspaceApiBase}/projects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: input.name.trim(),
+          ...(input.reference.trim() ? { reference: input.reference.trim() } : {}),
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Failed to create project.");
+      }
+
+      await reloadProjects();
+
+      if (importId && step === "validate") {
+        await revalidateImport(rowOverrides);
+      }
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Failed to create project.");
     } finally {
       setLoading(false);
     }
@@ -709,7 +774,10 @@ export function ImportWizard({
             projects={projects}
             members={members}
             dictionaries={dictionaries}
+            canCreateProject={canCreateProject}
+            loading={loading}
             onFieldChange={updateRowOverride}
+            onCreateProject={(input) => void handleCreateProjectFromImport(input)}
           />
         )}
 
@@ -1028,7 +1096,10 @@ function ValidateStep({
   projects,
   members,
   dictionaries,
+  canCreateProject,
+  loading,
   onFieldChange,
+  onCreateProject,
 }: {
   summary: ImportValidationSummary;
   issues: ImportRowIssue[];
@@ -1039,11 +1110,23 @@ function ValidateStep({
   projects: ProjectItem[];
   members: MemberItem[];
   dictionaries: Record<string, DictionaryItem[]>;
+  canCreateProject: boolean;
+  loading: boolean;
   onFieldChange: (rowNumber: number, fieldKey: string, value: string) => void;
+  onCreateProject: (input: {
+    importValue: string;
+    name: string;
+    reference: string;
+  }) => void;
 }) {
   const fieldMap = useMemo(
     () => new Map(config.fields.map((field) => [field.key, field])),
     [config.fields],
+  );
+
+  const unknownProjectNames = useMemo(
+    () => collectUnknownProjectNames(issues, errorRows),
+    [errorRows, issues],
   );
 
   return (
@@ -1054,6 +1137,17 @@ function ValidateStep({
         <StatCard label="Warnings" value={summary.warningRows} tone="warning" />
         <StatCard label="Errors" value={summary.errorRows} tone="danger" />
       </div>
+
+      {unknownProjectNames.length > 0 && (
+        <ImportMissingProjectsPanel
+          unknownProjectNames={unknownProjectNames}
+          issues={issues}
+          errorRows={errorRows}
+          canCreateProject={canCreateProject}
+          loading={loading}
+          onCreateProject={onCreateProject}
+        />
+      )}
 
       {errorRows.length > 0 ? (
         <div className="space-y-3">
@@ -1075,7 +1169,10 @@ function ValidateStep({
                 projects={projects}
                 members={members}
                 dictionaries={dictionaries}
+                canCreateProject={canCreateProject}
+                loading={loading}
                 onFieldChange={onFieldChange}
+                onCreateProject={onCreateProject}
               />
             ))}
           </div>
@@ -1141,6 +1238,146 @@ function ValidateStep({
   );
 }
 
+function ImportMissingProjectsPanel({
+  unknownProjectNames,
+  issues,
+  errorRows,
+  canCreateProject,
+  loading,
+  onCreateProject,
+}: {
+  unknownProjectNames: string[];
+  issues: ImportRowIssue[];
+  errorRows: ImportErrorRowDetail[];
+  canCreateProject: boolean;
+  loading: boolean;
+  onCreateProject: (input: {
+    importValue: string;
+    name: string;
+    reference: string;
+  }) => void;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, { name: string; reference: string }>>({});
+
+  function getDraft(importValue: string) {
+    return (
+      drafts[importValue] ?? {
+        name: suggestProjectNameFromImportValue(importValue),
+        reference: suggestProjectReferenceFromImportValue(importValue),
+      }
+    );
+  }
+
+  function countAffectedRows(importValue: string): number {
+    const rowNumbers = new Set<number>();
+
+    for (const issue of issues) {
+      if (issue.field !== "projectId") continue;
+      if (issue.message === `Unknown project "${importValue}".` && issue.rowNumber > 0) {
+        rowNumbers.add(issue.rowNumber);
+      }
+    }
+
+    for (const errorRow of errorRows) {
+      const matches = errorRow.issues.some(
+        (issue) =>
+          issue.field === "projectId" &&
+          issue.message === `Unknown project "${importValue}".`,
+      );
+      if (matches) {
+        rowNumbers.add(errorRow.rowNumber);
+      }
+    }
+
+    return rowNumbers.size;
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
+      <p className="text-[12px] font-medium text-[var(--color-ink)]">Missing projects</p>
+      <p className="text-[12px] text-[var(--color-ink-muted)]">
+        Create the project in your workspace, then validation will run again automatically.
+      </p>
+
+      {unknownProjectNames.map((importValue) => {
+        const draft = getDraft(importValue);
+        const affectedRows = countAffectedRows(importValue);
+
+        return (
+          <div
+            key={importValue}
+            className="rounded-lg border border-[var(--color-line)] bg-white p-3 space-y-2"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[12px] text-[var(--color-ink)]">
+                Unknown project{" "}
+                <span className="font-medium">{importValue}</span>
+                {affectedRows > 0 ? ` · ${affectedRows.toLocaleString()} rows` : null}
+              </p>
+            </div>
+
+            {canCreateProject ? (
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <label className="space-y-1">
+                  <span className="text-[11px] text-[var(--color-ink-muted)]">Project name</span>
+                  <Input
+                    fieldSize="sm"
+                    value={draft.name}
+                    disabled={loading}
+                    onChange={(event) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [importValue]: {
+                          ...getDraft(importValue),
+                          name: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[11px] text-[var(--color-ink-muted)]">Reference</span>
+                  <Input
+                    fieldSize="sm"
+                    value={draft.reference}
+                    disabled={loading}
+                    onChange={(event) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [importValue]: {
+                          ...getDraft(importValue),
+                          reference: event.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  disabled={loading || !draft.name.trim()}
+                  onClick={() =>
+                    onCreateProject({
+                      importValue,
+                      name: draft.name,
+                      reference: draft.reference,
+                    })
+                  }
+                >
+                  Create & re-validate
+                </Button>
+              </div>
+            ) : (
+              <p className="text-[12px] text-[#92400e]">
+                You need project create permission to add a project from this screen.
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ImportErrorRowEditor({
   errorRow,
   fieldMap,
@@ -1148,7 +1385,10 @@ function ImportErrorRowEditor({
   projects,
   members,
   dictionaries,
+  canCreateProject,
+  loading,
   onFieldChange,
+  onCreateProject,
 }: {
   errorRow: ImportErrorRowDetail;
   fieldMap: Map<string, ImportEntityConfigResponse["fields"][number]>;
@@ -1156,7 +1396,14 @@ function ImportErrorRowEditor({
   projects: ProjectItem[];
   members: MemberItem[];
   dictionaries: Record<string, DictionaryItem[]>;
+  canCreateProject: boolean;
+  loading: boolean;
   onFieldChange: (rowNumber: number, fieldKey: string, value: string) => void;
+  onCreateProject: (input: {
+    importValue: string;
+    name: string;
+    reference: string;
+  }) => void;
 }) {
   const editableFieldKeys = Array.from(
     new Set(
@@ -1212,7 +1459,10 @@ function ImportErrorRowEditor({
                 projects={projects}
                 members={members}
                 dictionaries={dictionaries}
+                canCreateProject={canCreateProject}
+                loading={loading}
                 onChange={(value) => onFieldChange(errorRow.rowNumber, fieldKey, value)}
+                onCreateProject={onCreateProject}
               />
             </label>
           );
@@ -1233,7 +1483,10 @@ function ImportFieldEditor({
   projects,
   members,
   dictionaries,
+  canCreateProject,
+  loading,
   onChange,
+  onCreateProject,
 }: {
   field: ImportEntityConfigResponse["fields"][number] | undefined;
   value: string;
@@ -1241,7 +1494,14 @@ function ImportFieldEditor({
   projects: ProjectItem[];
   members: MemberItem[];
   dictionaries: Record<string, DictionaryItem[]>;
+  canCreateProject: boolean;
+  loading: boolean;
   onChange: (value: string) => void;
+  onCreateProject?: (input: {
+    importValue: string;
+    name: string;
+    reference: string;
+  }) => void;
 }) {
   const unresolvedSource =
     sourceValue && !isObjectIdValue(sourceValue) && value === sourceValue
@@ -1250,13 +1510,16 @@ function ImportFieldEditor({
 
   if (field?.type === "project") {
     const hasMatch = projects.some((project) => project.id === value);
+    const unresolved = sourceValue && !isObjectIdValue(sourceValue) && !hasMatch
+      ? sourceValue
+      : unresolvedSource;
 
     return (
       <div className="space-y-1">
-        {unresolvedSource && !hasMatch && (
-          <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
+        {unresolved && (
+          <p className="text-[10px] text-[#92400e]">From file: {unresolved}</p>
         )}
-        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+        <Select fieldSize="sm" value={hasMatch ? value : ""} disabled={loading} onChange={(event) => onChange(event.target.value)}>
           <option value="">Select project</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
@@ -1264,6 +1527,22 @@ function ImportFieldEditor({
             </option>
           ))}
         </Select>
+        {unresolved && canCreateProject && onCreateProject && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={loading}
+            onClick={() =>
+              onCreateProject({
+                importValue: unresolved,
+                name: suggestProjectNameFromImportValue(unresolved),
+                reference: suggestProjectReferenceFromImportValue(unresolved),
+              })
+            }
+          >
+            {`Create ${suggestProjectNameFromImportValue(unresolved)}`}
+          </Button>
+        )}
       </div>
     );
   }

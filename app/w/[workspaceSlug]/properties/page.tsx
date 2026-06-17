@@ -29,6 +29,7 @@ export default async function PropertiesPage({ params }: { params: Params }) {
         workspaceSlug={workspaceSlug}
         defaultCurrency={access.context.workspace.defaultCurrency}
         canCreate={hasPermission(permissions, "property:create")}
+        canCreateProject={hasPermission(permissions, "project:create")}
         canArchive={hasPermission(permissions, "property:archive")}
       />
     </PageContainer>

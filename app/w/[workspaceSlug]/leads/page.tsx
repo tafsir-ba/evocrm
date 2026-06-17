@@ -28,6 +28,7 @@ export default async function LeadsPage({ params }: { params: Params }) {
       <LeadsPanel
         workspaceSlug={workspaceSlug}
         canCreate={hasPermission(permissions, "lead:create")}
+        canCreateProject={hasPermission(permissions, "project:create")}
         canArchive={hasPermission(permissions, "lead:archive")}
       />
     </PageContainer>

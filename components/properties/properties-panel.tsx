@@ -49,6 +49,7 @@ type PropertiesPanelProps = {
   workspaceSlug: string;
   defaultCurrency: string;
   canCreate: boolean;
+  canCreateProject?: boolean;
   canArchive: boolean;
 };
 
@@ -72,6 +73,7 @@ export function PropertiesPanel({
   workspaceSlug,
   defaultCurrency,
   canCreate,
+  canCreateProject = false,
   canArchive,
 }: PropertiesPanelProps) {
   const router = useRouter();
@@ -240,6 +242,7 @@ export function PropertiesPanel({
               <ImportLaunchButton
                 workspaceSlug={workspaceSlug}
                 entityType="property"
+                canCreateProject={canCreateProject}
                 onComplete={() => void loadProperties()}
               />
               <Button

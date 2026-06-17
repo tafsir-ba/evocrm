@@ -10,12 +10,14 @@ import { IconUpload } from "@/lib/icons";
 type ImportLaunchButtonProps = {
   workspaceSlug: string;
   entityType: ImportEntityType;
+  canCreateProject?: boolean;
   onComplete?: () => void;
 };
 
 export function ImportLaunchButton({
   workspaceSlug,
   entityType,
+  canCreateProject = false,
   onComplete,
 }: ImportLaunchButtonProps) {
   const [open, setOpen] = useState(false);
@@ -35,6 +37,7 @@ export function ImportLaunchButton({
         onClose={() => setOpen(false)}
         workspaceSlug={workspaceSlug}
         entityType={entityType}
+        canCreateProject={canCreateProject}
         onComplete={() => {
           onComplete?.();
           setOpen(false);

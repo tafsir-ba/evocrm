@@ -50,12 +50,14 @@ type LeadListItem = {
 type LeadsPanelProps = {
   workspaceSlug: string;
   canCreate: boolean;
+  canCreateProject?: boolean;
   canArchive: boolean;
 };
 
 export function LeadsPanel({
   workspaceSlug,
   canCreate,
+  canCreateProject = false,
   canArchive,
 }: LeadsPanelProps) {
   const router = useRouter();
@@ -235,6 +237,7 @@ export function LeadsPanel({
               <ImportLaunchButton
                 workspaceSlug={workspaceSlug}
                 entityType="lead"
+                canCreateProject={canCreateProject}
                 onComplete={() => void loadLeads()}
               />
               <Button
