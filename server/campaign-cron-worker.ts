@@ -1,8 +1,3 @@
-import "server-only";
-
-import { getEnv } from "@/server/env";
-import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
-
 const DEFAULT_INTERVAL_MS = 60_000;
 const MIN_INTERVAL_MS = 30_000;
 const MAX_INTERVAL_MS = 15 * 60_000;
@@ -25,14 +20,22 @@ function parseIntervalMs(): number {
   return Math.min(Math.max(parsed, MIN_INTERVAL_MS), MAX_INTERVAL_MS);
 }
 
+function getCronSecret(): string | undefined {
+  const secret = process.env.CRON_SECRET?.trim();
+  return secret || undefined;
+}
+
+function getCronBaseUrl(): string | undefined {
+  const baseUrl = process.env.NEXTAUTH_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  return baseUrl || undefined;
+}
+
 export function shouldStartInternalCampaignCron(): boolean {
   if (process.env.NODE_ENV === "test") {
     return false;
   }
 
-  const env = getEnv();
-
-  if (!env.CRON_SECRET) {
+  if (!getCronSecret() || !getCronBaseUrl()) {
     return false;
   }
 
@@ -44,7 +47,7 @@ export function shouldStartInternalCampaignCron(): boolean {
     return true;
   }
 
-  return env.NODE_ENV === "production";
+  return process.env.NODE_ENV === "production";
 }
 
 async function runCampaignCronTick(): Promise<void> {
@@ -52,11 +55,43 @@ async function runCampaignCronTick(): Promise<void> {
     return;
   }
 
+  const cronSecret = getCronSecret();
+  const baseUrl = getCronBaseUrl();
+
+  if (!cronSecret || !baseUrl) {
+    return;
+  }
+
   workerRunning = true;
 
   try {
-    const summary = await sendDueCampaignEmails(50);
-    console.info("[campaign-cron]", JSON.stringify({ at: new Date().toISOString(), summary }));
+    const response = await fetch(
+      `${baseUrl.replace(/\/$/, "")}/api/cron/campaigns/send-due`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cronSecret}`,
+        },
+      },
+    );
+
+    const payload = (await response.json().catch(() => null)) as
+      | { data?: unknown }
+      | null;
+
+    console.info(
+      "[campaign-cron]",
+      JSON.stringify({
+        at: new Date().toISOString(),
+        status: response.status,
+        ok: response.ok,
+        summary: payload?.data ?? payload,
+      }),
+    );
+
+    if (!response.ok) {
+      console.error("[campaign-cron] send-due request failed", response.status);
+    }
   } catch (error) {
     console.error("[campaign-cron] tick failed", error);
   } finally {

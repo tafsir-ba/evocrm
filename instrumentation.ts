@@ -4,7 +4,7 @@ export async function register() {
   }
 
   const { startInternalCampaignCronWorker } = await import(
-    "@/server/campaign-cron-worker"
+    "./server/campaign-cron-worker"
   );
   startInternalCampaignCronWorker();
 }

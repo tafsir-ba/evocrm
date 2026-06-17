@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetEnvCacheForTests } from "@/server/env";
-
-vi.mock("@/server/services/campaign-sending", () => ({
-  sendDueCampaignEmails: vi.fn(),
-}));
-
-import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
 import {
   resetInternalCampaignCronWorkerForTests,
   shouldStartInternalCampaignCron,
@@ -16,31 +9,35 @@ import {
 describe("campaign-cron-worker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetEnvCacheForTests();
     resetInternalCampaignCronWorkerForTests();
     vi.useFakeTimers();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://crm.evo-home.ch");
-    vi.stubEnv("MONGODB_URI", "mongodb://localhost:27017/evocrm");
+    vi.stubEnv("NEXTAUTH_URL", "https://crm.evo-home.ch");
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
     delete process.env.CAMPAIGN_CRON_INTERNAL;
     delete process.env.CAMPAIGN_CRON_INTERVAL_MS;
-    vi.mocked(sendDueCampaignEmails).mockResolvedValue({
-      processed: 0,
-      sent: 0,
-      skipped: 0,
-      failed: 0,
-    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { processed: 1, sent: 1, skipped: 0, failed: 0 },
+        }),
+      }),
+    );
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     resetInternalCampaignCronWorkerForTests();
-    resetEnvCacheForTests();
   });
 
-  it("starts in production when CRON_SECRET is configured", () => {
+  it("starts in production when CRON_SECRET and app URL are configured", () => {
     expect(shouldStartInternalCampaignCron()).toBe(true);
   });
 
@@ -53,21 +50,26 @@ describe("campaign-cron-worker", () => {
     startInternalCampaignCronWorker();
 
     await vi.waitFor(() => {
-      expect(sendDueCampaignEmails).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(
+        "https://crm.evo-home.ch/api/cron/campaigns/send-due",
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer test-cron-secret" },
+        }),
+      );
     });
 
     await vi.advanceTimersByTimeAsync(60_000);
 
-    expect(sendDueCampaignEmails).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("does not start without CRON_SECRET", () => {
     vi.stubEnv("CRON_SECRET", "");
-    resetEnvCacheForTests();
 
     expect(shouldStartInternalCampaignCron()).toBe(false);
     startInternalCampaignCronWorker();
 
-    expect(sendDueCampaignEmails).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
