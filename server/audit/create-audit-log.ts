@@ -25,7 +25,8 @@ export type AuditEntityType =
   | "integration"
   | "integration_log"
   | "billing"
-  | "feedback";
+  | "feedback"
+  | "import_job";
 
 export type CreateAuditLogInput = {
   workspaceId: string;

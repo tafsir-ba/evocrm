@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/domain/status-badge";
 import type { MemberSelectorMember } from "@/components/domain/member-selector";
 import type { TagSelectorTag } from "@/components/domain/tag-selector";
+import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -235,12 +236,19 @@ export function PropertiesPanel({
         }
         actions={
           canCreate ? (
-            <Button
-              leadingIcon={<IconPlus size={14} />}
-              onClick={() => router.push(workspacePath(workspaceSlug, "properties", "new"))}
-            >
-              New property
-            </Button>
+            <div className="flex items-center gap-2">
+              <ImportLaunchButton
+                workspaceSlug={workspaceSlug}
+                entityType="property"
+                onComplete={() => void loadProperties()}
+              />
+              <Button
+                leadingIcon={<IconPlus size={14} />}
+                onClick={() => router.push(workspacePath(workspaceSlug, "properties", "new"))}
+              >
+                New property
+              </Button>
+            </div>
           ) : undefined
         }
       />
