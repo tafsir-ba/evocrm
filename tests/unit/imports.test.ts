@@ -142,6 +142,28 @@ describe("import mapping validation", () => {
     expect(issues.some((issue) => issue.field === "statusId")).toBe(true);
   });
 
+  it("rejects duplicate target field mappings", () => {
+    const issues = validateMappingConfiguration(
+      leadImportConfig,
+      [
+        { sourceColumnIndex: 0, targetField: "email" },
+        { sourceColumnIndex: 1, targetField: "email" },
+      ],
+      {
+        projectId: "507f1f77bcf86cd799439012",
+        statusId: "507f1f77bcf86cd799439011",
+      },
+    );
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Field "email" is mapped more than once.',
+        }),
+      ]),
+    );
+  });
+
   it("accepts required fields via defaults", () => {
     const issues = validateMappingConfiguration(
       leadImportConfig,

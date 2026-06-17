@@ -6,6 +6,7 @@ import type {
   ImportRowIssue,
   ImportValidationSummary,
 } from "@/lib/imports";
+import { validateImportMappingConfiguration } from "@/lib/import-mapping-validation";
 import { findDictionaryItems } from "@/server/repositories/dictionary-items";
 import { findActiveLeadsByEmailNormalized } from "@/server/repositories/leads";
 import { listWorkspaceMembersForWorkspace } from "@/server/services/members";
@@ -116,55 +117,20 @@ export function validateMappingConfiguration(
   mappings: ImportMappingEntry[],
   defaults: ImportDefaults,
 ): ImportRowIssue[] {
-  const issues: ImportRowIssue[] = [];
-  const mappedFields = new Set<string>();
-  const validFieldKeys = new Set(entityConfig.fields.map((field) => field.key));
-
-  for (const mapping of mappings) {
-    if (!mapping.targetField) continue;
-
-    if (!validFieldKeys.has(mapping.targetField)) {
-      issues.push({
-        rowNumber: 0,
-        field: mapping.targetField,
-        message: `Unknown CRM field "${mapping.targetField}".`,
-        severity: "error",
-      });
-      continue;
-    }
-
-    if (mappedFields.has(mapping.targetField)) {
-      issues.push({
-        rowNumber: 0,
-        field: mapping.targetField,
-        message: `Field "${mapping.targetField}" is mapped more than once.`,
-        severity: "error",
-      });
-    }
-
-    mappedFields.add(mapping.targetField);
-  }
-
-  for (const field of entityConfig.fields) {
-    if (!field.required) continue;
-
-    const isMapped = mappedFields.has(field.key);
-    const hasDefault = Boolean(defaults[field.key]);
-    const satisfiedByFullName =
-      (field.key === "firstName" || field.key === "lastName") &&
-      mappedFields.has("fullName");
-
-    if (!isMapped && !hasDefault && !satisfiedByFullName) {
-      issues.push({
-        rowNumber: 0,
-        field: field.key,
-        message: `Required field "${field.label}" must be mapped or have a default value.`,
-        severity: "error",
-      });
-    }
-  }
-
-  return issues;
+  return validateImportMappingConfiguration(
+    entityConfig.fields.map((field) => ({
+      key: field.key,
+      label: field.label,
+      required: field.required ?? false,
+      aliases: field.aliases,
+      type: field.type,
+      helpText: field.helpText,
+      dictionaryType: field.dictionaryType,
+      supportsDefault: field.supportsDefault ?? false,
+    })),
+    mappings,
+    defaults,
+  );
 }
 
 export function mapRowFromSource(

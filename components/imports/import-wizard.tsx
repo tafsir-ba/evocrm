@@ -17,6 +17,10 @@ import {
   type ImportRowIssue,
   type ImportValidationSummary,
 } from "@/lib/imports";
+import {
+  sanitizeImportMappingPayload,
+  validateImportMappingConfiguration,
+} from "@/lib/import-mapping-validation";
 import { IconUpload } from "@/lib/icons";
 
 type WizardStep = "upload" | "map" | "validate" | "results";
@@ -170,6 +174,26 @@ export function ImportWizard({
 
   const allRequiredFieldsSatisfied = unsatisfiedRequiredFields.length === 0;
 
+  const mappingConfigurationIssues = useMemo(() => {
+    if (!config) return [];
+
+    const { mappings: sanitizedMappings, defaults: sanitizedDefaults } =
+      sanitizeImportMappingPayload({ mappings, defaults });
+
+    return validateImportMappingConfiguration(
+      config.fields,
+      sanitizedMappings,
+      sanitizedDefaults,
+    );
+  }, [config, defaults, mappings]);
+
+  const canValidateMapping =
+    allRequiredFieldsSatisfied && mappingConfigurationIssues.length === 0;
+
+  function formatMappingIssues(issues: ImportRowIssue[]): string {
+    return issues.map((issue) => issue.message).join(" ");
+  }
+
   function formatImportApiError(
     payload: { error?: { message?: string; details?: { issues?: ImportRowIssue[] } } },
     fallback: string,
@@ -309,6 +333,7 @@ export function ImportWizard({
       const data = payload.data as ParsePreviewResponse;
 
       setFileName(file.name);
+      setDefaults({});
       applyParsePreview(data);
       setStep("map");
     } catch (uploadError) {
@@ -353,7 +378,19 @@ export function ImportWizard({
   }
 
   async function handleSaveMappingAndValidate() {
-    if (!importId) return;
+    if (!importId || !config) return;
+
+    const payload = sanitizeImportMappingPayload({ mappings, defaults });
+    const clientIssues = validateImportMappingConfiguration(
+      config.fields,
+      payload.mappings,
+      payload.defaults,
+    );
+
+    if (clientIssues.length > 0) {
+      setError(formatMappingIssues(clientIssues));
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -362,7 +399,7 @@ export function ImportWizard({
       const mappingResponse = await fetch(`${apiBase}/${importId}/mapping`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mappings, defaults, hasHeaderRow }),
+        body: JSON.stringify({ ...payload, hasHeaderRow }),
       });
       const mappingPayload = await mappingResponse.json();
 
@@ -468,7 +505,7 @@ export function ImportWizard({
           <Button
             onClick={() => void handleSaveMappingAndValidate()}
             loading={loading}
-            disabled={!allRequiredFieldsSatisfied}
+            disabled={!canValidateMapping}
           >
             Validate import
           </Button>
@@ -551,6 +588,7 @@ export function ImportWizard({
             requiredFields={requiredFields}
             isRequiredFieldSatisfied={isRequiredFieldSatisfied}
             unsatisfiedRequiredFields={unsatisfiedRequiredFields}
+            mappingConfigurationIssues={mappingConfigurationIssues}
             hasHeaderRow={hasHeaderRow}
             sheetName={sheetName}
             rowCount={rowCount}
@@ -696,6 +734,7 @@ function MapStep({
   requiredFields,
   isRequiredFieldSatisfied,
   unsatisfiedRequiredFields,
+  mappingConfigurationIssues,
   hasHeaderRow,
   sheetName,
   rowCount,
@@ -715,6 +754,7 @@ function MapStep({
   requiredFields: ImportEntityConfigResponse["fields"];
   isRequiredFieldSatisfied: (fieldKey: string) => boolean;
   unsatisfiedRequiredFields: ImportEntityConfigResponse["fields"];
+  mappingConfigurationIssues: ImportRowIssue[];
   hasHeaderRow: boolean;
   sheetName: string | null;
   rowCount: number;
@@ -803,6 +843,13 @@ function MapStep({
             Map a column or set a default for:{" "}
             {unsatisfiedRequiredFields.map((field) => field.label).join(", ")}.
           </p>
+        )}
+        {mappingConfigurationIssues.length > 0 && (
+          <div className="mt-2 space-y-1 text-[12px] text-[#92400e]">
+            {mappingConfigurationIssues.map((issue, index) => (
+              <p key={`${issue.field ?? "mapping"}-${index}`}>{issue.message}</p>
+            ))}
+          </div>
         )}
       </div>
 
