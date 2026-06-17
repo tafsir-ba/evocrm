@@ -16,20 +16,17 @@ export type ParsedImportFile = {
   rowCount: number;
 };
 
-const DANGEROUS_CELL_PREFIX = /^[=+\-@]/;
-
-export function sanitizeCellValue(value: unknown): string {
+export function normalizeImportCellValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
 
-  const stringValue = String(value).trim();
+  return String(value).trim();
+}
 
-  if (DANGEROUS_CELL_PREFIX.test(stringValue)) {
-    return `'${stringValue}`;
-  }
-
-  return stringValue;
+/** @deprecated Use normalizeImportCellValue for imports; escapeCsvCell for exports only. */
+export function sanitizeCellValue(value: unknown): string {
+  return normalizeImportCellValue(value);
 }
 
 export function validateImportFileMeta(
@@ -158,11 +155,11 @@ function parseExcelBuffer(buffer: Buffer): ParsedImportFile {
 
 function normalizeRows(rawRows: unknown[]): string[][] {
   const rows = rawRows
-    .filter((row) => Array.isArray(row) && row.some((cell) => sanitizeCellValue(cell) !== ""))
+    .filter((row) => Array.isArray(row) && row.some((cell) => normalizeImportCellValue(cell) !== ""))
     .map((row) =>
       (row as unknown[])
         .slice(0, MAX_IMPORT_COLUMNS)
-        .map((cell) => sanitizeCellValue(cell)),
+        .map((cell) => normalizeImportCellValue(cell)),
     );
 
   if (rows.length === 0) {

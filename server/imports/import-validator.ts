@@ -7,9 +7,9 @@ import type {
   ImportValidationSummary,
 } from "@/lib/imports";
 import { findDictionaryItems } from "@/server/repositories/dictionary-items";
-import { findActiveLeadByEmailNormalized } from "@/server/repositories/leads";
+import { findActiveLeadsByEmailNormalized } from "@/server/repositories/leads";
 import { listWorkspaceMembersForWorkspace } from "@/server/services/members";
-import { findPropertyByReference } from "@/server/repositories/properties";
+import { findPropertiesByReferences } from "@/server/repositories/properties";
 import { findProjects } from "@/server/repositories/projects";
 import { findTags } from "@/server/repositories/tags";
 import type {
@@ -117,9 +117,20 @@ export function validateMappingConfiguration(
 ): ImportRowIssue[] {
   const issues: ImportRowIssue[] = [];
   const mappedFields = new Set<string>();
+  const validFieldKeys = new Set(entityConfig.fields.map((field) => field.key));
 
   for (const mapping of mappings) {
     if (!mapping.targetField) continue;
+
+    if (!validFieldKeys.has(mapping.targetField)) {
+      issues.push({
+        rowNumber: 0,
+        field: mapping.targetField,
+        message: `Unknown CRM field "${mapping.targetField}".`,
+        severity: "error",
+      });
+      continue;
+    }
 
     if (mappedFields.has(mapping.targetField)) {
       issues.push({
@@ -190,6 +201,41 @@ export async function validateImportRows(
   const seenEmails = new Map<string, number>();
   const seenReferences = new Map<string, number>();
 
+  const leadEmailsToCheck: string[] = [];
+  const propertyReferencesToCheck: string[] = [];
+
+  if (entityConfig.entityType === "lead") {
+    for (const dataRow of dataRows) {
+      const rawRow = mapRowFromSource(dataRow, headers, mappings, defaults);
+      if (!rawRow.email || typeof rawRow.email !== "string") continue;
+      try {
+        leadEmailsToCheck.push(normalizeLeadEmail(rawRow.email).emailNormalized);
+      } catch {
+        // Invalid emails are handled during row validation.
+      }
+    }
+  }
+
+  if (entityConfig.entityType === "property") {
+    for (const dataRow of dataRows) {
+      const rawRow = mapRowFromSource(dataRow, headers, mappings, defaults);
+      const reference = normalizeReferenceValue(rawRow.reference);
+      if (reference) {
+        propertyReferencesToCheck.push(reference);
+      }
+    }
+  }
+
+  const existingLeadEmails =
+    entityConfig.entityType === "lead"
+      ? await findActiveLeadsByEmailNormalized(context.workspaceId, leadEmailsToCheck)
+      : new Set<string>();
+
+  const existingPropertyReferences =
+    entityConfig.entityType === "property"
+      ? await findPropertiesByReferences(context.workspaceId, propertyReferencesToCheck)
+      : new Set<string>();
+
   for (let index = 0; index < dataRows.length; index += 1) {
     const rowNumber = index + 1;
     const dataRow = dataRows[index] ?? [];
@@ -224,22 +270,22 @@ export async function validateImportRows(
     }
 
     if (entityConfig.entityType === "lead") {
-      await validateLeadDuplicates(
-        context.workspaceId,
+      validateLeadDuplicates(
         normalizedRow,
         rowNumber,
         rowIssues,
         seenEmails,
+        existingLeadEmails,
       );
     }
 
     if (entityConfig.entityType === "property") {
-      await validatePropertyDuplicates(
-        context.workspaceId,
+      validatePropertyDuplicates(
         normalizedRow,
         rowNumber,
         rowIssues,
         seenReferences,
+        existingPropertyReferences,
       );
     }
 
@@ -326,13 +372,13 @@ function validateRawRow(
   }
 }
 
-async function validateLeadDuplicates(
-  workspaceId: string,
+function validateLeadDuplicates(
   row: NormalizedImportRow,
   rowNumber: number,
   issues: ImportRowIssue[],
   seenEmails: Map<string, number>,
-): Promise<void> {
+  existingLeadEmails: Set<string>,
+): void {
   if (!row.email || typeof row.email !== "string") {
     return;
   }
@@ -358,9 +404,7 @@ async function validateLeadDuplicates(
     seenEmails.set(emailNormalized, rowNumber);
   }
 
-  const existing = await findActiveLeadByEmailNormalized(workspaceId, emailNormalized);
-
-  if (existing) {
+  if (existingLeadEmails.has(emailNormalized)) {
     issues.push({
       rowNumber,
       field: "email",
@@ -370,13 +414,13 @@ async function validateLeadDuplicates(
   }
 }
 
-async function validatePropertyDuplicates(
-  workspaceId: string,
+function validatePropertyDuplicates(
   row: NormalizedImportRow,
   rowNumber: number,
   issues: ImportRowIssue[],
   seenReferences: Map<string, number>,
-): Promise<void> {
+  existingPropertyReferences: Set<string>,
+): void {
   if (!row.reference || typeof row.reference !== "string") {
     return;
   }
@@ -400,9 +444,7 @@ async function validatePropertyDuplicates(
     seenReferences.set(reference, rowNumber);
   }
 
-  const existing = await findPropertyByReference(workspaceId, reference);
-
-  if (existing) {
+  if (existingPropertyReferences.has(reference)) {
     issues.push({
       rowNumber,
       field: "reference",

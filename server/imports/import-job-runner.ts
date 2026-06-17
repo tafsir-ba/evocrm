@@ -6,7 +6,6 @@ import type { ImportEntityConfig, ImportContext } from "@/server/imports/import-
 import type { ImportValidationResult } from "@/server/imports/import-validator";
 import {
   updateImportJobExecution,
-  updateImportJobStatus,
   type ImportJobRecord,
   type ImportRowResultRecord,
 } from "@/server/repositories/import-jobs";
@@ -31,11 +30,6 @@ export async function executeImportJob(
       "Import cannot proceed in strict mode while rows have errors.",
     );
   }
-
-  await updateImportJobStatus(job.id, job.workspaceId, {
-    status: "processing",
-    startedAt: new Date(),
-  });
 
   const rowResults: ImportRowResultRecord[] = [];
   let createdCount = 0;

@@ -9,7 +9,12 @@ import type {
   ImportMappingEntry,
   ImportRowIssue,
 } from "@/lib/imports";
+import type { ImportFileStorageProvider } from "@/server/imports/import-file-storage";
 import { ImportJobModel, type ImportJobDocument } from "@/models/import-job";
+import {
+  findImportRowResults,
+  replaceImportRowResults,
+} from "@/server/repositories/import-row-results";
 import { connectDb } from "@/server/db/mongoose";
 import { AppError } from "@/server/errors";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
@@ -31,7 +36,8 @@ export type ImportJobRecord = {
   fileSize: number;
   mimeType: string;
   uploadedBy: string;
-  fileData: Buffer;
+  storageKey: string;
+  storageProvider: ImportFileStorageProvider;
   sheetName: string | null;
   headerRowIndex: number;
   hasHeaderRow: boolean;
@@ -44,7 +50,7 @@ export type ImportJobRecord = {
   warningRows: number;
   errorRows: number;
   validationIssues: ImportRowIssue[];
-  rowResults: ImportRowResultRecord[];
+  rowResults?: ImportRowResultRecord[];
   createdCount: number;
   skippedCount: number;
   failedCount: number;
@@ -55,7 +61,10 @@ export type ImportJobRecord = {
   updatedAt: Date;
 };
 
-function toImportJobRecord(document: ImportJobDocument): ImportJobRecord {
+function toImportJobRecord(
+  document: ImportJobDocument,
+  rowResults?: ImportRowResultRecord[],
+): ImportJobRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
@@ -65,7 +74,8 @@ function toImportJobRecord(document: ImportJobDocument): ImportJobRecord {
     fileSize: document.fileSize,
     mimeType: document.mimeType,
     uploadedBy: document.uploadedBy.toString(),
-    fileData: document.fileData,
+    storageKey: document.storageKey,
+    storageProvider: document.storageProvider as ImportFileStorageProvider,
     sheetName: document.sheetName ?? null,
     headerRowIndex: document.headerRowIndex ?? 0,
     hasHeaderRow: document.hasHeaderRow ?? true,
@@ -88,23 +98,7 @@ function toImportJobRecord(document: ImportJobDocument): ImportJobRecord {
       message: issue.message,
       severity: issue.severity as "error" | "warning",
     })),
-    rowResults: (document.rowResults ?? []).map((result) => ({
-      rowNumber: result.rowNumber,
-      status: result.status as ImportRowResultRecord["status"],
-      entityId: result.entityId ?? null,
-      errors: (result.errors ?? []).map((issue) => ({
-        rowNumber: issue.rowNumber,
-        field: issue.field ?? undefined,
-        message: issue.message,
-        severity: issue.severity as "error" | "warning",
-      })),
-      warnings: (result.warnings ?? []).map((issue) => ({
-        rowNumber: issue.rowNumber,
-        field: issue.field ?? undefined,
-        message: issue.message,
-        severity: issue.severity as "error" | "warning",
-      })),
-    })),
+    ...(rowResults ? { rowResults } : {}),
     createdCount: document.createdCount ?? 0,
     skippedCount: document.skippedCount ?? 0,
     failedCount: document.failedCount ?? 0,
@@ -123,11 +117,14 @@ export async function createImportJob(input: {
   fileSize: number;
   mimeType: string;
   uploadedBy: string;
-  fileData: Buffer;
+  storageKey: string;
+  storageProvider: ImportFileStorageProvider;
+  jobId?: string;
 }): Promise<ImportJobRecord> {
   await connectDb();
 
   const document = await ImportJobModel.create({
+    ...(input.jobId ? { _id: input.jobId } : {}),
     workspaceId: input.workspaceId,
     entityType: input.entityType,
     status: "draft",
@@ -135,7 +132,8 @@ export async function createImportJob(input: {
     fileSize: input.fileSize,
     mimeType: input.mimeType,
     uploadedBy: input.uploadedBy,
-    fileData: input.fileData,
+    storageKey: input.storageKey,
+    storageProvider: input.storageProvider,
   });
 
   return toImportJobRecord(document.toObject() as ImportJobDocument);
@@ -144,6 +142,7 @@ export async function createImportJob(input: {
 export async function findImportJobById(
   workspaceId: string,
   importJobId: string,
+  options?: { includeRowResults?: boolean },
 ): Promise<ImportJobRecord | null> {
   await connectDb();
 
@@ -153,6 +152,39 @@ export async function findImportJobById(
 
   const document = await ImportJobModel.findOne(
     withWorkspaceScope(workspaceId, { _id: importJobId }),
+  ).lean<ImportJobDocument>();
+
+  if (!document) {
+    return null;
+  }
+
+  const rowResults = options?.includeRowResults
+    ? await findImportRowResults(workspaceId, importJobId)
+    : undefined;
+
+  return toImportJobRecord(document, rowResults);
+}
+
+const EXECUTABLE_IMPORT_STATUSES: ImportJobStatus[] = ["mapped", "ready"];
+
+export async function claimImportJobForExecution(
+  importJobId: string,
+  workspaceId: string,
+): Promise<ImportJobRecord | null> {
+  await connectDb();
+
+  const document = await ImportJobModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: { $in: EXECUTABLE_IMPORT_STATUSES },
+    }),
+    {
+      $set: {
+        status: "processing",
+        startedAt: new Date(),
+      },
+    },
+    { new: true },
   ).lean<ImportJobDocument>();
 
   return document ? toImportJobRecord(document) : null;
@@ -304,9 +336,19 @@ export async function updateImportJobExecution(
 ): Promise<ImportJobRecord> {
   await connectDb();
 
+  await replaceImportRowResults(workspaceId, importJobId, input.rowResults);
+
   const document = await ImportJobModel.findOneAndUpdate(
     withWorkspaceScope(workspaceId, { _id: importJobId }),
-    { $set: input },
+    {
+      $set: {
+        status: input.status,
+        createdCount: input.createdCount,
+        skippedCount: input.skippedCount,
+        failedCount: input.failedCount,
+        completedAt: input.completedAt,
+      },
+    },
     { new: true },
   ).lean<ImportJobDocument>();
 
@@ -314,5 +356,5 @@ export async function updateImportJobExecution(
     throw new AppError("NOT_FOUND", "Import job not found.");
   }
 
-  return toImportJobRecord(document);
+  return toImportJobRecord(document, input.rowResults);
 }

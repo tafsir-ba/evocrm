@@ -224,6 +224,34 @@ export async function findLeadById(
   return document ? toLeadRecord(document) : null;
 }
 
+export async function findActiveLeadsByEmailNormalized(
+  workspaceId: string,
+  emailNormalizedValues: string[],
+): Promise<Set<string>> {
+  await connectDb();
+
+  const uniqueEmails = [...new Set(emailNormalizedValues.filter(Boolean))];
+
+  if (uniqueEmails.length === 0) {
+    return new Set();
+  }
+
+  const documents = await LeadModel.find(
+    withWorkspaceScope(workspaceId, {
+      emailNormalized: { $in: uniqueEmails },
+      archivedAt: null,
+    }),
+  )
+    .select({ emailNormalized: 1 })
+    .lean<Array<{ emailNormalized?: string | null }>>();
+
+  return new Set(
+    documents
+      .map((document) => document.emailNormalized)
+      .filter((email): email is string => Boolean(email)),
+  );
+}
+
 export async function findActiveLeadByEmailNormalized(
   workspaceId: string,
   emailNormalized: string,

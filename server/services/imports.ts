@@ -1,5 +1,7 @@
 import "server-only";
 
+import mongoose from "mongoose";
+
 import {
   IMPORT_PREVIEW_ROW_LIMIT,
   MAX_IMPORT_FILE_SIZE_BYTES,
@@ -28,6 +30,11 @@ import {
   validateMappingConfiguration,
 } from "@/server/imports/import-validator";
 import {
+  loadImportFileBuffer,
+  saveImportFileBuffer,
+} from "@/server/imports/import-file-storage";
+import {
+  claimImportJobForExecution,
   createImportJob,
   findImportJobById,
   updateImportJobMapping,
@@ -100,6 +107,17 @@ export async function createImportJobForWorkspace(input: {
     MAX_IMPORT_FILE_SIZE_BYTES,
   );
 
+  const draftJobId = new mongoose.Types.ObjectId();
+  const draftJobIdString = draftJobId.toString();
+
+  const { storageKey, storageProvider } = await saveImportFileBuffer({
+    workspaceId: input.workspaceId,
+    importJobId: draftJobIdString,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    buffer: input.fileData,
+  });
+
   const job = await createImportJob({
     workspaceId: input.workspaceId,
     entityType: input.entityType,
@@ -107,7 +125,9 @@ export async function createImportJobForWorkspace(input: {
     fileSize: input.fileSize,
     mimeType: input.mimeType,
     uploadedBy: input.actorId,
-    fileData: input.fileData,
+    storageKey,
+    storageProvider,
+    jobId: draftJobIdString,
   });
 
   const parsed = await parseImportJobFile(job, {
@@ -165,7 +185,8 @@ export async function parseImportJobFile(
   input: ParseImportInput,
 ) {
   const entityConfig = getImportEntityConfig(job.entityType);
-  const parsedFile = parseImportFile(job.fileData, job.fileName);
+  const fileBuffer = await loadImportJobFileBuffer(job);
+  const parsedFile = parseImportFile(fileBuffer, job.fileName);
   const { headers, dataRows } = extractHeadersAndDataRows(
     parsedFile.rows,
     input.hasHeaderRow,
@@ -283,7 +304,10 @@ export async function validateImportJob(
     entityConfig,
   );
 
-  const parsedFile = parseImportFile(job.fileData, job.fileName);
+  const parsedFile = parseImportFile(
+    await loadImportJobFileBuffer(job),
+    job.fileName,
+  );
   const { headers, dataRows } = extractHeadersAndDataRows(
     parsedFile.rows,
     job.hasHeaderRow,
@@ -319,14 +343,6 @@ export async function validateImportJob(
   };
 }
 
-const TERMINAL_IMPORT_STATUSES = new Set<ImportJobRecord["status"]>([
-  "processing",
-  "completed",
-  "completed_with_errors",
-  "failed",
-  "cancelled",
-]);
-
 export async function executeImportJobForWorkspace(
   workspaceId: string,
   importJobId: string,
@@ -334,15 +350,6 @@ export async function executeImportJobForWorkspace(
   defaultCurrency: string,
   input: ExecuteImportInput,
 ) {
-  const existingJob = await requireImportJob(workspaceId, importJobId);
-
-  if (TERMINAL_IMPORT_STATUSES.has(existingJob.status)) {
-    throw new AppError(
-      "CONFLICT",
-      "This import job has already been executed or is currently processing.",
-    );
-  }
-
   const validationResult = await validateImportJob(
     workspaceId,
     importJobId,
@@ -350,11 +357,19 @@ export async function executeImportJobForWorkspace(
     actorId,
   );
 
-  const job = await requireImportJob(workspaceId, importJobId);
-  const entityConfig = getImportEntityConfig(job.entityType);
+  const claimedJob = await claimImportJobForExecution(importJobId, workspaceId);
+
+  if (!claimedJob) {
+    throw new AppError(
+      "CONFLICT",
+      "This import job has already been executed or is currently processing.",
+    );
+  }
+
+  const entityConfig = getImportEntityConfig(claimedJob.entityType);
 
   const result = await executeImportJob(
-    job,
+    claimedJob,
     entityConfig,
     validationResult.context,
     validationResult.validation,
@@ -366,7 +381,7 @@ export async function executeImportJobForWorkspace(
     actorId,
     action: `${entityConfig.entityType}.import.completed`,
     entityType: "import_job",
-    entityId: job.id,
+    entityId: claimedJob.id,
     after: {
       createdCount: result.createdCount,
       skippedCount: result.skippedCount,
@@ -394,7 +409,9 @@ export async function getImportJobDetails(
   workspaceId: string,
   importJobId: string,
 ) {
-  const job = await requireImportJob(workspaceId, importJobId);
+  const job = await requireImportJob(workspaceId, importJobId, {
+    includeRowResults: true,
+  });
 
   return {
     job: toImportJobSummary(job),
@@ -412,7 +429,7 @@ export async function getImportJobDetails(
       values: row,
     })),
     issues: job.validationIssues,
-    rowResults: job.rowResults,
+    rowResults: job.rowResults ?? [],
   };
 }
 
@@ -420,8 +437,13 @@ export async function getImportErrorCsv(
   workspaceId: string,
   importJobId: string,
 ) {
-  const job = await requireImportJob(workspaceId, importJobId);
-  const parsedFile = parseImportFile(job.fileData, job.fileName);
+  const job = await requireImportJob(workspaceId, importJobId, {
+    includeRowResults: true,
+  });
+  const parsedFile = parseImportFile(
+    await loadImportJobFileBuffer(job),
+    job.fileName,
+  );
   const { headers, dataRows } = extractHeadersAndDataRows(
     parsedFile.rows,
     job.hasHeaderRow,
@@ -430,14 +452,22 @@ export async function getImportErrorCsv(
 
   const { buildImportErrorCsv } = await import("@/server/imports/import-results");
 
-  return buildImportErrorCsv(job.rowResults, headers, dataRows);
+  return buildImportErrorCsv(job.rowResults ?? [], headers, dataRows);
+}
+
+async function loadImportJobFileBuffer(job: ImportJobRecord): Promise<Buffer> {
+  return loadImportFileBuffer({
+    storageKey: job.storageKey,
+    storageProvider: job.storageProvider,
+  });
 }
 
 async function requireImportJob(
   workspaceId: string,
   importJobId: string,
+  options?: { includeRowResults?: boolean },
 ): Promise<ImportJobRecord> {
-  const job = await findImportJobById(workspaceId, importJobId);
+  const job = await findImportJobById(workspaceId, importJobId, options);
 
   if (!job) {
     throw new AppError("NOT_FOUND", "Import job not found.");

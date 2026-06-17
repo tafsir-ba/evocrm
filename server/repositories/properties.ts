@@ -211,6 +211,33 @@ export async function findPropertyById(
   return document ? toPropertyRecord(document) : null;
 }
 
+export async function findPropertiesByReferences(
+  workspaceId: string,
+  references: string[],
+): Promise<Set<string>> {
+  await connectDb();
+
+  const uniqueReferences = [...new Set(references.map((reference) => reference.trim()).filter(Boolean))];
+
+  if (uniqueReferences.length === 0) {
+    return new Set();
+  }
+
+  const documents = await PropertyModel.find(
+    withWorkspaceScope(workspaceId, {
+      reference: { $in: uniqueReferences },
+    }),
+  )
+    .select({ reference: 1 })
+    .lean<Array<{ reference?: string | null }>>();
+
+  return new Set(
+    documents
+      .map((document) => document.reference)
+      .filter((reference): reference is string => Boolean(reference)),
+  );
+}
+
 export async function findPropertyByReference(
   workspaceId: string,
   reference: string,

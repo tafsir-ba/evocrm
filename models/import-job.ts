@@ -25,21 +25,6 @@ const importRowIssueSchema = new Schema(
   { _id: false },
 );
 
-const importRowResultSchema = new Schema(
-  {
-    rowNumber: { type: Number, required: true },
-    status: {
-      type: String,
-      enum: ["valid", "created", "skipped", "failed"],
-      required: true,
-    },
-    entityId: { type: String, default: null },
-    errors: { type: [importRowIssueSchema], default: [] },
-    warnings: { type: [importRowIssueSchema], default: [] },
-  },
-  { _id: false },
-);
-
 const importJobSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
@@ -57,7 +42,12 @@ const importJobSchema = new Schema(
     fileSize: { type: Number, required: true },
     mimeType: { type: String, required: true, trim: true },
     uploadedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    fileData: { type: Buffer, required: true },
+    storageKey: { type: String, required: true, trim: true },
+    storageProvider: {
+      type: String,
+      enum: ["spaces", "gridfs"],
+      required: true,
+    },
     sheetName: { type: String, default: null },
     headerRowIndex: { type: Number, default: 0 },
     hasHeaderRow: { type: Boolean, default: true },
@@ -70,7 +60,6 @@ const importJobSchema = new Schema(
     warningRows: { type: Number, default: 0 },
     errorRows: { type: Number, default: 0 },
     validationIssues: { type: [importRowIssueSchema], default: [] },
-    rowResults: { type: [importRowResultSchema], default: [] },
     createdCount: { type: Number, default: 0 },
     skippedCount: { type: Number, default: 0 },
     failedCount: { type: Number, default: 0 },

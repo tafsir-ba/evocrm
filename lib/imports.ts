@@ -111,6 +111,7 @@ export const IMPORT_EXECUTE_MODES = ["valid_rows_only", "strict"] as const;
 export type ImportExecuteMode = (typeof IMPORT_EXECUTE_MODES)[number];
 
 export const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+/** Import files are stored outside the ImportJob MongoDB document (object storage or GridFS). */
 export const MAX_IMPORT_ROWS = 10_000;
 export const MAX_IMPORT_COLUMNS = 200;
 export const IMPORT_PREVIEW_ROW_LIMIT = 50;

@@ -17,7 +17,7 @@ import {
   validateMappingConfiguration,
   mapRowFromSource,
 } from "@/server/imports/import-validator";
-import { detectDuplicateHeaders } from "@/server/imports/import-file-parser";
+import { detectDuplicateHeaders, normalizeImportCellValue } from "@/server/imports/import-file-parser";
 
 describe("import header matcher", () => {
   it("normalizes header names", () => {
@@ -70,12 +70,29 @@ describe("import normalizers", () => {
     expect(parseOptionalCurrency("€1,250,000")).toBe(1250000);
   });
 
-  it("escapes dangerous CSV values", () => {
+  it("escapes dangerous CSV values on export only", () => {
     expect(escapeCsvCell("=SUM(1,1)")).toBe("\"'=SUM(1,1)\"");
+  });
+
+  it("preserves leading plus signs in import cell values", () => {
+    expect(normalizeImportCellValue("+971501234567")).toBe("+971501234567");
   });
 });
 
 describe("import mapping validation", () => {
+  it("rejects unknown CRM target fields", () => {
+    const issues = validateMappingConfiguration(
+      leadImportConfig,
+      [{ sourceColumnIndex: 0, targetField: "notARealField" }],
+      {
+        projectId: "507f1f77bcf86cd799439011",
+        statusId: "507f1f77bcf86cd799439012",
+        firstName: "mapped separately",
+      },
+    );
+
+    expect(issues.some((issue) => issue.field === "notARealField")).toBe(true);
+  });
   it("treats fullName mapping as satisfying first and last name requirements", () => {
     const issues = validateMappingConfiguration(
       leadImportConfig,

@@ -22,4 +22,5 @@ export { IntegrationModel, type IntegrationDocument } from "./integration";
 export { IntegrationLogModel, type IntegrationLogDocument } from "./integration-log";
 export { AuditLogModel, type AuditLogDocument } from "./audit-log";
 export { ImportJobModel, type ImportJobDocument } from "./import-job";
+export { ImportRowResultModel, type ImportRowResultDocument } from "./import-row-result";
 export { FeedbackModel, type FeedbackDocument } from "./feedback";
