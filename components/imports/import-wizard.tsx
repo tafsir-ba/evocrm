@@ -1183,7 +1183,7 @@ function ValidateStep({
               Showing the first {errorRows.length} of {summary.errorRows} error rows. Remaining errors will still be skipped during import.
             </p>
           )}
-          <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-3">
             {errorRows.map((errorRow) => (
               <ImportErrorRowEditor
                 key={errorRow.rowNumber}
@@ -1202,7 +1202,7 @@ function ValidateStep({
           </div>
         </div>
       ) : issues.length > 0 ? (
-        <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--color-line)]">
+        <div className="rounded-lg border border-[var(--color-line)]">
           <table className="min-w-full text-[12px]">
             <thead className="bg-[var(--color-canvas)]">
               <tr>
@@ -1234,7 +1234,7 @@ function ValidateStep({
               Showing the first {warningRows.length} of {summary.warningRows} warning rows.
             </p>
           )}
-          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-[#fde68a] bg-[#fffbeb] p-3">
+          <div className="space-y-2 rounded-lg border border-[#fde68a] bg-[#fffbeb] p-3">
             {warningRows.map((warningRow) => (
               <div key={warningRow.rowNumber} className="space-y-1">
                 <p className="text-[12px] font-medium text-[var(--color-ink)]">
