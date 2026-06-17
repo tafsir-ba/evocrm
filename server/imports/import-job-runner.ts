@@ -17,20 +17,13 @@ export async function executeImportJob(
   entityConfig: ImportEntityConfig,
   context: ImportContext,
   validation: ImportValidationResult,
-  mode: ImportExecuteMode,
+  _mode: ImportExecuteMode,
 ): Promise<{
   createdCount: number;
   skippedCount: number;
   failedCount: number;
   rowResults: ImportRowResultRecord[];
 }> {
-  if (mode === "strict" && validation.summary.errorRows > 0) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "Import cannot proceed in strict mode while rows have errors.",
-    );
-  }
-
   const rowResults: ImportRowResultRecord[] = [];
   let createdCount = 0;
   let skippedCount = 0;

@@ -167,6 +167,8 @@ export async function findImportJobById(
 
 const EXECUTABLE_IMPORT_STATUSES: ImportJobStatus[] = ["mapped", "ready"];
 
+export const MUTABLE_IMPORT_JOB_STATUSES: ImportJobStatus[] = ["draft", "mapped", "ready"];
+
 export async function claimImportJobForExecution(
   importJobId: string,
   workspaceId: string,
@@ -190,6 +192,62 @@ export async function claimImportJobForExecution(
   return document ? toImportJobRecord(document) : null;
 }
 
+export async function releaseImportJobToReady(
+  importJobId: string,
+  workspaceId: string,
+  input: {
+    errorMessage: string;
+    validRows: number;
+    warningRows: number;
+    errorRows: number;
+    validationIssues: ImportRowIssue[];
+  },
+): Promise<ImportJobRecord | null> {
+  await connectDb();
+
+  const document = await ImportJobModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: "processing",
+    }),
+    {
+      $set: {
+        status: "ready",
+        errorMessage: input.errorMessage,
+        validRows: input.validRows,
+        warningRows: input.warningRows,
+        errorRows: input.errorRows,
+        validationIssues: input.validationIssues,
+      },
+    },
+    { new: true },
+  ).lean<ImportJobDocument>();
+
+  return document ? toImportJobRecord(document) : null;
+}
+
+export async function failImportJob(
+  importJobId: string,
+  workspaceId: string,
+  errorMessage: string,
+): Promise<void> {
+  await connectDb();
+
+  await ImportJobModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: "processing",
+    }),
+    {
+      $set: {
+        status: "failed",
+        completedAt: new Date(),
+        errorMessage,
+      },
+    },
+  );
+}
+
 export async function updateImportJobParseResult(
   importJobId: string,
   workspaceId: string,
@@ -207,7 +265,10 @@ export async function updateImportJobParseResult(
   await connectDb();
 
   const document = await ImportJobModel.findOneAndUpdate(
-    withWorkspaceScope(workspaceId, { _id: importJobId }),
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: { $in: MUTABLE_IMPORT_JOB_STATUSES },
+    }),
     {
       $set: {
         status: input.status,
@@ -224,7 +285,10 @@ export async function updateImportJobParseResult(
   ).lean<ImportJobDocument>();
 
   if (!document) {
-    throw new AppError("NOT_FOUND", "Import job not found.");
+    throw new AppError(
+      "CONFLICT",
+      "Import job cannot be updated in its current state.",
+    );
   }
 
   return toImportJobRecord(document);
@@ -243,7 +307,10 @@ export async function updateImportJobMapping(
   await connectDb();
 
   const document = await ImportJobModel.findOneAndUpdate(
-    withWorkspaceScope(workspaceId, { _id: importJobId }),
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: { $in: MUTABLE_IMPORT_JOB_STATUSES },
+    }),
     {
       $set: {
         status: "mapped",
@@ -257,7 +324,10 @@ export async function updateImportJobMapping(
   ).lean<ImportJobDocument>();
 
   if (!document) {
-    throw new AppError("NOT_FOUND", "Import job not found.");
+    throw new AppError(
+      "CONFLICT",
+      "Import job cannot be updated in its current state.",
+    );
   }
 
   return toImportJobRecord(document);
@@ -277,7 +347,10 @@ export async function updateImportJobValidation(
   await connectDb();
 
   const document = await ImportJobModel.findOneAndUpdate(
-    withWorkspaceScope(workspaceId, { _id: importJobId }),
+    withWorkspaceScope(workspaceId, {
+      _id: importJobId,
+      status: { $in: MUTABLE_IMPORT_JOB_STATUSES },
+    }),
     {
       $set: {
         status: input.status,
@@ -291,7 +364,10 @@ export async function updateImportJobValidation(
   ).lean<ImportJobDocument>();
 
   if (!document) {
-    throw new AppError("NOT_FOUND", "Import job not found.");
+    throw new AppError(
+      "CONFLICT",
+      "Import job cannot be validated in its current state.",
+    );
   }
 
   return toImportJobRecord(document);

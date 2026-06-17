@@ -28,7 +28,9 @@ import {
   mapRowFromSource,
   validateImportRows,
   validateMappingConfiguration,
+  type ImportValidationResult,
 } from "@/server/imports/import-validator";
+import type { ImportContext } from "@/server/imports/import-entity-config";
 import {
   loadImportFileBuffer,
   saveImportFileBuffer,
@@ -36,7 +38,10 @@ import {
 import {
   claimImportJobForExecution,
   createImportJob,
+  failImportJob,
   findImportJobById,
+  MUTABLE_IMPORT_JOB_STATUSES,
+  releaseImportJobToReady,
   updateImportJobMapping,
   updateImportJobParseResult,
   updateImportJobValidation,
@@ -48,6 +53,58 @@ import type {
   SaveImportMappingInput,
 } from "@/server/validation/imports";
 import { createAuditLog } from "@/server/audit/create-audit-log";
+
+function assertImportJobMutable(
+  status: ImportJobRecord["status"],
+  action: string,
+): void {
+  if (!MUTABLE_IMPORT_JOB_STATUSES.includes(status)) {
+    throw new AppError(
+      "CONFLICT",
+      `Import job cannot be ${action} in its current state.`,
+    );
+  }
+}
+
+async function computeImportJobValidation(
+  job: ImportJobRecord,
+  workspaceId: string,
+  defaultCurrency: string,
+  actorId: string,
+): Promise<{
+  validation: ImportValidationResult;
+  dataRows: string[][];
+  context: ImportContext;
+}> {
+  const entityConfig = getImportEntityConfig(job.entityType);
+  const context = await buildImportContext(
+    workspaceId,
+    actorId,
+    defaultCurrency,
+    entityConfig,
+  );
+
+  const parsedFile = parseImportFile(
+    await loadImportJobFileBuffer(job),
+    job.fileName,
+  );
+  const { headers, dataRows } = extractHeadersAndDataRows(
+    parsedFile.rows,
+    job.hasHeaderRow,
+    job.headerRowIndex,
+  );
+
+  const validation = await validateImportRows(
+    entityConfig,
+    context,
+    headers,
+    dataRows,
+    job.mappings,
+    job.defaults,
+  );
+
+  return { validation, dataRows, context };
+}
 
 function toImportJobSummary(job: ImportJobRecord): ImportJobSummary {
   return {
@@ -239,6 +296,8 @@ export async function saveImportJobMapping(
   input: SaveImportMappingInput,
 ) {
   const job = await requireImportJob(workspaceId, importJobId);
+  assertImportJobMutable(job.status, "updated");
+
   const entityConfig = getImportEntityConfig(job.entityType);
 
   const mappingIssues = validateMappingConfiguration(
@@ -296,37 +355,17 @@ export async function validateImportJob(
   actorId: string,
 ) {
   const job = await requireImportJob(workspaceId, importJobId);
-  const entityConfig = getImportEntityConfig(job.entityType);
-  const context = await buildImportContext(
+  assertImportJobMutable(job.status, "validated");
+
+  const { validation, dataRows, context } = await computeImportJobValidation(
+    job,
     workspaceId,
-    actorId,
     defaultCurrency,
-    entityConfig,
+    actorId,
   );
-
-  const parsedFile = parseImportFile(
-    await loadImportJobFileBuffer(job),
-    job.fileName,
-  );
-  const { headers, dataRows } = extractHeadersAndDataRows(
-    parsedFile.rows,
-    job.hasHeaderRow,
-    job.headerRowIndex,
-  );
-
-  const validation = await validateImportRows(
-    entityConfig,
-    context,
-    headers,
-    dataRows,
-    job.mappings,
-    job.defaults,
-  );
-
-  const status: ImportJobRecord["status"] = "ready";
 
   const updatedJob = await updateImportJobValidation(job.id, workspaceId, {
-    status,
+    status: "ready",
     validRows: validation.summary.validRows,
     warningRows: validation.summary.warningRows,
     errorRows: validation.summary.errorRows,
@@ -350,13 +389,6 @@ export async function executeImportJobForWorkspace(
   defaultCurrency: string,
   input: ExecuteImportInput,
 ) {
-  const validationResult = await validateImportJob(
-    workspaceId,
-    importJobId,
-    defaultCurrency,
-    actorId,
-  );
-
   const claimedJob = await claimImportJobForExecution(importJobId, workspaceId);
 
   if (!claimedJob) {
@@ -366,35 +398,74 @@ export async function executeImportJobForWorkspace(
     );
   }
 
-  const entityConfig = getImportEntityConfig(claimedJob.entityType);
+  try {
+    const { validation, context } = await computeImportJobValidation(
+      claimedJob,
+      workspaceId,
+      defaultCurrency,
+      actorId,
+    );
 
-  const result = await executeImportJob(
-    claimedJob,
-    entityConfig,
-    validationResult.context,
-    validationResult.validation,
-    input.mode as ImportExecuteMode,
-  );
+    if (input.mode === "strict" && validation.summary.errorRows > 0) {
+      await releaseImportJobToReady(importJobId, workspaceId, {
+        errorMessage:
+          "Import cannot proceed in strict mode while rows have errors.",
+        validRows: validation.summary.validRows,
+        warningRows: validation.summary.warningRows,
+        errorRows: validation.summary.errorRows,
+        validationIssues: summarizeImportIssues(validation.issues),
+      });
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Import cannot proceed in strict mode while rows have errors.",
+      );
+    }
 
-  await createAuditLog({
-    workspaceId,
-    actorId,
-    action: `${entityConfig.entityType}.import.completed`,
-    entityType: "import_job",
-    entityId: claimedJob.id,
-    after: {
-      createdCount: result.createdCount,
-      skippedCount: result.skippedCount,
-      failedCount: result.failedCount,
-    },
-  });
+    const entityConfig = getImportEntityConfig(claimedJob.entityType);
 
-  const updatedJob = await requireImportJob(workspaceId, importJobId);
+    const result = await executeImportJob(
+      claimedJob,
+      entityConfig,
+      context,
+      validation,
+      input.mode as ImportExecuteMode,
+    );
 
-  return {
-    job: toImportJobSummary(updatedJob),
-    ...result,
-  };
+    await createAuditLog({
+      workspaceId,
+      actorId,
+      action: `${entityConfig.entityType}.import.completed`,
+      entityType: "import_job",
+      entityId: claimedJob.id,
+      after: {
+        createdCount: result.createdCount,
+        skippedCount: result.skippedCount,
+        failedCount: result.failedCount,
+      },
+    });
+
+    const updatedJob = await requireImportJob(workspaceId, importJobId);
+
+    return {
+      job: toImportJobSummary(updatedJob),
+      ...result,
+    };
+  } catch (error) {
+    if (
+      error instanceof AppError &&
+      error.code === "VALIDATION_ERROR" &&
+      error.message.includes("strict mode")
+    ) {
+      throw error;
+    }
+
+    await failImportJob(
+      importJobId,
+      workspaceId,
+      error instanceof Error ? error.message : "Import failed.",
+    );
+    throw error;
+  }
 }
 
 export async function getImportJobForWorkspace(
