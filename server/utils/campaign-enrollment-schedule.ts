@@ -265,7 +265,7 @@ export function computeEnrollmentNextSendAt(
   timeZone: string,
   now = new Date(),
 ): Date {
-  const anchor = enrollment.lastSentAt ?? now;
+  const anchor = enrollment.lastSentAt ?? enrollment.createdAt ?? now;
   return computeNextSendAt(anchor, step.delayDays, {
     sendTime: step.sendTime,
     timeZone,

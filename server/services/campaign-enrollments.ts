@@ -25,7 +25,11 @@ import { findStepByOrder } from "@/server/repositories/campaign-steps";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
 import { reconcileEnrollmentWithSendLogs } from "@/server/services/campaign-enrollment-reconcile";
 import { findCampaignSendsByEnrollmentIds } from "@/server/repositories/campaign-sends";
-import { computeNextSendAt, computeRescheduledSendAt } from "@/server/utils/campaign-schedule";
+import {
+  computeNextSendAt,
+  computeRescheduledSendAt,
+  isCampaignOrderOverdue,
+} from "@/server/utils/campaign-schedule";
 import {
   buildEnrollmentScheduledSteps,
   computeEnrollmentNextSendAt,
@@ -136,22 +140,16 @@ async function syncEnrollmentNextSendAtIfNeeded(
     return enrollment;
   }
 
+  // Keep an already-due pickup time stable on passive list loads.
+  if (enrollment.lastSentAt === null && enrollment.nextSendAt <= new Date()) {
+    return enrollment;
+  }
+
   const updated = await updateCampaignEnrollment(workspaceId, enrollment.id, {
     nextSendAt: projectedNextSendAt,
   });
 
-  const result = updated ?? enrollment;
-
-  if (updated && result.status === "active" && result.nextSendAt <= new Date()) {
-    void sendCampaignEnrollmentsImmediately(
-      workspaceId,
-      enrollment.campaignId,
-      "enrollment",
-      [result.id],
-    ).catch(() => undefined);
-  }
-
-  return result;
+  return updated ?? enrollment;
 }
 
 async function enrichEnrollment(
@@ -644,9 +642,15 @@ export async function rescheduleActiveEnrollmentSendsForCampaign(
       continue;
     }
 
+    const scheduleAnchor = enrollment.lastSentAt ?? enrollment.createdAt;
+    const overdue = isCampaignOrderOverdue(scheduleAnchor, anchor, step.delayDays, {
+      sendTime: step.sendTime,
+      timeZone,
+    });
+
     await updateCampaignEnrollment(workspaceId, enrollment.id, {
       nextSendAt: computeRescheduledSendAt(anchor, step.delayDays, {
-        overdue: mode === "resume" && enrollment.nextSendAt <= anchor,
+        overdue,
         sendTime: step.sendTime,
         timeZone,
       }),

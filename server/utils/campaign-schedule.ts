@@ -5,9 +5,6 @@ import {
   toDatetimeLocalInWorkspaceTimezone,
 } from "@/lib/workspace-datetime";
 
-/** Minimum wait before the first (or zero-delay) step is eligible for cron pickup. */
-export const IMMEDIATE_SEND_DELAY_MS = 60_000;
-
 const SEND_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export function parseSendTime(sendTime: string): { hour: number; minute: number } {
@@ -66,10 +63,16 @@ function scheduleAtLocalDateTime(
 }
 
 /**
- * Schedules a step at enrolment anchor + delay days + wall-clock send time (workspace TZ).
- * Zero-delay steps use the exact configured send time when it is still ahead today.
- * When today's slot already passed, zero-delay steps send about one minute after the anchor.
- * Delayed steps roll forward to the next day when the target slot is not after the anchor.
+ * Schedules a step at anchor + delay days + wall-clock send time (workspace TZ).
+ *
+ * Contract:
+ * - When the target slot is still ahead of the anchor, return that exact datetime.
+ * - When the slot already passed and delayDays > 0, roll to the next calendar day.
+ * - When the slot already passed and delayDays <= 0, return the exact configured slot
+ *   (the order time). Cron picks it up as soon as now >= order time.
+ *
+ * Late activate/resume after the order time is handled separately via
+ * computeRescheduledSendAt({ overdue: true }) which returns the pickup anchor (now).
  */
 export function computeStepSendAt(
   anchor: Date,
@@ -83,12 +86,12 @@ export function computeStepSendAt(
   let scheduled = scheduleAtLocalDateTime(targetDate, sendTime, timeZone);
 
   if (!scheduled) {
-    return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    return new Date(anchor);
   }
 
   if (scheduled <= anchor) {
     if (delayDays <= 0) {
-      return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+      return scheduled;
     }
 
     const bumpedDate = addCalendarDaysInTimezone(scheduled, 1, timeZone);
@@ -108,7 +111,7 @@ export function computeNextSendAt(
   }
 
   if (delayDays <= 0) {
-    return new Date(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    return new Date(anchor);
   }
 
   return addDays(anchor, delayDays);
@@ -131,4 +134,14 @@ export function computeRescheduledSendAt(
 
 export function isScheduledSendDue(nextSendAt: Date, now = new Date()): boolean {
   return nextSendAt <= now;
+}
+
+export function isCampaignOrderOverdue(
+  scheduleAnchor: Date,
+  pickupAnchor: Date,
+  stepDelayDays: number,
+  options: { sendTime?: string; timeZone?: string },
+): boolean {
+  const orderTime = computeNextSendAt(scheduleAnchor, stepDelayDays, options);
+  return orderTime <= pickupAnchor;
 }

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  IMMEDIATE_SEND_DELAY_MS,
   computeNextSendAt,
   computeRescheduledSendAt,
+  isCampaignOrderOverdue,
   isScheduledSendDue,
 } from "@/server/utils/campaign-schedule";
 
 describe("campaign schedule", () => {
-  it("schedules zero-delay steps one minute after the anchor", () => {
+  it("uses the anchor for zero-delay steps without a send time", () => {
     const anchor = new Date("2026-06-14T12:00:00.000Z");
     const nextSendAt = computeNextSendAt(anchor, 0);
 
-    expect(nextSendAt.getTime()).toBe(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    expect(nextSendAt.getTime()).toBe(anchor.getTime());
   });
 
   it("adds whole days for positive delays", () => {
@@ -32,14 +32,14 @@ describe("campaign schedule", () => {
     expect(nextSendAt.toISOString()).toBe("2026-06-15T09:00:00.000Z");
   });
 
-  it("sends immediately when a zero-delay send time already passed today", () => {
+  it("keeps the exact configured slot when a zero-delay send time already passed today", () => {
     const anchor = new Date("2026-06-14T15:00:00.000Z");
     const nextSendAt = computeNextSendAt(anchor, 0, {
       sendTime: "09:00",
       timeZone: "UTC",
     });
 
-    expect(nextSendAt.getTime()).toBe(anchor.getTime() + IMMEDIATE_SEND_DELAY_MS);
+    expect(nextSendAt.toISOString()).toBe("2026-06-14T09:00:00.000Z");
   });
 
   it("schedules later today when zero-delay send time is still ahead", () => {
@@ -85,5 +85,39 @@ describe("campaign schedule", () => {
     });
 
     expect(nextSendAt.toISOString()).toBe("2026-06-14T17:29:00.000Z");
+  });
+
+  it("schedules step two at the exact later slot after step one sends", () => {
+    const stepOneSentAt = new Date("2026-06-17T07:38:00.000Z");
+    const nextSendAt = computeNextSendAt(stepOneSentAt, 0, {
+      sendTime: "09:40",
+      timeZone: "Europe/Zurich",
+    });
+
+    expect(nextSendAt.toISOString()).toBe("2026-06-17T07:40:00.000Z");
+  });
+
+  it("marks an order overdue when activate/resume happens after the configured slot", () => {
+    const scheduleAnchor = new Date("2026-06-17T07:30:00.000Z");
+    const pickupAnchor = new Date("2026-06-17T07:45:00.000Z");
+
+    expect(
+      isCampaignOrderOverdue(scheduleAnchor, pickupAnchor, 0, {
+        sendTime: "09:34",
+        timeZone: "Europe/Zurich",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps future orders on-time when activate/resume happens before the slot", () => {
+    const scheduleAnchor = new Date("2026-06-17T07:30:00.000Z");
+    const pickupAnchor = new Date("2026-06-17T07:31:00.000Z");
+
+    expect(
+      isCampaignOrderOverdue(scheduleAnchor, pickupAnchor, 0, {
+        sendTime: "09:34",
+        timeZone: "Europe/Zurich",
+      }),
+    ).toBe(false);
   });
 });

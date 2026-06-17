@@ -149,16 +149,10 @@ async function processEnrollment(
   const campaign = await findCampaignById(workspaceId, enrollment.campaignId);
 
   if (!campaign || campaign.status !== "active") {
-    // #region agent log
-    fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:processEnrollment:campaign-inactive',message:'Skipped: campaign not active',data:{hypothesisId:'H1',enrollmentId:enrollment.id,campaignId:enrollment.campaignId,campaignStatus:campaign?.status??'missing',enrollmentStatus:enrollment.status,nextSendAt:enrollment.nextSendAt.toISOString(),chainDepth},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return singleOutcomeResult("skipped");
   }
 
   if (enrollment.status !== "active") {
-    // #region agent log
-    fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:processEnrollment:enrollment-inactive',message:'Skipped: enrollment not active',data:{hypothesisId:'H3',enrollmentId:enrollment.id,campaignId:enrollment.campaignId,campaignStatus:campaign.status,enrollmentStatus:enrollment.status,nextSendAt:enrollment.nextSendAt.toISOString()},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const step = await findStepByOrder(
       workspaceId,
       enrollment.campaignId,
@@ -194,9 +188,6 @@ async function processEnrollment(
   }
 
   if (step.status === "paused" || step.status === "draft") {
-    // #region agent log
-    fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:processEnrollment:step-inactive',message:'Skipped: step draft or paused',data:{hypothesisId:'H5',enrollmentId:enrollment.id,campaignId:enrollment.campaignId,stepOrder:step.order,stepStatus:step.status,nextSendAt:enrollment.nextSendAt.toISOString()},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     await recordSkippedSend({
       workspaceId,
       enrollment,
@@ -209,9 +200,6 @@ async function processEnrollment(
   }
 
   if (!isScheduledSendDue(enrollment.nextSendAt)) {
-    // #region agent log
-    fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:processEnrollment:not-due',message:'Skipped: nextSendAt still in future',data:{hypothesisId:'H4',enrollmentId:enrollment.id,campaignId:enrollment.campaignId,nextSendAt:enrollment.nextSendAt.toISOString(),now:new Date().toISOString()},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return singleOutcomeResult("skipped");
   }
 
@@ -470,10 +458,6 @@ async function processEnrollment(
     },
   });
 
-  // #region agent log
-  fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:processEnrollment:sent',message:'Email sent successfully',data:{hypothesisId:'H6',enrollmentId:enrollment.id,campaignId:enrollment.campaignId,stepOrder:step.order,messageId:sendResult.messageId},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   const nextStep = await findNextStepAfterOrder(
     workspaceId,
     enrollment.campaignId,
@@ -604,10 +588,6 @@ export async function sendCampaignEnrollmentsImmediately(
 
   const eligible = filterEnrollmentsForImmediateSend(enrollments, mode, enrollmentIds);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:sendCampaignEnrollmentsImmediately',message:'Immediate send pass',data:{hypothesisId:'H2',mode,campaignId,eligibleCount:eligible.length,enrollmentIds:enrollmentIds??null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   return summarizeEnrollmentProcessing(eligible);
 }
 
@@ -616,17 +596,7 @@ export async function sendDueCampaignEmails(
 ): Promise<SendDueSummary> {
   const dueEnrollments = await findDueEnrollments(limit);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:sendDueCampaignEmails',message:'Cron send-due invoked',data:{hypothesisId:'H2',dueCount:dueEnrollments.length,limit,enrollments:dueEnrollments.map((e)=>({id:e.id,campaignId:e.campaignId,status:e.status,nextSendAt:e.nextSendAt.toISOString(),currentStep:e.currentStep}))},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
-  const summary = await summarizeEnrollmentProcessing(dueEnrollments);
-
-  // #region agent log
-  fetch('http://127.0.0.1:7314/ingest/a60a918e-508d-4ff1-8e6b-6228f097e67c',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6942f7'},body:JSON.stringify({sessionId:'6942f7',location:'campaign-sending.ts:sendDueCampaignEmails:summary',message:'Cron send-due completed',data:{hypothesisId:'H2',summary},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
-  return summary;
+  return summarizeEnrollmentProcessing(dueEnrollments);
 }
 
 export async function listCampaignSendsForWorkspace(

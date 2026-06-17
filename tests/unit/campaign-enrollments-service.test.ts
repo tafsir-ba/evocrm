@@ -345,7 +345,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
 
     const createdAt = new Date("2026-06-18T15:06:00.000Z");
     const staleNextSendAt = new Date("2026-06-19T15:06:00.000Z");
-    const correctedNextSendAt = new Date("2026-06-18T15:09:00.000Z");
+    const correctedNextSendAt = new Date("2026-06-18T09:00:00.000Z");
 
     vi.mocked(findCampaignEnrollments).mockResolvedValue({
       enrollments: [
