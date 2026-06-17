@@ -103,7 +103,9 @@ async function computeImportJobValidation(
     job.headerRowIndex,
   );
 
-  const effectiveOverrides = rowOverrides ?? job.rowOverrides ?? {};
+  const configResponse = toImportEntityConfigResponse(entityConfig);
+  const rawOverrides = rowOverrides ?? job.rowOverrides ?? {};
+  const effectiveOverrides = sanitizeRowOverrides(configResponse.fields, rawOverrides);
 
   const validation = await validateImportRows(
     entityConfig,

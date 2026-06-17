@@ -21,11 +21,13 @@ import {
 } from "@/lib/imports";
 import {
   collectUnknownProjectNames,
+  parseUnknownProjectName,
   suggestProjectNameFromImportValue,
   suggestProjectReferenceFromImportValue,
 } from "@/lib/import-project-helpers";
 import {
   sanitizeImportMappingPayload,
+  sanitizeRowOverrides,
   validateImportMappingConfiguration,
 } from "@/lib/import-mapping-validation";
 import { IconUpload } from "@/lib/icons";
@@ -95,6 +97,7 @@ export function ImportWizard({
   const [loading, setLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
 
   const [config, setConfig] = useState<ImportEntityConfigResponse | null>(null);
   const [importId, setImportId] = useState<string | null>(null);
@@ -225,6 +228,7 @@ export function ImportWizard({
     setLoading(false);
     setConfigLoading(false);
     setError(null);
+    setLoadWarnings([]);
     setImportId(null);
     setFileName(null);
     setRowCount(0);
@@ -316,9 +320,7 @@ export function ImportWizard({
 
         setDictionaries(Object.fromEntries(dictionaryEntries));
 
-        if (loadErrors.length > 0) {
-          setError(loadErrors.join(" "));
-        }
+        setLoadWarnings(loadErrors);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load config.");
       } finally {
@@ -499,12 +501,14 @@ export function ImportWizard({
   }
 
   async function revalidateImport(overrides: ImportRowOverrides = rowOverrides) {
-    if (!importId) return;
+    if (!importId || !config) return;
+
+    const sanitizedOverrides = sanitizeRowOverrides(config.fields, overrides);
 
     const validateResponse = await fetch(`${apiBase}/${importId}/validate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rowOverrides: overrides }),
+      body: JSON.stringify({ rowOverrides: sanitizedOverrides }),
     });
     const validatePayload = await validateResponse.json();
 
@@ -546,7 +550,9 @@ export function ImportWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: input.name.trim(),
-          ...(input.reference.trim() ? { reference: input.reference.trim() } : {}),
+          reference:
+            input.reference.trim() ||
+            suggestProjectReferenceFromImportValue(input.importValue),
         }),
       });
       const payload = await response.json();
@@ -555,7 +561,11 @@ export function ImportWizard({
         throw new Error(payload.error?.message ?? "Failed to create project.");
       }
 
-      await reloadProjects();
+      const createdProject = payload.data.project as ProjectItem;
+      setProjects((current) => [
+        ...current,
+        { id: createdProject.id, name: createdProject.name },
+      ]);
 
       if (importId && step === "validate") {
         await revalidateImport(rowOverrides);
@@ -591,7 +601,7 @@ export function ImportWizard({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Import failed.");
+        throw new Error(formatImportApiError(payload, "Import failed."));
       }
 
       setImportResult({
@@ -726,6 +736,12 @@ export function ImportWizard({
           </div>
         )}
 
+        {loadWarnings.length > 0 && (
+          <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-[13px] text-[#92400e]">
+            {loadWarnings.join(" ")} Some import helpers may be unavailable until you refresh.
+          </div>
+        )}
+
         {step === "upload" && (
           <UploadStep
             loading={loading}
@@ -832,6 +848,7 @@ function UploadStep({
         tabIndex={0}
         onClick={() => !uploadDisabled && fileInputRef.current?.click()}
         onKeyDown={(event) => {
+          if (uploadDisabled) return;
           if (event.key === "Enter" || event.key === " ") {
             fileInputRef.current?.click();
           }
@@ -1149,6 +1166,13 @@ function ValidateStep({
         />
       )}
 
+      {summary.errorRows > 0 && errorRows.length === 0 && issues.length > 0 && (
+        <p className="text-[12px] text-[#92400e]">
+          {summary.errorRows.toLocaleString()} rows have errors, but detailed row editors are
+          unavailable. Re-run validation or download the error report after import.
+        </p>
+      )}
+
       {errorRows.length > 0 ? (
         <div className="space-y-3">
           <p className="text-[13px] text-[var(--color-ink-muted)]">
@@ -1273,7 +1297,7 @@ function ImportMissingProjectsPanel({
 
     for (const issue of issues) {
       if (issue.field !== "projectId") continue;
-      if (issue.message === `Unknown project "${importValue}".` && issue.rowNumber > 0) {
+      if (parseUnknownProjectName(issue.message) === importValue && issue.rowNumber > 0) {
         rowNumbers.add(issue.rowNumber);
       }
     }
@@ -1282,7 +1306,7 @@ function ImportMissingProjectsPanel({
       const matches = errorRow.issues.some(
         (issue) =>
           issue.field === "projectId" &&
-          issue.message === `Unknown project "${importValue}".`,
+          parseUnknownProjectName(issue.message) === importValue,
       );
       if (matches) {
         rowNumbers.add(errorRow.rowNumber);
@@ -1354,6 +1378,7 @@ function ImportMissingProjectsPanel({
                 </label>
                 <Button
                   size="sm"
+                  loading={loading}
                   disabled={loading || !draft.name.trim()}
                   onClick={() =>
                     onCreateProject({
@@ -1555,7 +1580,7 @@ function ImportFieldEditor({
         {unresolvedSource && !hasMatch && (
           <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
         )}
-        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+        <Select fieldSize="sm" value={hasMatch ? value : ""} disabled={loading} onChange={(event) => onChange(event.target.value)}>
           <option value="">Select member</option>
           {members.map((member) => (
             <option key={member.userId} value={member.userId}>
@@ -1576,7 +1601,7 @@ function ImportFieldEditor({
         {unresolvedSource && !hasMatch && (
           <p className="text-[10px] text-[#92400e]">From file: {unresolvedSource}</p>
         )}
-        <Select fieldSize="sm" value={hasMatch ? value : ""} onChange={(event) => onChange(event.target.value)}>
+        <Select fieldSize="sm" value={hasMatch ? value : ""} disabled={loading} onChange={(event) => onChange(event.target.value)}>
           <option value="">Select {field.label.toLowerCase()}</option>
           {items.map((item) => (
             <option key={item.id} value={item.id}>
@@ -1593,6 +1618,7 @@ function ImportFieldEditor({
       fieldSize="sm"
       type={field?.type === "email" ? "email" : field?.type === "phone" ? "tel" : "text"}
       value={value}
+      disabled={loading}
       onChange={(event) => onChange(event.target.value)}
       placeholder={field?.label ?? "Value"}
     />

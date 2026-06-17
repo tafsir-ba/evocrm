@@ -113,7 +113,9 @@ export function sanitizeImportMappingPayload(input: {
   return {
     mappings: input.mappings.map((mapping) => ({
       sourceColumnIndex: mapping.sourceColumnIndex,
-      targetField: mapping.targetField?.trim() ? mapping.targetField : null,
+      targetField: mapping.targetField?.trim()
+        ? mapping.targetField.trim()
+        : null,
     })),
     defaults: Object.fromEntries(
       Object.entries(input.defaults).filter(([, value]) => Boolean(value?.trim())),
