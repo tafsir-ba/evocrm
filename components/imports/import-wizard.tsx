@@ -557,6 +557,15 @@ function UploadStep({
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onSelectFile: (file: File) => void;
 }) {
+  const [dragOver, setDragOver] = useState(false);
+
+  function handleFile(file: File) {
+    if (loading) {
+      return;
+    }
+    onSelectFile(file);
+  }
+
   return (
     <div className="space-y-3">
       <p className="text-[13px] text-[var(--color-ink-muted)]">
@@ -565,13 +574,48 @@ function UploadStep({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => !loading && fileInputRef.current?.click()}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             fileInputRef.current?.click();
           }
         }}
-        className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--color-line)] bg-[var(--color-canvas)] px-6 py-10 text-center cursor-pointer hover:border-[var(--color-brand-600)]"
+        onDragEnter={(event) => {
+          event.preventDefault();
+          if (!loading) {
+            setDragOver(true);
+          }
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          if (!loading) {
+            setDragOver(true);
+          }
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setDragOver(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragOver(false);
+
+          if (loading) {
+            return;
+          }
+
+          const file = event.dataTransfer.files[0];
+          if (file) {
+            handleFile(file);
+          }
+        }}
+        className={[
+          "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors cursor-pointer",
+          dragOver
+            ? "border-[var(--color-brand-600)] bg-[color-mix(in_srgb,var(--color-brand-600)_5%,white)]"
+            : "border-[var(--color-line)] bg-[var(--color-canvas)] hover:border-[var(--color-brand-600)]",
+          loading ? "opacity-60 cursor-not-allowed" : "",
+        ].join(" ")}
       >
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[var(--color-brand-600)] shadow-sm">
           <IconUpload size={18} />
@@ -590,7 +634,8 @@ function UploadStep({
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) onSelectFile(file);
+          event.target.value = "";
+          if (file) handleFile(file);
         }}
       />
     </div>
