@@ -81,6 +81,8 @@ Production startup **fails fast** if required production keys are missing (`serv
 [ ] Resend domain verified for EMAIL_FROM
 [ ] Spaces bucket private; CORS if direct browser upload
 [ ] CRON job scheduled: POST /api/cron/campaigns/send-due with Authorization: Bearer $CRON_SECRET
+    (or rely on built-in internal cron — enabled by default in production when CRON_SECRET is set;
+     disable with CAMPAIGN_CRON_INTERNAL=false if using an external scheduler)
 [ ] Website integration URL documented for clients: POST /api/integrations/website/leads
 ```
 
