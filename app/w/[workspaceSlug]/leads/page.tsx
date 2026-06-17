@@ -30,6 +30,7 @@ export default async function LeadsPage({ params }: { params: Params }) {
         canCreate={hasPermission(permissions, "lead:create")}
         canCreateProject={hasPermission(permissions, "project:create")}
         canArchive={hasPermission(permissions, "lead:archive")}
+        canDelete={hasPermission(permissions, "lead:delete")}
       />
     </PageContainer>
   );

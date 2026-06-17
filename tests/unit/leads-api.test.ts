@@ -20,9 +20,11 @@ vi.mock("@/server/services/leads", () => ({
   archiveLeadForWorkspace: vi.fn(),
   getLeadForWorkspace: vi.fn(),
   updateLeadForWorkspace: vi.fn(),
+  purgeLeadsForWorkspace: vi.fn(),
 }));
 
 import { GET as getLeads, POST as postLead } from "@/app/api/workspaces/[workspaceSlug]/leads/route";
+import { POST as bulkDeleteLeads } from "@/app/api/workspaces/[workspaceSlug]/leads/bulk-delete/route";
 import {
   DELETE as deleteLeadById,
   GET as getLeadById,
@@ -35,6 +37,7 @@ import {
   createLeadForWorkspace,
   getLeadForWorkspace,
   listLeadsForWorkspace,
+  purgeLeadsForWorkspace,
   updateLeadForWorkspace,
 } from "@/server/services/leads";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
@@ -342,5 +345,78 @@ describe("lead API routes", () => {
 
     expect(response.status).toBe(200);
     expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:archive");
+  });
+
+  it("requires lead:delete for bulk delete", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockRejectedValue(
+      new AppError("PERMISSION_DENIED", "Permission denied."),
+    );
+
+    const response = await bulkDeleteLeads(
+      new Request("http://localhost/api/workspaces/demo/leads/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: ["507f1f77bcf86cd799439011"] }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("permanently deletes leads with lead:delete permission", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["lead:delete"],
+      },
+    });
+    vi.mocked(purgeLeadsForWorkspace).mockResolvedValue({
+      deletedCount: 2,
+      requestedCount: 2,
+    });
+
+    const response = await bulkDeleteLeads(
+      new Request("http://localhost/api/workspaces/demo/leads/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectAll: true,
+          filters: { search: "hubspot" },
+        }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:delete");
+    expect(purgeLeadsForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", {
+      selectAll: true,
+      filters: { search: "hubspot" },
+    });
   });
 });

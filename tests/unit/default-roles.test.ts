@@ -20,6 +20,7 @@ describe("default role permission sets", () => {
     expect(ownerPermissions).toContain("billing:manage");
     expect(ownerPermissions).toContain("roles:manage");
     expect(ownerPermissions).toContain("campaign:delete");
+    expect(ownerPermissions).toContain("lead:delete");
   });
 
   it("gives admin same operational permissions as owner for V1", () => {
@@ -28,9 +29,12 @@ describe("default role permission sets", () => {
     expect(adminPermissions).toContain("billing:manage");
     expect(adminPermissions).toContain("users:manage");
     expect(adminPermissions).toContain("campaign:delete");
+    expect(adminPermissions).toContain("lead:delete");
   });
 
-  it("does not give agent or viewer campaign delete", () => {
+  it("does not give agent or viewer destructive delete permissions", () => {
+    expect(getDefaultRolePermissions("agent")).not.toContain("lead:delete");
+    expect(getDefaultRolePermissions("viewer")).not.toContain("lead:delete");
     expect(getDefaultRolePermissions("agent")).not.toContain("campaign:delete");
     expect(getDefaultRolePermissions("viewer")).not.toContain("campaign:delete");
   });

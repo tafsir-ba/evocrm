@@ -99,6 +99,7 @@ describe("requireMembership", () => {
     const membership = await requireMembership("ws-1", "user-1");
 
     expect(membership.permissions).toContain("campaign:delete");
+    expect(membership.permissions).toContain("lead:delete");
     expect(membership.permissions).toContain("campaign:archive");
   });
 

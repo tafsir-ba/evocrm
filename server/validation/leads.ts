@@ -148,3 +148,24 @@ export type CreateLeadInput = z.infer<typeof createLeadInputSchema>;
 export type CreateLeadApiInput = z.infer<typeof createLeadApiInputSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadInputSchema>;
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
+
+const bulkDeleteLeadFiltersSchema = leadListQuerySchema
+  .omit({ page: true, pageSize: true })
+  .partial();
+
+export const bulkDeleteLeadsInputSchema = z
+  .object({
+    leadIds: z.array(objectIdSchema).min(1).max(1000).optional(),
+    selectAll: z.literal(true).optional(),
+    excludeLeadIds: z.array(objectIdSchema).max(1000).optional(),
+    filters: bulkDeleteLeadFiltersSchema.optional(),
+  })
+  .strict()
+  .refine((value) => Boolean(value.leadIds?.length) || value.selectAll === true, {
+    message: "Either leadIds or selectAll must be provided.",
+  })
+  .refine((value) => !(value.leadIds?.length && value.selectAll), {
+    message: "leadIds and selectAll cannot be used together.",
+  });
+
+export type BulkDeleteLeadsInput = z.infer<typeof bulkDeleteLeadsInputSchema>;

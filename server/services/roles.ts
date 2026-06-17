@@ -80,6 +80,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "lead:read": "View leads",
   "lead:update": "Edit leads",
   "lead:archive": "Archive leads",
+  "lead:delete": "Permanently delete leads",
   "property:create": "Create properties",
   "property:read": "View properties",
   "property:update": "Edit properties",

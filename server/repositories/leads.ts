@@ -118,6 +118,7 @@ export type LeadListFilter = {
   createdFrom?: Date;
   createdTo?: Date;
   excludeIds?: string[];
+  leadIds?: string[];
   page?: number;
   pageSize?: number;
 };
@@ -169,7 +170,17 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
     query.createdAt = createdAt;
   }
 
-  if (filter.excludeIds && filter.excludeIds.length > 0) {
+  if (filter.leadIds && filter.leadIds.length > 0) {
+    const leadObjectIds = toObjectIdArray(filter.leadIds);
+    if (filter.excludeIds && filter.excludeIds.length > 0) {
+      const excluded = new Set(filter.excludeIds);
+      query._id = {
+        $in: leadObjectIds.filter((id) => !excluded.has(id.toString())),
+      };
+    } else {
+      query._id = { $in: leadObjectIds };
+    }
+  } else if (filter.excludeIds && filter.excludeIds.length > 0) {
     query._id = { $nin: toObjectIdArray(filter.excludeIds) };
   }
 
@@ -211,6 +222,17 @@ export async function findLeads(
     leads: documents.map(toLeadRecord),
     total,
   };
+}
+
+export async function findLeadIds(
+  workspaceId: string,
+  filter: LeadListFilter = {},
+): Promise<string[]> {
+  await connectDb();
+  const query = withWorkspaceScope(workspaceId, buildListQuery(filter));
+  const documents = await LeadModel.find(query).select({ _id: 1 }).lean<Array<{ _id: mongoose.Types.ObjectId }>>();
+
+  return documents.map((document) => document._id.toString());
 }
 
 export async function findLeadById(

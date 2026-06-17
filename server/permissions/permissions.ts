@@ -15,6 +15,7 @@ export const PERMISSION_KEYS = [
   "lead:read",
   "lead:update",
   "lead:archive",
+  "lead:delete",
   "property:create",
   "property:read",
   "property:update",

@@ -9,11 +9,13 @@ import {
   findActiveLeadByEmailNormalized,
   findLeadById,
   findLeadByPhoneNormalized,
+  findLeadIds,
   findLeads,
   updateLead,
   type LeadListFilter,
   type LeadRecord,
 } from "@/server/repositories/leads";
+import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
@@ -23,7 +25,11 @@ import {
   assertValidProjectFilter,
   validateActiveProjectId,
 } from "@/server/services/project-scope";
-import type { CreateLeadInput, UpdateLeadInput } from "@/server/validation/leads";
+import type {
+  BulkDeleteLeadsInput,
+  CreateLeadInput,
+  UpdateLeadInput,
+} from "@/server/validation/leads";
 
 export type LeadDictionarySummary = {
   id: string;
@@ -654,4 +660,66 @@ export async function archiveLeadForWorkspace(
   });
 
   return enrichLeadRecord(archived);
+}
+
+function buildBulkDeleteLeadFilter(
+  input: BulkDeleteLeadsInput,
+): LeadListFilter {
+  const filters = input.filters ?? {};
+
+  return {
+    includeArchived: filters.includeArchived,
+    search: filters.search,
+    projectId: filters.projectId,
+    statusId: filters.statusId,
+    sourceId: filters.sourceId,
+    assignedTo: filters.assignedTo,
+    ownerId: filters.ownerId,
+    tagId: filters.tagId,
+    propertyTypeInterest: filters.propertyTypeInterest,
+    transactionIntent: filters.transactionIntent,
+    usagePurpose: filters.usagePurpose,
+    createdFrom: filters.createdFrom,
+    createdTo: filters.createdTo,
+    excludeIds: input.excludeLeadIds,
+  };
+}
+
+export async function purgeLeadsForWorkspace(
+  workspaceId: string,
+  actorId: string,
+  input: BulkDeleteLeadsInput,
+): Promise<{ deletedCount: number; requestedCount: number }> {
+  const leadIds = input.selectAll
+    ? await findLeadIds(workspaceId, buildBulkDeleteLeadFilter(input))
+    : await findLeadIds(workspaceId, {
+        leadIds: input.leadIds ?? [],
+        includeArchived: true,
+      });
+
+  const requestedCount = input.selectAll
+    ? leadIds.length
+    : input.leadIds?.length ?? 0;
+
+  if (leadIds.length === 0) {
+    return { deletedCount: 0, requestedCount };
+  }
+
+  const deletedCount = await purgeLeadsByIds(workspaceId, leadIds);
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "lead.bulk_deleted",
+    entityType: "lead",
+    entityId: leadIds[0] ?? workspaceId,
+    after: {
+      deletedCount,
+      requestedCount,
+      leadIds: leadIds.slice(0, 25),
+      selectAll: input.selectAll === true,
+    },
+  });
+
+  return { deletedCount, requestedCount };
 }
