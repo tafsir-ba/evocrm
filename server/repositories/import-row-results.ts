@@ -2,7 +2,7 @@ import "server-only";
 
 import mongoose from "mongoose";
 
-import { ImportRowResultModel } from "@/models/import-row-result";
+import { ImportRowResultModel, type ImportRowResultDocument } from "@/models/import-row-result";
 import { connectDb } from "@/server/db/mongoose";
 import type { ImportRowResultRecord } from "@/server/repositories/import-jobs";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
@@ -45,6 +45,22 @@ function toImportRowResultRecord(
   };
 }
 
+function toStoredRowIssues(
+  issues: ImportRowResultRecord["errors"],
+): Array<{
+  rowNumber: number;
+  field: string | null;
+  message: string;
+  severity: "error" | "warning";
+}> {
+  return issues.map((issue) => ({
+    rowNumber: issue.rowNumber,
+    field: issue.field ?? null,
+    message: issue.message,
+    severity: issue.severity,
+  }));
+}
+
 export async function replaceImportRowResults(
   workspaceId: string,
   importJobId: string,
@@ -59,37 +75,41 @@ export async function replaceImportRowResults(
     return;
   }
 
-  const rowNumbers = rowResults.map((result) => result.rowNumber);
+  const workspaceObjectId = new mongoose.Types.ObjectId(workspaceId);
+  const importJobObjectId = new mongoose.Types.ObjectId(importJobId);
+  const operations = rowResults.map((result) => ({
+    updateOne: {
+      filter: {
+        workspaceId: workspaceObjectId,
+        importJobId: importJobObjectId,
+        rowNumber: result.rowNumber,
+      },
+      update: {
+        $set: {
+          workspaceId: workspaceObjectId,
+          importJobId: importJobObjectId,
+          rowNumber: result.rowNumber,
+          status: result.status,
+          entityId: result.entityId,
+          errors: toStoredRowIssues(result.errors),
+          warnings: toStoredRowIssues(result.warnings),
+        },
+      },
+      upsert: true,
+    },
+  })) as mongoose.mongo.AnyBulkWriteOperation<ImportRowResultDocument>[];
 
   await ImportRowResultModel.bulkWrite(
-    rowResults.map((result) => ({
-      updateOne: {
-        filter: withWorkspaceScope(workspaceId, {
-          importJobId,
-          rowNumber: result.rowNumber,
-        }),
-        update: {
-          $set: {
-            workspaceId: new mongoose.Types.ObjectId(workspaceId),
-            importJobId: new mongoose.Types.ObjectId(importJobId),
-            rowNumber: result.rowNumber,
-            status: result.status,
-            entityId: result.entityId,
-            errors: result.errors,
-            warnings: result.warnings,
-          },
-        },
-        upsert: true,
-      },
-    })),
+    operations as Parameters<typeof ImportRowResultModel.bulkWrite>[0],
   );
 
-  await ImportRowResultModel.deleteMany(
-    withWorkspaceScope(workspaceId, {
-      importJobId,
-      rowNumber: { $nin: rowNumbers },
-    }),
-  );
+  const rowNumbers = rowResults.map((result) => result.rowNumber);
+
+  await ImportRowResultModel.deleteMany({
+    workspaceId: workspaceObjectId,
+    importJobId: importJobObjectId,
+    rowNumber: { $nin: rowNumbers },
+  });
 }
 
 export async function findImportRowResults(
