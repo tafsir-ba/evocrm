@@ -77,14 +77,35 @@ describe("import drip campaign opt-in", () => {
     ).toBe(false);
   });
 
-  it("does not request drip evaluation for strict imports even when checked", () => {
+  it("strict import with checkbox checked sends triggerAutomationForImportedLeads true", () => {
+    expect(
+      buildImportExecutePayload("strict", {
+        triggerAutomationForImportedLeads: true,
+      }),
+    ).toEqual({
+      mode: "strict",
+      triggerAutomationForImportedLeads: true,
+    });
+  });
+
+  it("requires confirmation before strict drip evaluation imports", () => {
+    expect(
+      shouldConfirmImportDripCampaignEvaluation({
+        entityType: "lead",
+        mode: "strict",
+        triggerAutomationForImportedLeads: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("requests drip evaluation for strict imports when checked", () => {
     expect(
       isImportDripCampaignEvaluationRequested({
         entityType: "lead",
         mode: "strict",
         triggerAutomationForImportedLeads: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("checkbox toggles checked state", async () => {

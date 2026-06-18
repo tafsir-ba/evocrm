@@ -260,6 +260,52 @@ describe("import execution lifecycle", () => {
     expect(result.dripCampaignEvaluationEnabled).toBe(true);
   });
 
+  it("passes triggerAutomationForImportedLeads into import context for strict lead imports", async () => {
+    vi.mocked(claimImportJobForExecution).mockResolvedValue({
+      ...baseJob,
+      status: "processing",
+      startedAt: new Date(),
+    });
+    vi.mocked(validateImportRows).mockResolvedValue({
+      ...validationResult,
+      summary: {
+        totalRows: 1,
+        validRows: 1,
+        warningRows: 0,
+        errorRows: 0,
+      },
+    });
+    vi.mocked(executeImportJob).mockResolvedValue({
+      createdCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [],
+    });
+    vi.mocked(findImportJobById).mockResolvedValue({
+      ...baseJob,
+      status: "completed",
+    });
+
+    const result = await executeImportJobForWorkspace(
+      workspaceId,
+      importJobId,
+      actorId,
+      "CHF",
+      { mode: "strict", triggerAutomationForImportedLeads: true },
+    );
+
+    expect(executeImportJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        triggerAutomationForImportedLeads: true,
+      }),
+      expect.anything(),
+      "strict",
+    );
+    expect(result.dripCampaignEvaluationEnabled).toBe(true);
+  });
+
   it("forces triggerAutomationForImportedLeads false for property imports", async () => {
     vi.mocked(claimImportJobForExecution).mockResolvedValue({
       ...baseJob,

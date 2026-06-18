@@ -156,11 +156,7 @@ export function isImportDripCampaignEvaluationRequested(input: {
   mode: ImportExecuteMode;
   triggerAutomationForImportedLeads: boolean;
 }): boolean {
-  return (
-    input.entityType === "lead" &&
-    input.mode === "valid_rows_only" &&
-    input.triggerAutomationForImportedLeads
-  );
+  return input.entityType === "lead" && input.triggerAutomationForImportedLeads;
 }
 
 export function shouldConfirmImportDripCampaignEvaluation(input: {

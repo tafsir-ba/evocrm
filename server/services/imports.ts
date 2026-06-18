@@ -466,7 +466,6 @@ export async function executeImportJobForWorkspace(
     const entityConfig = getImportEntityConfig(claimedJob.entityType);
     const triggerAutomationForImportedLeads =
       claimedJob.entityType === "lead" &&
-      input.mode === "valid_rows_only" &&
       Boolean(input.triggerAutomationForImportedLeads);
 
     const executionContext: ImportContext = {

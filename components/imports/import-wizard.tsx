@@ -730,7 +730,10 @@ export function ImportWizard({
               loading={loading}
               disabled={!validationSummary || validationSummary.errorRows > 0}
             >
-              Strict import
+              {shouldShowImportDripCampaignOption(entityType) &&
+              triggerAutomationForImportedLeads
+                ? "Strict import and evaluate drip campaigns"
+                : "Strict import"}
             </Button>
             <Button onClick={() => requestExecute("valid_rows_only")} loading={loading}>
               {shouldShowImportDripCampaignOption(entityType) &&
