@@ -9,6 +9,7 @@ vi.mock("@/server/repositories/import-jobs", () => ({
 }));
 
 import { executeImportJob } from "@/server/imports/import-job-runner";
+import type { ImportEntityConfig } from "@/server/imports/import-entity-config";
 import { findImportRowResults } from "@/server/repositories/import-row-results";
 import { updateImportJobExecution } from "@/server/repositories/import-jobs";
 
@@ -46,8 +47,8 @@ const job = {
   updatedAt: new Date(),
 };
 
-const entityConfig = {
-  entityType: "lead" as const,
+const entityConfig: ImportEntityConfig = {
+  entityType: "lead",
   label: "Lead",
   requiredPermission: "lead:create",
   fields: [],

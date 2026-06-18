@@ -18,7 +18,7 @@ describe("lead import automation", () => {
     } as never);
   });
 
-  it("triggers new_lead campaign automation during import", async () => {
+  it("does not trigger new_lead campaign automation during import", async () => {
     await leadImportConfig.createRecord(
       {
         projectId: "project-1",
@@ -45,6 +45,7 @@ describe("lead import automation", () => {
         firstName: "John",
         lastName: "Smith",
       }),
+      { triggerAutomation: false },
     );
   });
 });

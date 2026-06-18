@@ -177,6 +177,7 @@ export async function findActiveAutoEnrollmentCampaigns(
       autoEnrollmentEnabled: true,
       ...(filter.trigger === "new_lead"
         ? {
+            // Include legacy rows saved before trigger normalization (auto on + manual_only).
             enrollmentTrigger: { $in: ["new_lead", "manual_only"] },
           }
         : { enrollmentTrigger: filter.trigger }),

@@ -7,6 +7,7 @@ import {
 } from "@/server/imports/import-header-matcher";
 import { leadImportConfig } from "@/server/imports/entities/lead-import-config";
 import { propertyImportConfig } from "@/server/imports/entities/property-import-config";
+import type { LeadImportInput } from "@/server/imports/import-entity-config";
 import {
   splitFullName,
   parseOptionalNumber,
@@ -18,7 +19,6 @@ import {
   resolveProjectId,
   finalizeImportLookupField,
 } from "@/server/imports/import-normalizers";
-import { leadImportConfig } from "@/server/imports/entities/lead-import-config";
 import { AppError } from "@/server/errors";
 import {
   validateMappingConfiguration,
@@ -295,7 +295,7 @@ describe("import field configs", () => {
     registerImportLookupAliases(statusLookup, ["New"], statusId);
     dictionaryLookup.set("lead_status", statusLookup);
 
-    const input = await leadImportConfig.buildCreateInput(
+    const input = (await leadImportConfig.buildCreateInput(
       {
         projectId: "grosvenorvistas",
         statusId,
@@ -311,7 +311,7 @@ describe("import field configs", () => {
         memberLookup: new Map(),
         tagLookup: new Map(),
       },
-    );
+    )) as LeadImportInput;
 
     expect(input.projectId).toBe(projectId);
   });

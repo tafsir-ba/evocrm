@@ -327,6 +327,7 @@ export const leadImportConfig: ImportEntityConfig = {
       context.workspaceId,
       context.actorId,
       leadInput,
+      { triggerAutomation: false },
     );
 
     return {
