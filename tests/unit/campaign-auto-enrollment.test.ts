@@ -304,6 +304,109 @@ describe("evaluateEnrollmentConditions", () => {
 
     expect(enrollLeadInCampaignWithContext).not.toHaveBeenCalled();
   });
+
+  it("enrolls matching leads for active auto-enrollment campaigns", async () => {
+    vi.mocked(findLeadById).mockResolvedValue(buildLead());
+    vi.mocked(findActiveAutoEnrollmentCampaigns).mockResolvedValue([
+      {
+        id: "campaign-1",
+        workspaceId: "ws-1",
+        name: "Welcome drip",
+        status: "active",
+        audienceType: "leads",
+        projectIds: [],
+        autoEnrollmentEnabled: true,
+        enrollmentTrigger: "new_lead",
+        enrollmentRules: { logic: "AND", conditions: [] },
+        frequency: null,
+        defaultFromName: null,
+        senderName: null,
+        senderEmail: null,
+        sendingDomainId: null,
+        createdBy: "user-1",
+        ownerId: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(enrollLeadInCampaignWithContext).mockResolvedValue({
+      id: "enrollment-1",
+    } as never);
+
+    const { evaluateCampaignAutoEnrollmentForLead } = await import(
+      "@/server/services/campaign-auto-enrollment"
+    );
+
+    await evaluateCampaignAutoEnrollmentForLead({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      trigger: "new_lead",
+      actorId: "user-1",
+    });
+
+    expect(enrollLeadInCampaignWithContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws-1",
+        campaignId: "campaign-1",
+        leadId: "lead-1",
+        enrollmentSource: "rule_based_auto_enrollment",
+      }),
+    );
+    expect(createAuditLog).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: "campaign.auto_enrollment_skipped" }),
+    );
+  });
+
+  it("audits skipped auto-enrollment when enrollment cannot be created", async () => {
+    vi.mocked(findLeadById).mockResolvedValue(buildLead());
+    vi.mocked(findActiveAutoEnrollmentCampaigns).mockResolvedValue([
+      {
+        id: "campaign-1",
+        workspaceId: "ws-1",
+        name: "Welcome drip",
+        status: "active",
+        audienceType: "leads",
+        projectIds: [],
+        autoEnrollmentEnabled: true,
+        enrollmentTrigger: "new_lead",
+        enrollmentRules: { logic: "AND", conditions: [] },
+        frequency: null,
+        defaultFromName: null,
+        senderName: null,
+        senderEmail: null,
+        sendingDomainId: null,
+        createdBy: "user-1",
+        ownerId: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(enrollLeadInCampaignWithContext).mockResolvedValue(null);
+
+    const { evaluateCampaignAutoEnrollmentForLead } = await import(
+      "@/server/services/campaign-auto-enrollment"
+    );
+
+    await evaluateCampaignAutoEnrollmentForLead({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      trigger: "new_lead",
+      actorId: "user-1",
+    });
+
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "campaign.auto_enrollment_skipped",
+        entityId: "lead-1",
+        after: expect.objectContaining({
+          campaignId: "campaign-1",
+          trigger: "new_lead",
+        }),
+      }),
+    );
+  });
 });
 
 describe("auto-enrollment failure visibility", () => {

@@ -267,7 +267,7 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
       continue;
     }
 
-    await enrollLeadInCampaignWithContext({
+    const enrolled = await enrollLeadInCampaignWithContext({
       workspaceId: input.workspaceId,
       campaignId: campaign.id,
       leadId: lead.id,
@@ -279,5 +279,19 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
         matchedConditions: campaign.enrollmentRules.conditions,
       },
     });
+
+    if (!enrolled) {
+      await createAuditLog({
+        workspaceId: input.workspaceId,
+        actorId: input.actorId,
+        action: "campaign.auto_enrollment_skipped",
+        entityType: "lead",
+        entityId: lead.id,
+        after: {
+          trigger: input.trigger,
+          campaignId: campaign.id,
+        },
+      });
+    }
   }
 }

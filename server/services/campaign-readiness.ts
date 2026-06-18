@@ -27,11 +27,15 @@ export function isEnrollmentRulesReady(
     "autoEnrollmentEnabled" | "enrollmentTrigger" | "enrollmentRules"
   >,
 ): boolean {
-  if (!campaign.autoEnrollmentEnabled || campaign.enrollmentTrigger === "manual_only") {
+  if (!campaign.autoEnrollmentEnabled) {
     return true;
   }
 
-  return campaign.enrollmentRules.conditions.length > 0;
+  if (campaign.enrollmentTrigger === "manual_only") {
+    return false;
+  }
+
+  return true;
 }
 
 export async function evaluateCampaignReadiness(
@@ -52,7 +56,7 @@ export async function evaluateCampaignReadiness(
       key: "enrollment_rules",
       label: "Enrollment rules configured",
       passed: isEnrollmentRulesReady(campaign),
-      requiredFix: "Configure enrollment rules or disable auto-enrollment.",
+      requiredFix: "Choose when leads should be enrolled automatically.",
     },
     {
       key: "sending_domain",

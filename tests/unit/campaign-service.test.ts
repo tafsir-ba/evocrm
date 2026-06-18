@@ -135,6 +135,54 @@ describe("campaign service", () => {
     expect(result.id).toBe("camp-1");
   });
 
+  it("normalizes auto-enrollment trigger when enabling with manual_only", async () => {
+    vi.mocked(createCampaign).mockResolvedValue({
+      ...baseCampaign,
+      autoEnrollmentEnabled: true,
+      enrollmentTrigger: "new_lead",
+    });
+
+    await createCampaignForWorkspace("ws-1", "user-1", {
+      name: "Auto drip",
+      audienceType: "leads",
+      autoEnrollmentEnabled: true,
+      enrollmentTrigger: "manual_only",
+    });
+
+    expect(createCampaign).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        autoEnrollmentEnabled: true,
+        enrollmentTrigger: "new_lead",
+      }),
+    );
+  });
+
+  it("repairs legacy auto-enrollment trigger when updating unrelated fields", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      autoEnrollmentEnabled: true,
+      enrollmentTrigger: "manual_only",
+    });
+    vi.mocked(updateCampaign).mockResolvedValue({
+      ...baseCampaign,
+      name: "Renamed",
+      autoEnrollmentEnabled: true,
+      enrollmentTrigger: "new_lead",
+    });
+
+    await updateCampaignForWorkspace("ws-1", "user-1", "camp-1", { name: "Renamed" });
+
+    expect(updateCampaign).toHaveBeenCalledWith(
+      "ws-1",
+      "camp-1",
+      expect.objectContaining({
+        name: "Renamed",
+        enrollmentTrigger: "new_lead",
+      }),
+    );
+  });
+
   it("archive sets status=archived and archivedAt", async () => {
     vi.mocked(findCampaignById).mockResolvedValue({
       ...baseCampaign,

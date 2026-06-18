@@ -158,6 +158,58 @@ async function validateCampaignProjectIds(
   }
 }
 
+function normalizeAutoEnrollmentInput<
+  T extends {
+    autoEnrollmentEnabled?: boolean;
+    enrollmentTrigger?: CampaignRecord["enrollmentTrigger"];
+  },
+>(input: T): T {
+  if (
+    input.autoEnrollmentEnabled &&
+    (!input.enrollmentTrigger || input.enrollmentTrigger === "manual_only")
+  ) {
+    return {
+      ...input,
+      enrollmentTrigger: "new_lead",
+    };
+  }
+
+  return input;
+}
+
+function resolveEffectiveEnrollmentSettings(
+  existing: Pick<CampaignRecord, "autoEnrollmentEnabled" | "enrollmentTrigger">,
+  input: {
+    autoEnrollmentEnabled?: boolean;
+    enrollmentTrigger?: CampaignRecord["enrollmentTrigger"];
+  },
+): {
+  autoEnrollmentEnabled: boolean;
+  enrollmentTrigger: CampaignRecord["enrollmentTrigger"];
+} {
+  const normalized = normalizeAutoEnrollmentInput({
+    autoEnrollmentEnabled: input.autoEnrollmentEnabled ?? existing.autoEnrollmentEnabled,
+    enrollmentTrigger: input.enrollmentTrigger ?? existing.enrollmentTrigger,
+  });
+
+  return {
+    autoEnrollmentEnabled: normalized.autoEnrollmentEnabled ?? existing.autoEnrollmentEnabled,
+    enrollmentTrigger: normalized.enrollmentTrigger ?? existing.enrollmentTrigger,
+  };
+}
+
+function validateAutoEnrollmentSettings(input: {
+  autoEnrollmentEnabled?: boolean;
+  enrollmentTrigger?: CampaignRecord["enrollmentTrigger"];
+}): void {
+  if (input.autoEnrollmentEnabled && input.enrollmentTrigger === "manual_only") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Automatic enrollment requires a trigger of new_lead or lead_updated.",
+    );
+  }
+}
+
 async function validateEnrollmentRules(
   workspaceId: string,
   rules: EnrollmentRules | undefined,
@@ -235,24 +287,27 @@ export async function createCampaignForWorkspace(
   actorId: string,
   input: CreateCampaignInput,
 ): Promise<CampaignDetail> {
-  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
-  await validateCampaignProjectIds(workspaceId, input.projectIds);
-  await validateEnrollmentRules(workspaceId, input.enrollmentRules);
+  const normalizedInput = normalizeAutoEnrollmentInput(input);
+  validateAutoEnrollmentSettings(normalizedInput);
+
+  await validateOptionalAssignableMember(workspaceId, normalizedInput.ownerId, "Owner");
+  await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
+  await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
 
   const campaign = await createCampaign(workspaceId, {
-    name: input.name,
-    audienceType: input.audienceType,
-    projectIds: input.projectIds ?? [],
-    autoEnrollmentEnabled: input.autoEnrollmentEnabled ?? false,
-    enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
-    enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
-    frequency: input.frequency ?? null,
-    defaultFromName: input.defaultFromName ?? input.senderName ?? null,
-    senderName: input.senderName ?? input.defaultFromName ?? null,
-    senderEmail: input.senderEmail ?? null,
-    sendingDomainId: input.sendingDomainId ?? null,
+    name: normalizedInput.name,
+    audienceType: normalizedInput.audienceType,
+    projectIds: normalizedInput.projectIds ?? [],
+    autoEnrollmentEnabled: normalizedInput.autoEnrollmentEnabled ?? false,
+    enrollmentTrigger: normalizedInput.enrollmentTrigger ?? "manual_only",
+    enrollmentRules: normalizedInput.enrollmentRules ?? { logic: "AND", conditions: [] },
+    frequency: normalizedInput.frequency ?? null,
+    defaultFromName: normalizedInput.defaultFromName ?? normalizedInput.senderName ?? null,
+    senderName: normalizedInput.senderName ?? normalizedInput.defaultFromName ?? null,
+    senderEmail: normalizedInput.senderEmail ?? null,
+    sendingDomainId: normalizedInput.sendingDomainId ?? null,
     createdBy: actorId,
-    ownerId: input.ownerId ?? null,
+    ownerId: normalizedInput.ownerId ?? null,
   });
 
   await createAuditLog({
@@ -300,6 +355,7 @@ export async function updateCampaignForWorkspace(
   campaignId: string,
   input: UpdateCampaignInput,
 ): Promise<CampaignDetail> {
+  const normalizedInput = normalizeAutoEnrollmentInput(input);
   const existing = await findCampaignById(workspaceId, campaignId);
 
   if (!existing) {
@@ -313,10 +369,10 @@ export async function updateCampaignForWorkspace(
     );
   }
 
-  if (input.status) {
-    assertAllowedStatusTransition(existing.status, input.status);
+  if (normalizedInput.status) {
+    assertAllowedStatusTransition(existing.status, normalizedInput.status);
 
-    if (input.status === "active") {
+    if (normalizedInput.status === "active") {
       const stepCount = await countCampaignSteps(workspaceId, campaignId);
 
       if (stepCount < 1) {
@@ -326,46 +382,68 @@ export async function updateCampaignForWorkspace(
         );
       }
 
-      await assertCampaignLaunchReady(workspaceId, mergeCampaignUpdate(existing, input));
+      await assertCampaignLaunchReady(
+        workspaceId,
+        mergeCampaignUpdate(existing, normalizedInput),
+      );
     }
   }
 
-  if (input.ownerId !== undefined) {
-    await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+  if (normalizedInput.ownerId !== undefined) {
+    await validateOptionalAssignableMember(workspaceId, normalizedInput.ownerId, "Owner");
   }
 
-  await validateCampaignProjectIds(workspaceId, input.projectIds);
-  await validateEnrollmentRules(workspaceId, input.enrollmentRules);
-  await validateCampaignSenderInput(workspaceId, input);
+  await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
+  await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  await validateCampaignSenderInput(workspaceId, normalizedInput);
+
+  const effectiveEnrollment = resolveEffectiveEnrollmentSettings(existing, normalizedInput);
+  validateAutoEnrollmentSettings(effectiveEnrollment);
+
+  const shouldPersistEnrollmentSettings =
+    normalizedInput.autoEnrollmentEnabled !== undefined ||
+    normalizedInput.enrollmentTrigger !== undefined ||
+    effectiveEnrollment.autoEnrollmentEnabled !== existing.autoEnrollmentEnabled ||
+    effectiveEnrollment.enrollmentTrigger !== existing.enrollmentTrigger;
 
   const updated = await updateCampaign(workspaceId, campaignId, {
-    ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.projectIds !== undefined ? { projectIds: input.projectIds } : {}),
-    ...(input.autoEnrollmentEnabled !== undefined
-      ? { autoEnrollmentEnabled: input.autoEnrollmentEnabled }
+    ...(normalizedInput.name !== undefined ? { name: normalizedInput.name } : {}),
+    ...(normalizedInput.projectIds !== undefined
+      ? { projectIds: normalizedInput.projectIds }
       : {}),
-    ...(input.enrollmentTrigger !== undefined
-      ? { enrollmentTrigger: input.enrollmentTrigger }
+    ...(shouldPersistEnrollmentSettings
+      ? {
+          autoEnrollmentEnabled: effectiveEnrollment.autoEnrollmentEnabled,
+          enrollmentTrigger: effectiveEnrollment.enrollmentTrigger,
+        }
       : {}),
-    ...(input.enrollmentRules !== undefined ? { enrollmentRules: input.enrollmentRules } : {}),
-    ...(input.frequency !== undefined ? { frequency: input.frequency } : {}),
-    ...(input.defaultFromName !== undefined ? { defaultFromName: input.defaultFromName } : {}),
-    ...(input.senderName !== undefined ? { senderName: input.senderName } : {}),
-    ...(input.senderEmail !== undefined ? { senderEmail: input.senderEmail } : {}),
-    ...(input.sendingDomainId !== undefined ? { sendingDomainId: input.sendingDomainId } : {}),
-    ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),
-    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(normalizedInput.enrollmentRules !== undefined
+      ? { enrollmentRules: normalizedInput.enrollmentRules }
+      : {}),
+    ...(normalizedInput.frequency !== undefined ? { frequency: normalizedInput.frequency } : {}),
+    ...(normalizedInput.defaultFromName !== undefined
+      ? { defaultFromName: normalizedInput.defaultFromName }
+      : {}),
+    ...(normalizedInput.senderName !== undefined ? { senderName: normalizedInput.senderName } : {}),
+    ...(normalizedInput.senderEmail !== undefined
+      ? { senderEmail: normalizedInput.senderEmail }
+      : {}),
+    ...(normalizedInput.sendingDomainId !== undefined
+      ? { sendingDomainId: normalizedInput.sendingDomainId }
+      : {}),
+    ...(normalizedInput.ownerId !== undefined ? { ownerId: normalizedInput.ownerId } : {}),
+    ...(normalizedInput.status !== undefined ? { status: normalizedInput.status } : {}),
   });
 
   if (!updated) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
-  if (input.status === "paused" && existing.status === "active") {
+  if (normalizedInput.status === "paused" && existing.status === "active") {
     await pauseEnrollmentsForCampaign(workspaceId, campaignId);
   }
 
-  if (input.status === "active" && existing.status === "paused") {
+  if (normalizedInput.status === "active" && existing.status === "paused") {
     await resumeEnrollmentsForCampaign(workspaceId, campaignId);
     const anchor = new Date();
     const resumedEnrollmentIds = await rescheduleActiveEnrollmentSendsForCampaign(
@@ -384,7 +462,7 @@ export async function updateCampaignForWorkspace(
     }
   }
 
-  if (input.status === "active" && existing.status === "draft") {
+  if (normalizedInput.status === "active" && existing.status === "draft") {
     const anchor = new Date();
     const activatedEnrollmentIds = await rescheduleActiveEnrollmentSendsForCampaign(
       workspaceId,
@@ -403,9 +481,9 @@ export async function updateCampaignForWorkspace(
   }
 
   const auditAction =
-    input.status === "paused" && existing.status === "active"
+    normalizedInput.status === "paused" && existing.status === "active"
       ? "campaign.paused"
-      : input.status === "active" && existing.status === "paused"
+      : normalizedInput.status === "active" && existing.status === "paused"
         ? "campaign.resumed"
         : "campaign.updated";
 

@@ -20,7 +20,10 @@ import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import { scheduleCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
+import {
+  evaluateCampaignAutoEnrollmentForLead,
+  logAutoEnrollmentFailure,
+} from "@/server/services/campaign-auto-enrollment";
 import {
   assertValidProjectFilter,
   validateActiveProjectId,
@@ -418,12 +421,24 @@ export async function createLeadForWorkspace(
   });
 
   if (options?.triggerAutomation !== false) {
-    scheduleCampaignAutoEnrollmentForLead({
-      workspaceId,
-      leadId: lead.id,
-      trigger: "new_lead",
-      actorId,
-    });
+    try {
+      await evaluateCampaignAutoEnrollmentForLead({
+        workspaceId,
+        leadId: lead.id,
+        trigger: "new_lead",
+        actorId,
+      });
+    } catch (error) {
+      logAutoEnrollmentFailure(
+        {
+          workspaceId,
+          leadId: lead.id,
+          trigger: "new_lead",
+          actorId,
+        },
+        error,
+      );
+    }
   }
 
   return {
@@ -619,12 +634,24 @@ export async function updateLeadForWorkspace(
     });
   }
 
-  scheduleCampaignAutoEnrollmentForLead({
-    workspaceId,
-    leadId,
-    trigger: "lead_updated",
-    actorId,
-  });
+  try {
+    await evaluateCampaignAutoEnrollmentForLead({
+      workspaceId,
+      leadId,
+      trigger: "lead_updated",
+      actorId,
+    });
+  } catch (error) {
+    logAutoEnrollmentFailure(
+      {
+        workspaceId,
+        leadId,
+        trigger: "lead_updated",
+        actorId,
+      },
+      error,
+    );
+  }
 
   return {
     lead: await enrichLeadRecord(updated),

@@ -33,7 +33,8 @@ vi.mock("@/server/repositories/projects", () => ({
 }));
 
 vi.mock("@/server/services/campaign-auto-enrollment", () => ({
-  scheduleCampaignAutoEnrollmentForLead: vi.fn(),
+  evaluateCampaignAutoEnrollmentForLead: vi.fn(),
+  logAutoEnrollmentFailure: vi.fn(),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({
@@ -53,7 +54,7 @@ import {
   updateLead,
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
-import { scheduleCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
+import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
 import {
   archiveLeadForWorkspace,
   createLeadForWorkspace,
@@ -183,7 +184,7 @@ describe("lead service", () => {
       statusId: "status-1",
     });
 
-    expect(scheduleCampaignAutoEnrollmentForLead).toHaveBeenCalledWith({
+    expect(evaluateCampaignAutoEnrollmentForLead).toHaveBeenCalledWith({
       workspaceId: "ws-1",
       leadId: "lead-1",
       trigger: "new_lead",
@@ -206,7 +207,7 @@ describe("lead service", () => {
       { triggerAutomation: false },
     );
 
-    expect(scheduleCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
   it("normalizes email on create", async () => {

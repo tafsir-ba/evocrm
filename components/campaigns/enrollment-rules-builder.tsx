@@ -217,9 +217,17 @@ export function EnrollmentRulesBuilder({
           type="checkbox"
           checked={value.autoEnrollmentEnabled}
           disabled={disabled}
-          onChange={(event) =>
-            onChange({ ...value, autoEnrollmentEnabled: event.target.checked })
-          }
+          onChange={(event) => {
+            const enabled = event.target.checked;
+            onChange({
+              ...value,
+              autoEnrollmentEnabled: enabled,
+              enrollmentTrigger:
+                enabled && value.enrollmentTrigger === "manual_only"
+                  ? "new_lead"
+                  : value.enrollmentTrigger,
+            });
+          }}
         />
         Enable automatic enrollment
       </label>

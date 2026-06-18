@@ -4,24 +4,24 @@ import { isEnrollmentRulesReady } from "@/server/services/campaign-readiness";
 import { isCampaignStepLaunchReady } from "@/lib/campaign-step-readiness";
 
 describe("campaign readiness", () => {
-  it("treats manual-only campaigns as enrollment-ready", () => {
+  it("treats manual-only auto-enrollment as not launch-ready", () => {
     expect(
       isEnrollmentRulesReady({
         autoEnrollmentEnabled: true,
         enrollmentTrigger: "manual_only",
         enrollmentRules: { logic: "AND", conditions: [] },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("requires conditions when auto-enrollment is enabled", () => {
+  it("allows auto-enrollment without conditions", () => {
     expect(
       isEnrollmentRulesReady({
         autoEnrollmentEnabled: true,
         enrollmentTrigger: "new_lead",
         enrollmentRules: { logic: "AND", conditions: [] },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("treats ready status without unsubscribe content as not launch-ready", () => {

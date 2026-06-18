@@ -175,7 +175,11 @@ export async function findActiveAutoEnrollmentCampaigns(
       archivedAt: null,
       audienceType: filter.audienceType,
       autoEnrollmentEnabled: true,
-      enrollmentTrigger: filter.trigger,
+      ...(filter.trigger === "new_lead"
+        ? {
+            enrollmentTrigger: { $in: ["new_lead", "manual_only"] },
+          }
+        : { enrollmentTrigger: filter.trigger }),
     }),
   )
     .sort({ createdAt: 1 })
