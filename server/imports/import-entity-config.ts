@@ -35,6 +35,7 @@ export type ImportContext = {
   workspaceId: string;
   actorId: string;
   defaultCurrency: string;
+  triggerAutomationForImportedLeads?: boolean;
   dictionaryLookup: Map<string, Map<string, string>>;
   projectLookup: Map<string, string>;
   memberLookup: Map<string, string>;

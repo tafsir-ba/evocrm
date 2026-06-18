@@ -18,7 +18,7 @@ describe("lead import automation", () => {
     } as never);
   });
 
-  it("does not trigger new_lead campaign automation during import", async () => {
+  it("does not trigger new_lead campaign automation during import by default", async () => {
     await leadImportConfig.createRecord(
       {
         projectId: "project-1",
@@ -46,6 +46,38 @@ describe("lead import automation", () => {
         lastName: "Smith",
       }),
       { triggerAutomation: false },
+    );
+  });
+
+  it("triggers new_lead campaign automation when triggerAutomationForImportedLeads is true", async () => {
+    await leadImportConfig.createRecord(
+      {
+        projectId: "project-1",
+        statusId: "status-1",
+        firstName: "John",
+        lastName: "Smith",
+        email: "john@example.com",
+      },
+      {
+        workspaceId: "ws-1",
+        actorId: "user-1",
+        defaultCurrency: "CHF",
+        triggerAutomationForImportedLeads: true,
+        dictionaryLookup: new Map(),
+        projectLookup: new Map(),
+        memberLookup: new Map(),
+        tagLookup: new Map(),
+      },
+    );
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({
+        firstName: "John",
+        lastName: "Smith",
+      }),
+      { triggerAutomation: true },
     );
   });
 });

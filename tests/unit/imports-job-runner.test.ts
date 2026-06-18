@@ -117,4 +117,44 @@ describe("executeImportJob idempotency", () => {
       ]),
     );
   });
+
+  it("passes triggerAutomationForImportedLeads through import context to createRecord", async () => {
+    vi.mocked(findImportRowResults).mockResolvedValue([]);
+
+    await executeImportJob(
+      job,
+      entityConfig,
+      {
+        workspaceId: "ws-1",
+        actorId: "user-1",
+        defaultCurrency: "EUR",
+        triggerAutomationForImportedLeads: true,
+        dictionaryLookup: new Map(),
+        projectLookup: new Map(),
+        memberLookup: new Map(),
+        tagLookup: new Map(),
+      },
+      {
+        summary: { totalRows: 1, validRows: 1, warningRows: 0, errorRows: 0 },
+        issues: [],
+        normalizedRows: [
+          {
+            rowNumber: 1,
+            rawRow: { firstName: "New" },
+            row: { firstName: "New" },
+            status: "valid",
+            issues: [],
+          },
+        ],
+      },
+      "valid_rows_only",
+    );
+
+    expect(entityConfig.createRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        triggerAutomationForImportedLeads: true,
+      }),
+    );
+  });
 });

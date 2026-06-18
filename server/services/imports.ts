@@ -464,11 +464,20 @@ export async function executeImportJobForWorkspace(
     }
 
     const entityConfig = getImportEntityConfig(claimedJob.entityType);
+    const triggerAutomationForImportedLeads =
+      claimedJob.entityType === "lead" &&
+      input.mode === "valid_rows_only" &&
+      Boolean(input.triggerAutomationForImportedLeads);
+
+    const executionContext: ImportContext = {
+      ...context,
+      triggerAutomationForImportedLeads,
+    };
 
     const result = await executeImportJob(
       claimedJob,
       entityConfig,
-      context,
+      executionContext,
       validation,
       input.mode as ImportExecuteMode,
     );
@@ -483,6 +492,9 @@ export async function executeImportJobForWorkspace(
         createdCount: result.createdCount,
         skippedCount: result.skippedCount,
         failedCount: result.failedCount,
+        ...(triggerAutomationForImportedLeads
+          ? { triggerAutomationForImportedLeads: true }
+          : {}),
       },
     });
 
@@ -491,6 +503,7 @@ export async function executeImportJobForWorkspace(
     return {
       job: toImportJobSummary(updatedJob),
       ...result,
+      dripCampaignEvaluationEnabled: triggerAutomationForImportedLeads,
     };
   } catch (error) {
     if (

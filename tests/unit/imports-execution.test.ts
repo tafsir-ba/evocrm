@@ -54,6 +54,7 @@ import {
   buildImportContext,
   validateImportRows,
 } from "@/server/imports/import-validator";
+import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   executeImportJobForWorkspace,
   validateImportJob,
@@ -189,7 +190,7 @@ describe("import execution lifecycle", () => {
       importJobId,
       actorId,
       "CHF",
-      { mode: "valid_rows_only" },
+      { mode: "valid_rows_only", triggerAutomationForImportedLeads: false },
     );
 
     expect(callOrder).toEqual(["claim", "execute"]);
@@ -206,6 +207,117 @@ describe("import execution lifecycle", () => {
     );
   });
 
+  it("passes triggerAutomationForImportedLeads into import context for lead imports", async () => {
+    vi.mocked(claimImportJobForExecution).mockResolvedValue({
+      ...baseJob,
+      status: "processing",
+      startedAt: new Date(),
+    });
+    vi.mocked(validateImportRows).mockResolvedValue({
+      ...validationResult,
+      summary: {
+        totalRows: 1,
+        validRows: 1,
+        warningRows: 0,
+        errorRows: 0,
+      },
+    });
+    vi.mocked(executeImportJob).mockResolvedValue({
+      createdCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [],
+    });
+    vi.mocked(findImportJobById).mockResolvedValue({
+      ...baseJob,
+      status: "completed",
+    });
+
+    const result = await executeImportJobForWorkspace(
+      workspaceId,
+      importJobId,
+      actorId,
+      "CHF",
+      { mode: "valid_rows_only", triggerAutomationForImportedLeads: true },
+    );
+
+    expect(executeImportJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        triggerAutomationForImportedLeads: true,
+      }),
+      expect.anything(),
+      "valid_rows_only",
+    );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          triggerAutomationForImportedLeads: true,
+        }),
+      }),
+    );
+    expect(result.dripCampaignEvaluationEnabled).toBe(true);
+  });
+
+  it("forces triggerAutomationForImportedLeads false for property imports", async () => {
+    vi.mocked(claimImportJobForExecution).mockResolvedValue({
+      ...baseJob,
+      entityType: "property",
+      status: "processing",
+      startedAt: new Date(),
+    });
+    vi.mocked(validateImportRows).mockResolvedValue({
+      ...validationResult,
+      summary: {
+        totalRows: 1,
+        validRows: 1,
+        warningRows: 0,
+        errorRows: 0,
+      },
+    });
+    vi.mocked(executeImportJob).mockResolvedValue({
+      createdCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [],
+    });
+    vi.mocked(findImportJobById).mockResolvedValue({
+      ...baseJob,
+      entityType: "property",
+      status: "completed",
+    });
+
+    const result = await executeImportJobForWorkspace(
+      workspaceId,
+      importJobId,
+      actorId,
+      "CHF",
+      { mode: "valid_rows_only", triggerAutomationForImportedLeads: true },
+    );
+
+    expect(executeImportJob).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        triggerAutomationForImportedLeads: false,
+      }),
+      expect.anything(),
+      "valid_rows_only",
+    );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          createdCount: 1,
+        }),
+      }),
+    );
+    expect(
+      vi.mocked(createAuditLog).mock.calls.at(-1)?.[0]?.after,
+    ).not.toHaveProperty("triggerAutomationForImportedLeads");
+    expect(result.dripCampaignEvaluationEnabled).toBe(false);
+  });
+
   it("returns conflict when the job cannot be claimed", async () => {
     vi.mocked(claimImportJobForExecution).mockResolvedValue(null);
 
@@ -215,7 +327,7 @@ describe("import execution lifecycle", () => {
         importJobId,
         actorId,
         "CHF",
-        { mode: "valid_rows_only" },
+        { mode: "valid_rows_only", triggerAutomationForImportedLeads: false },
       ),
     ).rejects.toMatchObject({
       code: "CONFLICT",
@@ -244,7 +356,7 @@ describe("import execution lifecycle", () => {
         importJobId,
         actorId,
         "CHF",
-        { mode: "strict" },
+        { mode: "strict", triggerAutomationForImportedLeads: false },
       ),
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
@@ -288,7 +400,7 @@ describe("import execution lifecycle", () => {
         importJobId,
         actorId,
         "CHF",
-        { mode: "valid_rows_only" },
+        { mode: "valid_rows_only", triggerAutomationForImportedLeads: false },
       ),
     ).rejects.toMatchObject({
       code: "INTERNAL_ERROR",

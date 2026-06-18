@@ -6,8 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { ImportDripCampaignOption } from "@/components/imports/import-drip-campaign-option";
 import {
+  buildImportExecutePayload,
   formatImportFileSize,
+  isImportDripCampaignEvaluationRequested,
+  shouldConfirmImportDripCampaignEvaluation,
+  shouldShowImportDripCampaignOption,
   MAX_IMPORT_FILE_SIZE_BYTES,
   SUPPORTED_IMPORT_EXTENSIONS,
   type ImportEntityConfigResponse,
@@ -125,7 +130,14 @@ export function ImportWizard({
     skippedCount: number;
     failedCount: number;
     status: string;
+    dripCampaignEvaluationEnabled?: boolean;
   } | null>(null);
+  const [triggerAutomationForImportedLeads, setTriggerAutomationForImportedLeads] =
+    useState(false);
+  const [confirmDripDialogOpen, setConfirmDripDialogOpen] = useState(false);
+  const [pendingExecuteMode, setPendingExecuteMode] = useState<
+    "valid_rows_only" | "strict" | null
+  >(null);
 
   const entityLabel = config?.label ?? entityType;
 
@@ -244,6 +256,9 @@ export function ImportWizard({
     setWarningRowDetails([]);
     setRowOverrides({});
     setImportResult(null);
+    setTriggerAutomationForImportedLeads(false);
+    setConfirmDripDialogOpen(false);
+    setPendingExecuteMode(null);
   }, []);
 
   useEffect(() => {
@@ -592,11 +607,21 @@ export function ImportWizard({
     setLoading(true);
     setError(null);
 
+    const includeDripEvaluation = isImportDripCampaignEvaluationRequested({
+      entityType,
+      mode,
+      triggerAutomationForImportedLeads,
+    });
+
     try {
       const response = await fetch(`${apiBase}/${importId}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify(
+          buildImportExecutePayload(mode, {
+            triggerAutomationForImportedLeads: includeDripEvaluation,
+          }),
+        ),
       });
       const payload = await response.json();
 
@@ -609,13 +634,34 @@ export function ImportWizard({
         skippedCount: payload.data.skippedCount,
         failedCount: payload.data.failedCount,
         status: payload.data.job.status,
+        dripCampaignEvaluationEnabled: Boolean(
+          payload.data.dripCampaignEvaluationEnabled,
+        ),
       });
       setStep("results");
     } catch (executeError) {
       setError(executeError instanceof Error ? executeError.message : "Import failed.");
     } finally {
       setLoading(false);
+      setConfirmDripDialogOpen(false);
+      setPendingExecuteMode(null);
     }
+  }
+
+  function requestExecute(mode: "valid_rows_only" | "strict") {
+    if (
+      shouldConfirmImportDripCampaignEvaluation({
+        entityType,
+        mode,
+        triggerAutomationForImportedLeads,
+      })
+    ) {
+      setPendingExecuteMode(mode);
+      setConfirmDripDialogOpen(true);
+      return;
+    }
+
+    void handleExecute(mode);
   }
 
   function updateMapping(columnIndex: number, targetField: string | null) {
@@ -680,14 +726,17 @@ export function ImportWizard({
             )}
             <Button
               variant="secondary"
-              onClick={() => void handleExecute("strict")}
+              onClick={() => requestExecute("strict")}
               loading={loading}
               disabled={!validationSummary || validationSummary.errorRows > 0}
             >
               Strict import
             </Button>
-            <Button onClick={() => void handleExecute("valid_rows_only")} loading={loading}>
-              Import valid rows
+            <Button onClick={() => requestExecute("valid_rows_only")} loading={loading}>
+              {shouldShowImportDripCampaignOption(entityType) &&
+              triggerAutomationForImportedLeads
+                ? "Import and evaluate drip campaigns"
+                : "Import valid rows"}
             </Button>
           </>
         )}
@@ -786,12 +835,15 @@ export function ImportWizard({
             errorRows={errorRowDetails}
             warningRows={warningRowDetails}
             config={config}
+            entityType={entityType}
             rowOverrides={rowOverrides}
             projects={projects}
             members={members}
             dictionaries={dictionaries}
             canCreateProject={canCreateProject}
             loading={loading}
+            triggerAutomationForImportedLeads={triggerAutomationForImportedLeads}
+            onTriggerAutomationChange={setTriggerAutomationForImportedLeads}
             onFieldChange={updateRowOverride}
             onCreateProject={(input) => void handleCreateProjectFromImport(input)}
           />
@@ -808,6 +860,52 @@ export function ImportWizard({
           />
         )}
       </div>
+
+      <Modal
+        open={confirmDripDialogOpen}
+        onClose={() => {
+          if (!loading) {
+            setConfirmDripDialogOpen(false);
+            setPendingExecuteMode(null);
+          }
+        }}
+        title="Confirm drip campaign evaluation"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              disabled={loading}
+              onClick={() => {
+                setConfirmDripDialogOpen(false);
+                setPendingExecuteMode(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              loading={loading}
+              onClick={() => {
+                if (pendingExecuteMode) {
+                  void handleExecute(pendingExecuteMode);
+                }
+              }}
+            >
+              Continue import
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[13px] text-[var(--color-ink-muted)]">
+          You are about to import{" "}
+          <span className="font-medium text-[var(--color-ink)]">
+            {validationSummary?.validRows.toLocaleString() ?? 0}
+          </span>{" "}
+          leads and evaluate them against active drip campaigns for their project.
+        </p>
+        <p className="mt-3 text-[13px] text-[var(--color-ink-muted)]">
+          Matching leads may be enrolled and may receive campaign emails.
+        </p>
+      </Modal>
     </Modal>
   );
 }
@@ -1109,12 +1207,15 @@ function ValidateStep({
   errorRows,
   warningRows,
   config,
+  entityType,
   rowOverrides,
   projects,
   members,
   dictionaries,
   canCreateProject,
   loading,
+  triggerAutomationForImportedLeads,
+  onTriggerAutomationChange,
   onFieldChange,
   onCreateProject,
 }: {
@@ -1123,12 +1224,15 @@ function ValidateStep({
   errorRows: ImportErrorRowDetail[];
   warningRows: ImportErrorRowDetail[];
   config: ImportEntityConfigResponse;
+  entityType: ImportEntityType;
   rowOverrides: ImportRowOverrides;
   projects: ProjectItem[];
   members: MemberItem[];
   dictionaries: Record<string, DictionaryItem[]>;
   canCreateProject: boolean;
   loading: boolean;
+  triggerAutomationForImportedLeads: boolean;
+  onTriggerAutomationChange: (checked: boolean) => void;
   onFieldChange: (rowNumber: number, fieldKey: string, value: string) => void;
   onCreateProject: (input: {
     importValue: string;
@@ -1154,6 +1258,14 @@ function ValidateStep({
         <StatCard label="Warnings" value={summary.warningRows} tone="warning" />
         <StatCard label="Errors" value={summary.errorRows} tone="danger" />
       </div>
+
+      {shouldShowImportDripCampaignOption(entityType) && (
+        <ImportDripCampaignOption
+          checked={triggerAutomationForImportedLeads}
+          disabled={loading}
+          onChange={onTriggerAutomationChange}
+        />
+      )}
 
       {unknownProjectNames.length > 0 && (
         <ImportMissingProjectsPanel
@@ -1638,6 +1750,7 @@ function ResultsStep({
     skippedCount: number;
     failedCount: number;
     status: string;
+    dripCampaignEvaluationEnabled?: boolean;
   };
   rowCount: number;
   errorsUrl: string;
@@ -1664,6 +1777,15 @@ function ResultsStep({
       <p className="text-[13px] text-[var(--color-ink-muted)]">
         Import status: <span className="font-medium text-[var(--color-ink)]">{result.status}</span>
       </p>
+
+      {shouldShowImportDripCampaignOption(entityType) && (
+        <p className="text-[13px] text-[var(--color-ink-muted)]">
+          Drip campaign evaluation:{" "}
+          <span className="font-medium text-[var(--color-ink)]">
+            {result.dripCampaignEvaluationEnabled ? "Enabled" : "Disabled"}
+          </span>
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <a

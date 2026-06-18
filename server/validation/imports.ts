@@ -40,6 +40,7 @@ export const parseImportSchema = z.object({
 
 export const executeImportSchema = z.object({
   mode: z.enum(IMPORT_EXECUTE_MODES).default("valid_rows_only"),
+  triggerAutomationForImportedLeads: z.boolean().optional().default(false),
 });
 
 export const validateImportSchema = z.object({

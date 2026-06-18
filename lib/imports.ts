@@ -119,6 +119,66 @@ export const IMPORT_EXECUTE_MODES = ["valid_rows_only", "strict"] as const;
 
 export type ImportExecuteMode = (typeof IMPORT_EXECUTE_MODES)[number];
 
+export type ImportExecuteRequestBody = {
+  mode: ImportExecuteMode;
+  triggerAutomationForImportedLeads?: boolean;
+};
+
+export function buildImportExecutePayload(
+  mode: ImportExecuteMode,
+  options?: { triggerAutomationForImportedLeads?: boolean },
+): ImportExecuteRequestBody {
+  const payload: ImportExecuteRequestBody = { mode };
+
+  if (
+    isImportDripCampaignEvaluationRequested({
+      entityType: "lead",
+      mode,
+      triggerAutomationForImportedLeads: Boolean(
+        options?.triggerAutomationForImportedLeads,
+      ),
+    })
+  ) {
+    payload.triggerAutomationForImportedLeads = true;
+  }
+
+  return payload;
+}
+
+export function shouldShowImportDripCampaignOption(
+  entityType: ImportEntityType,
+): boolean {
+  return entityType === "lead";
+}
+
+export function isImportDripCampaignEvaluationRequested(input: {
+  entityType: ImportEntityType;
+  mode: ImportExecuteMode;
+  triggerAutomationForImportedLeads: boolean;
+}): boolean {
+  return (
+    input.entityType === "lead" &&
+    input.mode === "valid_rows_only" &&
+    input.triggerAutomationForImportedLeads
+  );
+}
+
+export function shouldConfirmImportDripCampaignEvaluation(input: {
+  entityType: ImportEntityType;
+  mode: ImportExecuteMode;
+  triggerAutomationForImportedLeads: boolean;
+}): boolean {
+  return isImportDripCampaignEvaluationRequested(input);
+}
+
+export type ImportExecuteResult = {
+  createdCount: number;
+  skippedCount: number;
+  failedCount: number;
+  dripCampaignEvaluationEnabled?: boolean;
+  job: ImportJobSummary;
+};
+
 export const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 /** Import files are stored outside the ImportJob MongoDB document (object storage or GridFS). */
 export const MAX_IMPORT_ROWS = 10_000;
