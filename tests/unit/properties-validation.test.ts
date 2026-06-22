@@ -61,4 +61,24 @@ describe("property validation", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("accepts website transfer fields on create", () => {
+    const result = createPropertyInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
+      title: "Test Property",
+      statusId: "507f1f77bcf86cd799439011",
+      totalSurface: 120,
+      balconyTerraceSurface: 18,
+      building: "Tower A",
+      lot: "Lot 14",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.totalSurface).toBe(120);
+      expect(result.data.balconyTerraceSurface).toBe(18);
+      expect(result.data.building).toBe("Tower A");
+      expect(result.data.lot).toBe("Lot 14");
+    }
+  });
 });

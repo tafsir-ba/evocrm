@@ -387,8 +387,12 @@ export async function createPropertyForWorkspace(
     bedrooms: input.bedrooms ?? null,
     bathrooms: input.bathrooms ?? null,
     surface: input.surface ?? null,
+    totalSurface: input.totalSurface ?? null,
+    balconyTerraceSurface: input.balconyTerraceSurface ?? null,
     surfaceUnit: input.surfaceUnit ?? "sqm",
     floor: input.floor ?? null,
+    building: input.building ?? null,
+    lot: input.lot ?? null,
     description: input.description ?? null,
     features: normalizePropertyFeatures(input.features),
     tags: input.tags ?? [],
@@ -494,11 +498,23 @@ export async function updatePropertyForWorkspace(
   if (input.surface !== undefined) {
     updatePayload.surface = input.surface;
   }
+  if (input.totalSurface !== undefined) {
+    updatePayload.totalSurface = input.totalSurface;
+  }
+  if (input.balconyTerraceSurface !== undefined) {
+    updatePayload.balconyTerraceSurface = input.balconyTerraceSurface;
+  }
   if (input.surfaceUnit !== undefined) {
     updatePayload.surfaceUnit = input.surfaceUnit;
   }
   if (input.floor !== undefined) {
     updatePayload.floor = input.floor;
+  }
+  if (input.building !== undefined) {
+    updatePayload.building = input.building?.trim() || null;
+  }
+  if (input.lot !== undefined) {
+    updatePayload.lot = input.lot?.trim() || null;
   }
   if (input.description !== undefined) {
     updatePayload.description = input.description?.trim() || null;

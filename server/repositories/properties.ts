@@ -35,8 +35,12 @@ export type PropertyRecord = {
   bedrooms: number | null;
   bathrooms: number | null;
   surface: number | null;
+  totalSurface: number | null;
+  balconyTerraceSurface: number | null;
   surfaceUnit: SurfaceUnit;
   floor: number | null;
+  building: string | null;
+  lot: string | null;
   description: string | null;
   features: string[];
   tags: string[];
@@ -67,8 +71,12 @@ function toPropertyRecord(document: PropertyDocument): PropertyRecord {
     bedrooms: document.bedrooms ?? null,
     bathrooms: document.bathrooms ?? null,
     surface: document.surface ?? null,
+    totalSurface: document.totalSurface ?? null,
+    balconyTerraceSurface: document.balconyTerraceSurface ?? null,
     surfaceUnit: document.surfaceUnit === "sqft" ? "sqft" : "sqm",
     floor: document.floor ?? null,
+    building: document.building ?? null,
+    lot: document.lot ?? null,
     description: document.description ?? null,
     features: document.features ?? [],
     tags: (document.tags ?? []).map((tagId) => tagId.toString()),
@@ -267,8 +275,12 @@ export async function createProperty(input: {
   bedrooms?: number | null;
   bathrooms?: number | null;
   surface?: number | null;
+  totalSurface?: number | null;
+  balconyTerraceSurface?: number | null;
   surfaceUnit?: SurfaceUnit;
   floor?: number | null;
+  building?: string | null;
+  lot?: string | null;
   description?: string | null;
   features?: string[];
   tags?: string[];
@@ -295,8 +307,12 @@ export async function createProperty(input: {
       bedrooms: input.bedrooms ?? null,
       bathrooms: input.bathrooms ?? null,
       surface: input.surface ?? null,
+      totalSurface: input.totalSurface ?? null,
+      balconyTerraceSurface: input.balconyTerraceSurface ?? null,
       surfaceUnit: input.surfaceUnit ?? "sqm",
       floor: input.floor ?? null,
+      building: input.building?.trim() || null,
+      lot: input.lot?.trim() || null,
       description: input.description?.trim() || null,
       features: input.features ?? [],
       tags: input.tags ?? [],
@@ -337,8 +353,12 @@ export async function updateProperty(
     bedrooms: number | null;
     bathrooms: number | null;
     surface: number | null;
+    totalSurface: number | null;
+    balconyTerraceSurface: number | null;
     surfaceUnit: SurfaceUnit;
     floor: number | null;
+    building: string | null;
+    lot: string | null;
     description: string | null;
     features: string[];
     tags: string[];

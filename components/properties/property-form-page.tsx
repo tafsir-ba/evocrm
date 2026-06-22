@@ -55,8 +55,12 @@ export type PropertyFormInitialValues = {
   bedrooms: string;
   bathrooms: string;
   surface: string;
+  totalSurface: string;
+  balconyTerraceSurface: string;
   surfaceUnit: SurfaceUnit;
   floor: string;
+  building: string;
+  lot: string;
   description: string;
   features: string;
   tagIds: string[];
@@ -89,8 +93,12 @@ const emptyForm = (defaultCurrency: string): PropertyFormInitialValues => ({
   bedrooms: "",
   bathrooms: "",
   surface: "",
+  totalSurface: "",
+  balconyTerraceSurface: "",
   surfaceUnit: "sqm",
   floor: "",
+  building: "",
+  lot: "",
   description: "",
   features: "",
   tagIds: [],
@@ -221,8 +229,28 @@ export function PropertyFormPage({
     }));
   }
 
+  function convertSurfaceFieldsForUnit(
+    values: PropertyFormInitialValues,
+    nextUnit: SurfaceUnit,
+  ) {
+    const convert = (value: string) =>
+      sqmToInputValue(parseSurfaceInput(value, values.surfaceUnit), nextUnit);
+
+    return {
+      surfaceUnit: nextUnit,
+      surface: convert(values.surface),
+      totalSurface: convert(values.totalSurface),
+      balconyTerraceSurface: convert(values.balconyTerraceSurface),
+    };
+  }
+
   function buildPayload() {
     const surfaceSqm = parseSurfaceInput(form.surface, form.surfaceUnit);
+    const totalSurfaceSqm = parseSurfaceInput(form.totalSurface, form.surfaceUnit);
+    const balconyTerraceSurfaceSqm = parseSurfaceInput(
+      form.balconyTerraceSurface,
+      form.surfaceUnit,
+    );
     const features = form.features
       ? form.features.split(",").map((feature) => feature.trim()).filter(Boolean)
       : isEdit
@@ -244,8 +272,13 @@ export function PropertyFormPage({
       bedrooms: form.bedrooms ? Number(form.bedrooms) : isEdit ? null : undefined,
       bathrooms: form.bathrooms ? Number(form.bathrooms) : isEdit ? null : undefined,
       surface: surfaceSqm ?? (isEdit ? null : undefined),
+      totalSurface: totalSurfaceSqm ?? (isEdit ? null : undefined),
+      balconyTerraceSurface:
+        balconyTerraceSurfaceSqm ?? (isEdit ? null : undefined),
       surfaceUnit: form.surfaceUnit,
       floor: form.floor ? Number(form.floor) : isEdit ? null : undefined,
+      building: form.building.trim() || (isEdit ? null : undefined),
+      lot: form.lot.trim() || (isEdit ? null : undefined),
       description: form.description.trim() || (isEdit ? null : undefined),
       features,
       tags: form.tagIds,
@@ -511,11 +544,9 @@ export function PropertyFormPage({
               value={form.surfaceUnit}
               onChange={(event) => {
                 const nextUnit = event.target.value as SurfaceUnit;
-                const currentSqm = parseSurfaceInput(form.surface, form.surfaceUnit);
                 setForm((current) => ({
                   ...current,
-                  surfaceUnit: nextUnit,
-                  surface: sqmToInputValue(currentSqm, nextUnit),
+                  ...convertSurfaceFieldsForUnit(current, nextUnit),
                 }));
               }}
             >
@@ -525,6 +556,36 @@ export function PropertyFormPage({
                 </option>
               ))}
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="totalSurface">Total surface</Label>
+            <Input
+              id="totalSurface"
+              type="number"
+              min={0}
+              value={form.totalSurface}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, totalSurface: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="balconyTerraceSurface">Balcony / Terrace surface</Label>
+            <Input
+              id="balconyTerraceSurface"
+              type="number"
+              min={0}
+              value={form.balconyTerraceSurface}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  balconyTerraceSurface: event.target.value,
+                }))
+              }
+            />
           </div>
         </div>
 
@@ -538,6 +599,29 @@ export function PropertyFormPage({
               setForm((current) => ({ ...current, floor: event.target.value }))
             }
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="building">Building</Label>
+            <Input
+              id="building"
+              value={form.building}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, building: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="lot">Lot</Label>
+            <Input
+              id="lot"
+              value={form.lot}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, lot: event.target.value }))
+              }
+            />
+          </div>
         </div>
 
         <div>
@@ -633,8 +717,12 @@ export function propertyFormValuesFromSqm(
     bedrooms: number | null;
     bathrooms: number | null;
     surface: number | null;
+    totalSurface: number | null;
+    balconyTerraceSurface: number | null;
     surfaceUnit?: SurfaceUnit;
     floor: number | null;
+    building: string | null;
+    lot: string | null;
     description: string | null;
     features: string[];
     tags: string[];
@@ -658,8 +746,12 @@ export function propertyFormValuesFromSqm(
     bedrooms: property.bedrooms?.toString() ?? "",
     bathrooms: property.bathrooms?.toString() ?? "",
     surface: sqmToInputValue(property.surface, surfaceUnit),
+    totalSurface: sqmToInputValue(property.totalSurface, surfaceUnit),
+    balconyTerraceSurface: sqmToInputValue(property.balconyTerraceSurface, surfaceUnit),
     surfaceUnit,
     floor: property.floor?.toString() ?? "",
+    building: property.building ?? "",
+    lot: property.lot ?? "",
     description: property.description ?? "",
     features: property.features.join(", "),
     tagIds: property.tags,

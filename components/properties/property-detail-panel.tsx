@@ -50,8 +50,12 @@ type PropertyDetail = {
   bedrooms: number | null;
   bathrooms: number | null;
   surface: number | null;
+  totalSurface: number | null;
+  balconyTerraceSurface: number | null;
   surfaceUnit: "sqm" | "sqft";
   floor: number | null;
+  building: string | null;
+  lot: string | null;
   description: string | null;
   features: string[];
   createdAt: string;
@@ -448,6 +452,22 @@ export function PropertyDetailPanel({
                       label="Surface"
                       value={formatSurfaceValue(property.surface, property.surfaceUnit ?? "sqm")}
                     />
+                    <Info
+                      label="Total surface"
+                      value={formatSurfaceValue(
+                        property.totalSurface,
+                        property.surfaceUnit ?? "sqm",
+                      )}
+                    />
+                    <Info
+                      label="Balcony / Terrace surface"
+                      value={formatSurfaceValue(
+                        property.balconyTerraceSurface,
+                        property.surfaceUnit ?? "sqm",
+                      )}
+                    />
+                    <Info label="Building" value={property.building ?? "—"} />
+                    <Info label="Lot" value={property.lot ?? "—"} />
                     <Info label="City" value={property.city ?? "—"} />
                     <Info label="Country" value={property.country ?? "—"} />
                   </div>

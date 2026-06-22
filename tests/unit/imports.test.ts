@@ -48,6 +48,14 @@ describe("import header matcher", () => {
     expect(suggestion).toBe("title");
   });
 
+  it("suggests property building field instead of project for Building header", () => {
+    expect(suggestFieldForHeader("Building", propertyImportConfig.fields)).toBe("building");
+    expect(suggestFieldForHeader("Project", propertyImportConfig.fields)).toBe("projectId");
+    expect(suggestFieldForHeader("Total Surface", propertyImportConfig.fields)).toBe(
+      "totalSurface",
+    );
+  });
+
   it("returns null for unknown headers", () => {
     expect(suggestFieldForHeader("foobar", leadImportConfig.fields)).toBeNull();
   });

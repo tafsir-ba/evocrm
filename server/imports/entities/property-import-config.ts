@@ -29,7 +29,7 @@ const PROPERTY_FIELDS: ImportFieldConfig[] = [
     key: "projectId",
     label: "Project",
     required: true,
-    aliases: ["project", "development", "building"],
+    aliases: ["project", "development"],
     type: "project",
     supportsDefault: true,
   },
@@ -128,7 +128,24 @@ const PROPERTY_FIELDS: ImportFieldConfig[] = [
   {
     key: "surface",
     label: "Surface",
-    aliases: ["surface", "area", "size", "sqm", "sqft"],
+    aliases: ["surface", "area", "size", "sqm", "sqft", "living area"],
+    type: "number",
+  },
+  {
+    key: "totalSurface",
+    label: "Total Surface",
+    aliases: ["total surface", "total area", "gross surface", "gross area"],
+    type: "number",
+  },
+  {
+    key: "balconyTerraceSurface",
+    label: "Balcony / Terrace Surface",
+    aliases: [
+      "balcony surface",
+      "terrace surface",
+      "balcony terrace surface",
+      "outdoor surface",
+    ],
     type: "number",
   },
   {
@@ -142,6 +159,18 @@ const PROPERTY_FIELDS: ImportFieldConfig[] = [
     label: "Floor",
     aliases: ["floor", "level"],
     type: "number",
+  },
+  {
+    key: "building",
+    label: "Building",
+    aliases: ["building name", "building number", "tower", "block"],
+    type: "string",
+  },
+  {
+    key: "lot",
+    label: "Lot",
+    aliases: ["lot", "lot number", "parcel", "plot number"],
+    type: "string",
   },
   {
     key: "description",
@@ -238,6 +267,14 @@ async function buildPropertyCreateInput(
 
   if (input.surface !== undefined) {
     input.surface = parseOptionalNumber(input.surface);
+  }
+
+  if (input.totalSurface !== undefined) {
+    input.totalSurface = parseOptionalNumber(input.totalSurface);
+  }
+
+  if (input.balconyTerraceSurface !== undefined) {
+    input.balconyTerraceSurface = parseOptionalNumber(input.balconyTerraceSurface);
   }
 
   if (input.floor !== undefined) {

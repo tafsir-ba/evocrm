@@ -71,8 +71,12 @@ const baseProperty = {
   bedrooms: 2,
   bathrooms: 2,
   surface: 96,
+  totalSurface: null,
+  balconyTerraceSurface: null,
   surfaceUnit: "sqm" as const,
   floor: 2,
+  building: null,
+  lot: null,
   description: "Beautiful apartment with lake view.",
   features: ["Lake view", "Balcony"],
   tags: [],
@@ -171,6 +175,34 @@ describe("property service", () => {
     expect(createProperty).toHaveBeenCalledWith(
       expect.objectContaining({
         reference: "GV-APT-12",
+      }),
+    );
+  });
+
+  it("persists website transfer fields on create", async () => {
+    vi.mocked(createProperty).mockResolvedValue(baseProperty);
+
+    await createPropertyForWorkspace(
+      "ws-1",
+      "user-1",
+      {
+        projectId: "project-1",
+        title: "Green View Apartment 12",
+        statusId: "status-1",
+        totalSurface: 120,
+        balconyTerraceSurface: 18,
+        building: "Tower A",
+        lot: "Lot 14",
+      },
+      "CHF",
+    );
+
+    expect(createProperty).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalSurface: 120,
+        balconyTerraceSurface: 18,
+        building: "Tower A",
+        lot: "Lot 14",
       }),
     );
   });
