@@ -325,45 +325,82 @@ export async function captureWebsiteLead(
       attributes,
     });
   } catch (error) {
-    if (
-      error instanceof AppError &&
-      error.code === "CONFLICT" &&
-      emailFields?.emailNormalized
-    ) {
-      const duplicateLead = await findActiveLeadByEmailNormalized(
-        workspaceId,
-        emailFields.emailNormalized,
-      );
-
-      if (duplicateLead) {
-        await writeIntegrationLog({
+    if (error instanceof AppError && error.code === "CONFLICT") {
+      if (idempotencyKey) {
+        const duplicateLead = await findLeadByIntegrationIdempotencyKey(
           workspaceId,
-          integrationId: integration.id,
-          direction: "inbound",
-          status: "success",
-          eventType: "website.lead.duplicate",
-          payloadSummary: buildWebsiteLeadPayloadSummary({
-            externalId: input.externalId,
-            email: input.email,
-            phone: input.phone,
+          integration.id,
+          idempotencyKey,
+        );
+
+        if (duplicateLead) {
+          await writeIntegrationLog({
+            workspaceId,
+            integrationId: integration.id,
+            direction: "inbound",
+            status: "success",
+            eventType: "website.lead.duplicate",
+            payloadSummary: buildWebsiteLeadPayloadSummary({
+              externalId: input.externalId,
+              email: input.email,
+              phone: input.phone,
+              leadId: duplicateLead.id,
+              idempotent: true,
+            }),
+          });
+
+          await createAuditLog({
+            workspaceId,
+            actorId: integration.createdBy,
+            action: "integration.website_lead_duplicate",
+            entityType: "lead",
+            entityId: duplicateLead.id,
+          });
+
+          return {
             leadId: duplicateLead.id,
             duplicate: true,
-          }),
-        });
+            idempotent: true,
+          };
+        }
+      }
 
-        await createAuditLog({
+      if (emailFields?.emailNormalized) {
+        const duplicateLead = await findActiveLeadByEmailNormalized(
           workspaceId,
-          actorId: integration.createdBy,
-          action: "integration.website_lead_duplicate",
-          entityType: "lead",
-          entityId: duplicateLead.id,
-        });
+          emailFields.emailNormalized,
+        );
 
-        return {
-          leadId: duplicateLead.id,
-          duplicate: true,
-          idempotent: false,
-        };
+        if (duplicateLead) {
+          await writeIntegrationLog({
+            workspaceId,
+            integrationId: integration.id,
+            direction: "inbound",
+            status: "success",
+            eventType: "website.lead.duplicate",
+            payloadSummary: buildWebsiteLeadPayloadSummary({
+              externalId: input.externalId,
+              email: input.email,
+              phone: input.phone,
+              leadId: duplicateLead.id,
+              duplicate: true,
+            }),
+          });
+
+          await createAuditLog({
+            workspaceId,
+            actorId: integration.createdBy,
+            action: "integration.website_lead_duplicate",
+            entityType: "lead",
+            entityId: duplicateLead.id,
+          });
+
+          return {
+            leadId: duplicateLead.id,
+            duplicate: true,
+            idempotent: false,
+          };
+        }
       }
     }
 

@@ -10,15 +10,18 @@ import {
 } from "@/server/services/integration-api-keys";
 import { findWebsiteIntegrationByApiKeyHash } from "@/server/repositories/integrations";
 import { assertWebsiteLeadRateLimit } from "@/server/security/website-lead-rate-limit";
+import { assertWebsiteLeadContentLength } from "@/server/security/website-lead-request-guards";
 import { captureWebsiteLeadFromRequest } from "@/server/services/website-lead-capture";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { websiteLeadCaptureInputSchema } from "@/server/validation/website-lead-capture";
 
 export async function POST(request: Request) {
   try {
+    assertWebsiteLeadContentLength(request);
+
     const rawApiKey = parseIntegrationApiKeyFromRequest(request);
 
-    assertWebsiteLeadRateLimit(request, rawApiKey);
+    await assertWebsiteLeadRateLimit(request, rawApiKey);
 
     if (!rawApiKey) {
       throw new AppError("UNAUTHENTICATED", "Invalid or missing API key.");

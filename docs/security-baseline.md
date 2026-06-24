@@ -340,13 +340,15 @@ Authorization: Bearer <CRON_SECRET>
 ## Integration Security (Phase 12)
 
 - Website integrations store only `apiKeyHash` (SHA-256 with server pepper). Raw API keys are returned once on create/rotate only.
+- API key hash pepper: prefer dedicated `INTEGRATION_API_KEY_PEPPER`; falls back to `NEXTAUTH_SECRET` when unset. Rotating `NEXTAUTH_SECRET` invalidates existing integration keys unless a dedicated pepper is configured or keys are reissued.
 - `credentialsEncrypted` is reserved for future MLS/Ads OAuth flows — not populated in Phase 12.
 - Do not log full sensitive payloads — use sanitized `payloadSummary` in `IntegrationLog` (no API keys, tokens, or full PII).
 - Website webhook authentication: `Authorization: Bearer <apiKey>` (or `X-Integration-Key`).
 - Workspace for inbound leads is derived from the integration record — never trusted from payload.
 - Paused/archived/error integrations cannot process inbound website leads.
-- Idempotency via `Lead.attributes.integration.idempotencyKey`; duplicate normalized email returns existing lead reference.
-- Website lead webhook rate limiting: in-process fixed window of **60 requests per minute** per API key hash (authenticated) or client IP (missing/invalid key attempts). Excess requests return `RATE_LIMITED` (HTTP 429). Suitable for single-instance V1; use edge/WAF limits in multi-instance production if needed.
+- Idempotency via `Lead.attributes.integration.idempotencyKey` with a **unique** partial index on `workspaceId + integrationId + idempotencyKey` (non-archived leads); duplicate normalized email returns existing lead reference.
+- Website lead webhook rate limiting: **60 requests per minute** per API key hash (authenticated) or client IP (missing/invalid key attempts). Excess requests return `RATE_LIMITED` (HTTP 429). Production uses MongoDB-backed counters (`RateLimitBucket` collection with TTL); tests use an in-process fallback. Complement with edge/WAF limits for defense in depth.
+- Website lead webhook pre-parse guard: reject `Content-Length` above **64 KB** before `request.json()`.
 
 ---
 

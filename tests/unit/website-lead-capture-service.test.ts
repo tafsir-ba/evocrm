@@ -294,6 +294,67 @@ describe("website lead capture service", () => {
     expect(createLeadForWorkspace).not.toHaveBeenCalled();
   });
 
+  it("returns idempotent lead when create conflicts on duplicate idempotency key", async () => {
+    vi.mocked(createLeadForWorkspace).mockRejectedValue(
+      new AppError("CONFLICT", "A lead with this email already exists in this workspace."),
+    );
+    vi.mocked(findLeadByIntegrationIdempotencyKey)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "lead-race",
+        workspaceId: "ws-1",
+        ...leadRecordExtras,
+        statusId: "status-1",
+        sourceId: "source-1",
+        ownerId: null,
+        assignedTo: null,
+        firstName: "Race",
+        lastName: "Winner",
+        fullName: "Race Winner",
+        email: null,
+        emailNormalized: null,
+        phone: "+15551234567",
+        phoneNormalized: "+15551234567",
+        language: null,
+        preferredContactMethod: null,
+        budgetMin: null,
+        budgetMax: null,
+        preferredAreas: [],
+        propertyTypeInterests: [],
+        transactionIntent: null,
+        usagePurpose: null,
+        notes: null,
+        tags: [],
+        attributes: {
+          integration: {
+            integrationId: "int-1",
+            idempotencyKey: "phone-form-1",
+          },
+        },
+        emailConsentStatus: "unknown",
+        emailUnsubscribedAt: null,
+        emailUnsubscribeReason: null,
+        lastContactedAt: null,
+        createdBy: "user-1",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+    const result = await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      phone: "+15551234567",
+      idempotencyKey: "phone-form-1",
+    });
+
+    expect(result).toEqual({
+      leadId: "lead-race",
+      duplicate: true,
+      idempotent: true,
+    });
+  });
+
   it("returns duplicate lead for existing normalized email without creating a new lead", async () => {
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue({
       id: "lead-dup",

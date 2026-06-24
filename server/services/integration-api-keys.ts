@@ -14,6 +14,10 @@ function getHashPepper(): string {
 
   const env = getEnv();
 
+  if (env.INTEGRATION_API_KEY_PEPPER) {
+    return env.INTEGRATION_API_KEY_PEPPER;
+  }
+
   if (!env.NEXTAUTH_SECRET) {
     throw new AppError("INTERNAL_ERROR", "Integration API key hashing is not configured.", {
       expose: false,

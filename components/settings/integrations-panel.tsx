@@ -475,19 +475,23 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
 
       <section className="space-y-3">
         <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
-          Coming later
+          Placeholder integrations — not available yet
         </h2>
+        <p className="text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
+          MLS, Google Ads, and Meta Ads appear here for planning only. They are not
+          production integrations in V1 — only website lead capture is live.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <PlaceholderCard
             title="MLS Import"
-            description="Bidirectional MLS sync is not implemented in V1."
+            description="Placeholder only. Bidirectional MLS sync is not implemented."
             configured={configuredTypes.has("mls")}
             canUpdate={canUpdate}
             onConnect={() => void createPlaceholder("mls", "MLS Import")}
           />
           <PlaceholderCard
             title="Google Ads"
-            description="OAuth and campaign sync coming in a later phase."
+            description="Placeholder only. OAuth and campaign sync are not implemented."
             icon={<IconGoogle size={16} />}
             configured={configuredTypes.has("google_ads")}
             canUpdate={canUpdate}
@@ -495,7 +499,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
           />
           <PlaceholderCard
             title="Meta Ads"
-            description="OAuth and lead sync coming in a later phase."
+            description="Placeholder only. OAuth and lead sync are not implemented."
             configured={configuredTypes.has("meta_ads")}
             canUpdate={canUpdate}
             onConnect={() => void createPlaceholder("meta_ads", "Meta Ads")}

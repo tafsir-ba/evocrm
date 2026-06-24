@@ -50,6 +50,7 @@ import {
   resetWebsiteLeadRateLimitStoreForTests,
   WEBSITE_LEAD_RATE_LIMIT,
 } from "@/server/security/website-lead-rate-limit";
+import { MAX_WEBSITE_LEAD_REQUEST_BYTES } from "@/server/security/website-lead-request-guards";
 
 const workspace = {
   id: "ws-1",
@@ -256,6 +257,27 @@ describe("integrations API", () => {
     );
 
     expect(response.status).toBe(401);
+    expect(captureWebsiteLeadFromRequest).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when Content-Length exceeds the JSON body cap", async () => {
+    const response = await captureWebsiteLead(
+      new Request("http://localhost/api/integrations/website/leads", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer evocrm_whk_secret",
+          "Content-Type": "application/json",
+          "Content-Length": String(MAX_WEBSITE_LEAD_REQUEST_BYTES + 1),
+        },
+        body: JSON.stringify({
+          firstName: "John",
+          lastName: "Smith",
+          email: "john@example.com",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
     expect(captureWebsiteLeadFromRequest).not.toHaveBeenCalled();
   });
 

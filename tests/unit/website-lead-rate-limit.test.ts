@@ -7,7 +7,6 @@ import {
   resetWebsiteLeadRateLimitStoreForTests,
   WEBSITE_LEAD_RATE_LIMIT,
 } from "@/server/security/website-lead-rate-limit";
-import { AppError } from "@/server/errors";
 
 describe("website lead rate limit", () => {
   beforeEach(() => {
@@ -38,42 +37,38 @@ describe("website lead rate limit", () => {
     expect(key).toBe("website-lead:ip:203.0.113.10");
   });
 
-  it("allows requests within the configured window", () => {
+  it("allows requests within the configured window", async () => {
     const key = "website-lead:ip:test";
 
     for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
-      expect(checkWebsiteLeadRateLimit(key).allowed).toBe(true);
+      expect((await checkWebsiteLeadRateLimit(key)).allowed).toBe(true);
     }
   });
 
-  it("blocks requests above the configured window", () => {
+  it("blocks requests above the configured window", async () => {
     const key = "website-lead:ip:test";
 
     for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
-      checkWebsiteLeadRateLimit(key);
+      await checkWebsiteLeadRateLimit(key);
     }
 
-    const blocked = checkWebsiteLeadRateLimit(key);
+    const blocked = await checkWebsiteLeadRateLimit(key);
 
     expect(blocked.allowed).toBe(false);
     expect(blocked.retryAfterSeconds).toBeGreaterThan(0);
   });
 
-  it("throws RATE_LIMITED when assertWebsiteLeadRateLimit is exceeded", () => {
+  it("throws RATE_LIMITED when assertWebsiteLeadRateLimit is exceeded", async () => {
     const request = new Request("http://localhost/api/integrations/website/leads", {
       headers: { "x-forwarded-for": "203.0.113.99" },
     });
 
     for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
-      assertWebsiteLeadRateLimit(request, null);
+      await assertWebsiteLeadRateLimit(request, null);
     }
 
-    expect(() => assertWebsiteLeadRateLimit(request, null)).toThrow(AppError);
-
-    try {
-      assertWebsiteLeadRateLimit(request, null);
-    } catch (error) {
-      expect(error).toMatchObject({ code: "RATE_LIMITED" });
-    }
+    await expect(assertWebsiteLeadRateLimit(request, null)).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
   });
 });

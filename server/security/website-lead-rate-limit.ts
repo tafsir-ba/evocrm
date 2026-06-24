@@ -2,6 +2,7 @@ import "server-only";
 
 import { AppError } from "@/server/errors";
 import { hashIntegrationApiKey } from "@/server/services/integration-api-keys";
+import { incrementMongoWebsiteLeadRateLimitBucket } from "@/server/security/website-lead-rate-limit-store";
 
 export const WEBSITE_LEAD_RATE_LIMIT = {
   maxRequests: 60,
@@ -14,6 +15,10 @@ type RateLimitBucket = {
 };
 
 const buckets = new Map<string, RateLimitBucket>();
+
+function useInMemoryWebsiteLeadRateLimitStore(): boolean {
+  return process.env.NODE_ENV === "test";
+}
 
 export function resetWebsiteLeadRateLimitStoreForTests(): void {
   buckets.clear();
@@ -44,7 +49,7 @@ export function getWebsiteLeadRateLimitKey(
   return `website-lead:ip:${getClientIp(request)}`;
 }
 
-export function checkWebsiteLeadRateLimit(key: string): {
+function checkInMemoryWebsiteLeadRateLimit(key: string): {
   allowed: boolean;
   retryAfterSeconds: number;
 } {
@@ -71,12 +76,36 @@ export function checkWebsiteLeadRateLimit(key: string): {
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
-export function assertWebsiteLeadRateLimit(
+export async function checkWebsiteLeadRateLimit(key: string): Promise<{
+  allowed: boolean;
+  retryAfterSeconds: number;
+}> {
+  if (useInMemoryWebsiteLeadRateLimitStore()) {
+    return checkInMemoryWebsiteLeadRateLimit(key);
+  }
+
+  const bucket = await incrementMongoWebsiteLeadRateLimitBucket(
+    key,
+    WEBSITE_LEAD_RATE_LIMIT.windowMs,
+  );
+  const now = Date.now();
+
+  if (bucket.count > WEBSITE_LEAD_RATE_LIMIT.maxRequests) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+    };
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export async function assertWebsiteLeadRateLimit(
   request: Request,
   rawApiKey: string | null,
-): void {
+): Promise<void> {
   const key = getWebsiteLeadRateLimitKey(request, rawApiKey);
-  const result = checkWebsiteLeadRateLimit(key);
+  const result = await checkWebsiteLeadRateLimit(key);
 
   if (!result.allowed) {
     throw new AppError("RATE_LIMITED", "Rate limit exceeded.", {

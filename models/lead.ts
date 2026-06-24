@@ -92,6 +92,7 @@ leadSchema.index(
     "attributes.integration.idempotencyKey": 1,
   },
   {
+    unique: true,
     partialFilterExpression: {
       "attributes.integration.idempotencyKey": { $type: "string", $ne: "" },
       archivedAt: null,

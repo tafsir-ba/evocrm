@@ -57,6 +57,7 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 |----------|---------------|-------------|
 | `NEXTAUTH_URL` | Phase 2 | Same as app URL for local; production URL in prod |
 | `NEXTAUTH_SECRET` | Phase 2 | Random secret — `openssl rand -base64 32` |
+| `INTEGRATION_API_KEY_PEPPER` | Phase 12 (optional) | Dedicated pepper for website integration API key hashing. When unset, `NEXTAUTH_SECRET` is used. Set this in production so rotating auth secrets does not invalidate integration keys. |
 | `GOOGLE_CLIENT_ID` | Phase 2 | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Phase 2 | Google OAuth client secret |
 

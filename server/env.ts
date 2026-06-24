@@ -26,6 +26,7 @@ const envSchema = z.object({
   // Phase 2 — Auth.js
   NEXTAUTH_URL: optionalNonEmptyString,
   NEXTAUTH_SECRET: optionalNonEmptyString,
+  INTEGRATION_API_KEY_PEPPER: optionalNonEmptyString,
   GOOGLE_CLIENT_ID: optionalNonEmptyString,
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString,
 
