@@ -774,7 +774,7 @@ Required payload fields: `firstName`, `lastName`, and at least one of `email` or
 
 Inbound leads set `sourceId` from dictionary item `lead_source` key `website` when available. UTM/external metadata is stored in `Lead.attributes.integration`.
 
-**Rate limiting:** `POST /api/integrations/website/leads` allows up to **60 requests per minute** per authenticated API key (hashed bucket) or per client IP when no key is supplied. Excess requests return HTTP 429 with error code `RATE_LIMITED` and optional `retryAfterSeconds` in `details`. Counters are stored in MongoDB in production (shared across instances); tests use an in-process store.
+**Rate limiting:** `POST /api/integrations/website/leads` enforces **60 requests per minute** on two buckets before authentication: always per client IP, and additionally per supplied API key hash when a bearer/header key is present. This prevents invalid-key spam from bypassing limits by rotating fake bearer tokens. Excess requests return HTTP 429 with error code `RATE_LIMITED` and optional `retryAfterSeconds` in `details`. Counters are stored in MongoDB in production (shared across instances); tests use an in-process store.
 
 **Pre-parse guards:** `Content-Length` must not exceed **64 KB** before `request.json()` → `VALIDATION_ERROR` (HTTP 400).
 

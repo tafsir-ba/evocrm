@@ -38,15 +38,23 @@ function getClientIp(request: Request): string {
   return realIp || "unknown";
 }
 
+export function getWebsiteLeadIpRateLimitKey(request: Request): string {
+  return `website-lead:ip:${getClientIp(request)}`;
+}
+
+export function getWebsiteLeadApiKeyRateLimitKey(rawApiKey: string): string {
+  return `website-lead:api-key:${hashIntegrationApiKey(rawApiKey)}`;
+}
+
 export function getWebsiteLeadRateLimitKey(
   request: Request,
   rawApiKey: string | null,
 ): string {
   if (rawApiKey) {
-    return `website-lead:api-key:${hashIntegrationApiKey(rawApiKey)}`;
+    return getWebsiteLeadApiKeyRateLimitKey(rawApiKey);
   }
 
-  return `website-lead:ip:${getClientIp(request)}`;
+  return getWebsiteLeadIpRateLimitKey(request);
 }
 
 function checkInMemoryWebsiteLeadRateLimit(key: string): {
@@ -104,12 +112,19 @@ export async function assertWebsiteLeadRateLimit(
   request: Request,
   rawApiKey: string | null,
 ): Promise<void> {
-  const key = getWebsiteLeadRateLimitKey(request, rawApiKey);
-  const result = await checkWebsiteLeadRateLimit(key);
+  const limits = [getWebsiteLeadIpRateLimitKey(request)];
 
-  if (!result.allowed) {
-    throw new AppError("RATE_LIMITED", "Rate limit exceeded.", {
-      details: { retryAfterSeconds: result.retryAfterSeconds },
-    });
+  if (rawApiKey) {
+    limits.push(getWebsiteLeadApiKeyRateLimitKey(rawApiKey));
+  }
+
+  for (const key of limits) {
+    const result = await checkWebsiteLeadRateLimit(key);
+
+    if (!result.allowed) {
+      throw new AppError("RATE_LIMITED", "Rate limit exceeded.", {
+        details: { retryAfterSeconds: result.retryAfterSeconds },
+      });
+    }
   }
 }

@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   assertWebsiteLeadRateLimit,
   checkWebsiteLeadRateLimit,
+  getWebsiteLeadApiKeyRateLimitKey,
+  getWebsiteLeadIpRateLimitKey,
   getWebsiteLeadRateLimitKey,
   resetWebsiteLeadRateLimitStoreForTests,
   WEBSITE_LEAD_RATE_LIMIT,
@@ -21,10 +23,11 @@ describe("website lead rate limit", () => {
       },
     });
 
-    const key = getWebsiteLeadRateLimitKey(request, "evocrm_whk_test_key");
+    const key = getWebsiteLeadApiKeyRateLimitKey("evocrm_whk_test_key");
 
     expect(key.startsWith("website-lead:api-key:")).toBe(true);
     expect(key).not.toContain("203.0.113.10");
+    expect(getWebsiteLeadIpRateLimitKey(request)).toBe("website-lead:ip:203.0.113.10");
   });
 
   it("keys unauthenticated requests by client IP", () => {
@@ -32,9 +35,10 @@ describe("website lead rate limit", () => {
       headers: { "x-forwarded-for": "203.0.113.10, 10.0.0.1" },
     });
 
-    const key = getWebsiteLeadRateLimitKey(request, null);
+    const key = getWebsiteLeadIpRateLimitKey(request);
 
     expect(key).toBe("website-lead:ip:203.0.113.10");
+    expect(getWebsiteLeadRateLimitKey(request, null)).toBe(key);
   });
 
   it("allows requests within the configured window", async () => {
@@ -68,6 +72,22 @@ describe("website lead rate limit", () => {
     }
 
     await expect(assertWebsiteLeadRateLimit(request, null)).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
+  });
+
+  it("rate limits rotating fake API keys by shared client IP", async () => {
+    const request = new Request("http://localhost/api/integrations/website/leads", {
+      headers: { "x-forwarded-for": "203.0.113.77" },
+    });
+
+    for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
+      await assertWebsiteLeadRateLimit(request, `evocrm_whk_fake_${index}`);
+    }
+
+    await expect(
+      assertWebsiteLeadRateLimit(request, "evocrm_whk_fake_rotated"),
+    ).rejects.toMatchObject({
       code: "RATE_LIMITED",
     });
   });

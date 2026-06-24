@@ -323,6 +323,52 @@ describe("integrations API", () => {
     expect(payload.error.code).toBe("RATE_LIMITED");
   });
 
+  it("returns 429 for rotating fake API keys once the shared IP limit is exceeded", async () => {
+    vi.mocked(captureWebsiteLeadFromRequest).mockResolvedValue({
+      leadId: "lead-1",
+      duplicate: false,
+      idempotent: false,
+    });
+
+    const body = JSON.stringify({
+      firstName: "John",
+      lastName: "Smith",
+      email: "john@example.com",
+    });
+
+    for (let index = 0; index < WEBSITE_LEAD_RATE_LIMIT.maxRequests; index += 1) {
+      const response = await captureWebsiteLead(
+        new Request("http://localhost/api/integrations/website/leads", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer evocrm_whk_fake_${index}`,
+            "Content-Type": "application/json",
+            "x-forwarded-for": "203.0.113.88",
+          },
+          body,
+        }),
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await captureWebsiteLead(
+      new Request("http://localhost/api/integrations/website/leads", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer evocrm_whk_fake_rotated",
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.88",
+        },
+        body,
+      }),
+    );
+
+    expect(blocked.status).toBe(429);
+    expect(captureWebsiteLeadFromRequest).toHaveBeenCalledTimes(
+      WEBSITE_LEAD_RATE_LIMIT.maxRequests,
+    );
+  });
+
   it("requires settings:update to create integrations", async () => {
     vi.mocked(requirePermission).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),

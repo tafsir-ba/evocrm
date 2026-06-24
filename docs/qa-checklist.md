@@ -415,7 +415,7 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] `POST /api/integrations/website/leads` authenticates via API key; derives workspace from integration
 - [ ] Paused/archived/error integrations reject inbound website leads
 - [ ] Website payload requires `firstName`, `lastName`, and email or phone
-- [ ] Website webhook rate limited (60/min per API key hash or IP)
+- [ ] Website webhook rate limited (60/min per client IP, plus 60/min per supplied API key hash)
 - [ ] Middleware public allowlist limited to `/api/integrations/website/leads`
 - [ ] Lead creation reuses lead service; source attribution via `lead_source` key `website`
 - [ ] Idempotency via `Lead.attributes.integration.idempotencyKey`
