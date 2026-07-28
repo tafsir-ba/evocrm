@@ -527,6 +527,31 @@ describe("website lead capture service", () => {
     );
   });
 
+  it("allows locked payload projectId when it matches the default project", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...integration,
+      defaultProjectId: TEST_PROJECT_ID,
+      allowProjectOverride: false,
+    });
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      email: "john-match@example.com",
+      projectId: TEST_PROJECT_ID,
+    });
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+    );
+  });
+
   it("rejects payload projectId when project override is locked", async () => {
     vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
       ...integration,

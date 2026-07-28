@@ -20,7 +20,7 @@
 | Consent not accepted on webhook | **Fixed** — optional `emailConsentStatus` on capture payload |
 | Integrations UI inconsistent | **Fixed** — Label/ProjectSelector patterns aligned with other settings panels |
 
-**Ops note:** Deployments that already created the old unique email index must drop `workspaceId_1_emailNormalized_1` (partial unique) so the new `workspaceId_1_projectId_1_emailNormalized_1` index can apply.
+**Ops note:** Deployments that already created the old unique email index must run `npm run migrate:lead-email-index` (supports `--dry-run`) to drop `workspaceId_1_emailNormalized_1` and ensure `workspaceId_1_projectId_1_emailNormalized_1`.
 
 ---
 
@@ -36,14 +36,9 @@
 
 ## Executive verdict
 
-Leads are **not** dumped into one undifferentiated bucket without structure: every lead **must** belong to a **workspace** and a **project**, and website integrations authenticate with per-integration API keys. Attribution metadata (integration id, UTM, free-text source, property reference) is stored permanently on the lead.
+Leads are workspace- and project-scoped. Website integrations authenticate with per-integration API keys and are **locked to `defaultProjectId` by default** (`allowProjectOverride: false`). Cross-project payload targeting returns `403 FORBIDDEN` unless an admin enables override. Email uniqueness is **per project**. Attribution metadata (integration id, UTM, free-text source, property reference) is stored on the lead and shown in lead detail; leads list can filter by website integration and UTM campaign.
 
-However, segregation is **project-based within a shared workspace database**, not separate databases or hard-locked website→project tunnels. Critical gaps remain:
-
-1. A website API key can target **any active project in the same workspace** via `projectId` / `projectReference` (**no lock to `defaultProjectId`**).
-2. Email uniqueness / duplicate detection is **workspace-wide**, so a submission intended for Project A can silently resolve to an existing lead in Project B.
-3. The CRM UI does **not** show website/integration/UTM metadata on lead records, and does **not** expose `defaultProjectId` configuration.
-4. Permissions are **workspace-role** based; there is **no** project- or website-scoped access control.
+Remaining gaps (deferred P2): humanized status/consent labels; lead:read-safe integration name endpoint for custom roles without `settings:read`; making `projectId` required on low-level email lookup helpers.
 
 ---
 

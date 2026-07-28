@@ -438,6 +438,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 <div>
                   <Label htmlFor="new-default-project">Default project</Label>
                   <ProjectSelector
+                    id="new-default-project"
                     projects={projects}
                     selectedProjectId={newDefaultProjectId}
                     onChange={setNewDefaultProjectId}
@@ -641,6 +642,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
               <div>
                 <Label htmlFor="edit-default-project">Default project</Label>
                 <ProjectSelector
+                  id="edit-default-project"
                   projects={projects}
                   selectedProjectId={editDefaultProjectId}
                   onChange={setEditDefaultProjectId}

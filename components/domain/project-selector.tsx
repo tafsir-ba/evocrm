@@ -18,6 +18,8 @@ export type ProjectSelectorProps = {
   placeholder?: string;
   emptyLabel?: string;
   className?: string;
+  id?: string;
+  name?: string;
 };
 
 export function ProjectSelector({
@@ -28,6 +30,8 @@ export function ProjectSelector({
   placeholder = "No project selected",
   emptyLabel = "No projects available",
   className,
+  id,
+  name,
 }: ProjectSelectorProps) {
   if (projects.length === 0) {
     return (
@@ -49,6 +53,8 @@ export function ProjectSelector({
 
   return (
     <select
+      id={id}
+      name={name}
       value={selectedProjectId ?? ""}
       disabled={disabled}
       onChange={(event) => {

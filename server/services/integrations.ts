@@ -21,6 +21,7 @@ import {
   hashIntegrationApiKey,
 } from "@/server/services/integration-api-keys";
 import { validateActiveProjectId } from "@/server/services/project-scope";
+import { findProjects } from "@/server/repositories/projects";
 import type {
   CreateIntegrationInput,
   UpdateIntegrationInput,
@@ -97,6 +98,29 @@ function auditActionForStatusChange(
   return "integration.updated";
 }
 
+async function assertWebsiteDefaultProjectConfigured(
+  workspaceId: string,
+  defaultProjectId: string | null | undefined,
+  allowProjectOverride: boolean,
+): Promise<void> {
+  if (allowProjectOverride) {
+    return;
+  }
+
+  if (defaultProjectId) {
+    return;
+  }
+
+  const projects = await findProjects(workspaceId, { includeArchived: false });
+
+  if (projects.length > 1) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Set a default project for this website integration when the workspace has multiple active projects.",
+    );
+  }
+}
+
 export async function listIntegrationsForWorkspace(
   workspaceId: string,
   filter: IntegrationListFilter = {},
@@ -135,15 +159,27 @@ export async function createIntegrationForWorkspace(
     await validateActiveProjectId(workspaceId, input.defaultProjectId);
   }
 
+  const allowProjectOverride =
+    input.type === "website" ? (input.allowProjectOverride ?? false) : false;
+  const defaultProjectId =
+    input.type === "website" ? (input.defaultProjectId ?? null) : null;
+
+  if (input.type === "website") {
+    await assertWebsiteDefaultProjectConfigured(
+      workspaceId,
+      defaultProjectId,
+      allowProjectOverride,
+    );
+  }
+
   const integration = await createIntegration({
     workspaceId,
     type: input.type,
     name: input.name,
     status: defaultStatusForType(input.type),
     apiKeyHash,
-    defaultProjectId: input.type === "website" ? (input.defaultProjectId ?? null) : null,
-    allowProjectOverride:
-      input.type === "website" ? (input.allowProjectOverride ?? false) : false,
+    defaultProjectId,
+    allowProjectOverride,
     createdBy: actorId,
   });
 
@@ -186,6 +222,23 @@ export async function updateIntegrationForWorkspace(
 
   if (input.defaultProjectId) {
     await validateActiveProjectId(workspaceId, input.defaultProjectId);
+  }
+
+  const nextDefaultProjectId =
+    input.defaultProjectId !== undefined
+      ? input.defaultProjectId
+      : existing.defaultProjectId;
+  const nextAllowOverride =
+    input.allowProjectOverride !== undefined
+      ? input.allowProjectOverride
+      : existing.allowProjectOverride;
+
+  if (existing.type === "website") {
+    await assertWebsiteDefaultProjectConfigured(
+      workspaceId,
+      nextDefaultProjectId,
+      nextAllowOverride,
+    );
   }
 
   const updated = await updateIntegration(workspaceId, integrationId, {

@@ -9,7 +9,7 @@ import type {
 } from "@/lib/imports";
 import { validateImportMappingConfiguration } from "@/lib/import-mapping-validation";
 import { findDictionaryItems } from "@/server/repositories/dictionary-items";
-import { findActiveLeadsByEmailNormalized } from "@/server/repositories/leads";
+import { findActiveLeadsByEmailNormalized, buildLeadEmailProjectKey } from "@/server/repositories/leads";
 import { listWorkspaceMembersForWorkspace } from "@/server/services/members";
 import { findPropertiesByReferences } from "@/server/repositories/properties";
 import { findProjects } from "@/server/repositories/projects";
@@ -403,6 +403,10 @@ function validateLeadDuplicates(
     return;
   }
 
+  if (!row.projectId || typeof row.projectId !== "string") {
+    return;
+  }
+
   let emailNormalized: string;
 
   try {
@@ -411,24 +415,25 @@ function validateLeadDuplicates(
     return;
   }
 
-  const inFileDuplicate = seenEmails.get(emailNormalized);
+  const duplicateKey = buildLeadEmailProjectKey(row.projectId, emailNormalized);
+  const inFileDuplicate = seenEmails.get(duplicateKey);
 
   if (inFileDuplicate !== undefined) {
     issues.push({
       rowNumber,
       field: "email",
-      message: `Duplicate email in file (also on row ${inFileDuplicate}).`,
+      message: `Duplicate email in file for this project (also on row ${inFileDuplicate}).`,
       severity: "error",
     });
   } else {
-    seenEmails.set(emailNormalized, rowNumber);
+    seenEmails.set(duplicateKey, rowNumber);
   }
 
-  if (existingLeadEmails.has(emailNormalized)) {
+  if (existingLeadEmails.has(duplicateKey)) {
     issues.push({
       rowNumber,
       field: "email",
-      message: "A lead with this email already exists in this workspace.",
+      message: "A lead with this email already exists in this project.",
       severity: "error",
     });
   }

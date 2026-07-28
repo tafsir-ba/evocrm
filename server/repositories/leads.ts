@@ -272,14 +272,25 @@ export async function findActiveLeadsByEmailNormalized(
       archivedAt: null,
     }),
   )
-    .select({ emailNormalized: 1 })
-    .lean<Array<{ emailNormalized?: string | null }>>();
+    .select({ emailNormalized: 1, projectId: 1 })
+    .lean<Array<{ emailNormalized?: string | null; projectId?: unknown }>>();
 
   return new Set(
     documents
-      .map((document) => document.emailNormalized)
-      .filter((email): email is string => Boolean(email)),
+      .map((document) => {
+        const email = document.emailNormalized;
+        const projectId = document.projectId ? String(document.projectId) : null;
+        if (!email || !projectId) {
+          return null;
+        }
+        return buildLeadEmailProjectKey(projectId, email);
+      })
+      .filter((key): key is string => Boolean(key)),
   );
+}
+
+export function buildLeadEmailProjectKey(projectId: string, emailNormalized: string): string {
+  return `${projectId}::${emailNormalized}`;
 }
 
 export async function findActiveLeadByEmailNormalized(
