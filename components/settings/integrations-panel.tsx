@@ -71,14 +71,9 @@ const LOCKED_EXAMPLE_PAYLOAD = {
   },
 } as const;
 
-const OVERRIDE_EXAMPLE_PAYLOAD = {
-  ...LOCKED_EXAMPLE_PAYLOAD,
-  projectId: "507f1f77bcf86cd799439011",
-} as const;
-
 const SETUP_STEPS = [
   "Create (or select) the destination project under Settings → Projects.",
-  "Create a website integration below and set its default project.",
+  "Create a website integration below and set its default project (required when multiple projects exist).",
   "Copy the one-time API key immediately — it cannot be viewed again.",
   "Keep project override locked unless one website must feed multiple projects.",
   "POST form submissions to the webhook with Bearer auth. Required: firstName, lastName, and email or phone.",
@@ -102,6 +97,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   const [routingSaving, setRoutingSaving] = useState(false);
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const webhookUrl =
@@ -110,14 +106,23 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       : "/api/integrations/website/leads";
 
   const loadProjects = useCallback(async () => {
+    setProjectsLoadError(null);
+
     try {
       const response = await fetch(`${apiBase}/projects`);
       const payload = await response.json();
-      if (response.ok) {
-        setProjects(payload.data.projects as ProjectSelectorProject[]);
+      if (!response.ok) {
+        setProjects([]);
+        setProjectsLoadError(
+          payload.error?.message ?? "Failed to load projects for destination mapping.",
+        );
+        return;
       }
+
+      setProjects(payload.data.projects as ProjectSelectorProject[]);
     } catch {
-      // Non-blocking for integrations list.
+      setProjects([]);
+      setProjectsLoadError("Failed to load projects for destination mapping.");
     }
   }, [apiBase]);
 
@@ -385,17 +390,20 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   }
 
   const examplePayload = useMemo(() => {
-    if (selectedIntegration?.type === "website" && selectedIntegration.allowProjectOverride) {
-      return {
-        ...OVERRIDE_EXAMPLE_PAYLOAD,
-        ...(selectedIntegration.defaultProjectId
-          ? { projectId: selectedIntegration.defaultProjectId }
-          : {}),
-      };
+    if (selectedIntegration?.type !== "website") {
+      return { ...LOCKED_EXAMPLE_PAYLOAD };
+    }
+
+    // Prefer unsaved Configure form state so copy buttons match what the admin is editing.
+    if (editAllowOverride) {
+      const projectId = editDefaultProjectId ?? selectedIntegration.defaultProjectId;
+      return projectId
+        ? { ...LOCKED_EXAMPLE_PAYLOAD, projectId }
+        : { ...LOCKED_EXAMPLE_PAYLOAD };
     }
 
     return { ...LOCKED_EXAMPLE_PAYLOAD };
-  }, [selectedIntegration]);
+  }, [selectedIntegration, editAllowOverride, editDefaultProjectId]);
 
   const exampleCurl = useMemo(
     () => `curl -X POST '${webhookUrl}' \\
@@ -405,10 +413,24 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     [examplePayload, webhookUrl],
   );
 
-  const exampleModeNote =
-    selectedIntegration?.type === "website" && selectedIntegration.allowProjectOverride
-      ? "Override is enabled for this integration — include a valid projectId (or projectReference) that exists in this workspace."
-      : "Override is locked — omit projectId / projectReference. Leads route to the integration default project.";
+  const exampleModeNote = (() => {
+    if (selectedIntegration?.type !== "website") {
+      return "Select a website integration to copy a mode-aware example.";
+    }
+
+    if (editAllowOverride) {
+      if (editDefaultProjectId ?? selectedIntegration.defaultProjectId) {
+        return "Override is on in the form below — example includes that projectId. Save routing before relying on it in production.";
+      }
+      return "Override is on but no default project is selected — add projectId or projectReference yourself for every request, then Save.";
+    }
+
+    return "Override is locked in the form below — omit projectId / projectReference. Leads route to the integration default project.";
+  })();
+
+  const canCopyOverrideExample =
+    selectedIntegration?.type === "website" &&
+    (!editAllowOverride || Boolean(editDefaultProjectId ?? selectedIntegration.defaultProjectId));
 
   const requiresDefaultProject = projects.length > 1;
   const createDisabled =
@@ -446,6 +468,15 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
 
   return (
     <div className="space-y-6">
+      {projectsLoadError && (
+        <Card>
+          <p className="text-[13px] text-[var(--color-danger-600)]">{projectsLoadError}</p>
+          <Button size="sm" variant="secondary" className="mt-2" onClick={() => void loadProjects()}>
+            Retry projects
+          </Button>
+        </Card>
+      )}
+
       {error && (
         <Card>
           <p className="text-[13px] text-[var(--color-danger-600)]">{error}</p>
@@ -793,6 +824,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 <Button
                   size="sm"
                   variant="secondary"
+                  disabled={!canCopyOverrideExample && editAllowOverride}
                   onClick={() =>
                     void copyText("Example payload", JSON.stringify(examplePayload, null, 2))
                   }
@@ -802,11 +834,18 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 <Button
                   size="sm"
                   variant="secondary"
+                  disabled={!canCopyOverrideExample && editAllowOverride}
                   onClick={() => void copyText("Example curl", exampleCurl)}
                 >
                   Copy example curl
                 </Button>
               </div>
+              {editAllowOverride && !canCopyOverrideExample && (
+                <p className="text-[12px] text-[var(--color-danger-600)]">
+                  Select a default project before copying an override example, or include projectId
+                  manually.
+                </p>
+              )}
             </div>
           </Card>
         </section>

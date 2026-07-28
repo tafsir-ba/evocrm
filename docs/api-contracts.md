@@ -196,7 +196,7 @@ DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
 
 **GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `includeArchived`.
 
-**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email **in the same project** returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
 
 **DELETE** sets `archivedAt`; does not hard-delete.
 
@@ -878,7 +878,7 @@ UI: floating widget on authenticated workspace shell; platform admin menu at `/a
 
 Website lead capture accepts `idempotencyKey` in the JSON body (or falls back to `externalId`). The server stores metadata in `Lead.attributes.integration` and replays the existing lead when the same integration + key is seen again.
 
-Duplicate normalized email within a workspace returns the existing lead reference with `duplicate: true` instead of creating a second lead.
+Duplicate normalized email within the same project returns the existing lead reference with `duplicate: true` instead of creating a second lead.
 
 Optional HTTP header pattern for future endpoints:
 

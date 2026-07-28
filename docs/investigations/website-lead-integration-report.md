@@ -36,7 +36,8 @@
 
 ## Current implementation protocol (source of truth)
 
-> Prefer **`docs/website-lead-capture-setup.md`** and Settings → Integrations UI for operator steps. Sections below the remediation table retain historical investigation detail and may lag; treat this block as current.
+> Canonical operator guide: **`docs/website-lead-capture-setup.md`**.  
+> Historical narrative below was the **pre-remediation** investigation. Key tables in §§3–6 and Appendices were corrected to match code after remediation; prefer this protocol block and the setup guide if anything conflicts.
 
 ### Admin steps
 
@@ -61,11 +62,11 @@ Required: `firstName`, `lastName`, and `email` or `phone`. Do not send `projectI
 | A (mis-sent `projectId=B`) | Project A | locked | `403 FORBIDDEN` |
 | A | Project A | enabled | May target any active workspace project via payload |
 
----
+### Executive verdict (post-remediation)
 
-Leads are workspace- and project-scoped. Website integrations authenticate with per-integration API keys and are **locked to `defaultProjectId` by default** (`allowProjectOverride: false`). Cross-project payload targeting returns `403 FORBIDDEN` unless an admin enables override. Email uniqueness is **per project**. Attribution metadata (integration id, UTM, free-text source, property reference) is stored on the lead and shown in lead detail; leads list can filter by website integration and UTM campaign.
+Leads are workspace- and project-scoped. Website integrations authenticate with per-integration API keys and are **locked to `defaultProjectId` by default** (`allowProjectOverride: false`). Cross-project payload targeting returns `403 FORBIDDEN` unless an admin enables override. Email uniqueness is **per project**. Attribution metadata is stored and shown on lead detail; leads list filters by website integration and UTM campaign. Settings UI exposes default project + override.
 
-Remaining gaps (deferred P2): humanized status/consent labels; lead:read-safe integration name endpoint for custom roles without `settings:read`; making `projectId` required on low-level email lookup helpers.
+Remaining gaps (deferred P2): humanized status/consent labels; lead:read-safe integration name endpoint for custom roles without `settings:read`; project-scoped RBAC; first-class campaign/form ids.
 
 ---
 
@@ -91,13 +92,11 @@ Remaining gaps (deferred P2): humanized status/consent labels; lead:read-safe in
         │ 5. SHA-256(pepper:key) → Integration │
         │    (type=website, status=active)     │
         │ 6. Workspace = integration.workspace │
-        │ 7. Idempotency / email duplicate     │
-        │ 8. Resolve projectId:                │
-        │      payload.projectId               │
-        │      → payload.projectReference      │
-        │      → integration.defaultProjectId  │
-        │      → sole active project           │
-        │      → else VALIDATION_ERROR         │
+        │ 7. Idempotency / email duplicate (per project)
+        │ 8. Resolve projectId (locked unless allowProjectOverride):
+        │      if locked: defaultProjectId / sole project only
+        │      if override: payload projectId|projectReference → default → sole
+        │      → else VALIDATION_ERROR / FORBIDDEN
         │ 9. Create Lead (source=website)      │
         │10. IntegrationLog + AuditLog         │
         └──────────────────┬───────────────────┘
@@ -110,9 +109,9 @@ Remaining gaps (deferred P2): humanized status/consent labels; lead:read-safe in
                            ▼
         ┌──────────────────────────────────────┐
         │ CRM UI /w/{slug}/leads               │
-        │ Filter: project (global), sourceId   │
-        │ Detail: Source label + Project name  │
-        │ (UTM / website name NOT shown)       │
+        │ Filter: project, sourceId, website,  │
+        │         UTM campaign                 │
+        │ Detail: Source, Project, attribution │
         └──────────────────────────────────────┘
 ```
 
@@ -231,30 +230,31 @@ There is **no** first-class Website entity. A “website connection” = an `Int
 
 ### What exists
 
-1. **Workspace tenancy (hard):** API key → integration → `workspaceId`. Payload cannot choose another workspace.
-2. **Project assignment (hard field, soft routing):** Every lead requires `projectId`. Indexes support `workspaceId + projectId` queries. Global UI `ProjectFilter` and list API `projectId` filter scope views.
-3. **Integration attribution (soft metadata):** `attributes.integration.integrationId` permanently stores which website integration created the lead.
-4. **Source dictionary:** All website captures set `sourceId` to `lead_source.website` when that dictionary item is active.
-5. **Campaign-ish attribution:** UTM campaign string only — not CRM drip Campaign enrollment from the webhook.
+1. **Workspace tenancy (hard):** API key → integration → `workspaceId`.
+2. **Project assignment (hard):** Every lead requires `projectId`; list API + UI filter by project.
+3. **Locked website → project routing (hard when `allowProjectOverride=false`):** mismatched `projectId` → `403 FORBIDDEN`; omit `projectId` to use `defaultProjectId`.
+4. **Email uniqueness (hard):** unique active lead per `(workspaceId, projectId, emailNormalized)`.
+5. **Integration attribution (metadata + UI):** `attributes.integration.integrationId` + Website attribution panel + website/UTM filters.
+6. **Source dictionary:** captures set `sourceId` to `lead_source.website` when active.
+7. **UTM campaign string:** stored on lead; filterable; not CRM Campaign enrollment.
 
 ### What does **not** exist
 
-- Separate MongoDB databases or collections per website/project (**one Lead collection per deployment**).
-- Hard binding of API key → only its `defaultProjectId`.
+- Separate MongoDB databases/collections per website.
 - Project-level or website-level RBAC on memberships.
-- UI filter by integration / website / UTM / form.
-- First-class `website`, `form`, or ads campaign entities for inbound capture.
+- First-class `website` / `form` / ads campaign entities beyond Integration + UTM strings.
+- Per-website selective export UI (workspace export only).
 
 ### Enforcement model
 
-| Control | Technical enforcement? | Or tags/manual only? |
-|---------|------------------------|----------------------|
-| Workspace isolation | Technical (API key hash) | — |
-| Project field required | Technical (schema) | — |
-| Correct default project | Partial — needs `defaultProjectId` or payload | Easy to misconfigure |
-| Cannot post to other projects | **No** — payload can override | Relies on integrator discipline |
-| Users cannot see other projects’ leads | **No** — UX filter only | Manual filter |
-| Website visible on lead | Metadata stored | Manual inspection of attributes / export |
+| Control | Technical enforcement? | Notes |
+|---------|------------------------|-------|
+| Workspace isolation | Yes (API key hash) | — |
+| Project field required | Yes (schema) | — |
+| Default project configured | Yes when multi-project + locked | Create/update validation |
+| Cannot post to other projects | Yes when override locked | `403 FORBIDDEN` |
+| Users cannot see other projects’ leads | **No** | UI filter only |
+| Website visible / filterable | Yes | Detail + list filters |
 
 ---
 
@@ -264,10 +264,10 @@ There is **no** first-class Website entity. A “website connection” = an `Int
 |----------|--------|----------|
 | One general undifferentiated bucket? | **No** — leads always have `projectId` | `models/lead.ts` requires `projectId`; capture resolves project or errors |
 | Separate databases per website? | **No** — single workspace Lead collection | Schema + repositories |
-| Stored in separate projects when configured? | **Yes**, when `defaultProjectId` or payload project is set | Segregation tests passed |
-| Source website clearly displayed? | **Partial** — dictionary Source = “Website”; specific site name/UTM **not** in lead detail UI | `lead-detail-panel.tsx` shows Source label + Project only |
-| Filter / report / export by website? | **Partial** — filter by project + dictionary source; export includes leads/attributes/integrations but not a website-specific export UI | leads list, dashboard sources, workspace export |
-| User defines destination per website? | **Partial** — API `PATCH defaultProjectId`; **Settings UI does not expose it** | `integrations.ts` vs `integrations-panel.tsx` |
+| Stored in separate projects when configured? | **Yes**, via `defaultProjectId` / locked routing | Segregation tests + Settings UI |
+| Source website clearly displayed? | **Yes** — Website attribution on lead detail | `lead-detail-panel.tsx` |
+| Filter / report / export by website? | **Partial** — filter by website + UTM + project; export is workspace-wide admin JSON | leads list + `/export` |
+| User defines destination per website? | **Yes** — Settings create/configure + public DTO | `integrations-panel.tsx`, `toIntegrationPublicRecord` |
 
 **Test evidence summary (2026-07-28):**
 
@@ -284,64 +284,51 @@ Log: /opt/cursor/artifacts/lead-integration-investigation-evidence.log
 
 ### Connecting a new website (**Exists**)
 
-1. Settings → Integrations → create type `website` (name e.g. “Website Lead Capture”).
-2. Copy one-time API key `evocrm_whk_…` and webhook URL.
-3. Configure the external site to POST JSON with Bearer key.
-4. Pause / resume / rotate / archive from UI; view recent logs.
+See **Current implementation protocol** above and `docs/website-lead-capture-setup.md`. Settings → Integrations supports create (name + default project), Configure (routing + mode-aware examples), pause/rotate/archive, and logs.
 
-### Gaps affecting auditability / misconfiguration risk
+### Gaps affecting auditability / misconfiguration risk (post-remediation)
 
 | Gap | Impact | Status |
 |-----|--------|--------|
-| No UI for `defaultProjectId` | Multi-project workspaces fail capture or require every form to send project | **Partial** |
-| Public integration DTO omits `defaultProjectId` | Admins cannot see mapping in API/UI | **Partial** |
-| Example payload omits `projectId` / `projectReference` | Docs/UI examples under-document routing | **Partial** |
-| No website→project matrix screen | Hard to audit which site feeds which project | **Missing** |
-| Lead detail hides integration metadata | Operators cannot see which site/campaign produced a lead | **Missing** |
-| Membership has no project scope | Agents with `lead:read` see all projects’ leads | **Missing** |
+| Project-scoped memberships | Agents with `lead:read` can see all projects’ leads | **Missing** (deferred P2) |
+| Selective per-website export UI | Admins use workspace export only | **Partial** |
+| Humanized consent/status labels | Raw enums in some places | **Partial** (deferred P2) |
+| lead:read-safe website name map | Custom roles without `settings:read` see warnings + raw ids | **Partial** (warning now shown) |
 
 ### Permissions relevant to leads
 
 | Role | lead:read | Can restrict to one project? | Can manage integrations? |
 |------|-----------|------------------------------|--------------------------|
 | Owner/Admin | Yes | No | Yes (`settings:update`) |
-| Agent | Yes | No | No (settings:read only) |
+| Agent | Yes | No | No (`settings:read` only) |
 | Viewer | Yes | No | No |
 
 ---
 
-## 7. Issues list
+## 7. Issues list (remaining after remediation)
 
 ### Technical
 
-1. Integration API key is not locked to `defaultProjectId`; payload can retarget any workspace project.
-2. Email uniqueness is workspace-scoped, not project-scoped → cross-project duplicate “hijack.”
-3. Duplicate email returns existing lead **without merging** new message/UTM into the record.
-4. `propertyReference` never resolves to a Property document.
-5. MLS / Google Ads / Meta Ads integrations are placeholders only.
-6. No outbound webhook reliability (retries, DLQ) for CRM→site; inbound retries are caller-owned.
-7. Docs (`api-contracts.md` optional field list) omit `projectId` / `projectReference` despite code support.
+1. Duplicate email returns existing lead **without merging** new message/UTM into the record.
+2. `propertyReference` never resolves to a Property document.
+3. MLS / Google Ads / Meta Ads integrations are placeholders only.
+4. No outbound webhook reliability (retries, DLQ) for CRM→site; inbound retries are caller-owned.
 
 ### Security
 
-1. Long-lived static API keys (hashed at rest) — no OAuth, no request signing, no key scoped permissions beyond “capture lead in this workspace.”
-2. Cross-project injection via compromised or misconfigured site form (`projectId` override).
-3. No project-level authorization — any member with `lead:read` can access all project leads if they clear/change the UI filter or call the API without `projectId`.
-4. Rate limit is IP + key based (good) but no per-workspace quota / anomaly alerting UI beyond integration logs.
+1. Long-lived static API keys (hashed at rest) — no OAuth / request signing.
+2. No project-level authorization — any member with `lead:read` can access all project leads if they clear the UI filter or call the API without `projectId`.
+3. Rate limit is IP + key based; no per-workspace anomaly alerting UI beyond integration logs.
 
 ### Usability
 
-1. Settings UI cannot set/view default project for a website integration.
-2. Lead UI does not surface website name, UTM, external id, or form idempotency key.
-3. No filter by integration / campaign UTM / form.
-4. Example curl/payload incomplete for multi-project setups.
+1. Humanize status/consent labels (deferred).
+2. Custom roles without `settings:read` cannot populate website name filter (warning surfaced).
 
 ### Data governance / compliance
 
-1. Webhook does not accept or require marketing consent; defaults to `unknown`.
-2. No purpose-of-processing or lawful-basis capture on inbound leads.
-3. Audit logs exist for receive/create/duplicate/fail (**Exists**) but operators lack an attribution audit view in the lead UI.
-4. Export is workspace-wide (admin) — not a per-website/project selective lead export in the leads UI.
+1. Webhook accepts optional consent but does not require it.
+2. Export is workspace-wide (admin) — not a per-website selective lead export in the leads UI.
 
 ---
 
@@ -351,56 +338,49 @@ Compared to common capabilities in HubSpot, Salesforce, Pipedrive, Dynamics, Zoh
 
 | Capability | Industry norm | Evohome CRM today | Gap |
 |------------|---------------|-------------------|-----|
-| Lead-source attribution | Channel + campaign + form | Dictionary `website` + UTM in attributes | Medium — storage Partial, UI Missing |
-| Project / campaign segmentation | Native objects + reporting | Project hard; campaign = UTM string | Medium–High |
+| Lead-source attribution | Channel + campaign + form | Dictionary `website` + UTM + attribution UI | Low–Medium |
+| Project / campaign segmentation | Native objects + reporting | Project hard; campaign = UTM string | Medium |
 | Custom fields & mapping | Mapper UI per form | Fixed Zod schema; `attributes` bag | Medium |
-| Multi-account / multi-project separation | Portals, teams, record sharing | Workspace + project field; no sharing rules | High |
+| Multi-account / multi-project separation | Portals, teams, record sharing | Workspace + project lock; no sharing rules | High |
 | API security | OAuth, scoped tokens, signing | Static hashed API key | Medium |
 | Webhook reliability | Retries, signatures, DLQ | Rate limit + logs; no signature | Medium |
-| Duplicate management | Configurable rules, merge UI | Email unique + idempotency; no merge | High |
-| Audit logs | Entity history | Integration + audit actions | Low–Medium (exists, limited UI) |
-| Consent / GDPR | Explicit capture & suppress | Field exists; webhook ignores | High |
+| Duplicate management | Configurable rules, merge UI | Per-project email unique + idempotency; no merge | Medium–High |
+| Audit logs | Entity history | Integration + audit actions | Low–Medium |
+| Consent / GDPR | Explicit capture & suppress | Optional `emailConsentStatus` on webhook | Medium |
 | Error monitoring | Alerts / dashboards | Integration logs in settings | Medium |
-| Integration documentation | Public developer docs | In-app example + internal `api-contracts.md` | Medium |
+| Integration documentation | Public developer docs | Setup guide + in-app protocol + `api-contracts.md` | Low–Medium |
 | Scalability | Queues, async ingest | Sync request path; Mongo rate counters | Low for current scale |
 | RBAC | Team / pipeline / record ACL | Workspace roles only | High for multi-project agencies |
-| Reporting by source/website/campaign/project | Standard | Project + dictionary source; not by website/UTM | Medium–High |
+| Reporting by source/website/campaign/project | Standard | Project + website + UTM filters; limited reports | Medium |
 
-**Overall maturity:** Solid foundation for a single-agency multi-project CRM with website capture, but **below professional multi-site / multi-client separation standards** until project locking, attribution UI, consent, and access control are completed.
+**Overall maturity:** Solid multi-project website capture with technical lock and attribution. Remaining enterprise gaps: project ACL, merge UI, OAuth/signing, selective export.
 
 ---
 
-## 9. Prioritised recommendations
+## 9. Prioritised recommendations (remaining)
 
 ### Critical
 
-1. **Lock website integrations to an allowlist of projects** (at minimum enforce `defaultProjectId` unless admin enables “allow payload project override”). Reject Website A → Project B by default.
-2. **Revisit workspace-wide email uniqueness** for multi-project agencies: either scope uniqueness to project, or return a conflict that preserves intended project attribution instead of silently returning another project’s lead.
-3. **Expose and require `defaultProjectId` in Settings UI** for every website integration in multi-project workspaces; show website→project mapping clearly.
+None open for the original segregation brief after remediation.
 
 ### High
 
-4. Surface `attributes.integration` on lead detail (website/integration name, UTM, externalId, propertyReference).
-5. Add lead list filters: integrationId / website, UTM campaign.
-6. Accept optional consent fields on the webhook; store and honour them for campaigns.
-7. Document `projectId` / `projectReference` in public contracts and in-app examples.
-8. Include `defaultProjectId` on `IntegrationPublicRecord` for auditability.
+1. Project-scoped memberships / record ACL for multi-project agencies.
+2. lead:read-safe website name resolution (avoid `settings:read` dependency).
 
 ### Medium
 
-9. Optional project-scoped memberships or “assigned projects” for agents/viewers.
-10. Configurable duplicate rules + merge UI (message/UTM append on duplicate).
-11. Resolve `propertyReference` to Property when unique within project/workspace.
-12. Add request signing (HMAC) or rotating short-lived tokens for higher-security sites.
-13. Per-project / per-integration selective export from leads UI.
-14. Alerting when integration error rate spikes.
+3. Configurable duplicate merge (append message/UTM).
+4. Resolve `propertyReference` to Property when unique.
+5. Request signing (HMAC) or rotating short-lived tokens.
+6. Per-project / per-integration selective export from leads UI.
 
 ### Low
 
-15. First-class `form_id` / landing-page registry.
-16. Embeddable form snippet / JS SDK.
-17. Implement real MLS / Google Ads / Meta Ads inbound (currently placeholders).
-18. Async ingest queue for very high volume sites.
+7. Humanize consent/status labels.
+8. First-class `form_id` / landing-page registry.
+9. Embeddable form snippet / JS SDK.
+10. Real MLS / Google Ads / Meta Ads inbound.
 
 ---
 
@@ -460,23 +440,24 @@ Compared to common capabilities in HubSpot, Salesforce, Pipedrive, Dynamics, Zoh
 | `server/services/website-lead-capture.ts` | Capture + project resolution |
 | `server/validation/website-lead-capture.ts` | Payload schema |
 | `server/services/integration-api-keys.ts` | Key generate/hash/parse |
-| `server/services/integrations.ts` | CRUD; public DTO omits defaultProjectId |
+| `server/services/integrations.ts` | CRUD; public DTO includes `defaultProjectId` + `allowProjectOverride` |
 | `models/lead.ts` / `models/integration.ts` | Persistence |
-| `components/settings/integrations-panel.tsx` | Connect websites UI |
-| `components/leads/leads-panel.tsx` / `lead-detail-panel.tsx` | List/detail |
+| `components/settings/integrations-panel.tsx` | Connect websites UI + setup protocol |
+| `components/leads/leads-panel.tsx` / `lead-detail-panel.tsx` | List/detail + attribution/filters |
+| `docs/website-lead-capture-setup.md` | Canonical setup protocol |
 | `components/layout/project-filter.tsx` | Global project UX filter |
 | `server/permissions/roles.ts` | Workspace RBAC |
 | `tests/unit/website-lead-multi-site-segregation.test.ts` | Practical multi-site tests |
 
-## Appendix B — Existence summary for investigation questions
+## Appendix B — Existence summary (post-remediation)
 
 | Question | Verdict |
 |----------|---------|
-| Can Website A send exclusively to Project A? | **Partial** — yes via `defaultProjectId`, but override possible |
-| Can Website B send exclusively to Project B? | **Partial** — same |
+| Can Website A send exclusively to Project A? | **Exists** when override locked + `defaultProjectId=A` |
+| Can Website B send exclusively to Project B? | **Exists** (same pattern) |
 | Can several websites feed the same project? | **Exists** |
-| Can one website feed different projects by page/form/params? | **Exists** via payload (also the risk vector) |
-| Separation enforced technically? | **Partial** — workspace hard; project soft/overridable |
-| Risk of mix / misattribution / duplicate / exposure? | **Yes** — documented above |
-| Users filter/report/export/manage by website or project? | Project **Exists**; website **Missing**/Partial |
-| Permissions prevent viewing other projects’ leads? | **Missing** |
+| Can one website feed different projects by page/form/params? | **Exists** only when `allowProjectOverride` enabled |
+| Separation enforced technically? | **Exists** for lock; override is admin opt-in |
+| Risk of mix / misattribution / duplicate / exposure? | **Reduced** — lock + per-project email; remaining: no project ACL |
+| Users filter/report/export/manage by website or project? | Project + website + UTM filter **Exists**; selective export **Partial** |
+| Permissions prevent viewing other projects’ leads? | **Missing** (workspace roles only) |

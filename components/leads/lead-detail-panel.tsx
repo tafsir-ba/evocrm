@@ -113,6 +113,7 @@ export function LeadDetailPanel({
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [integrationNames, setIntegrationNames] = useState<Record<string, string>>({});
+  const [integrationNamesWarning, setIntegrationNamesWarning] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -154,10 +155,22 @@ export function LeadDetailPanel({
     let cancelled = false;
 
     async function loadIntegrations() {
+      setIntegrationNamesWarning(null);
+
       try {
         const response = await fetch(`${apiBase}/integrations?type=website`);
         const payload = await response.json();
-        if (!response.ok || cancelled) {
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          setIntegrationNames({});
+          setIntegrationNamesWarning(
+            response.status === 403
+              ? "Website names unavailable — requires settings:read. Showing integration id when present."
+              : "Could not resolve website integration names.",
+          );
           return;
         }
 
@@ -170,7 +183,9 @@ export function LeadDetailPanel({
         }
         setIntegrationNames(next);
       } catch {
-        // Attribution still works with raw integration ids.
+        if (!cancelled) {
+          setIntegrationNamesWarning("Could not resolve website integration names.");
+        }
       }
     }
 
@@ -452,6 +467,11 @@ export function LeadDetailPanel({
                             <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-3">
                               Website attribution
                             </p>
+                            {integrationNamesWarning && (
+                              <p className="text-[12px] text-[var(--color-ink-muted)] mb-3">
+                                {integrationNamesWarning}
+                              </p>
+                            )}
                           </div>
                           <Info label="Website integration" value={websiteName ?? "—"} />
                           <Info

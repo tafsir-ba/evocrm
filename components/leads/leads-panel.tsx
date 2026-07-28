@@ -89,7 +89,9 @@ export function LeadsPanel({
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
   const [websiteIntegrations, setWebsiteIntegrations] = useState<WebsiteIntegrationOption[]>(
     [],
-  );  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(() => new Set());
+  );
+  const [websiteOptionsWarning, setWebsiteOptionsWarning] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(() => new Set());
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -98,6 +100,8 @@ export function LeadsPanel({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const loadOptions = useCallback(async () => {
+    setWebsiteOptionsWarning(null);
+
     try {
       const [statusRes, sourceRes, tagsRes, integrationsRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
@@ -128,9 +132,19 @@ export function LeadsPanel({
             (integration) => ({ id: integration.id, name: integration.name }),
           ),
         );
+      } else if (integrationsRes.status === 403) {
+        setWebsiteIntegrations([]);
+        setWebsiteOptionsWarning(
+          "Website filter unavailable — requires settings:read to list integrations.",
+        );
+      } else {
+        setWebsiteIntegrations([]);
+        setWebsiteOptionsWarning(
+          integrationsPayload.error?.message ?? "Could not load website integrations for filtering.",
+        );
       }
     } catch {
-      // Options are non-blocking for list view.
+      setWebsiteOptionsWarning("Could not load some lead filter options.");
     }
   }, [apiBase]);
 
@@ -445,6 +459,10 @@ export function LeadsPanel({
           ) : undefined
         }
       />
+
+      {websiteOptionsWarning && (
+        <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px] max-w-md">
