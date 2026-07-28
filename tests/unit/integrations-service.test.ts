@@ -42,6 +42,7 @@ const baseIntegration = {
   credentialsEncrypted: null,
   apiKeyHash: "hashed-key",
   defaultProjectId: null,
+  allowProjectOverride: false,
   createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -98,6 +99,8 @@ describe("integrations service", () => {
     const publicRecord = toIntegrationPublicRecord(baseIntegration);
 
     expect(publicRecord).not.toHaveProperty("apiKeyHash");
+    expect(publicRecord.defaultProjectId).toBeNull();
+    expect(publicRecord.allowProjectOverride).toBe(false);
     expect(publicRecord).not.toHaveProperty("credentialsEncrypted");
     expect(publicRecord.hasApiKey).toBe(true);
   });

@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import {
+  ProjectSelector,
+  type ProjectSelectorProject,
+} from "@/components/domain/project-selector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconGoogle } from "@/lib/icons";
@@ -18,6 +22,8 @@ type IntegrationRecord = {
   name: string;
   status: "active" | "paused" | "archived" | "error";
   hasApiKey: boolean;
+  defaultProjectId: string | null;
+  allowProjectOverride: boolean;
   createdAt: string;
   archivedAt: string | null;
 };
@@ -57,6 +63,8 @@ const EXAMPLE_PAYLOAD = {
   budgetMin: 800000,
   budgetMax: 1200000,
   propertyReference: "GV-APT-12",
+  projectId: "REPLACE_WITH_PROJECT_ID_IF_OVERRIDE_ENABLED",
+  emailConsentStatus: "subscribed",
   utm: {
     source: "google",
     medium: "cpc",
@@ -66,6 +74,7 @@ const EXAMPLE_PAYLOAD = {
 
 export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPanelProps) {
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -73,6 +82,10 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   const [logs, setLogs] = useState<IntegrationLogRecord[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [newWebsiteName, setNewWebsiteName] = useState("Website Lead Capture");
+  const [newDefaultProjectId, setNewDefaultProjectId] = useState<string | null>(null);
+  const [editDefaultProjectId, setEditDefaultProjectId] = useState<string | null>(null);
+  const [editAllowOverride, setEditAllowOverride] = useState(false);
+  const [routingSaving, setRoutingSaving] = useState(false);
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -81,6 +94,18 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     typeof window !== "undefined"
       ? `${window.location.origin}/api/integrations/website/leads`
       : "/api/integrations/website/leads";
+
+  const loadProjects = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBase}/projects`);
+      const payload = await response.json();
+      if (response.ok) {
+        setProjects(payload.data.projects as ProjectSelectorProject[]);
+      }
+    } catch {
+      // Non-blocking for integrations list.
+    }
+  }, [apiBase]);
 
   const loadIntegrations = useCallback(async () => {
     setLoading(true);
@@ -132,7 +157,8 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
 
   useEffect(() => {
     void loadIntegrations();
-  }, [loadIntegrations]);
+    void loadProjects();
+  }, [loadIntegrations, loadProjects]);
 
   useEffect(() => {
     if (selectedId) {
@@ -147,11 +173,31 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     [integrations, selectedId],
   );
 
+  useEffect(() => {
+    if (!selectedIntegration || selectedIntegration.type !== "website") {
+      return;
+    }
+
+    setEditDefaultProjectId(selectedIntegration.defaultProjectId);
+    setEditAllowOverride(selectedIntegration.allowProjectOverride);
+  }, [selectedIntegration]);
+
   const websiteIntegrations = integrations.filter((integration) => integration.type === "website");
   const configuredTypes = new Set(integrations.map((integration) => integration.type));
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of projects) {
+      map.set(
+        project.id,
+        project.reference ? `${project.name} (${project.reference})` : project.name,
+      );
+    }
+    return map;
+  }, [projects]);
 
   async function createWebsiteIntegration() {
     setActionMessage(null);
+    setError(null);
 
     const response = await fetch(`${apiBase}/integrations`, {
       method: "POST",
@@ -159,6 +205,8 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       body: JSON.stringify({
         type: "website",
         name: newWebsiteName.trim() || "Website Lead Capture",
+        defaultProjectId: newDefaultProjectId,
+        allowProjectOverride: false,
       }),
     });
 
@@ -175,11 +223,14 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     }
 
     setSelectedId(payload.data.integration.id as string);
+    setNewWebsiteName("Website Lead Capture");
+    setNewDefaultProjectId(null);
     await loadIntegrations();
   }
 
   async function createPlaceholder(type: IntegrationRecord["type"], name: string) {
     setActionMessage(null);
+    setError(null);
 
     const response = await fetch(`${apiBase}/integrations`, {
       method: "POST",
@@ -203,6 +254,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     status: IntegrationRecord["status"],
   ) {
     setActionMessage(null);
+    setError(null);
 
     const response = await fetch(`${apiBase}/integrations/${integrationId}`, {
       method: "PATCH",
@@ -220,6 +272,35 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     await loadIntegrations();
   }
 
+  async function saveWebsiteRouting(integrationId: string) {
+    setRoutingSaving(true);
+    setActionMessage(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`${apiBase}/integrations/${integrationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultProjectId: editDefaultProjectId,
+          allowProjectOverride: editAllowOverride,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to save project routing.");
+        return;
+      }
+
+      setActionMessage("Website project routing saved.");
+      await loadIntegrations();
+    } finally {
+      setRoutingSaving(false);
+    }
+  }
+
   async function archiveIntegration(integrationId: string, name: string) {
     const confirmed = window.confirm(`Archive "${name}"? Inbound payloads will be rejected.`);
 
@@ -228,6 +309,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     }
 
     setActionMessage(null);
+    setError(null);
 
     const response = await fetch(`${apiBase}/integrations/${integrationId}`, {
       method: "DELETE",
@@ -249,6 +331,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
 
   async function rotateApiKey(integrationId: string) {
     setActionMessage(null);
+    setError(null);
 
     const response = await fetch(`${apiBase}/integrations/${integrationId}/rotate-api-key`, {
       method: "POST",
@@ -323,37 +406,50 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       )}
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
-              Website lead capture
-            </h2>
-            <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
-              Authenticated webhook endpoint for inbound website form submissions.
-            </p>
-          </div>
+        <div>
+          <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
+            Website lead capture
+          </h2>
+          <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
+            Authenticated webhook for inbound website forms. Each website integration routes leads
+            to a default project unless override is explicitly enabled.
+          </p>
         </div>
 
         <Card>
           <div className="space-y-4">
             <Info label="Webhook endpoint" value={webhookUrl} />
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-              Authenticate with <code className="text-[12px]">Authorization: Bearer &lt;apiKey&gt;</code>.
+              Authenticate with{" "}
+              <code className="text-[12px]">Authorization: Bearer &lt;apiKey&gt;</code>.
             </p>
 
             {canUpdate && (
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-[240px] flex-1">
-                  <label className="text-[12px] font-medium text-[var(--color-ink-muted)]">
-                    Integration name
-                  </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div>
+                  <Label htmlFor="new-website-name">Integration name</Label>
                   <Input
+                    id="new-website-name"
                     value={newWebsiteName}
                     onChange={(event) => setNewWebsiteName(event.target.value)}
                     placeholder="Website Lead Capture"
                   />
                 </div>
-                <Button onClick={() => void createWebsiteIntegration()}>Create website integration</Button>
+                <div>
+                  <Label htmlFor="new-default-project">Default project</Label>
+                  <ProjectSelector
+                    projects={projects}
+                    selectedProjectId={newDefaultProjectId}
+                    onChange={setNewDefaultProjectId}
+                    placeholder="Select destination project"
+                    emptyLabel="Create a project before connecting a website."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Button onClick={() => void createWebsiteIntegration()}>
+                    Create website integration
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -380,9 +476,14 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
-          Connected integrations
-        </h2>
+        <div>
+          <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
+            Connected integrations
+          </h2>
+          <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
+            Website destination project is shown for each connection so routing stays auditable.
+          </p>
+        </div>
 
         {integrations.length === 0 ? (
           <EmptyState
@@ -421,6 +522,17 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                     <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
                       Created {new Date(integration.createdAt).toLocaleString()}
                     </p>
+                    {integration.type === "website" && (
+                      <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
+                        Destination:{" "}
+                        {integration.defaultProjectId
+                          ? (projectNameById.get(integration.defaultProjectId) ??
+                            integration.defaultProjectId)
+                          : "Auto (single project) / unset"}
+                        {" · "}
+                        Override: {integration.allowProjectOverride ? "allowed" : "locked"}
+                      </p>
+                    )}
                     {integration.type === "website" && integration.hasApiKey && !revealedApiKey && (
                       <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
                         API key cannot be viewed again. Rotate to generate a new key.
@@ -429,8 +541,12 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setSelectedId(integration.id)}>
-                      View logs
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setSelectedId(integration.id)}
+                    >
+                      {integration.type === "website" ? "Configure" : "View logs"}
                     </Button>
                     {canUpdate && integration.type === "website" && integration.status !== "archived" && (
                       <>
@@ -478,8 +594,8 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
           Placeholder integrations — not available yet
         </h2>
         <p className="text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
-          MLS, Google Ads, and Meta Ads appear here for planning only. They are not
-          production integrations in V1 — only website lead capture is live.
+          MLS, Google Ads, and Meta Ads appear here for planning only. They are not production
+          integrations in V1 — only website lead capture is live.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <PlaceholderCard
@@ -512,17 +628,73 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
           <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
             Website integration details
           </h2>
-          <Card className="space-y-4">
-            <Info label="Selected integration" value={selectedIntegration.name} />
-            <div className="flex flex-wrap gap-2">
+          <Card>
+            <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
+              {selectedIntegration.name}
+            </h4>
+            <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+              Configure which CRM project receives leads from this website. Keep override locked
+              unless one website must deliberately feed multiple projects.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-default-project">Default project</Label>
+                <ProjectSelector
+                  projects={projects}
+                  selectedProjectId={editDefaultProjectId}
+                  onChange={setEditDefaultProjectId}
+                  disabled={!canUpdate || routingSaving}
+                  placeholder="Select destination project"
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-start gap-2 text-[13px] text-[var(--color-ink)]">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={editAllowOverride}
+                    disabled={!canUpdate || routingSaving}
+                    onChange={(event) => setEditAllowOverride(event.target.checked)}
+                  />
+                  <span>
+                    Allow payload <code className="text-[12px]">projectId</code> /{" "}
+                    <code className="text-[12px]">projectReference</code> override
+                    <span className="block text-[12px] text-[var(--color-ink-muted)] mt-0.5">
+                      When off, Website A cannot send leads into another project.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {canUpdate && (
+              <div className="mt-4">
+                <Button
+                  size="sm"
+                  disabled={routingSaving}
+                  onClick={() => void saveWebsiteRouting(selectedIntegration.id)}
+                >
+                  {routingSaving ? "Saving…" : "Save project routing"}
+                </Button>
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--color-line)] pt-4">
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => void copyText("Example payload", JSON.stringify(EXAMPLE_PAYLOAD, null, 2))}
+                onClick={() =>
+                  void copyText("Example payload", JSON.stringify(EXAMPLE_PAYLOAD, null, 2))
+                }
               >
                 Copy example payload
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => void copyText("Example curl", exampleCurl)}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void copyText("Example curl", exampleCurl)}
+              >
                 Copy example curl
               </Button>
             </div>
@@ -580,7 +752,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
 
       {websiteIntegrations.length > 0 && !selectedId && (
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-          Select an integration and use View logs to inspect sanitized webhook activity.
+          Select a website integration and use Configure to set project routing and inspect logs.
         </p>
       )}
     </div>

@@ -17,6 +17,10 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import {
+  formatLeadUtmSummary,
+  readLeadIntegrationAttributes,
+} from "@/lib/lead-integration-attributes";
+import {
   labelPropertyTypeInterest,
   labelTransactionIntent,
   labelUsagePurpose,
@@ -64,6 +68,8 @@ type LeadDetail = {
   assignedUser: { id: string; name: string | null; email: string } | null;
   statusId: string;
   sourceId: string | null;
+  attributes?: Record<string, unknown> | null;
+  emailConsentStatus?: "unknown" | "subscribed" | "unsubscribed" | null;
 };
 
 type LeadDetailPanelProps = {
@@ -106,6 +112,7 @@ export function LeadDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [integrationNames, setIntegrationNames] = useState<Record<string, string>>({});
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -142,6 +149,36 @@ export function LeadDetailPanel({
   useEffect(() => {
     void loadLead();
   }, [loadLead]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadIntegrations() {
+      try {
+        const response = await fetch(`${apiBase}/integrations?type=website`);
+        const payload = await response.json();
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        const next: Record<string, string> = {};
+        for (const integration of payload.data.integrations as Array<{
+          id: string;
+          name: string;
+        }>) {
+          next[integration.id] = integration.name;
+        }
+        setIntegrationNames(next);
+      } catch {
+        // Attribution still works with raw integration ids.
+      }
+    }
+
+    void loadIntegrations();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
 
   async function handleArchive() {
     if (!lead || !canArchive) {
@@ -229,6 +266,11 @@ export function LeadDetailPanel({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const integrationAttrs = readLeadIntegrationAttributes(lead.attributes);
+  const websiteName = integrationAttrs?.integrationId
+    ? (integrationNames[integrationAttrs.integrationId] ?? integrationAttrs.integrationId)
+    : null;
 
   return (
     <>
@@ -377,6 +419,10 @@ export function LeadDetailPanel({
                       />
                       <Info label="Status" value={lead.status?.label ?? "—"} />
                       <Info
+                        label="Email consent"
+                        value={lead.emailConsentStatus ?? "unknown"}
+                      />
+                      <Info
                         label="Property type interests"
                         value={
                           lead.propertyTypeInterests.length > 0
@@ -400,6 +446,36 @@ export function LeadDetailPanel({
                           lead.usagePurpose ? labelUsagePurpose(lead.usagePurpose) : "—"
                         }
                       />
+                      {integrationAttrs && (
+                        <>
+                          <div className="md:col-span-2 border-t border-[var(--color-line)] pt-4">
+                            <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-3">
+                              Website attribution
+                            </p>
+                          </div>
+                          <Info label="Website integration" value={websiteName ?? "—"} />
+                          <Info
+                            label="Inbound source"
+                            value={integrationAttrs.inboundSource ?? "—"}
+                          />
+                          <Info
+                            label="Campaign / UTM"
+                            value={formatLeadUtmSummary(integrationAttrs.utm)}
+                          />
+                          <Info
+                            label="Property reference"
+                            value={integrationAttrs.propertyReference ?? "—"}
+                          />
+                          <Info
+                            label="External ID"
+                            value={integrationAttrs.externalId ?? "—"}
+                          />
+                          <Info
+                            label="Idempotency key"
+                            value={integrationAttrs.idempotencyKey ?? "—"}
+                          />
+                        </>
+                      )}
                     </div>
                   ),
                 },

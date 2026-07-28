@@ -44,12 +44,42 @@ export async function resolveWebsiteLeadProjectId(input: {
   payload: Pick<WebsiteLeadCaptureInput, "projectId" | "projectReference">;
 }): Promise<string> {
   const { workspaceId, integration, payload } = input;
+  const allowOverride = integration.allowProjectOverride === true;
+  const hasPayloadProjectId = Boolean(payload.projectId);
+  const hasPayloadProjectReference = Boolean(payload.projectReference?.trim());
 
-  if (payload.projectId && payload.projectReference?.trim()) {
+  if (hasPayloadProjectId && hasPayloadProjectReference) {
     throw new AppError(
       "VALIDATION_ERROR",
       "Provide either projectId or projectReference, not both.",
     );
+  }
+
+  if (!allowOverride && (hasPayloadProjectId || hasPayloadProjectReference)) {
+    const lockedProjectId = await resolveLockedDefaultProjectId(workspaceId, integration);
+
+    if (payload.projectId && payload.projectId !== lockedProjectId) {
+      throw new AppError(
+        "FORBIDDEN",
+        "This website integration is locked to its default project. Remove projectId from the payload, or enable project override in CRM settings.",
+      );
+    }
+
+    if (payload.projectReference?.trim()) {
+      const project = await findProjectByReference(
+        workspaceId,
+        payload.projectReference.trim(),
+      );
+
+      if (!project || project.archivedAt || project.id !== lockedProjectId) {
+        throw new AppError(
+          "FORBIDDEN",
+          "This website integration is locked to its default project. Remove projectReference from the payload, or enable project override in CRM settings.",
+        );
+      }
+    }
+
+    return lockedProjectId;
   }
 
   if (payload.projectId) {
@@ -81,6 +111,13 @@ export async function resolveWebsiteLeadProjectId(input: {
     return project.id;
   }
 
+  return resolveLockedDefaultProjectId(workspaceId, integration);
+}
+
+async function resolveLockedDefaultProjectId(
+  workspaceId: string,
+  integration: IntegrationRecord,
+): Promise<string> {
   if (integration.defaultProjectId) {
     const project = await findProjectById(workspaceId, integration.defaultProjectId);
 
@@ -109,7 +146,7 @@ export async function resolveWebsiteLeadProjectId(input: {
 
   throw new AppError(
     "VALIDATION_ERROR",
-    "Multiple active projects exist. Provide projectId or projectReference in the payload, or set a default project on the website integration.",
+    "Multiple active projects exist. Set a default project on the website integration, or enable project override and provide projectId or projectReference in the payload.",
   );
 }
 
@@ -255,12 +292,23 @@ export async function captureWebsiteLead(
 
   await ensureDefaultDictionaries(workspaceId, integration.createdBy);
 
+  const projectId = await resolveWebsiteLeadProjectId({
+    workspaceId,
+    integration,
+    payload: {
+      projectId: input.projectId,
+      projectReference: input.projectReference,
+    },
+  });
+
   const emailFields = input.email ? normalizeLeadEmail(input.email) : null;
 
   if (emailFields?.emailNormalized) {
     const duplicateLead = await findActiveLeadByEmailNormalized(
       workspaceId,
       emailFields.emailNormalized,
+      undefined,
+      projectId,
     );
 
     if (duplicateLead) {
@@ -297,14 +345,6 @@ export async function captureWebsiteLead(
 
   const statusId = await resolveDefaultLeadStatusId(workspaceId);
   const sourceId = await resolveWebsiteLeadSourceId(workspaceId);
-  const projectId = await resolveWebsiteLeadProjectId({
-    workspaceId,
-    integration,
-    payload: {
-      projectId: input.projectId,
-      projectReference: input.projectReference,
-    },
-  });
   const attributes = buildIntegrationAttributes(integration, input, idempotencyKey);
 
   let result;
@@ -322,6 +362,7 @@ export async function captureWebsiteLead(
       budgetMax: input.budgetMax,
       preferredAreas: input.preferredAreas,
       notes: input.message,
+      emailConsentStatus: input.emailConsentStatus,
       attributes,
     });
   } catch (error) {
@@ -369,6 +410,8 @@ export async function captureWebsiteLead(
         const duplicateLead = await findActiveLeadByEmailNormalized(
           workspaceId,
           emailFields.emailNormalized,
+          undefined,
+          projectId,
         );
 
         if (duplicateLead) {

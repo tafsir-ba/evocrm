@@ -115,6 +115,7 @@ const websiteA = {
   credentialsEncrypted: null,
   apiKeyHash: "hash:key-a",
   defaultProjectId: PROJECT_A,
+  allowProjectOverride: false,
   createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date(),
@@ -337,7 +338,10 @@ describe("multi-website lead segregation (investigation)", () => {
     expect(projects).toEqual([PROJECT_A, PROJECT_A]);
   });
 
-  it("allows one website to feed different projects via projectId / projectReference", async () => {
+  it("allows one website to feed different projects when override is enabled", async () => {
+    const overrideWebsite = { ...websiteA, allowProjectOverride: true };
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue(overrideWebsite);
+
     await captureWebsiteLead("key-a", {
       firstName: "Page",
       lastName: "A",
@@ -355,13 +359,32 @@ describe("multi-website lead segregation (investigation)", () => {
     expect(projects).toEqual([PROJECT_A, PROJECT_B]);
   });
 
-  it("RISK: Website A can deliberately submit a lead into Project B via payload projectId", async () => {
-    // There is no technical lock binding an integration API key to its defaultProjectId.
-    // Any active project in the same workspace is accepted if supplied in the payload.
+  it("blocks Website A from submitting into Project B when project override is locked", async () => {
+    await expect(
+      captureWebsiteLead("key-a", {
+        firstName: "Cross",
+        lastName: "Project",
+        email: "cross@site-a.test",
+        projectId: PROJECT_B,
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: expect.stringContaining("locked to its default project"),
+    });
+
+    expect(createLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("allows Website A into Project B only when allowProjectOverride is enabled", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...websiteA,
+      allowProjectOverride: true,
+    });
+
     const result = await captureWebsiteLead("key-a", {
       firstName: "Cross",
-      lastName: "Project",
-      email: "cross@site-a.test",
+      lastName: "Allowed",
+      email: "cross-allowed@site-a.test",
       projectId: PROJECT_B,
     });
 
@@ -379,10 +402,15 @@ describe("multi-website lead segregation (investigation)", () => {
   });
 
   it("rejects unknown project ids (cannot target projects outside the workspace)", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...websiteA,
+      allowProjectOverride: true,
+    });
+
     await expect(
       resolveWebsiteLeadProjectId({
         workspaceId: "ws-1",
-        integration: websiteA,
+        integration: { ...websiteA, allowProjectOverride: true },
         payload: { projectId: "cccccccccccccccccccccccc" },
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
@@ -408,13 +436,36 @@ describe("multi-website lead segregation (investigation)", () => {
     expect(createLeadForWorkspace).not.toHaveBeenCalled();
   });
 
-  it("RISK: workspace-wide email dedupe can return a lead from another project", async () => {
-    // Email uniqueness is scoped to workspaceId, not projectId.
-    // A Website A submission with an email already on Project B returns the Project B lead.
+  it("scopes email dedupe to the target project (same email allowed across projects)", async () => {
+    vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
+
+    await captureWebsiteLead("key-a", {
+      firstName: "Shared",
+      lastName: "Email",
+      email: "shared@example.com",
+    });
+
+    expect(findActiveLeadByEmailNormalized).toHaveBeenCalledWith(
+      "ws-1",
+      "shared@example.com",
+      undefined,
+      PROJECT_A,
+    );
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({
+        projectId: PROJECT_A,
+        email: "shared@example.com",
+      }),
+    );
+  });
+
+  it("returns duplicate when the same email already exists in the target project", async () => {
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(
       makeLead({
-        id: "lead-on-project-b",
-        projectId: PROJECT_B,
+        id: "lead-on-project-a",
+        projectId: PROJECT_A,
         email: "shared@example.com",
         emailNormalized: "shared@example.com",
       }) as never,
@@ -427,7 +478,7 @@ describe("multi-website lead segregation (investigation)", () => {
     });
 
     expect(result).toEqual({
-      leadId: "lead-on-project-b",
+      leadId: "lead-on-project-a",
       duplicate: true,
       idempotent: false,
     });
@@ -454,7 +505,7 @@ describe("multi-website lead segregation (investigation)", () => {
       }),
     ).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
-      message: expect.stringContaining("Multiple active projects"),
+      message: expect.stringContaining("default project"),
     });
   });
 
@@ -496,6 +547,7 @@ describe("multi-website lead segregation (investigation)", () => {
       idempotencyKey: "idem-99",
       source: "landing-hero",
       propertyReference: "PA-200",
+      emailConsentStatus: "subscribed",
       utm: {
         source: "google",
         medium: "cpc",
@@ -510,6 +562,7 @@ describe("multi-website lead segregation (investigation)", () => {
       "user-1",
       expect.objectContaining({
         projectId: PROJECT_A,
+        emailConsentStatus: "subscribed",
         attributes: {
           integration: {
             integrationId: "int-website-a",

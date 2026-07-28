@@ -26,14 +26,26 @@ export const createIntegrationInputSchema = z
   .object({
     type: z.enum(INTEGRATION_TYPES),
     name: z.string().trim().min(1).max(120),
+    defaultProjectId: objectIdSchema.nullable().optional(),
+    allowProjectOverride: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      value.type === "website" ||
+      (value.defaultProjectId === undefined && value.allowProjectOverride === undefined),
+    {
+      message: "Project routing fields are only supported for website integrations.",
+      path: ["defaultProjectId"],
+    },
+  );
 
 export const updateIntegrationInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     status: z.enum(INTEGRATION_STATUSES).optional(),
     defaultProjectId: objectIdSchema.nullable().optional(),
+    allowProjectOverride: z.boolean().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

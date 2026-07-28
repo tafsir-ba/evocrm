@@ -31,6 +31,7 @@ export type IntegrationRecord = {
   credentialsEncrypted: string | null;
   apiKeyHash: string | null;
   defaultProjectId: string | null;
+  allowProjectOverride: boolean;
   createdBy: string;
   archivedAt: Date | null;
   createdAt: Date;
@@ -47,6 +48,7 @@ function toIntegrationRecord(document: IntegrationDocument): IntegrationRecord {
     credentialsEncrypted: document.credentialsEncrypted ?? null,
     apiKeyHash: document.apiKeyHash ?? null,
     defaultProjectId: document.defaultProjectId?.toString() ?? null,
+    allowProjectOverride: Boolean(document.allowProjectOverride),
     createdBy: document.createdBy.toString(),
     archivedAt: document.archivedAt ?? null,
     createdAt: document.createdAt,
@@ -140,6 +142,8 @@ export async function createIntegration(input: {
   name: string;
   status: IntegrationStatus;
   apiKeyHash?: string | null;
+  defaultProjectId?: string | null;
+  allowProjectOverride?: boolean;
   createdBy: string;
 }): Promise<IntegrationRecord> {
   await connectDb();
@@ -151,6 +155,8 @@ export async function createIntegration(input: {
       name: input.name.trim(),
       status: input.status,
       apiKeyHash: input.apiKeyHash ?? null,
+      defaultProjectId: input.defaultProjectId ?? null,
+      allowProjectOverride: input.allowProjectOverride ?? false,
       createdBy: input.createdBy,
     });
 
@@ -172,6 +178,7 @@ export async function updateIntegration(
     status?: IntegrationStatus;
     apiKeyHash?: string | null;
     defaultProjectId?: string | null;
+    allowProjectOverride?: boolean;
     archivedAt?: Date | null;
   },
 ): Promise<IntegrationRecord | null> {

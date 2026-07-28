@@ -2,10 +2,27 @@
 
 **Product:** Evohome CRM (`evocrm`)  
 **Date:** 2026-07-28  
+**Updated:** 2026-07-28 — remediation applied on branch `cursor/website-lead-integration-investigation-2bb6`  
 **Scope:** How external websites capture and route leads into the CRM; whether leads are correctly separated, attributed, and stored by website/project.  
-**Method:** Codebase review (models, services, APIs, UI, permissions, docs) + automated practical tests (59 unit tests including a new 13-case multi-website segregation suite).  
-**Evidence log:** `/opt/cursor/artifacts/lead-integration-investigation-evidence.log`  
+**Method:** Codebase review (models, services, APIs, UI, permissions, docs) + automated practical tests (multi-website segregation suite).  
+**Evidence log:** `docs/investigations/test-evidence.log`  
 **Segregation test suite:** `tests/unit/website-lead-multi-site-segregation.test.ts`
+
+## Remediation status (applied)
+
+| Issue | Fix |
+|-------|-----|
+| Website A could post into Project B via payload | **Fixed** — integrations default to `allowProjectOverride: false`; cross-project payload returns `403 FORBIDDEN` |
+| Workspace-wide email dedupe misattributed leads | **Fixed** — uniqueness is now `workspaceId + projectId + emailNormalized` |
+| `defaultProjectId` hidden from API/UI | **Fixed** — exposed on public DTO; Settings UI configure + create flows |
+| Website/UTM not visible on lead | **Fixed** — lead detail shows Website attribution section |
+| No website / UTM filters | **Fixed** — leads list filters by website integration + UTM campaign |
+| Consent not accepted on webhook | **Fixed** — optional `emailConsentStatus` on capture payload |
+| Integrations UI inconsistent | **Fixed** — Label/ProjectSelector patterns aligned with other settings panels |
+
+**Ops note:** Deployments that already created the old unique email index must drop `workspaceId_1_emailNormalized_1` (partial unique) so the new `workspaceId_1_projectId_1_emailNormalized_1` index can apply.
+
+---
 
 **Status legend used below**
 

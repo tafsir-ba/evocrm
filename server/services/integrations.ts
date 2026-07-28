@@ -32,6 +32,8 @@ export type IntegrationPublicRecord = {
   name: string;
   status: IntegrationStatus;
   hasApiKey: boolean;
+  defaultProjectId: string | null;
+  allowProjectOverride: boolean;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +58,8 @@ export function toIntegrationPublicRecord(
     name: integration.name,
     status: integration.status,
     hasApiKey: integration.type === "website" && Boolean(integration.apiKeyHash),
+    defaultProjectId: integration.defaultProjectId,
+    allowProjectOverride: integration.allowProjectOverride,
     createdBy: integration.createdBy,
     createdAt: integration.createdAt,
     updatedAt: integration.updatedAt,
@@ -69,6 +73,8 @@ function integrationSnapshot(integration: IntegrationRecord): Record<string, unk
     name: integration.name,
     status: integration.status,
     hasApiKey: Boolean(integration.apiKeyHash),
+    defaultProjectId: integration.defaultProjectId,
+    allowProjectOverride: integration.allowProjectOverride,
   };
 }
 
@@ -125,12 +131,19 @@ export async function createIntegrationForWorkspace(
     apiKeyHash = hashIntegrationApiKey(rawApiKey);
   }
 
+  if (input.defaultProjectId) {
+    await validateActiveProjectId(workspaceId, input.defaultProjectId);
+  }
+
   const integration = await createIntegration({
     workspaceId,
     type: input.type,
     name: input.name,
     status: defaultStatusForType(input.type),
     apiKeyHash,
+    defaultProjectId: input.type === "website" ? (input.defaultProjectId ?? null) : null,
+    allowProjectOverride:
+      input.type === "website" ? (input.allowProjectOverride ?? false) : false,
     createdBy: actorId,
   });
 
@@ -161,6 +174,16 @@ export async function updateIntegrationForWorkspace(
     throw new AppError("NOT_FOUND", "Integration not found.");
   }
 
+  if (
+    existing.type !== "website" &&
+    (input.defaultProjectId !== undefined || input.allowProjectOverride !== undefined)
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Project routing fields are only supported for website integrations.",
+    );
+  }
+
   if (input.defaultProjectId) {
     await validateActiveProjectId(workspaceId, input.defaultProjectId);
   }
@@ -170,6 +193,9 @@ export async function updateIntegrationForWorkspace(
     ...(input.status !== undefined ? { status: input.status } : {}),
     ...(input.defaultProjectId !== undefined
       ? { defaultProjectId: input.defaultProjectId }
+      : {}),
+    ...(input.allowProjectOverride !== undefined
+      ? { allowProjectOverride: input.allowProjectOverride }
       : {}),
   });
 

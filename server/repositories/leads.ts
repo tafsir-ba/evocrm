@@ -115,6 +115,8 @@ export type LeadListFilter = {
   propertyTypeInterest?: PropertyTypeInterest;
   transactionIntent?: TransactionIntent;
   usagePurpose?: UsagePurpose;
+  integrationId?: string;
+  utmCampaign?: string;
   createdFrom?: Date;
   createdTo?: Date;
   excludeIds?: string[];
@@ -157,6 +159,12 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   }
   if (filter.usagePurpose) {
     query.usagePurpose = filter.usagePurpose;
+  }
+  if (filter.integrationId) {
+    query["attributes.integration.integrationId"] = filter.integrationId;
+  }
+  if (filter.utmCampaign?.trim()) {
+    query["attributes.integration.utm.campaign"] = filter.utmCampaign.trim();
   }
 
   if (filter.createdFrom || filter.createdTo) {
@@ -278,6 +286,7 @@ export async function findActiveLeadByEmailNormalized(
   workspaceId: string,
   emailNormalized: string,
   excludeLeadId?: string,
+  projectId?: string,
 ): Promise<LeadRecord | null> {
   await connectDb();
   const query: Record<string, unknown> = {
@@ -286,6 +295,9 @@ export async function findActiveLeadByEmailNormalized(
   };
   if (excludeLeadId) {
     query._id = { $ne: excludeLeadId };
+  }
+  if (projectId) {
+    query.projectId = projectId;
   }
 
   const document = await LeadModel.findOne(

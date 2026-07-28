@@ -55,6 +55,8 @@ export const leadListQuerySchema = z.object({
   propertyTypeInterest: z.enum(PROPERTY_TYPE_INTERESTS).optional(),
   transactionIntent: transactionIntentSchema.optional(),
   usagePurpose: usagePurposeSchema.optional(),
+  integrationId: objectIdSchema.optional(),
+  utmCampaign: z.string().trim().min(1).max(120).optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
 });
