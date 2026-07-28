@@ -587,20 +587,24 @@ Immutable audit trail for sensitive actions.
 
 ### Integration
 
-External system connection (settings/internal in V1).
+External system connection (settings/internal in V1). Website lead capture is the only production inbound type in V1.
 
 | Field | Description |
 |-------|-------------|
 | `workspaceId` | |
 | `type` | `mls`, `website`, `google_ads`, `meta_ads` |
 | `name` | |
-| `status` | |
-| `credentialsEncrypted` | Encrypted credential blob |
+| `status` | `active`, `paused`, `archived`, `error` |
+| `credentialsEncrypted` | Encrypted credential blob (unused for website) |
 | `apiKeyHash` | Hashed API key for webhook validation |
+| `defaultProjectId` | Destination project for website inbound leads |
+| `allowProjectOverride` | When `false` (default), payload cannot retarget another project |
 | `createdBy` | |
 | `createdAt` | |
 | `updatedAt` | |
 | `archivedAt` | Set when archived (soft delete) |
+
+Setup protocol: `docs/website-lead-capture-setup.md`.
 
 ---
 

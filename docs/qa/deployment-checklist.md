@@ -84,6 +84,8 @@ Production startup **fails fast** if required production keys are missing (`serv
     (or rely on built-in internal cron — enabled by default in production when CRON_SECRET is set;
      disable with CAMPAIGN_CRON_INTERNAL=false if using an external scheduler)
 [ ] Website integration URL documented for clients: POST /api/integrations/website/leads
+[ ] Client docs include default-project + omit-projectId-when-locked protocol (`docs/website-lead-capture-setup.md`)
+[ ] `npm run migrate:lead-email-index` run (or confirmed N/A) for project-scoped email uniqueness
 ```
 
 ---

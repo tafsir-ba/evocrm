@@ -50,7 +50,7 @@ type IntegrationsPanelProps = {
   canUpdate: boolean;
 };
 
-const EXAMPLE_PAYLOAD = {
+const LOCKED_EXAMPLE_PAYLOAD = {
   externalId: "form-submit-123",
   idempotencyKey: "form-submit-123",
   firstName: "John",
@@ -63,14 +63,28 @@ const EXAMPLE_PAYLOAD = {
   budgetMin: 800000,
   budgetMax: 1200000,
   propertyReference: "GV-APT-12",
-  projectId: "REPLACE_WITH_PROJECT_ID_IF_OVERRIDE_ENABLED",
   emailConsentStatus: "subscribed",
   utm: {
     source: "google",
     medium: "cpc",
     campaign: "spring-buyers",
   },
-};
+} as const;
+
+const OVERRIDE_EXAMPLE_PAYLOAD = {
+  ...LOCKED_EXAMPLE_PAYLOAD,
+  projectId: "507f1f77bcf86cd799439011",
+} as const;
+
+const SETUP_STEPS = [
+  "Create (or select) the destination project under Settings → Projects.",
+  "Create a website integration below and set its default project.",
+  "Copy the one-time API key immediately — it cannot be viewed again.",
+  "Keep project override locked unless one website must feed multiple projects.",
+  "POST form submissions to the webhook with Bearer auth. Required: firstName, lastName, and email or phone.",
+  "When override is locked, omit projectId / projectReference from the payload.",
+  "Confirm the lead appears under the destination project and check Configure → logs.",
+] as const;
 
 export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPanelProps) {
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
@@ -198,6 +212,18 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   async function createWebsiteIntegration() {
     setActionMessage(null);
     setError(null);
+
+    if (projects.length === 0) {
+      setError("Create a project before connecting a website.");
+      return;
+    }
+
+    if (projects.length > 1 && !newDefaultProjectId) {
+      setError(
+        "Select a default project. Multi-project workspaces require a destination before the API key is issued.",
+      );
+      return;
+    }
 
     const response = await fetch(`${apiBase}/integrations`, {
       method: "POST",
@@ -358,10 +384,37 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     }
   }
 
-  const exampleCurl = `curl -X POST '${webhookUrl}' \\
+  const examplePayload = useMemo(() => {
+    if (selectedIntegration?.type === "website" && selectedIntegration.allowProjectOverride) {
+      return {
+        ...OVERRIDE_EXAMPLE_PAYLOAD,
+        ...(selectedIntegration.defaultProjectId
+          ? { projectId: selectedIntegration.defaultProjectId }
+          : {}),
+      };
+    }
+
+    return { ...LOCKED_EXAMPLE_PAYLOAD };
+  }, [selectedIntegration]);
+
+  const exampleCurl = useMemo(
+    () => `curl -X POST '${webhookUrl}' \\
   -H 'Authorization: Bearer YOUR_API_KEY' \\
   -H 'Content-Type: application/json' \\
-  -d '${JSON.stringify(EXAMPLE_PAYLOAD)}'`;
+  -d '${JSON.stringify(examplePayload)}'`,
+    [examplePayload, webhookUrl],
+  );
+
+  const exampleModeNote =
+    selectedIntegration?.type === "website" && selectedIntegration.allowProjectOverride
+      ? "Override is enabled for this integration — include a valid projectId (or projectReference) that exists in this workspace."
+      : "Override is locked — omit projectId / projectReference. Leads route to the integration default project.";
+
+  const requiresDefaultProject = projects.length > 1;
+  const createDisabled =
+    !canUpdate ||
+    projects.length === 0 ||
+    (requiresDefaultProject && !newDefaultProjectId);
 
   if (forbidden) {
     return (
@@ -411,17 +464,28 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
             Website lead capture
           </h2>
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
-            Authenticated webhook for inbound website forms. Each website integration routes leads
-            to a default project unless override is explicitly enabled.
+            Authenticated webhook for inbound website forms. Each website integration is locked to
+            its default project unless you explicitly enable override.
           </p>
         </div>
+
+        <Card>
+          <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">Setup protocol</h4>
+          <ol className="mt-3 list-decimal pl-5 space-y-1.5 text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
+            {SETUP_STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </Card>
 
         <Card>
           <div className="space-y-4">
             <Info label="Webhook endpoint" value={webhookUrl} />
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
               Authenticate with{" "}
-              <code className="text-[12px]">Authorization: Bearer &lt;apiKey&gt;</code>.
+              <code className="text-[12px]">Authorization: Bearer &lt;apiKey&gt;</code>
+              {" "}or{" "}
+              <code className="text-[12px]">X-Integration-Key: &lt;apiKey&gt;</code>.
             </p>
 
             {canUpdate && (
@@ -436,7 +500,9 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                   />
                 </div>
                 <div>
-                  <Label htmlFor="new-default-project">Default project</Label>
+                  <Label htmlFor="new-default-project">
+                    Default project{requiresDefaultProject ? " (required)" : ""}
+                  </Label>
                   <ProjectSelector
                     id="new-default-project"
                     projects={projects}
@@ -445,9 +511,17 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                     placeholder="Select destination project"
                     emptyLabel="Create a project before connecting a website."
                   />
+                  <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                    {requiresDefaultProject
+                      ? "Required when the workspace has multiple active projects."
+                      : "Recommended. If unset with a single active project, capture uses that project automatically."}
+                  </p>
                 </div>
                 <div className="md:col-span-2">
-                  <Button onClick={() => void createWebsiteIntegration()}>
+                  <Button
+                    disabled={createDisabled}
+                    onClick={() => void createWebsiteIntegration()}
+                  >
                     Create website integration
                   </Button>
                 </div>
@@ -462,9 +536,30 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 <code className="block text-[12px] break-all text-[var(--color-ink)]">
                   {revealedApiKey}
                 </code>
-                <div className="flex gap-2">
+                <p className="text-[12px] text-[var(--color-brand-800)]">
+                  Next: POST to the webhook with this key. Leave projectId out of the payload while
+                  override stays locked.
+                </p>
+                <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => void copyText("API key", revealedApiKey)}>
                     Copy API key
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      void copyText(
+                        "Minimal curl",
+                        `curl -X POST '${webhookUrl}' \\\n  -H 'Authorization: Bearer ${revealedApiKey}' \\\n  -H 'Content-Type: application/json' \\\n  -d '${JSON.stringify({
+                          firstName: "John",
+                          lastName: "Smith",
+                          email: "john@example.com",
+                          idempotencyKey: "form-submit-123",
+                        })}'`,
+                      )
+                    }
+                  >
+                    Copy working curl
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => setRevealedApiKey(null)}>
                     Dismiss
@@ -682,23 +777,36 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
               </div>
             )}
 
-            <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--color-line)] pt-4">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  void copyText("Example payload", JSON.stringify(EXAMPLE_PAYLOAD, null, 2))
-                }
-              >
-                Copy example payload
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void copyText("Example curl", exampleCurl)}
-              >
-                Copy example curl
-              </Button>
+            <div className="mt-5 space-y-3 border-t border-[var(--color-line)] pt-4">
+              <div>
+                <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
+                  Integrator example
+                </p>
+                <p className="text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
+                  Required fields: <code className="text-[12px]">firstName</code>,{" "}
+                  <code className="text-[12px]">lastName</code>, and{" "}
+                  <code className="text-[12px]">email</code> or{" "}
+                  <code className="text-[12px]">phone</code>. {exampleModeNote}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    void copyText("Example payload", JSON.stringify(examplePayload, null, 2))
+                  }
+                >
+                  Copy example payload
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void copyText("Example curl", exampleCurl)}
+                >
+                  Copy example curl
+                </Button>
+              </div>
             </div>
           </Card>
         </section>

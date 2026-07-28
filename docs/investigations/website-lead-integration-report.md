@@ -34,7 +34,34 @@
 
 ---
 
-## Executive verdict
+## Current implementation protocol (source of truth)
+
+> Prefer **`docs/website-lead-capture-setup.md`** and Settings → Integrations UI for operator steps. Sections below the remediation table retain historical investigation detail and may lag; treat this block as current.
+
+### Admin steps
+
+1. Create destination project (Settings → Projects).
+2. Settings → Integrations → create website integration with **default project** (required if multi-project).
+3. Copy one-time API key.
+4. Leave override **locked** unless one site must feed multiple projects.
+5. Website POSTs to `/api/integrations/website/leads` with Bearer key.
+6. When locked: **omit** `projectId` / `projectReference`.
+7. Verify lead under destination project + integration logs.
+
+### Integrator payload (locked)
+
+Required: `firstName`, `lastName`, and `email` or `phone`. Do not send `projectId` while override is locked.
+
+### Multi-website matrix (current)
+
+| Website | Integration default | Override | Result |
+|---------|---------------------|----------|--------|
+| A | Project A | locked | A → A only |
+| B | Project B | locked | B → B only |
+| A (mis-sent `projectId=B`) | Project A | locked | `403 FORBIDDEN` |
+| A | Project A | enabled | May target any active workspace project via payload |
+
+---
 
 Leads are workspace- and project-scoped. Website integrations authenticate with per-integration API keys and are **locked to `defaultProjectId` by default** (`allowProjectOverride: false`). Cross-project payload targeting returns `403 FORBIDDEN` unless an admin enables override. Email uniqueness is **per project**. Attribution metadata (integration id, UTM, free-text source, property reference) is stored on the lead and shown in lead detail; leads list can filter by website integration and UTM campaign.
 
