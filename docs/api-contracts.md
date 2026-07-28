@@ -194,9 +194,9 @@ DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
 | PATCH update | `lead:update` |
 | DELETE archive | `lead:archive` |
 
-**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `createdFrom`, `createdTo`, `includeArchived`.
+**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `includeArchived`.
 
-**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
+**POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email **in the same project** returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
 
 **DELETE** sets `archivedAt`; does not hard-delete.
 
@@ -745,7 +745,20 @@ Permissions:
 - `settings:read` — list/get integrations and logs
 - `settings:update` — create/update/archive/rotate API key
 
-Management responses expose `IntegrationPublicRecord` only (no `apiKeyHash`, no `credentialsEncrypted`, no stored raw API key). Website create/rotate responses may include `apiKey` once.
+Management responses expose `IntegrationPublicRecord` only (no `apiKeyHash`, no `credentialsEncrypted`, no stored raw API key). Website create/rotate responses may include `apiKey` once. Public records include `defaultProjectId` and `allowProjectOverride` for website routing auditability.
+
+**Create website integration (`POST …/integrations`):**
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `type` | yes | `"website"` |
+| `name` | yes | Display name |
+| `defaultProjectId` | conditional | Required when the workspace has multiple active projects and override is off |
+| `allowProjectOverride` | no | Defaults to `false` (locked) |
+
+**PATCH website integration:** may update `name`, `status` (`active`/`paused`/`error`), `defaultProjectId`, `allowProjectOverride`. Clearing `defaultProjectId` while locked in a multi-project workspace is rejected.
+
+**Admin/integrator setup protocol:** see `docs/website-lead-capture-setup.md`.
 
 Website lead capture (public webhook, not workspaceSlug-based):
 
@@ -768,11 +781,20 @@ Success response:
 }
 ```
 
-Duplicate email or repeated idempotency key returns HTTP 200 with `duplicate: true` (and `idempotent: true` when the same integration + idempotency key was already processed). Workspace is derived from the active website integration matched by hashed API key — never from the request body.
+Duplicate email (same project) or repeated idempotency key returns HTTP 200 with `duplicate: true` (and `idempotent: true` when the same integration + idempotency key was already processed). Workspace is derived from the active website integration matched by hashed API key — never from the request body.
 
-Required payload fields: `firstName`, `lastName`, and at least one of `email` or `phone`. Optional: `externalId`, `idempotencyKey`, `message`, `source`, `preferredAreas`, `budgetMin`, `budgetMax`, `propertyReference`, `utm`.
+Required payload fields: `firstName`, `lastName`, and at least one of `email` or `phone`. Optional: `externalId`, `idempotencyKey`, `message`, `source`, `preferredAreas`, `budgetMin`, `budgetMax`, `propertyReference`, `projectId`, `projectReference`, `emailConsentStatus`, `utm`.
 
 Inbound leads set `sourceId` from dictionary item `lead_source` key `website` when available. UTM/external metadata is stored in `Lead.attributes.integration`.
+
+**Project routing:** Website integrations are locked to `defaultProjectId` by default (`allowProjectOverride: false`).
+
+| Override | Payload `projectId` / `projectReference` |
+|----------|------------------------------------------|
+| Locked (`false`) | **Omit** both fields (or send the exact default). Mismatched project → `403 FORBIDDEN`. |
+| Enabled (`true`) | Provide either `projectId` or `projectReference` for an active workspace project. |
+
+Email uniqueness is scoped per project (`workspaceId + projectId + emailNormalized`).
 
 **Rate limiting:** `POST /api/integrations/website/leads` enforces **60 requests per minute** on two buckets before authentication: always per client IP, and additionally per supplied API key hash when a bearer/header key is present. This prevents invalid-key spam from bypassing limits by rotating fake bearer tokens. Excess requests return HTTP 429 with error code `RATE_LIMITED` and optional `retryAfterSeconds` in `details`. Counters are stored in MongoDB in production (shared across instances); tests use an in-process store.
 
@@ -856,7 +878,7 @@ UI: floating widget on authenticated workspace shell; platform admin menu at `/a
 
 Website lead capture accepts `idempotencyKey` in the JSON body (or falls back to `externalId`). The server stores metadata in `Lead.attributes.integration` and replays the existing lead when the same integration + key is seen again.
 
-Duplicate normalized email within a workspace returns the existing lead reference with `duplicate: true` instead of creating a second lead.
+Duplicate normalized email within the same project returns the existing lead reference with `duplicate: true` instead of creating a second lead.
 
 Optional HTTP header pattern for future endpoints:
 

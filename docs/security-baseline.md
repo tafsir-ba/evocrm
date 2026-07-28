@@ -346,7 +346,7 @@ Authorization: Bearer <CRON_SECRET>
 - Website webhook authentication: `Authorization: Bearer <apiKey>` (or `X-Integration-Key`).
 - Workspace for inbound leads is derived from the integration record — never trusted from payload.
 - Paused/archived/error integrations cannot process inbound website leads.
-- Idempotency via `Lead.attributes.integration.idempotencyKey` with a **unique** partial index on `workspaceId + integrationId + idempotencyKey` (non-archived leads); duplicate normalized email returns existing lead reference.
+- Idempotency via `Lead.attributes.integration.idempotencyKey` with a **unique** partial index on `workspaceId + integrationId + idempotencyKey` (non-archived leads); duplicate normalized email returns an existing lead reference **within the same project**.
 - Website lead webhook rate limiting: **60 requests per minute** per client IP for all requests, plus an additional **60 requests per minute** per supplied API key hash when a bearer/header key is present (before key validation). Excess requests return `RATE_LIMITED` (HTTP 429). Production uses MongoDB-backed counters (`RateLimitBucket` collection with TTL); tests use an in-process fallback. Complement with edge/WAF limits for defense in depth.
 - Website lead webhook pre-parse guard: reject `Content-Length` above **64 KB** before `request.json()`.
 

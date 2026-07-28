@@ -21,6 +21,7 @@ import {
   hashIntegrationApiKey,
 } from "@/server/services/integration-api-keys";
 import { validateActiveProjectId } from "@/server/services/project-scope";
+import { findProjects } from "@/server/repositories/projects";
 import type {
   CreateIntegrationInput,
   UpdateIntegrationInput,
@@ -32,6 +33,8 @@ export type IntegrationPublicRecord = {
   name: string;
   status: IntegrationStatus;
   hasApiKey: boolean;
+  defaultProjectId: string | null;
+  allowProjectOverride: boolean;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +59,8 @@ export function toIntegrationPublicRecord(
     name: integration.name,
     status: integration.status,
     hasApiKey: integration.type === "website" && Boolean(integration.apiKeyHash),
+    defaultProjectId: integration.defaultProjectId,
+    allowProjectOverride: integration.allowProjectOverride,
     createdBy: integration.createdBy,
     createdAt: integration.createdAt,
     updatedAt: integration.updatedAt,
@@ -69,6 +74,8 @@ function integrationSnapshot(integration: IntegrationRecord): Record<string, unk
     name: integration.name,
     status: integration.status,
     hasApiKey: Boolean(integration.apiKeyHash),
+    defaultProjectId: integration.defaultProjectId,
+    allowProjectOverride: integration.allowProjectOverride,
   };
 }
 
@@ -89,6 +96,29 @@ function auditActionForStatusChange(
   }
 
   return "integration.updated";
+}
+
+async function assertWebsiteDefaultProjectConfigured(
+  workspaceId: string,
+  defaultProjectId: string | null | undefined,
+  allowProjectOverride: boolean,
+): Promise<void> {
+  if (allowProjectOverride) {
+    return;
+  }
+
+  if (defaultProjectId) {
+    return;
+  }
+
+  const projects = await findProjects(workspaceId, { includeArchived: false });
+
+  if (projects.length > 1) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Set a default project for this website integration when the workspace has multiple active projects.",
+    );
+  }
 }
 
 export async function listIntegrationsForWorkspace(
@@ -125,12 +155,31 @@ export async function createIntegrationForWorkspace(
     apiKeyHash = hashIntegrationApiKey(rawApiKey);
   }
 
+  if (input.defaultProjectId) {
+    await validateActiveProjectId(workspaceId, input.defaultProjectId);
+  }
+
+  const allowProjectOverride =
+    input.type === "website" ? (input.allowProjectOverride ?? false) : false;
+  const defaultProjectId =
+    input.type === "website" ? (input.defaultProjectId ?? null) : null;
+
+  if (input.type === "website") {
+    await assertWebsiteDefaultProjectConfigured(
+      workspaceId,
+      defaultProjectId,
+      allowProjectOverride,
+    );
+  }
+
   const integration = await createIntegration({
     workspaceId,
     type: input.type,
     name: input.name,
     status: defaultStatusForType(input.type),
     apiKeyHash,
+    defaultProjectId,
+    allowProjectOverride,
     createdBy: actorId,
   });
 
@@ -161,8 +210,35 @@ export async function updateIntegrationForWorkspace(
     throw new AppError("NOT_FOUND", "Integration not found.");
   }
 
+  if (
+    existing.type !== "website" &&
+    (input.defaultProjectId !== undefined || input.allowProjectOverride !== undefined)
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Project routing fields are only supported for website integrations.",
+    );
+  }
+
   if (input.defaultProjectId) {
     await validateActiveProjectId(workspaceId, input.defaultProjectId);
+  }
+
+  const nextDefaultProjectId =
+    input.defaultProjectId !== undefined
+      ? input.defaultProjectId
+      : existing.defaultProjectId;
+  const nextAllowOverride =
+    input.allowProjectOverride !== undefined
+      ? input.allowProjectOverride
+      : existing.allowProjectOverride;
+
+  if (existing.type === "website") {
+    await assertWebsiteDefaultProjectConfigured(
+      workspaceId,
+      nextDefaultProjectId,
+      nextAllowOverride,
+    );
   }
 
   const updated = await updateIntegration(workspaceId, integrationId, {
@@ -170,6 +246,9 @@ export async function updateIntegrationForWorkspace(
     ...(input.status !== undefined ? { status: input.status } : {}),
     ...(input.defaultProjectId !== undefined
       ? { defaultProjectId: input.defaultProjectId }
+      : {}),
+    ...(input.allowProjectOverride !== undefined
+      ? { allowProjectOverride: input.allowProjectOverride }
       : {}),
   });
 

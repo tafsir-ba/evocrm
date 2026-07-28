@@ -76,6 +76,7 @@ const integration = {
   credentialsEncrypted: null,
   apiKeyHash: "hashed-key",
   defaultProjectId: null,
+  allowProjectOverride: false,
   createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date(),
@@ -496,10 +497,17 @@ describe("website lead capture service", () => {
         lastName: "Smith",
         email: "john@example.com",
       }),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("default project"),
+    });
   });
 
-  it("accepts explicit projectId from payload", async () => {
+  it("accepts explicit projectId from payload when override is enabled", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...integration,
+      allowProjectOverride: true,
+    });
     vi.mocked(findProjects).mockResolvedValue([
       activeProject,
       { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
@@ -519,10 +527,56 @@ describe("website lead capture service", () => {
     );
   });
 
-  it("accepts projectReference from payload", async () => {
+  it("allows locked payload projectId when it matches the default project", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...integration,
+      defaultProjectId: TEST_PROJECT_ID,
+      allowProjectOverride: false,
+    });
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      email: "john-match@example.com",
+      projectId: TEST_PROJECT_ID,
+    });
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+    );
+  });
+
+  it("rejects payload projectId when project override is locked", async () => {
+    vi.mocked(findActiveWebsiteIntegrationByApiKeyHash).mockResolvedValue({
+      ...integration,
+      defaultProjectId: TEST_PROJECT_ID,
+      allowProjectOverride: false,
+    });
+    vi.mocked(findProjects).mockResolvedValue([
+      activeProject,
+      { ...activeProject, id: "project-2", name: "Second Project", reference: "second" },
+    ]);
+
+    await expect(
+      captureWebsiteLead("raw-key", {
+        firstName: "John",
+        lastName: "Smith",
+        email: "john@example.com",
+        projectId: "project-2",
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("accepts projectReference from payload when override is enabled", async () => {
     await resolveWebsiteLeadProjectId({
       workspaceId: "ws-1",
-      integration,
+      integration: { ...integration, allowProjectOverride: true },
       payload: { projectReference: "default" },
     });
 
@@ -548,7 +602,7 @@ describe("website lead capture service", () => {
     await expect(
       resolveWebsiteLeadProjectId({
         workspaceId: "ws-1",
-        integration,
+        integration: { ...integration, allowProjectOverride: true },
         payload: { projectId: "archived-project" },
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
@@ -556,7 +610,7 @@ describe("website lead capture service", () => {
     await expect(
       resolveWebsiteLeadProjectId({
         workspaceId: "ws-1",
-        integration,
+        integration: { ...integration, allowProjectOverride: true },
         payload: { projectId: "missing-project" },
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });

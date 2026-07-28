@@ -112,7 +112,9 @@ You may deploy the hotfix **before** migration (reads work), but still run migra
 
 For workspaces with **multiple active projects**, configure website capture explicitly:
 
-1. Set `defaultProjectId` on the website integration (PATCH `/api/workspaces/{slug}/integrations/{id}`), **or**
-2. Send `projectId` or `projectReference` in each inbound lead payload.
+1. Set `defaultProjectId` on the website integration (required when override is locked), **or**
+2. Enable `allowProjectOverride: true` and send `projectId` **or** `projectReference` in each inbound lead payload.
 
-Silent assignment to the first active project is **not** supported.
+With override locked (the default), sending a mismatched `projectId` returns `403 FORBIDDEN`. Silent assignment to the first active project is **not** supported.
+
+See `docs/website-lead-capture-setup.md` for the full ordered protocol.

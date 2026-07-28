@@ -326,7 +326,7 @@ Demand-side record (buyer/inquirer).
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
 
-**Phase 4:** Mongoose model at `/models/lead.ts`. `fullName` derived server-side from `firstName` + `lastName`. `emailNormalized` unique per workspace for non-archived leads with email (partial unique index + service check). `phoneNormalized` stored for search; duplicate phone warns but does not block. `statusId` validated as same-workspace `lead_status` dictionary item; `sourceId` as `lead_source`. `tags[]` validated as same-workspace tags with `entityTypes` including `lead`. Archive via `DELETE` sets `archivedAt`. `Lead.notes` is a static internal field — not the future Activity type Note timeline. Assignment UI uses `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) for active member picker; create/edit send `assignedTo` validated server-side.
+**Phase 4:** Mongoose model at `/models/lead.ts`. `fullName` derived server-side from `firstName` + `lastName`. `emailNormalized` unique per **project** within a workspace for non-archived leads with email (partial unique index on `{ workspaceId, projectId, emailNormalized }` + service check). `phoneNormalized` stored for search; duplicate phone warns but does not block. `statusId` validated as same-workspace `lead_status` dictionary item; `sourceId` as `lead_source`. `tags[]` validated as same-workspace tags with `entityTypes` including `lead`. Archive via `DELETE` sets `archivedAt`. `Lead.notes` is a static internal field — not the future Activity type Note timeline. Assignment UI uses `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) for active member picker; create/edit send `assignedTo` validated server-side.
 
 ---
 
@@ -587,20 +587,24 @@ Immutable audit trail for sensitive actions.
 
 ### Integration
 
-External system connection (settings/internal in V1).
+External system connection (settings/internal in V1). Website lead capture is the only production inbound type in V1.
 
 | Field | Description |
 |-------|-------------|
 | `workspaceId` | |
 | `type` | `mls`, `website`, `google_ads`, `meta_ads` |
 | `name` | |
-| `status` | |
-| `credentialsEncrypted` | Encrypted credential blob |
+| `status` | `active`, `paused`, `archived`, `error` |
+| `credentialsEncrypted` | Encrypted credential blob (unused for website) |
 | `apiKeyHash` | Hashed API key for webhook validation |
+| `defaultProjectId` | Destination project for website inbound leads |
+| `allowProjectOverride` | When `false` (default), payload cannot retarget another project |
 | `createdBy` | |
 | `createdAt` | |
 | `updatedAt` | |
 | `archivedAt` | Set when archived (soft delete) |
+
+Setup protocol: `docs/website-lead-capture-setup.md`.
 
 ---
 

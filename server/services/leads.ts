@@ -165,6 +165,7 @@ async function validateLeadTags(
 async function assertUniqueEmail(
   workspaceId: string,
   emailNormalized: string | null | undefined,
+  projectId: string,
   excludeLeadId?: string,
 ): Promise<void> {
   if (!emailNormalized) {
@@ -175,12 +176,13 @@ async function assertUniqueEmail(
     workspaceId,
     emailNormalized,
     excludeLeadId,
+    projectId,
   );
 
   if (duplicate) {
     throw new AppError(
       "CONFLICT",
-      "A lead with this email already exists in this workspace.",
+      "A lead with this email already exists in this project.",
     );
   }
 }
@@ -374,7 +376,11 @@ export async function createLeadForWorkspace(
   const emailFields = input.email ? normalizeLeadEmail(input.email) : null;
   const phoneFields = input.phone ? normalizeLeadPhone(input.phone) : null;
 
-  await assertUniqueEmail(workspaceId, emailFields?.emailNormalized);
+  await assertUniqueEmail(
+    workspaceId,
+    emailFields?.emailNormalized,
+    input.projectId,
+  );
 
   const warnings = await checkDuplicatePhoneWarning(
     workspaceId,
@@ -500,10 +506,18 @@ export async function updateLeadForWorkspace(
       updatePayload.email = null;
       updatePayload.emailNormalized = null;
     } else {
+      if (!existing.projectId) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Lead must belong to a project before email can be updated.",
+        );
+      }
+
       const emailFields = normalizeLeadEmail(input.email);
       await assertUniqueEmail(
         workspaceId,
         emailFields.emailNormalized,
+        existing.projectId,
         leadId,
       );
       updatePayload.email = emailFields.email;
@@ -706,6 +720,8 @@ function buildBulkDeleteLeadFilter(
     propertyTypeInterest: filters.propertyTypeInterest,
     transactionIntent: filters.transactionIntent,
     usagePurpose: filters.usagePurpose,
+    integrationId: filters.integrationId,
+    utmCampaign: filters.utmCampaign,
     createdFrom: filters.createdFrom,
     createdTo: filters.createdTo,
     excludeIds: input.excludeLeadIds,

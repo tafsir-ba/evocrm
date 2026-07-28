@@ -49,6 +49,8 @@ export async function GET(request: Request, context: RouteContext) {
       propertyTypeInterest: query.propertyTypeInterest,
       transactionIntent: query.transactionIntent,
       usagePurpose: query.usagePurpose,
+      integrationId: query.integrationId,
+      utmCampaign: query.utmCampaign,
       createdFrom: query.createdFrom,
       createdTo: query.createdTo,
     });

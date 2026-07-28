@@ -12,6 +12,7 @@ const integrationSchema = new Schema(
     credentialsEncrypted: { type: String, default: null },
     apiKeyHash: { type: String, default: null },
     defaultProjectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
+    allowProjectOverride: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     archivedAt: { type: Date, default: null },
   },

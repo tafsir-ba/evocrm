@@ -30,6 +30,7 @@ export const websiteLeadCaptureInputSchema = z
     propertyReference: z.string().trim().max(120).optional(),
     projectId: objectIdSchema.optional(),
     projectReference: z.string().trim().min(1).max(120).optional(),
+    emailConsentStatus: z.enum(["unknown", "subscribed", "unsubscribed"]).optional(),
     utm: utmSchema.optional(),
   })
   .strict()

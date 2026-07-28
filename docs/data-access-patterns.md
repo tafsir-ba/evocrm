@@ -198,10 +198,10 @@ Recommended MongoDB indexes:
 { workspaceId: 1, phoneNormalized: 1 }
 { workspaceId: 1, fullName: 1 }
 { workspaceId: 1, tags: 1 }
-{ workspaceId: 1, emailNormalized: 1 }  // partial unique when emailNormalized exists and archivedAt is null
+{ workspaceId: 1, projectId: 1, emailNormalized: 1 }  // partial unique when emailNormalized exists and archivedAt is null
 ```
 
-Duplicate email: enforced in service + partial unique index on `{ workspaceId, emailNormalized }` for non-archived leads. Archived leads do not block re-creating an active lead with the same email.
+Duplicate email: enforced in service + partial unique index on `{ workspaceId, projectId, emailNormalized }` for non-archived leads. The same email may exist in different projects. Archived leads do not block re-creating an active lead with the same email in that project. Deployments upgrading from workspace-scoped uniqueness must run `npm run migrate:lead-email-index` to drop `workspaceId_1_emailNormalized_1`.
 
 Duplicate phone: service returns warning metadata only; no hard block in V1.
 

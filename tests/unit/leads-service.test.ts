@@ -243,7 +243,7 @@ describe("lead service", () => {
     });
   });
 
-  it("prevents duplicate normalized email within workspace", async () => {
+  it("prevents duplicate normalized email within the same project", async () => {
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(baseLead);
 
     await expect(
@@ -255,6 +255,13 @@ describe("lead service", () => {
         email: "john@example.com",
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+
+    expect(findActiveLeadByEmailNormalized).toHaveBeenCalledWith(
+      "ws-1",
+      "john@example.com",
+      undefined,
+      "project-1",
+    );
   });
 
   it("returns duplicate phone warning without blocking create", async () => {

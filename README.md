@@ -10,6 +10,7 @@ Phase 2 complete: Google auth (Auth.js v5), workspace creation/selection, member
 
 | Doc | Purpose |
 |-----|---------|
+| [website-lead-capture-setup.md](docs/website-lead-capture-setup.md) | Connect websites → CRM lead capture (admin + integrator protocol) |
 | [product-scope.md](docs/product-scope.md) | V1 scope, nav, MVP, delayed features |
 | [domain-model.md](docs/domain-model.md) | Entities, fields, status behavior |
 | [architecture-decisions.md](docs/architecture-decisions.md) | Stack, layering, workspace strategy |

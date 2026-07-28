@@ -7,6 +7,10 @@ vi.mock("@/server/repositories/integrations", () => ({
   updateIntegration: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/projects", () => ({
+  findProjects: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/integration-logs", () => ({
   findIntegrationLogs: vi.fn(),
 }));
@@ -20,17 +24,23 @@ vi.mock("@/server/services/integration-api-keys", () => ({
   hashIntegrationApiKey: vi.fn(() => "hashed-key"),
 }));
 
+vi.mock("@/server/services/project-scope", () => ({
+  validateActiveProjectId: vi.fn(),
+}));
+
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   createIntegration,
   findIntegrationById,
   updateIntegration,
 } from "@/server/repositories/integrations";
+import { findProjects } from "@/server/repositories/projects";
 import {
   archiveIntegrationForWorkspace,
   createIntegrationForWorkspace,
   rotateIntegrationApiKeyForWorkspace,
   toIntegrationPublicRecord,
+  updateIntegrationForWorkspace,
 } from "@/server/services/integrations";
 
 const baseIntegration = {
@@ -42,6 +52,7 @@ const baseIntegration = {
   credentialsEncrypted: null,
   apiKeyHash: "hashed-key",
   defaultProjectId: null,
+  allowProjectOverride: false,
   createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -51,6 +62,27 @@ const baseIntegration = {
 describe("integrations service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(findProjects).mockResolvedValue([
+      {
+        id: "project-1",
+        workspaceId: "ws-1",
+        name: "Only Project",
+        reference: "only",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
   });
 
   it("sets workspaceId and createdBy server-side on create", async () => {
@@ -98,6 +130,8 @@ describe("integrations service", () => {
     const publicRecord = toIntegrationPublicRecord(baseIntegration);
 
     expect(publicRecord).not.toHaveProperty("apiKeyHash");
+    expect(publicRecord.defaultProjectId).toBeNull();
+    expect(publicRecord.allowProjectOverride).toBe(false);
     expect(publicRecord).not.toHaveProperty("credentialsEncrypted");
     expect(publicRecord.hasApiKey).toBe(true);
   });
@@ -141,5 +175,114 @@ describe("integrations service", () => {
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: "integration.api_key_rotated" }),
     );
+  });
+
+  it("requires default project when creating a locked website integration in a multi-project workspace", async () => {
+    vi.mocked(findProjects).mockResolvedValue([
+      {
+        id: "project-1",
+        workspaceId: "ws-1",
+        name: "Project A",
+        reference: "a",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "project-2",
+        workspaceId: "ws-1",
+        name: "Project B",
+        reference: "b",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    await expect(
+      createIntegrationForWorkspace("ws-1", "user-1", {
+        type: "website",
+        name: "Website Lead Capture",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("default project"),
+    });
+    expect(createIntegration).not.toHaveBeenCalled();
+  });
+
+  it("rejects clearing default project while locked in a multi-project workspace", async () => {
+    vi.mocked(findIntegrationById).mockResolvedValue({
+      ...baseIntegration,
+      defaultProjectId: "project-1",
+      allowProjectOverride: false,
+    });
+    vi.mocked(findProjects).mockResolvedValue([
+      {
+        id: "project-1",
+        workspaceId: "ws-1",
+        name: "Project A",
+        reference: "a",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "project-2",
+        workspaceId: "ws-1",
+        name: "Project B",
+        reference: "b",
+        projectType: null,
+        defaultDripCampaignId: null,
+        statusId: null,
+        address: null,
+        city: null,
+        country: null,
+        description: null,
+        createdBy: "user-1",
+        ownerId: null,
+        assignedTo: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    await expect(
+      updateIntegrationForWorkspace("ws-1", "int-1", "user-1", {
+        defaultProjectId: null,
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(updateIntegration).not.toHaveBeenCalled();
   });
 });

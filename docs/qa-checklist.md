@@ -415,11 +415,15 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] `POST /api/integrations/website/leads` authenticates via API key; derives workspace from integration
 - [ ] Paused/archived/error integrations reject inbound website leads
 - [ ] Website payload requires `firstName`, `lastName`, and email or phone
+- [ ] Website integrations expose `defaultProjectId` / `allowProjectOverride`; multi-project create requires default when locked
+- [ ] Locked override rejects mismatched payload `projectId` with `403 FORBIDDEN`
+- [ ] Example/copy curl omits `projectId` when override is locked (Settings UI)
+- [ ] Setup protocol documented in `docs/website-lead-capture-setup.md`
 - [ ] Website webhook rate limited (60/min per client IP, plus 60/min per supplied API key hash)
 - [ ] Middleware public allowlist limited to `/api/integrations/website/leads`
 - [ ] Lead creation reuses lead service; source attribution via `lead_source` key `website`
 - [ ] Idempotency via `Lead.attributes.integration.idempotencyKey`
-- [ ] Duplicate normalized email returns existing lead (`duplicate: true`) without second insert
+- [ ] Duplicate normalized email returns existing lead **in the same project** (`duplicate: true`) without second insert
 - [ ] Integration logs store sanitized `payloadSummary` only
 - [ ] MLS / Google Ads / Meta Ads are placeholders only (paused, no OAuth/credentials)
 - [ ] Unit tests for workspace isolation, permissions, webhook auth, duplicate/idempotency, logging

@@ -76,7 +76,7 @@ leadSchema.index({ workspaceId: 1, propertyTypeInterests: 1 });
 leadSchema.index({ workspaceId: 1, transactionIntent: 1 });
 leadSchema.index({ workspaceId: 1, usagePurpose: 1 });
 leadSchema.index(
-  { workspaceId: 1, emailNormalized: 1 },
+  { workspaceId: 1, projectId: 1, emailNormalized: 1 },
   {
     unique: true,
     partialFilterExpression: {

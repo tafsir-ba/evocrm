@@ -46,6 +46,11 @@ type LeadListItem = {
   assignedUser: { id: string; name: string | null; email: string } | null;
 };
 
+type WebsiteIntegrationOption = {
+  id: string;
+  name: string;
+};
+
 type LeadsPanelProps = {
   workspaceSlug: string;
   canCreate: boolean;
@@ -74,12 +79,18 @@ export function LeadsPanel({
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [integrationFilter, setIntegrationFilter] = useState("");
+  const [utmCampaignFilter, setUtmCampaignFilter] = useState("");
   const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState("");
   const [transactionIntentFilter, setTransactionIntentFilter] = useState("");
   const [usagePurposeFilter, setUsagePurposeFilter] = useState("");
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [websiteIntegrations, setWebsiteIntegrations] = useState<WebsiteIntegrationOption[]>(
+    [],
+  );
+  const [websiteOptionsWarning, setWebsiteOptionsWarning] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(() => new Set());
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(() => new Set());
@@ -89,17 +100,21 @@ export function LeadsPanel({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const loadOptions = useCallback(async () => {
+    setWebsiteOptionsWarning(null);
+
     try {
-      const [statusRes, sourceRes, tagsRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes, integrationsRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
+        fetch(`${apiBase}/integrations?type=website`),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload] = await Promise.all([
+      const [statusPayload, sourcePayload, tagsPayload, integrationsPayload] = await Promise.all([
         statusRes.json(),
         sourceRes.json(),
         tagsRes.json(),
+        integrationsRes.json(),
       ]);
 
       if (statusRes.ok) {
@@ -111,8 +126,25 @@ export function LeadsPanel({
       if (tagsRes.ok) {
         setTags(tagsPayload.data.tags as Array<{ id: string; name: string }>);
       }
+      if (integrationsRes.ok) {
+        setWebsiteIntegrations(
+          (integrationsPayload.data.integrations as WebsiteIntegrationOption[]).map(
+            (integration) => ({ id: integration.id, name: integration.name }),
+          ),
+        );
+      } else if (integrationsRes.status === 403) {
+        setWebsiteIntegrations([]);
+        setWebsiteOptionsWarning(
+          "Website filter unavailable — requires settings:read to list integrations.",
+        );
+      } else {
+        setWebsiteIntegrations([]);
+        setWebsiteOptionsWarning(
+          integrationsPayload.error?.message ?? "Could not load website integrations for filtering.",
+        );
+      }
     } catch {
-      // Options are non-blocking for list view.
+      setWebsiteOptionsWarning("Could not load some lead filter options.");
     }
   }, [apiBase]);
 
@@ -155,6 +187,8 @@ export function LeadsPanel({
     sourceFilter,
     statusFilter,
     tagFilter,
+    integrationFilter,
+    utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
     projectId,
@@ -180,6 +214,8 @@ export function LeadsPanel({
     sourceFilter,
     statusFilter,
     tagFilter,
+    integrationFilter,
+    utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
   ]);
@@ -225,6 +261,12 @@ export function LeadsPanel({
     }
     if (tagFilter) {
       filters.tagId = tagFilter;
+    }
+    if (integrationFilter) {
+      filters.integrationId = integrationFilter;
+    }
+    if (utmCampaignFilter.trim()) {
+      filters.utmCampaign = utmCampaignFilter.trim();
     }
     if (propertyTypeInterestFilter) {
       filters.propertyTypeInterest = propertyTypeInterestFilter;
@@ -418,6 +460,10 @@ export function LeadsPanel({
         }
       />
 
+      {websiteOptionsWarning && (
+        <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px] max-w-md">
           <Input
@@ -478,6 +524,32 @@ export function LeadsPanel({
             </option>
           ))}
         </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[160px]"
+          value={integrationFilter}
+          onChange={(event) => {
+            setPage(1);
+            setIntegrationFilter(event.target.value);
+          }}
+        >
+          <option value="">All websites</option>
+          {websiteIntegrations.map((integration) => (
+            <option key={integration.id} value={integration.id}>
+              {integration.name}
+            </option>
+          ))}
+        </Select>
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[150px] max-w-[180px]"
+          placeholder="UTM campaign"
+          value={utmCampaignFilter}
+          onChange={(event) => {
+            setPage(1);
+            setUtmCampaignFilter(event.target.value);
+          }}
+        />
         <Select
           fieldSize="sm"
           className="w-auto min-w-[160px]"
