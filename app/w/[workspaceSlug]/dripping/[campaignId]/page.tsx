@@ -24,7 +24,7 @@ export default async function CampaignDetailPage({ params }: { params: Params })
   const permissions = access.context.membership.role.permissions;
 
   return (
-    <PageContainer>
+    <PageContainer className="min-w-0 overflow-x-hidden">
       <CampaignDetailPanel
         workspaceSlug={workspaceSlug}
         campaignId={campaignId}

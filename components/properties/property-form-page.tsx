@@ -30,6 +30,7 @@ import {
   type PropertyPhotoDraft,
   uploadPropertyPhotos,
 } from "@/lib/property-media";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -116,6 +117,7 @@ export function PropertyFormPage({
   canCreateDocument = false,
 }: PropertyFormPageProps) {
   const router = useRouter();
+  const scopedProjectId = useWorkspaceProjectFilter();
   const [form, setForm] = useState<PropertyFormInitialValues>(
     initialValues ?? emptyForm(defaultCurrency),
   );
@@ -143,37 +145,47 @@ export function PropertyFormPage({
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const [statusRes, typeRes, projectsRes, tagsRes, membersRes] = await Promise.all([
-        fetch(`${apiBase}/dictionary-items?type=property_status`),
-        fetch(`${apiBase}/dictionary-items?type=property_type`),
-        fetch(`${apiBase}/projects`),
-        fetch(`${apiBase}/tags?entityType=property`),
-        fetch(`${apiBase}/members`),
+      const loadJson = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            return { ok: false, data: null };
+          }
+          const payload = await response.json();
+          return { ok: true, data: payload?.data ?? null };
+        } catch {
+          return { ok: false, data: null };
+        }
+      };
+
+      const projectsPromise = loadJson<{ projects: ProjectSelectorProject[] }>(
+        `${apiBase}/projects`,
+      ).then((result) => {
+        if (result.ok) {
+          setProjects(result.data?.projects ?? []);
+        }
+      });
+
+      const [statusResult, typeResult, tagsResult, membersResult] = await Promise.all([
+        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=property_status`),
+        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=property_type`),
+        loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=property`),
+        loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
       ]);
 
-      const [statusPayload, typePayload, projectsPayload, tagsPayload, membersPayload] =
-        await Promise.all([
-          statusRes.json(),
-          typeRes.json(),
-          projectsRes.json(),
-          tagsRes.json(),
-          membersRes.json(),
-        ]);
+      await projectsPromise;
 
-      if (statusRes.ok) {
-        setStatuses(statusPayload.data.items as DictionaryItem[]);
+      if (statusResult.ok) {
+        setStatuses(statusResult.data?.items ?? []);
       }
-      if (typeRes.ok) {
-        setTypes(typePayload.data.items as DictionaryItem[]);
+      if (typeResult.ok) {
+        setTypes(typeResult.data?.items ?? []);
       }
-      if (projectsRes.ok) {
-        setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
+      if (tagsResult.ok) {
+        setTags(tagsResult.data?.tags ?? []);
       }
-      if (tagsRes.ok) {
-        setTags(tagsPayload.data.tags as TagSelectorTag[]);
-      }
-      if (membersRes.ok) {
-        setMembers(membersPayload.data.members as MemberSelectorMember[]);
+      if (membersResult.ok) {
+        setMembers(membersResult.data?.members ?? []);
       }
     } finally {
       setLoadingOptions(false);
@@ -201,10 +213,17 @@ export function PropertyFormPage({
       return;
     }
 
-    if (projects.length === 1) {
-      setForm((current) => ({ ...current, projectId: projects[0].id }));
+    const preferredProjectId =
+      scopedProjectId && projects.some((project) => project.id === scopedProjectId)
+        ? scopedProjectId
+        : projects.length === 1
+          ? projects[0].id
+          : "";
+
+    if (preferredProjectId) {
+      setForm((current) => ({ ...current, projectId: preferredProjectId }));
     }
-  }, [form.projectId, isEdit, projects]);
+  }, [form.projectId, isEdit, projects, scopedProjectId]);
 
   useEffect(() => {
     return () => {
@@ -423,6 +442,8 @@ export function PropertyFormPage({
               onChange={(projectId) =>
                 setForm((current) => ({ ...current, projectId: projectId ?? "" }))
               }
+              disabled={loadingOptions}
+              loading={loadingOptions}
               placeholder="No project"
             />
           </div>

@@ -1,6 +1,9 @@
+import { Suspense } from "react";
+
 import { LeadFormPage } from "@/components/leads/lead-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -39,12 +42,21 @@ export default async function NewLeadPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <LeadFormPage
-        workspaceSlug={workspaceSlug}
-        mode="create"
-        cancelHref={workspacePath(workspaceSlug, "leads")}
-        back={{ href: workspacePath(workspaceSlug, "leads"), label: "Back to leads" }}
-      />
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
+        }
+      >
+        <LeadFormPage
+          workspaceSlug={workspaceSlug}
+          mode="create"
+          cancelHref={workspacePath(workspaceSlug, "leads")}
+          back={{ href: workspacePath(workspaceSlug, "leads"), label: "Back to leads" }}
+        />
+      </Suspense>
     </PageContainer>
   );
 }

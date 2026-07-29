@@ -109,27 +109,29 @@ export function DonutChart({
             stroke="var(--color-muted)"
             strokeWidth="18"
           />
-          {data.map((d) => {
-            const len = (d.value / sum) * circumference;
-            const dashArray = `${len} ${circumference - len}`;
-            const el = (
-              <circle
-                key={d.label}
-                cx="74"
-                cy="74"
-                r={radius}
-                fill="none"
-                stroke={d.color}
-                strokeWidth="18"
-                strokeDasharray={dashArray}
-                strokeDashoffset={-offset}
-                transform="rotate(-90 74 74)"
-                strokeLinecap="butt"
-              />
-            );
-            offset += len;
-            return el;
-          })}
+          {sum > 0
+            ? data.map((d) => {
+                const len = (d.value / sum) * circumference;
+                const dashArray = `${len} ${circumference - len}`;
+                const el = (
+                  <circle
+                    key={d.label}
+                    cx="74"
+                    cy="74"
+                    r={radius}
+                    fill="none"
+                    stroke={d.color}
+                    strokeWidth="18"
+                    strokeDasharray={dashArray}
+                    strokeDashoffset={-offset}
+                    transform="rotate(-90 74 74)"
+                    strokeLinecap="butt"
+                  />
+                );
+                offset += len;
+                return el;
+              })
+            : null}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-[10.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold">
@@ -142,7 +144,7 @@ export function DonutChart({
       </div>
       <div className="flex-1 space-y-2 min-w-0">
         {data.map((d) => {
-          const pct = Math.round((d.value / sum) * 100);
+          const pct = sum > 0 ? Math.round((d.value / sum) * 100) : 0;
           return (
             <div key={d.label} className="flex items-center gap-2 text-[12.5px]">
               <span

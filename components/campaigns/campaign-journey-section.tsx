@@ -501,8 +501,8 @@ export function CampaignJourneySection({
             {orderedSteps.map((step, index) => {
               const dayOffset = calculateCampaignDayOffset(orderedSteps, step.order);
               const stepLabel = step.name || step.subject || `Email ${step.order}`;
-              const missingSubject = !step.subject.trim();
-              const missingBody = !step.body.trim();
+              const missingSubject = !step.subject?.trim();
+              const missingBody = !step.body?.trim();
               const launchIssues =
                 step.status === "ready" || step.status === "active"
                   ? getCampaignStepLaunchIssues({

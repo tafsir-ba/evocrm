@@ -388,7 +388,7 @@ export function DashboardPanel({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <Card>
               <CardHeader title="Properties by status" subtitle="Current inventory" />
-              {propertiesChartData.length > 0 ? (
+              {propertiesChartData.length > 0 && data.properties.total > 0 ? (
                 <DonutChart data={propertiesChartData} total={data.properties.total} />
               ) : (
                 <EmptyState

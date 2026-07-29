@@ -265,7 +265,13 @@ export function PipelinePanel({
   }
 
   if (!pipeline) {
-    return null;
+    return (
+      <ErrorState
+        title="Could not load pipeline"
+        description="Pipeline data is unavailable. Retry to reload opportunities by stage."
+        primaryAction={{ label: "Retry", onClick: () => void loadPipeline() }}
+      />
+    );
   }
 
   const activeValueLabel =
@@ -336,8 +342,8 @@ export function PipelinePanel({
           }
         />
       ) : (
-        <div className="-mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 overflow-x-auto pb-6">
-          <div className="grid grid-flow-col auto-cols-[280px] gap-3 min-w-fit">
+        <div className="-mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 overflow-x-auto pb-6 min-w-0 max-w-full">
+          <div className="grid grid-flow-col auto-cols-[minmax(240px,280px)] gap-3 w-max">
             {pipeline.columns.map((column) => (
               <KanbanColumn
                 key={column.status.id}

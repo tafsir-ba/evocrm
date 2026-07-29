@@ -16,6 +16,13 @@ describe("ProjectSelector", () => {
     expect(screen.getByText("No projects available")).toBeInTheDocument();
   });
 
+  it("renders loading label while projects are loading", () => {
+    render(<ProjectSelector projects={[]} loading />);
+
+    expect(screen.getByText("Loading projects…")).toBeInTheDocument();
+    expect(screen.queryByText("No projects available")).not.toBeInTheDocument();
+  });
+
   it("renders placeholder when no project is selected", () => {
     render(
       <ProjectSelector

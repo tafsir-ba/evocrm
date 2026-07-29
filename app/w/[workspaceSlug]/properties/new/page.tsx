@@ -1,8 +1,11 @@
+import { Suspense } from "react";
+
 import {
   PropertyFormPage,
 } from "@/components/properties/property-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -41,14 +44,23 @@ export default async function NewPropertyPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <PropertyFormPage
-        workspaceSlug={workspaceSlug}
-        defaultCurrency={access.context.workspace.defaultCurrency}
-        mode="create"
-        canCreateDocument={hasPermission(permissions, "document:create")}
-        cancelHref={workspacePath(workspaceSlug, "properties")}
-        back={{ href: workspacePath(workspaceSlug, "properties"), label: "Back to properties" }}
-      />
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
+        }
+      >
+        <PropertyFormPage
+          workspaceSlug={workspaceSlug}
+          defaultCurrency={access.context.workspace.defaultCurrency}
+          mode="create"
+          canCreateDocument={hasPermission(permissions, "document:create")}
+          cancelHref={workspacePath(workspaceSlug, "properties")}
+          back={{ href: workspacePath(workspaceSlug, "properties"), label: "Back to properties" }}
+        />
+      </Suspense>
     </PageContainer>
   );
 }

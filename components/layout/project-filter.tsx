@@ -58,13 +58,15 @@ export function ProjectFilter() {
   }
 
   return (
-    <div className="flex items-center gap-2 mr-2 max-w-[min(100%,220px)]">
-      <span className="text-[12px] text-[var(--color-ink-muted)]">Project</span>
-      <div className="relative">
+    <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 min-w-0 max-w-[42vw] sm:max-w-[min(100%,220px)]">
+      <span className="hidden sm:inline text-[12px] text-[var(--color-ink-muted)] shrink-0">
+        Project
+      </span>
+      <div className="relative min-w-0 flex-1">
         <select
           value={selectedProjectId ?? ""}
           onChange={(event) => onChange(event.target.value)}
-          className="h-8 pl-2.5 pr-7 rounded-md border border-[var(--color-line)] bg-white text-[13px] text-[var(--color-ink-soft)] appearance-none focus-ring"
+          className="h-8 w-full max-w-full pl-2.5 pr-7 rounded-md border border-[var(--color-line)] bg-white text-[13px] text-[var(--color-ink-soft)] appearance-none focus-ring"
           aria-label="Filter by project"
         >
           <option value="">All Projects</option>

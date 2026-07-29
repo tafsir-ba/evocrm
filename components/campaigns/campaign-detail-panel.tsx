@@ -218,9 +218,15 @@ export function CampaignDetailPanel({
 
       setCampaign(campaignPayload.data?.campaign ?? null);
       setSteps(stepsRes.ok ? (stepsPayload.data?.steps ?? []) : []);
-      setEnrollments(enrollRes.ok ? (enrollPayload.data ?? []) : []);
-      setEnrollmentCandidates(candidatesRes.ok ? (candidatesPayload.data ?? []) : []);
-      setSends(sendsRes.ok ? (sendsPayload.data ?? []) : []);
+      setEnrollments(
+        enrollRes.ok && Array.isArray(enrollPayload.data) ? enrollPayload.data : [],
+      );
+      setEnrollmentCandidates(
+        candidatesRes.ok && Array.isArray(candidatesPayload.data)
+          ? candidatesPayload.data
+          : [],
+      );
+      setSends(sendsRes.ok && Array.isArray(sendsPayload.data) ? sendsPayload.data : []);
       if (readinessRes.ok) {
         const readiness = readinessPayload.data?.readiness;
         setLaunchReady(Boolean(readiness?.ready));
@@ -799,7 +805,7 @@ export function CampaignDetailPanel({
                       </ul>
                     </td>
                     <td className="py-2">
-                      {enrollment.warnings.length > 0 ? (
+                      {enrollment.warnings?.length > 0 ? (
                         <span className="text-[11px] text-[var(--color-warning)]">
                           {enrollment.warnings.join(" ")}
                         </span>

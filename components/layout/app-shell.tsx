@@ -1,11 +1,9 @@
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { FeedbackWidget } from "@/components/feedback/feedback-widget";
-import { ProjectFilter } from "@/components/layout/project-filter";
 import { PermissionDenied } from "@/components/ui/permission-denied";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
@@ -16,7 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { permissionDenied } = useWorkspaceShell();
 
   return (
-    <div className="min-h-screen flex bg-[var(--color-canvas)]">
+    <div className="min-h-screen flex bg-[var(--color-canvas)] overflow-x-hidden">
       <div className="hidden lg:block shrink-0">
         <div className="sticky top-0 h-screen">
           <Sidebar />
@@ -25,9 +23,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden">
           {permissionDenied ? (
             <PermissionDenied
               title="Permission denied"

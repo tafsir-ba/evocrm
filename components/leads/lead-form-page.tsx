@@ -126,37 +126,49 @@ export function LeadFormPage({
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const [statusRes, sourceRes, tagsRes, membersRes, projectsRes] = await Promise.all([
-        fetch(`${apiBase}/dictionary-items?type=lead_status`),
-        fetch(`${apiBase}/dictionary-items?type=lead_source`),
-        fetch(`${apiBase}/tags?entityType=lead`),
-        fetch(`${apiBase}/members`),
-        fetch(`${apiBase}/projects`),
+      const loadJson = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            return { ok: false, data: null };
+          }
+          const payload = await response.json();
+          return { ok: true, data: payload?.data ?? null };
+        } catch {
+          return { ok: false, data: null };
+        }
+      };
+
+      // Populate projects as soon as that response arrives so the selector is not
+      // stuck on "No projects available" while dictionaries/members are still loading.
+      const projectsPromise = loadJson<{ projects: ProjectSelectorProject[] }>(
+        `${apiBase}/projects`,
+      ).then((result) => {
+        if (result.ok) {
+          setProjects(result.data?.projects ?? []);
+        }
+      });
+
+      const [statusResult, sourceResult, tagsResult, membersResult] = await Promise.all([
+        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_status`),
+        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_source`),
+        loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
+        loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload, membersPayload, projectsPayload] =
-        await Promise.all([
-        statusRes.json(),
-        sourceRes.json(),
-        tagsRes.json(),
-        membersRes.json(),
-        projectsRes.json(),
-      ]);
+      await projectsPromise;
 
-      if (statusRes.ok) {
-        setStatuses(statusPayload.data.items as DictionaryItem[]);
+      if (statusResult.ok) {
+        setStatuses(statusResult.data?.items ?? []);
       }
-      if (sourceRes.ok) {
-        setSources(sourcePayload.data.items as DictionaryItem[]);
+      if (sourceResult.ok) {
+        setSources(sourceResult.data?.items ?? []);
       }
-      if (tagsRes.ok) {
-        setTags(tagsPayload.data.tags as TagSelectorTag[]);
+      if (tagsResult.ok) {
+        setTags(tagsResult.data?.tags ?? []);
       }
-      if (membersRes.ok) {
-        setMembers(membersPayload.data.members as MemberSelectorMember[]);
-      }
-      if (projectsRes.ok) {
-        setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
+      if (membersResult.ok) {
+        setMembers(membersResult.data?.members ?? []);
       }
     } finally {
       setLoadingOptions(false);
@@ -318,6 +330,7 @@ export function LeadFormPage({
                 setForm((current) => ({ ...current, projectId: projectId ?? "" }))
               }
               disabled={loadingOptions || projects.length === 0}
+              loading={loadingOptions}
               emptyLabel="No active projects available"
             />
           </div>

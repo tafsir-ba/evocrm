@@ -15,8 +15,10 @@ export type ProjectSelectorProps = {
   selectedProjectId?: string | null;
   onChange?: (projectId: string | null) => void;
   disabled?: boolean;
+  loading?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  loadingLabel?: string;
   className?: string;
   id?: string;
   name?: string;
@@ -27,12 +29,22 @@ export function ProjectSelector({
   selectedProjectId = null,
   onChange,
   disabled = false,
+  loading = false,
   placeholder = "No project selected",
   emptyLabel = "No projects available",
+  loadingLabel = "Loading projects…",
   className,
   id,
   name,
 }: ProjectSelectorProps) {
+  if (loading && projects.length === 0) {
+    return (
+      <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
+        {loadingLabel}
+      </p>
+    );
+  }
+
   if (projects.length === 0) {
     return (
       <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
