@@ -68,6 +68,10 @@ vi.mock("@/server/email/resend", () => ({
   buildCampaignEmailHtml: vi.fn((body: string) => `<p>${body}</p>`),
 }));
 
+vi.mock("@/server/services/campaign-email-attachments", () => ({
+  loadCampaignEmailAttachments: vi.fn(async () => ({ ok: true, attachments: [] })),
+}));
+
 vi.mock("@/server/utils/unsubscribe-token", () => ({
   createUnsubscribeToken: vi.fn(() => "token"),
   buildUnsubscribeUrl: vi.fn(() => "https://app.test/unsubscribe?token=token"),

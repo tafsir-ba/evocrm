@@ -6,6 +6,7 @@ import { findCampaignById } from "@/server/repositories/campaigns";
 import { buildCampaignEmailHtml, sendCampaignEmail } from "@/server/email/resend";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
+import { loadCampaignEmailAttachments } from "@/server/services/campaign-email-attachments";
 import { applyCampaignVariables, CAMPAIGN_EMAIL_PREVIEW_CONTEXT } from "@/lib/campaign-email";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { AppError } from "@/server/errors";
@@ -60,6 +61,15 @@ export async function POST(request: Request, context: RouteContext) {
       previewText: step.previewText,
     });
 
+    const attachmentResult = await loadCampaignEmailAttachments(
+      workspace.id,
+      step.documentIds,
+    );
+
+    if (!attachmentResult.ok) {
+      throw new AppError("VALIDATION_ERROR", attachmentResult.error);
+    }
+
     const result = await sendCampaignEmail({
       to: input.to,
       subject: `[Test] ${step.subject || step.name || "Campaign email"}`,
@@ -67,6 +77,7 @@ export async function POST(request: Request, context: RouteContext) {
       text: step.bodyText ?? resolvedBody,
       fromName,
       fromEmail: campaign.senderEmail,
+      attachments: attachmentResult.attachments,
       tags: [
         { name: "workspace_id", value: workspace.id },
         { name: "campaign_id", value: campaignId },

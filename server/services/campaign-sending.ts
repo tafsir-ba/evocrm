@@ -7,6 +7,7 @@ import {
 } from "@/server/email/resend";
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
+import { loadCampaignEmailAttachments } from "@/server/services/campaign-email-attachments";
 import {
   claimEnrollmentForSend,
   findActiveEnrollmentsByIds,
@@ -382,6 +383,23 @@ async function processEnrollment(
     resolvedBody ||
     `${resolvedBody}\n\nUnsubscribe: ${unsubscribeUrl}`;
 
+  const attachmentResult = await loadCampaignEmailAttachments(
+    workspaceId,
+    step.documentIds,
+  );
+
+  if (!attachmentResult.ok) {
+    await recordSkippedSend({
+      workspaceId,
+      enrollment,
+      stepId: step.id,
+      reason: attachmentResult.error,
+      deferDays: SKIP_RETRY_DELAY_DAYS,
+    });
+
+    return singleOutcomeResult("skipped");
+  }
+
   const sendResult = await sendCampaignEmail({
     to: lead.email,
     subject: resolvedSubject,
@@ -391,6 +409,7 @@ async function processEnrollment(
       : `${plainText}\n\nUnsubscribe: ${unsubscribeUrl}`,
     fromName,
     fromEmail: campaign.senderEmail,
+    attachments: attachmentResult.attachments,
     tags: [
       { name: "workspace_id", value: workspaceId },
       { name: "campaign_id", value: campaign.id },
