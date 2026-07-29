@@ -1,15 +1,13 @@
-import {
-  PropertyFormPage,
-  propertyFormValuesFromSqm,
-} from "@/components/properties/property-form-page";
+import { PropertyFormPage } from "@/components/properties/property-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import { propertyFormValuesFromSqm } from "@/lib/property-form-values";
+import { workspacePath } from "@/lib/workspace-paths";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getPropertyForWorkspace } from "@/server/services/properties";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
-import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string; propertyId: string }>;
 
