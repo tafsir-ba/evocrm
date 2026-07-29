@@ -24,3 +24,9 @@ export { AuditLogModel, type AuditLogDocument } from "./audit-log";
 export { ImportJobModel, type ImportJobDocument } from "./import-job";
 export { ImportRowResultModel, type ImportRowResultDocument } from "./import-row-result";
 export { FeedbackModel, type FeedbackDocument } from "./feedback";
+export {
+  NotificationModel,
+  type NotificationDocument,
+  type NotificationType,
+} from "./notification";
+

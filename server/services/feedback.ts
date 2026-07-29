@@ -36,6 +36,7 @@ import {
   buildFeedbackStorageKey,
 } from "@/server/services/feedback-file-utils";
 import { sanitizeFileName } from "@/server/services/document-file-utils";
+import { notifyFeedbackResolved } from "@/server/services/notifications";
 import {
   deleteObject,
   getObjectBuffer,
@@ -46,7 +47,7 @@ import type { FeedbackSubmitFields } from "@/server/validation/feedback";
 import { requireMembership } from "@/server/permissions/require-membership";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { resolveFeedbackImageMimeType } from "@/lib/feedback";
-
+import { captureError } from "@/server/observability/capture-error";
 export type FeedbackScreenshotPublic = {
   filename: string;
   sizeBytes: number;
@@ -413,6 +414,7 @@ export async function updateFeedbackStatusForAdmin(input: {
       reporterName,
       feedbackMessage: existing.body || "(no message)",
       pageUrl: existing.pageUrl,
+      category: existing.category,
     });
 
     if (!sendResult.success) {
@@ -476,6 +478,46 @@ export async function updateFeedbackStatusForAdmin(input: {
         manualEmail: Boolean(input.notifyEmail?.trim()),
       },
     });
+
+    try {
+      const inApp = await notifyFeedbackResolved({
+        userId: existing.userId,
+        feedbackId: updated.id,
+        category: existing.category,
+        feedbackMessage: existing.body || "(no message)",
+        pageUrl: existing.pageUrl,
+        workspaceId: existing.workspaceId,
+      });
+
+      await createFeedbackAuditLog(updated, {
+        actorId: input.adminUserId,
+        action: "feedback.in_app_notification.sent",
+        entityType: "feedback",
+        entityId: updated.id,
+        after: {
+          notificationId: inApp.id,
+          userId: existing.userId,
+        },
+      });
+    } catch (error) {
+      captureError(error, {
+        tags: {
+          area: "feedback.in_app_notification",
+          feedbackId: updated.id,
+        },
+      });
+
+      await createFeedbackAuditLog(updated, {
+        actorId: input.adminUserId,
+        action: "feedback.in_app_notification.failed",
+        entityType: "feedback",
+        entityId: updated.id,
+        after: {
+          userId: existing.userId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+      });
+    }
 
     return getFeedbackDetailForAdmin(updated.id);
   }

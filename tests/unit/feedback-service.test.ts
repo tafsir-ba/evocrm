@@ -57,8 +57,17 @@ vi.mock("@/server/email/resend", () => ({
   sendFeedbackResolvedEmail: vi.fn(),
 }));
 
+vi.mock("@/server/services/notifications", () => ({
+  notifyFeedbackResolved: vi.fn(),
+}));
+
+vi.mock("@/server/observability/capture-error", () => ({
+  captureError: vi.fn(),
+}));
+
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { sendFeedbackResolvedEmail } from "@/server/email/resend";
+import { notifyFeedbackResolved } from "@/server/services/notifications";
 import {
   createFeedback,
   deleteFeedback,
@@ -197,6 +206,21 @@ describe("feedback service", () => {
       success: true,
       messageId: "msg-1",
     });
+    vi.mocked(notifyFeedbackResolved).mockResolvedValue({
+      id: "notif-1",
+      userId: "user-1",
+      type: "feedback.resolved",
+      title: "Your bug has been solved",
+      body: "Broken button",
+      href: "https://app.example/w/demo/leads",
+      workspaceId: "ws-1",
+      entityType: "feedback",
+      entityId: "fb-1",
+      readAt: null,
+      meta: { category: "bug" },
+      createdAt: new Date("2026-06-14T11:00:00.000Z"),
+      updatedAt: new Date("2026-06-14T11:00:00.000Z"),
+    });
     vi.mocked(findFeedbackById)
       .mockResolvedValueOnce(baseRecord)
       .mockResolvedValueOnce({
@@ -218,6 +242,19 @@ describe("feedback service", () => {
       adminUserId: "admin-1",
     });
 
+    expect(sendFeedbackResolvedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "reporter@example.com",
+        category: "bug",
+      }),
+    );
+    expect(notifyFeedbackResolved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        feedbackId: "fb-1",
+        category: "bug",
+      }),
+    );
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "feedback.resolve",
@@ -232,6 +269,49 @@ describe("feedback service", () => {
         entityId: "fb-1",
       }),
     );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "feedback.in_app_notification.sent",
+        entityType: "feedback",
+        entityId: "fb-1",
+      }),
+    );
+  });
+
+  it("still resolves when in-app notification creation fails", async () => {
+    vi.mocked(sendFeedbackResolvedEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-1",
+    });
+    vi.mocked(notifyFeedbackResolved).mockRejectedValue(new Error("db down"));
+    vi.mocked(findFeedbackById)
+      .mockResolvedValueOnce(baseRecord)
+      .mockResolvedValueOnce({
+        ...baseRecord,
+        status: "resolved",
+        resolvedAt: new Date("2026-06-14T11:00:00.000Z"),
+        resolvedBy: "admin-1",
+      });
+    vi.mocked(updateFeedbackStatus).mockResolvedValue({
+      ...baseRecord,
+      status: "resolved",
+      resolvedAt: new Date("2026-06-14T11:00:00.000Z"),
+      resolvedBy: "admin-1",
+    });
+
+    await expect(
+      updateFeedbackStatusForAdmin({
+        feedbackId: "fb-1",
+        status: "resolved",
+        adminUserId: "admin-1",
+      }),
+    ).resolves.toBeDefined();
+
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "feedback.in_app_notification.failed",
+      }),
+    );
   });
 
   it("resolves feedback without audit when workspace context is missing", async () => {
@@ -240,6 +320,21 @@ describe("feedback service", () => {
     vi.mocked(sendFeedbackResolvedEmail).mockResolvedValue({
       success: true,
       messageId: "msg-1",
+    });
+    vi.mocked(notifyFeedbackResolved).mockResolvedValue({
+      id: "notif-2",
+      userId: "user-1",
+      type: "feedback.resolved",
+      title: "Your bug has been solved",
+      body: "Broken button",
+      href: "https://app.example/w/demo/leads",
+      workspaceId: null,
+      entityType: "feedback",
+      entityId: "fb-1",
+      readAt: null,
+      meta: { category: "bug" },
+      createdAt: new Date("2026-06-14T11:00:00.000Z"),
+      updatedAt: new Date("2026-06-14T11:00:00.000Z"),
     });
     vi.mocked(findFeedbackById)
       .mockResolvedValueOnce(recordWithoutWorkspace)
@@ -264,6 +359,7 @@ describe("feedback service", () => {
       }),
     ).resolves.toBeDefined();
 
+    expect(notifyFeedbackResolved).toHaveBeenCalled();
     expect(createAuditLog).not.toHaveBeenCalled();
   });
 

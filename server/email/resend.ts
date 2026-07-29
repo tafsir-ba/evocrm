@@ -121,6 +121,7 @@ export function buildFeedbackResolvedEmailHtml(input: {
   reporterName: string;
   feedbackMessage: string;
   pageUrl?: string | null;
+  category?: "bug" | "idea" | "other";
 }): string {
   const escapedMessage = input.feedbackMessage
     .replace(/&/g, "&amp;")
@@ -131,11 +132,19 @@ export function buildFeedbackResolvedEmailHtml(input: {
     ? `<p style="margin-top: 16px;"><a href="${input.pageUrl}">Open the page where you reported this</a></p>`
     : "";
 
+  const isBug = input.category === "bug";
+  const intro = isBug
+    ? "We have solved the bug you reported:"
+    : "We have marked the following item as resolved:";
+  const thanks = isBug
+    ? "Thank you again for reporting this bug."
+    : "Thank you again for your feedback.";
+
   return `
     <div style="font-family: sans-serif; line-height: 1.6; color: #111; max-width: 560px;">
       <p>Hello ${input.reporterName.replace(/</g, "&lt;")},</p>
-      <p>Thank you again for your feedback.</p>
-      <p>We have marked the following item as resolved:</p>
+      <p>${thanks}</p>
+      <p>${intro}</p>
       <blockquote style="margin: 16px 0; padding: 12px 16px; border-left: 3px solid #e5e5e5; color: #333;">
         “${escapedMessage}”
       </blockquote>
@@ -151,13 +160,19 @@ export function buildFeedbackResolvedEmailText(input: {
   reporterName: string;
   feedbackMessage: string;
   pageUrl?: string | null;
+  category?: "bug" | "idea" | "other";
 }): string {
+  const isBug = input.category === "bug";
   const lines = [
     `Hello ${input.reporterName},`,
     "",
-    "Thank you again for your feedback.",
+    isBug
+      ? "Thank you again for reporting this bug."
+      : "Thank you again for your feedback.",
     "",
-    "We have marked the following item as resolved:",
+    isBug
+      ? "We have solved the bug you reported:"
+      : "We have marked the following item as resolved:",
     `"${input.feedbackMessage}"`,
     "",
     "Please test the app again when you have a moment and let us know if the issue is fully resolved on your side.",
@@ -179,10 +194,13 @@ export async function sendFeedbackResolvedEmail(input: {
   reporterName: string;
   feedbackMessage: string;
   pageUrl?: string | null;
+  category?: "bug" | "idea" | "other";
 }): Promise<SendCampaignEmailResult> {
+  const isBug = input.category === "bug";
+
   return sendCampaignEmail({
     to: input.to,
-    subject: "Your feedback has been resolved",
+    subject: isBug ? "Your bug has been solved" : "Your feedback has been resolved",
     html: buildFeedbackResolvedEmailHtml(input),
     text: buildFeedbackResolvedEmailText(input),
     fromName: "EvoHome",
