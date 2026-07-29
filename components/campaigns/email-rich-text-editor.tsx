@@ -166,6 +166,17 @@ export function EmailRichTextEditor({
     if (!editor) {
       return;
     }
+
+    if (token === "{unsubscribe_url}") {
+      editor
+        .chain()
+        .focus()
+        .insertContent('<a href="{unsubscribe_url}">Unsubscribe</a>')
+        .run();
+      setMergeOpen(false);
+      return;
+    }
+
     editor.chain().focus().insertContent(token).run();
     setMergeOpen(false);
   }

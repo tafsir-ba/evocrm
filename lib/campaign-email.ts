@@ -117,11 +117,79 @@ export function emailBodyHasUnsubscribe(content: string): boolean {
     return true;
   }
 
-  if (/<a\b[^>]*href=["'][^"']*unsubscribe/i.test(content)) {
+  if (contentHasUnsubscribeAnchor(content)) {
     return true;
   }
 
   return /https?:\/\/\S*unsubscribe/i.test(content);
+}
+
+/** True when content already has a hyperlinked unsubscribe URL (not a bare URL). */
+export function contentHasUnsubscribeAnchor(content: string): boolean {
+  return /<a\b[^>]*href=["'][^"']*unsubscribe[^"']*["'][^>]*>/i.test(content);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Removes bare unsubscribe URLs / merge tokens from email content while
+ * preserving href attributes on existing anchors. Campaign sends always append
+ * a formatted "Unsubscribe" footer unless a custom unsubscribe anchor remains.
+ */
+export function stripBareUnsubscribeUrls(
+  content: string,
+  unsubscribeUrl?: string | null,
+): string {
+  const hrefPlaceholders: string[] = [];
+  let result = content.replace(/\bhref\s*=\s*(["'])[\s\S]*?\1/gi, (match) => {
+    hrefPlaceholders.push(match);
+    return `__UNSUB_HREF_${hrefPlaceholders.length - 1}__`;
+  });
+
+  const trimmedUrl = unsubscribeUrl?.trim() ?? "";
+  if (trimmedUrl && /unsubscribe/i.test(trimmedUrl)) {
+    const escapedUrl = escapeRegExp(trimmedUrl);
+    result = result.replace(
+      new RegExp(`(?:Unsubscribe\\s*:\\s*)?${escapedUrl}`, "gi"),
+      "",
+    );
+  }
+
+  result = result.replace(/\{\{?unsubscribe_url\}\}?/gi, "");
+  result = result.replace(/https?:\/\/[^\s<>"']*unsubscribe[^\s<>"']*/gi, "");
+
+  result = result.replace(/__UNSUB_HREF_(\d+)__/g, (_, index: string) => {
+    return hrefPlaceholders[Number(index)] ?? "";
+  });
+
+  return result
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/(?:<br\s*\/?>\s*){3,}/gi, "<br /><br />")
+    .replace(/<p>\s*<\/p>/gi, "")
+    .replace(/^\s+|\s+$/g, "")
+    .trim();
+}
+
+/** Plain-text body with a single unsubscribe line (never a duplicated raw URL). */
+export function buildCampaignEmailPlainText(
+  body: string,
+  unsubscribeUrl: string,
+): string {
+  const cleaned = stripBareUnsubscribeUrls(body, unsubscribeUrl).trim();
+  const footer = `Unsubscribe: ${unsubscribeUrl}`;
+
+  if (!cleaned) {
+    return footer;
+  }
+
+  if (/unsubscribe/i.test(cleaned) && cleaned.includes(unsubscribeUrl)) {
+    return cleaned;
+  }
+
+  return `${cleaned}\n\n${footer}`;
 }
 
 function countUnclosedHtmlTags(html: string): number {
@@ -179,13 +247,6 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
     warnings.push({
       code: "unsafe_javascript",
       message: "This email contains inline JavaScript, which is not supported in most email clients.",
-    });
-  }
-
-  if (!emailBodyHasUnsubscribe(html)) {
-    warnings.push({
-      code: "missing_unsubscribe",
-      message: "Consider including an unsubscribe link using {unsubscribe_url}.",
     });
   }
 

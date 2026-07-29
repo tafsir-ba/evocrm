@@ -18,7 +18,6 @@ import {
   applyCampaignVariables,
   CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
   CAMPAIGN_EMAIL_VARIABLES,
-  emailBodyHasUnsubscribe,
   normalizeCampaignSendTime,
   stripHtmlToPlainText,
   validateCampaignHtml,
@@ -371,14 +370,6 @@ export function CampaignStepFormPage({
     setFormError(null);
     setFormMessage(null);
 
-    const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
-    if (intent === "ready" && !emailBodyHasUnsubscribe(bodyContent)) {
-      setFormError(
-        "Include {unsubscribe_url} in the email body before marking this email as ready.",
-      );
-      return;
-    }
-
     setSubmitting(true);
 
     try {
@@ -700,9 +691,6 @@ export function CampaignStepFormPage({
     );
   }
 
-  const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
-  const missingUnsubscribe = !emailBodyHasUnsubscribe(bodyContent);
-
   return (
     <FocusedFormLayout
       title={isEdit ? form.name || "Edit email" : "Add email step"}
@@ -729,7 +717,7 @@ export function CampaignStepFormPage({
               Save draft
             </Button>
             <Button
-              disabled={submitting || missingUnsubscribe}
+              disabled={submitting}
               onClick={() => void saveStep("ready")}
             >
               Mark as ready
@@ -979,12 +967,9 @@ export function CampaignStepFormPage({
                 </div>
               ) : null}
 
-              {missingUnsubscribe ? (
-                <p className="text-[12px] text-[var(--color-ink-muted)]">
-                  Include {"{unsubscribe_url}"} (Insert field → Unsubscribe URL) before marking this
-                  email as ready.
-                </p>
-              ) : null}
+              <p className="text-[12px] text-[var(--color-ink-muted)]">
+                An unsubscribe link is added automatically when this email is sent.
+              </p>
             </div>
           </Card>
 

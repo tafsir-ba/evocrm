@@ -7,7 +7,11 @@ import { buildCampaignEmailHtml, sendCampaignEmail } from "@/server/email/resend
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 import { loadCampaignEmailAttachments } from "@/server/services/campaign-email-attachments";
-import { applyCampaignVariables, CAMPAIGN_EMAIL_PREVIEW_CONTEXT } from "@/lib/campaign-email";
+import {
+  applyCampaignVariables,
+  buildCampaignEmailPlainText,
+  CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+} from "@/lib/campaign-email";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { AppError } from "@/server/errors";
 
@@ -54,7 +58,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     await assertVerifiedSenderEmail(workspace.id, campaign.sendingDomainId, campaign.senderEmail);
 
-    const previewUrl = "#";
+    const previewUrl = "https://example.com/unsubscribe?token=preview";
     const previewContext = {
       ...CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
       unsubscribeUrl: previewUrl,
@@ -77,11 +81,14 @@ export async function POST(request: Request, context: RouteContext) {
       throw new AppError("VALIDATION_ERROR", attachmentResult.error);
     }
 
+    const plainTextSource = step.bodyText?.trim() || resolvedBody || "";
+    const plainText = buildCampaignEmailPlainText(plainTextSource, previewUrl);
+
     const result = await sendCampaignEmail({
       to: input.to,
       subject: `[Test] ${step.subject || step.name || "Campaign email"}`,
       html,
-      text: step.bodyText ?? resolvedBody,
+      text: plainText,
       fromName,
       fromEmail: campaign.senderEmail,
       attachments: attachmentResult.attachments,

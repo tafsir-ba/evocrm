@@ -5,7 +5,7 @@ import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findVerifiedSendingDomainById } from "@/server/repositories/sending-domains";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
 import { campaignHasSenderContactName } from "@/lib/campaign-from-name";
-import { validateCampaignHtml, emailBodyHasUnsubscribe } from "@/lib/campaign-email";
+import { validateCampaignHtml } from "@/lib/campaign-email";
 import { isCampaignStepLaunchReady } from "@/lib/campaign-step-readiness";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
@@ -109,12 +109,9 @@ export async function evaluateCampaignReadiness(
     },
     {
       key: "unsubscribe",
-      label: "Unsubscribe support included",
-      passed: activeSteps.every((step) => {
-        const content = `${step.body} ${step.bodyHtml ?? ""} ${step.bodyText ?? ""}`;
-        return emailBodyHasUnsubscribe(content);
-      }),
-      requiredFix: "Include {unsubscribe_url} in each active email step.",
+      label: "Unsubscribe link is appended automatically",
+      passed: true,
+      requiredFix: undefined,
     },
   ];
 
