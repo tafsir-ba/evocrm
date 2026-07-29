@@ -84,8 +84,31 @@ export type HtmlValidationWarning = {
   message: string;
 };
 
+/** Tags that are unsafe or unsupported in email clients (not email <head> tags like meta/link). */
 const UNSAFE_TAG_PATTERN =
-  /<(script|iframe|embed|object|form|input|button|link|meta|base)\b/i;
+  /<(script|iframe|embed|object|form|input|button|base)\b/gi;
+
+/** Void / self-closing tags that do not need a matching close tag. */
+const VOID_HTML_TAGS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+/** Event-handler attributes (onclick=, onload=, …) — not substrings like content=. */
+const INLINE_EVENT_HANDLER_PATTERN = /\s(on[a-z]+)\s*=/i;
+const JAVASCRIPT_URL_PATTERN = /\bjavascript\s*:/i;
 
 export function emailBodyHasUnsubscribe(content: string): boolean {
   const normalized = normalizeCampaignVariableTokens(content);
@@ -101,6 +124,23 @@ export function emailBodyHasUnsubscribe(content: string): boolean {
   return /https?:\/\/\S*unsubscribe/i.test(content);
 }
 
+function countUnclosedHtmlTags(html: string): number {
+  const openTags = html.match(/<([a-z][a-z0-9]*)\b[^>]*\/?>/gi) ?? [];
+  const closeTags = html.match(/<\/([a-z][a-z0-9]*)\s*>/gi) ?? [];
+
+  let openCount = 0;
+  for (const tag of openTags) {
+    const nameMatch = tag.match(/^<\/?([a-z][a-z0-9]*)/i);
+    const name = nameMatch?.[1]?.toLowerCase();
+    if (!name || VOID_HTML_TAGS.has(name) || /\/\s*>$/.test(tag)) {
+      continue;
+    }
+    openCount += 1;
+  }
+
+  return openCount - closeTags.length;
+}
+
 export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   const warnings: HtmlValidationWarning[] = [];
 
@@ -112,10 +152,7 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
     return warnings;
   }
 
-  const openTags = html.match(/<([a-z][a-z0-9]*)\b[^>]*>/gi) ?? [];
-  const closeTags = html.match(/<\/([a-z][a-z0-9]*)\s*>/gi) ?? [];
-
-  if (openTags.length > closeTags.length + 5) {
+  if (countUnclosedHtmlTags(html) > 5) {
     warnings.push({
       code: "broken_tags",
       message: "This email may contain broken or unclosed HTML tags.",
@@ -124,14 +161,21 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
 
   const unsafeMatches = html.match(UNSAFE_TAG_PATTERN);
   if (unsafeMatches) {
-    const tags = [...new Set(unsafeMatches.map((tag) => tag.replace(/[<>\/]/g, "").toLowerCase()))];
+    const tags = [
+      ...new Set(
+        unsafeMatches.map((tag) => {
+          const nameMatch = tag.match(/^<([a-z][a-z0-9]*)/i);
+          return (nameMatch?.[1] ?? tag.replace(/[<>\/]/g, "")).toLowerCase();
+        }),
+      ),
+    ];
     warnings.push({
       code: "unsafe_tags",
       message: `This email contains unsupported tags: ${tags.map((tag) => `<${tag}>`).join(", ")}. These may be removed or may not render correctly in email clients.`,
     });
   }
 
-  if (/on\w+\s*=/i.test(html) || /javascript:/i.test(html)) {
+  if (INLINE_EVENT_HANDLER_PATTERN.test(html) || JAVASCRIPT_URL_PATTERN.test(html)) {
     warnings.push({
       code: "unsafe_javascript",
       message: "This email contains inline JavaScript, which is not supported in most email clients.",
