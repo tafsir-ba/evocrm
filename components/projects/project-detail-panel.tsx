@@ -30,6 +30,7 @@ const TABS = [
   { key: "pipeline", label: "Pipeline", href: "pipeline" },
   { key: "activities", label: "Activities", href: "activities" },
   { key: "dripping", label: "Dripping", href: "dripping" },
+  { key: "sharing", label: "People & access", href: "sharing" },
   { key: "settings", label: "Settings", href: "edit" },
 ] as const;
 
