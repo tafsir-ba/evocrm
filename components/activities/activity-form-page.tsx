@@ -162,10 +162,15 @@ export function ActivityFormPage({
       return;
     }
 
-    setForm({
-      ...emptyForm,
-      typeId: defaultTypeId,
-      statusId: defaultStatusId,
+    // Only fill empty type/status defaults. Replacing the whole form with
+    // emptyForm would wipe dueDate/nextActionDate entered before options load.
+    setForm((current) => {
+      const typeId = current.typeId || defaultTypeId;
+      const statusId = current.statusId || defaultStatusId;
+      if (typeId === current.typeId && statusId === current.statusId) {
+        return current;
+      }
+      return { ...current, typeId, statusId };
     });
   }, [defaultStatusId, defaultTypeId, initialValues, isEdit]);
 
