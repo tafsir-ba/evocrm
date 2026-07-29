@@ -302,7 +302,7 @@ describe("campaign sending service", () => {
     vi.mocked(findCampaignById).mockResolvedValue({
       id: "camp-1",
       workspaceId: "ws-1",
-      name: "   ",
+      name: "Grosvenor Vistas website contact form dripping",
       status: "active",
       audienceType: "leads",
   ...campaignRecordExtras,
@@ -361,6 +361,76 @@ describe("campaign sending service", () => {
       expect.objectContaining({ status: "skipped", error: "Step from name is missing." }),
     );
     expect(sendCampaignEmail).not.toHaveBeenCalled();
+  });
+
+  it("uses campaign sender name when step from name was baked as the campaign title", async () => {
+    vi.mocked(findStepByOrder).mockResolvedValue({
+      ...step,
+      fromName: "Grosvenor Vistas website contact form dripping",
+    });
+    vi.mocked(findCampaignById).mockResolvedValue({
+      id: "camp-1",
+      workspaceId: "ws-1",
+      name: "Grosvenor Vistas website contact form dripping",
+      status: "active",
+      audienceType: "leads",
+      ...campaignRecordExtras,
+      frequency: null,
+      defaultFromName: null,
+      senderName: "Grosvenor",
+      senderEmail: "hello@example.com",
+      sendingDomainId: "domain-1",
+      createdBy: "user-1",
+      ownerId: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-legacy-from",
+    });
+
+    await sendDueCampaignEmails(50);
+
+    expect(sendCampaignEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ fromName: "Grosvenor" }),
+    );
   });
 
   it("uses campaign default from name when step from name is blank", async () => {

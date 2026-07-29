@@ -1,7 +1,8 @@
 /**
  * Resolve the From / contact name shown in recipients' inboxes.
  * Prefer an explicit step override, then campaign sender settings.
- * Campaign name is a last-resort fallback for legacy rows only.
+ * Never use the campaign title — that produced long internal names in inboxes.
+ * A step fromName equal to the campaign name is treated as unset (legacy bake).
  */
 export function resolveCampaignStepFromName(
   stepFromName: string | null | undefined,
@@ -11,9 +12,10 @@ export function resolveCampaignStepFromName(
     name: string;
   },
 ): string {
+  const campaignTitle = campaign.name.trim();
   const trimmedStepFromName = stepFromName?.trim() ?? "";
 
-  if (trimmedStepFromName.length > 0) {
+  if (trimmedStepFromName.length > 0 && trimmedStepFromName !== campaignTitle) {
     return trimmedStepFromName;
   }
 
@@ -23,12 +25,11 @@ export function resolveCampaignStepFromName(
   }
 
   const defaultFromName = campaign.defaultFromName?.trim();
-
   if (defaultFromName) {
     return defaultFromName;
   }
 
-  return campaign.name.trim();
+  return "";
 }
 
 /** True when the campaign has an explicit contact/from name (not just the campaign title). */

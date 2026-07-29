@@ -53,7 +53,7 @@ export default async function EditCampaignPage({ params }: { params: Params }) {
         initialValues={{
           name: campaign.name,
           audienceType: campaign.audienceType,
-          defaultFromName: campaign.defaultFromName ?? "",
+          defaultFromName: campaign.senderName ?? campaign.defaultFromName ?? "",
           sending: {
             sendingDomainId: campaign.sendingDomainId ?? "",
             senderEmail: campaign.senderEmail ?? "",

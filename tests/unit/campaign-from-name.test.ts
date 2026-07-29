@@ -12,12 +12,18 @@ describe("resolveCampaignStepFromName", () => {
     name: "Grosvenor Vistas website contact form dripping",
   };
 
-  it("uses the step from name when present", () => {
+  it("uses the step from name when present and distinct from the campaign title", () => {
     expect(resolveCampaignStepFromName("Step Sender", campaign)).toBe("Step Sender");
   });
 
   it("falls back to campaign sender name before default from name", () => {
     expect(resolveCampaignStepFromName("  ", campaign)).toBe("Grosvenor");
+  });
+
+  it("ignores a legacy step from name that was baked as the campaign title", () => {
+    expect(
+      resolveCampaignStepFromName("Grosvenor Vistas website contact form dripping", campaign),
+    ).toBe("Grosvenor");
   });
 
   it("falls back to campaign default from name", () => {
@@ -30,13 +36,20 @@ describe("resolveCampaignStepFromName", () => {
     ).toBe("Project X");
   });
 
-  it("falls back to campaign name when sender settings are empty", () => {
+  it("does not use the campaign title when sender settings are empty", () => {
     expect(
       resolveCampaignStepFromName("", {
         defaultFromName: null,
         name: "Buyer Follow-up",
       }),
-    ).toBe("Buyer Follow-up");
+    ).toBe("");
+    expect(
+      resolveCampaignStepFromName("Buyer Follow-up", {
+        senderName: null,
+        defaultFromName: null,
+        name: "Buyer Follow-up",
+      }),
+    ).toBe("");
   });
 });
 

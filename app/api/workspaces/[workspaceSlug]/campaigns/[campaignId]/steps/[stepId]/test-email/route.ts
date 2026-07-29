@@ -38,6 +38,13 @@ export async function POST(request: Request, context: RouteContext) {
 
     const fromName = resolveCampaignStepFromName(step.fromName, campaign);
 
+    if (!fromName) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Set a sender contact name on the campaign or this email step before sending a test email.",
+      );
+    }
+
     if (!campaign.sendingDomainId || !campaign.senderEmail) {
       throw new AppError(
         "VALIDATION_ERROR",
