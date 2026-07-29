@@ -29,4 +29,9 @@ export {
   type NotificationDocument,
   type NotificationType,
 } from "./notification";
+export { ProjectGrantModel, type ProjectGrantDocument } from "./project-grant";
+export {
+  ProjectInvitationModel,
+  type ProjectInvitationDocument,
+} from "./project-invitation";
 
