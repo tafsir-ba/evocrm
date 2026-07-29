@@ -28,7 +28,12 @@ function withOptionalProjectScope(
   filter: Record<string, unknown>,
   projectId?: string,
 ): Record<string, unknown> {
-  const scoped = withWorkspaceScope(workspaceId, filter);
+  // Aggregations do not cast string IDs the way find/countDocuments do.
+  // Always match ObjectId fields with ObjectId values (same pattern as projects.ts).
+  const scoped = {
+    ...withWorkspaceScope(workspaceId, filter),
+    workspaceId: new Types.ObjectId(workspaceId),
+  };
 
   if (projectId) {
     return { ...scoped, projectId: new Types.ObjectId(projectId) };
