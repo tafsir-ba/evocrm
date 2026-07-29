@@ -20,17 +20,15 @@ describe("campaign step launch readiness", () => {
     expect(isCampaignStepLaunchReady(baseStep)).toBe(true);
   });
 
-  it("rejects ready steps missing unsubscribe support", () => {
+  it("accepts ready steps without an in-body unsubscribe token", () => {
     const step = {
       ...baseStep,
       body: "Thanks for joining.",
       bodyText: "Thanks for joining.",
     };
 
-    expect(getCampaignStepLaunchIssues(step)).toEqual([
-      "Include {unsubscribe_url} or an unsubscribe link before marking this email as ready.",
-    ]);
-    expect(isCampaignStepLaunchReady(step)).toBe(false);
+    expect(getCampaignStepLaunchIssues(step)).toEqual([]);
+    expect(isCampaignStepLaunchReady(step)).toBe(true);
   });
 
   it("treats draft steps as not launch-ready", () => {

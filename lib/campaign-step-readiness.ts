@@ -1,4 +1,4 @@
-import { emailBodyHasUnsubscribe, validateCampaignHtml } from "@/lib/campaign-email";
+import { validateCampaignHtml } from "@/lib/campaign-email";
 
 export type CampaignStepLaunchFields = {
   status: string;
@@ -17,11 +17,6 @@ function stepHasContent(step: Pick<CampaignStepLaunchFields, "contentMode" | "bo
   return Boolean(step.body.trim() || step.bodyText?.trim());
 }
 
-function stepHasUnsubscribe(step: Pick<CampaignStepLaunchFields, "body" | "bodyHtml" | "bodyText">): boolean {
-  const content = `${step.body} ${step.bodyHtml ?? ""} ${step.bodyText ?? ""}`;
-  return emailBodyHasUnsubscribe(content);
-}
-
 export function getCampaignStepLaunchIssues(step: CampaignStepLaunchFields): string[] {
   const issues: string[] = [];
 
@@ -31,10 +26,6 @@ export function getCampaignStepLaunchIssues(step: CampaignStepLaunchFields): str
 
   if (!stepHasContent(step)) {
     issues.push("Add email content before marking this email as ready.");
-  }
-
-  if (!stepHasUnsubscribe(step)) {
-    issues.push("Include {unsubscribe_url} or an unsubscribe link before marking this email as ready.");
   }
 
   if (step.contentMode === "html" && step.bodyHtml) {

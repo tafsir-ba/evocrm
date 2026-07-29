@@ -117,11 +117,124 @@ export function emailBodyHasUnsubscribe(content: string): boolean {
     return true;
   }
 
-  if (/<a\b[^>]*href=["'][^"']*unsubscribe/i.test(content)) {
+  if (contentHasUnsubscribeAnchor(content)) {
     return true;
   }
 
   return /https?:\/\/\S*unsubscribe/i.test(content);
+}
+
+/** True when content already has a hyperlinked unsubscribe URL (not a bare URL). */
+export function contentHasUnsubscribeAnchor(content: string): boolean {
+  return /<a\b[^>]*href=["'][^"']*unsubscribe[^"']*["'][^>]*>/i.test(content);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Removes bare unsubscribe URLs / merge tokens from email content while
+ * preserving quoted HTML attribute values (href, src, etc.). Campaign sends
+ * always append a formatted "Unsubscribe" footer unless a custom unsubscribe
+ * anchor remains.
+ */
+export function stripBareUnsubscribeUrls(
+  content: string,
+  unsubscribeUrl?: string | null,
+): string {
+  const attrPlaceholders: string[] = [];
+  // Protect all quoted attribute values so src/href/action/etc. are not stripped.
+  let result = content.replace(
+    /(\b[a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)(["'])([\s\S]*?)\3/g,
+    (match) => {
+      attrPlaceholders.push(match);
+      return `__UNSUB_ATTR_${attrPlaceholders.length - 1}__`;
+    },
+  );
+
+  const trimmedUrl = unsubscribeUrl?.trim() ?? "";
+  if (trimmedUrl && /unsubscribe/i.test(trimmedUrl)) {
+    const escapedUrl = escapeRegExp(trimmedUrl);
+    result = result.replace(
+      new RegExp(`(?:Unsubscribe\\s*:\\s*)?${escapedUrl}`, "gi"),
+      "",
+    );
+  }
+
+  result = result.replace(/\{\{?unsubscribe_url\}\}?/gi, "");
+  result = result.replace(/https?:\/\/[^\s<>"']*unsubscribe[^\s<>"']*/gi, "");
+
+  result = result.replace(/__UNSUB_ATTR_(\d+)__/g, (_, index: string) => {
+    return attrPlaceholders[Number(index)] ?? "";
+  });
+
+  return result
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/(?:<br\s*\/?>\s*){3,}/gi, "<br /><br />")
+    .replace(/<p>\s*<\/p>/gi, "")
+    .replace(/^\s+|\s+$/g, "")
+    .trim();
+}
+
+/** Plain-text body with a single unsubscribe line (never a duplicated raw URL). */
+export function buildCampaignEmailPlainText(
+  body: string,
+  unsubscribeUrl: string,
+): string {
+  const cleaned = stripBareUnsubscribeUrls(body, unsubscribeUrl).trim();
+  const footer = `Unsubscribe: ${unsubscribeUrl}`;
+
+  if (!cleaned) {
+    return footer;
+  }
+
+  const hasExactFooter = cleaned
+    .split(/\n/)
+    .some((line) => line.trim().toLowerCase() === footer.toLowerCase());
+
+  if (hasExactFooter) {
+    return cleaned;
+  }
+
+  return `${cleaned}\n\n${footer}`;
+}
+
+export function buildCampaignEmailHtml(
+  body: string,
+  unsubscribeUrl: string,
+  options?: { htmlBody?: string | null; previewText?: string | null },
+): string {
+  const rawContent = options?.htmlBody?.trim()
+    ? options.htmlBody
+    : body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br />");
+
+  const content = stripBareUnsubscribeUrls(rawContent, unsubscribeUrl);
+
+  const preview = options?.previewText
+    ? `<div style="display:none;max-height:0;overflow:hidden;">${options.previewText.replace(/</g, "&lt;")}</div>`
+    : "";
+
+  const footer = contentHasUnsubscribeAnchor(content)
+    ? ""
+    : `
+      <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e5e5;" />
+      <p style="font-size: 12px; color: #666;">
+        <a href="${unsubscribeUrl}">Unsubscribe</a> from future campaign emails.
+      </p>`;
+
+  return `
+    <div style="font-family: sans-serif; line-height: 1.5; color: #111;">
+      ${preview}
+      <div>${content}</div>
+      ${footer}
+    </div>
+  `.trim();
 }
 
 function countUnclosedHtmlTags(html: string): number {
@@ -179,13 +292,6 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
     warnings.push({
       code: "unsafe_javascript",
       message: "This email contains inline JavaScript, which is not supported in most email clients.",
-    });
-  }
-
-  if (!emailBodyHasUnsubscribe(html)) {
-    warnings.push({
-      code: "missing_unsubscribe",
-      message: "Consider including an unsubscribe link using {unsubscribe_url}.",
     });
   }
 

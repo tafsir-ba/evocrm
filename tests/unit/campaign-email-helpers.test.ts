@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   addMinutesToCampaignSendTime,
   applyCampaignVariables,
+  buildCampaignEmailPlainText,
+  contentHasUnsubscribeAnchor,
   emailBodyHasUnsubscribe,
   getZeroDelaySendTimePredecessorIssue,
   getZeroDelaySendTimeSequenceIssue,
   isValidCampaignSendTime,
   normalizeCampaignSendTime,
   normalizeCampaignVariableTokens,
+  stripBareUnsubscribeUrls,
   validateCampaignHtml,
 } from "@/lib/campaign-email";
 
@@ -54,6 +57,56 @@ describe("campaign email helpers", () => {
     );
     expect(emailBodyHasUnsubscribe("test{{first_name}}")).toBe(false);
     expect(emailBodyHasUnsubscribe("No unsubscribe here")).toBe(false);
+  });
+
+  it("strips bare unsubscribe urls while preserving anchors", () => {
+    const url =
+      "https://crm.evo-home.ch/unsubscribe?token=eyJhbGciOiJIUzI1NiJ9.very-long-token";
+
+    expect(
+      stripBareUnsubscribeUrls(
+        `Thanks for your interest.\n${url}\n\n<a href="${url}">Unsubscribe</a>`,
+        url,
+      ),
+    ).toBe('Thanks for your interest.\n\n<a href="' + url + '">Unsubscribe</a>');
+
+    expect(stripBareUnsubscribeUrls(`Hello\n{unsubscribe_url}`, url)).toBe("Hello");
+    expect(
+      contentHasUnsubscribeAnchor(`<a href="${url}">Unsubscribe</a>`),
+    ).toBe(true);
+  });
+
+  it("preserves non-href attributes that contain unsubscribe", () => {
+    const url = "https://crm.evo-home.ch/unsubscribe?token=abc";
+    const html =
+      '<img src="https://cdn.example.com/unsubscribe-icon.png" alt="x" /><p>Hi</p>\n' + url;
+
+    expect(stripBareUnsubscribeUrls(html, url)).toBe(
+      '<img src="https://cdn.example.com/unsubscribe-icon.png" alt="x" /><p>Hi</p>',
+    );
+  });
+
+  it("builds plain text with a single unsubscribe line", () => {
+    const url = "https://crm.evo-home.ch/unsubscribe?token=abc";
+
+    expect(buildCampaignEmailPlainText(`Hello\n${url}`, url)).toBe(
+      `Hello\n\nUnsubscribe: ${url}`,
+    );
+    expect(buildCampaignEmailPlainText(`Hello\nUnsubscribe: ${url}`, url)).toBe(
+      `Hello\n\nUnsubscribe: ${url}`,
+    );
+  });
+
+  it("always appends plain-text unsubscribe footer for short placeholder urls", () => {
+    expect(buildCampaignEmailPlainText("Please unsubscribe #notes", "#")).toBe(
+      "Please unsubscribe #notes\n\nUnsubscribe: #",
+    );
+  });
+
+  it("does not strip unrelated hash characters when unsubscribe url is a placeholder", () => {
+    expect(stripBareUnsubscribeUrls("Color #111 and link #section", "#")).toBe(
+      "Color #111 and link #section",
+    );
   });
 
   it("detects out-of-order zero-delay send times", () => {

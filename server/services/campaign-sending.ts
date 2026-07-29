@@ -33,7 +33,10 @@ import {
 import { addDays, computeNextSendAt, isScheduledSendDue } from "@/server/utils/campaign-schedule";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
-import { applyCampaignVariables } from "@/lib/campaign-email";
+import {
+  applyCampaignVariables,
+  buildCampaignEmailPlainText,
+} from "@/lib/campaign-email";
 import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
 import { reconcileEnrollmentBeforeSend } from "@/server/services/campaign-enrollment-reconcile";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
@@ -378,10 +381,11 @@ async function processEnrollment(
     previewText: step.previewText,
   });
 
-  const plainText =
-    step.bodyText?.trim() ||
-    resolvedBody ||
-    `${resolvedBody}\n\nUnsubscribe: ${unsubscribeUrl}`;
+  const plainTextSource = step.bodyText?.trim() || resolvedBody || "";
+  const plainText = buildCampaignEmailPlainText(
+    applyCampaignVariables(plainTextSource, variableContext),
+    unsubscribeUrl,
+  );
 
   const attachmentResult = await loadCampaignEmailAttachments(
     workspaceId,
@@ -404,9 +408,7 @@ async function processEnrollment(
     to: lead.email,
     subject: resolvedSubject,
     html,
-    text: plainText.includes("Unsubscribe")
-      ? plainText
-      : `${plainText}\n\nUnsubscribe: ${unsubscribeUrl}`,
+    text: plainText,
     fromName,
     fromEmail: campaign.senderEmail,
     attachments: attachmentResult.attachments,

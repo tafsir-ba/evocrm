@@ -40,7 +40,7 @@ describe("campaign readiness", () => {
     ).toBe(true);
   });
 
-  it("treats ready status without unsubscribe content as not launch-ready", () => {
+  it("treats ready status without an in-body unsubscribe token as launch-ready", () => {
     expect(
       isCampaignStepLaunchReady({
         status: "ready",
@@ -50,6 +50,6 @@ describe("campaign readiness", () => {
         bodyHtml: null,
         bodyText: "No unsubscribe here",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 });

@@ -16,9 +16,9 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   applyCampaignVariables,
+  buildCampaignEmailHtml,
   CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
   CAMPAIGN_EMAIL_VARIABLES,
-  emailBodyHasUnsubscribe,
   normalizeCampaignSendTime,
   stripHtmlToPlainText,
   validateCampaignHtml,
@@ -271,13 +271,28 @@ export function CampaignStepFormPage({
   }, [form.bodyHtml, form.contentMode]);
 
   const previewHtml = useMemo(() => {
-    const raw =
-      form.contentMode === "html" || form.contentMode === "rich_text"
-        ? form.bodyHtml || "<p>No content yet.</p>"
-        : (form.bodyHtml || form.body).replace(/\n/g, "<br />") || "No content yet.";
+    const previewUnsubscribeUrl =
+      CAMPAIGN_EMAIL_PREVIEW_CONTEXT.unsubscribeUrl ?? "https://example.com/unsubscribe";
 
-    return applyCampaignVariables(raw, CAMPAIGN_EMAIL_PREVIEW_CONTEXT);
-  }, [form.body, form.bodyHtml, form.contentMode]);
+    if (form.contentMode === "html" || form.contentMode === "rich_text") {
+      const resolvedHtml = applyCampaignVariables(
+        form.bodyHtml || "<p>No content yet.</p>",
+        CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+      );
+      return buildCampaignEmailHtml("", previewUnsubscribeUrl, {
+        htmlBody: resolvedHtml,
+        previewText: form.previewText.trim() || null,
+      });
+    }
+
+    const resolvedBody = applyCampaignVariables(
+      form.body || "No content yet.",
+      CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+    );
+    return buildCampaignEmailHtml(resolvedBody, previewUnsubscribeUrl, {
+      previewText: form.previewText.trim() || null,
+    });
+  }, [form.body, form.bodyHtml, form.contentMode, form.previewText]);
 
   function buildPayload(intent: SaveIntent) {
     const contentMode = form.contentMode;
@@ -370,14 +385,6 @@ export function CampaignStepFormPage({
 
     setFormError(null);
     setFormMessage(null);
-
-    const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
-    if (intent === "ready" && !emailBodyHasUnsubscribe(bodyContent)) {
-      setFormError(
-        "Include {unsubscribe_url} in the email body before marking this email as ready.",
-      );
-      return;
-    }
 
     setSubmitting(true);
 
@@ -472,6 +479,38 @@ export function CampaignStepFormPage({
   }
 
   function insertVariable(token: string, field: "body" | "bodyHtml") {
+    if (token === "{unsubscribe_url}") {
+      if (form.contentMode === "rich_text" && richEditorRef.current) {
+        richEditorRef.current
+          .chain()
+          .focus()
+          .insertContent('<a href="{unsubscribe_url}">Unsubscribe</a>')
+          .run();
+        return;
+      }
+
+      if (field === "bodyHtml") {
+        setForm((current) => {
+          const source = current.bodyHtml;
+          const element = bodyFieldRef.current;
+          const start = element?.selectionStart ?? source.length;
+          const end = element?.selectionEnd ?? source.length;
+          const before = source.slice(0, start);
+          const after = source.slice(end);
+          const inserted = `${before}<a href="{unsubscribe_url}">Unsubscribe</a>${after}`;
+          return {
+            ...current,
+            bodyHtml: inserted,
+            bodyText: stripHtmlToPlainText(inserted),
+          };
+        });
+        return;
+      }
+
+      // Plain text: unsubscribe footer is appended automatically at send time.
+      return;
+    }
+
     if (form.contentMode === "rich_text" && richEditorRef.current) {
       richEditorRef.current.chain().focus().insertContent(token).run();
       return;
@@ -700,9 +739,6 @@ export function CampaignStepFormPage({
     );
   }
 
-  const bodyContent = `${form.body} ${form.bodyHtml} ${form.bodyText}`;
-  const missingUnsubscribe = !emailBodyHasUnsubscribe(bodyContent);
-
   return (
     <FocusedFormLayout
       title={isEdit ? form.name || "Edit email" : "Add email step"}
@@ -729,7 +765,7 @@ export function CampaignStepFormPage({
               Save draft
             </Button>
             <Button
-              disabled={submitting || missingUnsubscribe}
+              disabled={submitting}
               onClick={() => void saveStep("ready")}
             >
               Mark as ready
@@ -979,12 +1015,9 @@ export function CampaignStepFormPage({
                 </div>
               ) : null}
 
-              {missingUnsubscribe ? (
-                <p className="text-[12px] text-[var(--color-ink-muted)]">
-                  Include {"{unsubscribe_url}"} (Insert field → Unsubscribe URL) before marking this
-                  email as ready.
-                </p>
-              ) : null}
+              <p className="text-[12px] text-[var(--color-ink-muted)]">
+                An unsubscribe link is added automatically when this email is sent.
+              </p>
             </div>
           </Card>
 
