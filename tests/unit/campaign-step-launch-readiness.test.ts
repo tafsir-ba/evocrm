@@ -36,4 +36,48 @@ describe("campaign step launch readiness", () => {
   it("treats draft steps as not launch-ready", () => {
     expect(isCampaignStepLaunchReady({ ...baseStep, status: "draft" })).toBe(false);
   });
+
+  it("does not block launch for typical email HTML with meta/content attributes", () => {
+    const bodyHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://example.com/email.css" />
+</head>
+<body>
+  <img src="https://example.com/hero.jpg" alt="Hero" />
+  <p>Hello</p>
+  <br />
+  <a href="{unsubscribe_url}">Unsubscribe</a>
+</body>
+</html>`;
+
+    const step = {
+      status: "ready",
+      subject: "Thank you",
+      contentMode: "html",
+      body: "",
+      bodyHtml,
+      bodyText: null,
+    };
+
+    expect(getCampaignStepLaunchIssues(step)).toEqual([]);
+    expect(isCampaignStepLaunchReady(step)).toBe(true);
+  });
+
+  it("still blocks launch when HTML contains script tags", () => {
+    const step = {
+      status: "ready",
+      subject: "Thank you",
+      contentMode: "html",
+      body: "",
+      bodyHtml: '<script>alert(1)</script><a href="{unsubscribe_url}">Unsubscribe</a>',
+      bodyText: null,
+    };
+
+    expect(getCampaignStepLaunchIssues(step)).toContain(
+      "Resolve unsafe HTML warnings before marking this email as ready.",
+    );
+  });
 });
