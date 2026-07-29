@@ -60,7 +60,11 @@ type MemberOption = {
   email: string;
 };
 
-function memberInitials(member: MemberOption): string {
+function memberInitials(member: {
+  userId?: string;
+  name: string | null;
+  email: string | null | undefined;
+}): string {
   if (member.name) {
     return member.name
       .split(" ")
@@ -70,7 +74,11 @@ function memberInitials(member: MemberOption): string {
       .toUpperCase();
   }
 
-  return member.email.slice(0, 2).toUpperCase();
+  if (member.email) {
+    return member.email.slice(0, 2).toUpperCase();
+  }
+
+  return "?";
 }
 
 type PipelinePanelProps = {
@@ -129,8 +137,20 @@ export function PipelinePanel({
         throw new Error("Failed to load pipeline.");
       }
 
-      const body = (await response.json()) as { data: PipelineResponse };
-      setPipeline(body.data);
+      const body = (await response.json()) as { data?: PipelineResponse | null };
+      const nextPipeline = body.data;
+      if (
+        !nextPipeline ||
+        !Array.isArray(nextPipeline.columns) ||
+        !nextPipeline.totals ||
+        typeof nextPipeline.totals.count !== "number"
+      ) {
+        throw new Error("Pipeline response was incomplete.");
+      }
+      setPipeline({
+        columns: nextPipeline.columns,
+        totals: nextPipeline.totals,
+      });
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Failed to load pipeline.",
@@ -152,20 +172,22 @@ export function PipelinePanel({
       ]);
 
       if (membersResponse.ok) {
-        const payload = (await membersResponse.json()) as { data: { members: MemberOption[] } };
-        setMembers(payload.data.members);
+        const payload = (await membersResponse.json()) as {
+          data?: { members?: MemberOption[] };
+        };
+        setMembers(Array.isArray(payload.data?.members) ? payload.data.members : []);
       }
       if (lostReasonsResponse.ok) {
         const payload = (await lostReasonsResponse.json()) as {
-          data: { items: Array<{ id: string; label: string }> };
+          data?: { items?: Array<{ id: string; label: string }> };
         };
-        setLostReasons(payload.data.items);
+        setLostReasons(Array.isArray(payload.data?.items) ? payload.data.items : []);
       }
     })();
   }, [workspaceSlug]);
 
   const allStages = useMemo(
-    () => pipeline?.columns.map((column) => column.status) ?? [],
+    () => pipeline?.columns?.map((column) => column.status) ?? [],
     [pipeline],
   );
 
@@ -278,6 +300,7 @@ export function PipelinePanel({
     pipeline.totals.activeValue > 0
       ? formatPrice(pipeline.totals.activeValue, defaultCurrency)
       : "—";
+  const columns = pipeline.columns ?? [];
 
   return (
     <>
@@ -328,7 +351,7 @@ export function PipelinePanel({
         <p className="mb-3 text-[12.5px] text-[var(--color-danger-fg)]">{stageMoveError}</p>
       )}
 
-      {pipeline.columns.every((column) => column.count === 0) ? (
+      {columns.length === 0 ? (
         <EmptyState
           title="No opportunities in pipeline"
           description="Create an opportunity to connect a lead with a property."
@@ -344,7 +367,7 @@ export function PipelinePanel({
       ) : (
         <div className="-mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 overflow-x-auto pb-6 min-w-0 max-w-full">
           <div className="grid grid-flow-col auto-cols-[minmax(240px,280px)] gap-3 w-max">
-            {pipeline.columns.map((column) => (
+            {columns.map((column) => (
               <KanbanColumn
                 key={column.status.id}
                 title={column.status.label}
@@ -361,7 +384,7 @@ export function PipelinePanel({
                   </>
                 }
                 emptyLabel="No opportunities"
-                cards={column.opportunities.map((opportunity) => ({
+                cards={(column.opportunities ?? []).map((opportunity) => ({
                   id: opportunity.id,
                   title: opportunity.lead?.fullName ?? "Lead",
                   subtitle: opportunity.property?.title ?? "Property",
@@ -373,7 +396,7 @@ export function PipelinePanel({
                   href: workspacePath(workspaceSlug, "opportunities", opportunity.id),
                 }))}
                 renderCard={(card) => {
-                  const opportunity = column.opportunities.find(
+                  const opportunity = (column.opportunities ?? []).find(
                     (item) => item.id === card.id,
                   );
                   return (
@@ -389,7 +412,10 @@ export function PipelinePanel({
                             <Avatar
                               user={{
                                 id: opportunity.assignedUser.id,
-                                name: opportunity.assignedUser.name ?? opportunity.assignedUser.email,
+                                name:
+                                  opportunity.assignedUser.name ??
+                                  opportunity.assignedUser.email ??
+                                  "User",
                                 initials: memberInitials({
                                   userId: opportunity.assignedUser.id,
                                   name: opportunity.assignedUser.name,
