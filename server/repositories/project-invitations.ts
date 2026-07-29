@@ -96,6 +96,20 @@ export async function findPendingInvitation(
   return doc ? toRecord(doc) : null;
 }
 
+export async function findInvitationByIdInProject(
+  workspaceId: string,
+  projectId: string,
+  invitationId: string,
+): Promise<ProjectInvitationRecord | null> {
+  await connectDb();
+  const doc = await ProjectInvitationModel.findOne({
+    _id: invitationId,
+    workspaceId,
+    projectId,
+  }).lean<ProjectInvitationDocument>();
+  return doc ? toRecord(doc) : null;
+}
+
 export async function findInvitationsForProject(
   workspaceId: string,
   projectId: string,

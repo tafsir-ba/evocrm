@@ -11,6 +11,7 @@ import {
   listProjectInvitations,
   sendProjectInvitation,
 } from "@/server/services/project-invitations";
+import { assertProjectSharingEnabled } from "@/server/features/project-sharing";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { z } from "zod";
 
@@ -35,6 +36,7 @@ const removeGrantSchema = z.object({
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
+    assertProjectSharingEnabled();
     const { workspaceSlug, projectId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
     await requireProjectAccess(workspace.id, userId, projectId, "project:read");
@@ -52,6 +54,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
+    assertProjectSharingEnabled();
     const { workspaceSlug, projectId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
     const access = await requireProjectAccess(workspace.id, userId, projectId);
@@ -80,6 +83,7 @@ export async function POST(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    assertProjectSharingEnabled();
     const { workspaceSlug, projectId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
     const access = await requireProjectAccess(workspace.id, userId, projectId);
@@ -107,6 +111,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   try {
+    assertProjectSharingEnabled();
     const { workspaceSlug, projectId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
     const access = await requireProjectAccess(workspace.id, userId, projectId);

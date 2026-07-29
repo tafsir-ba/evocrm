@@ -5,6 +5,7 @@ import {
   resendProjectInvitation,
   revokeProjectInvitation,
 } from "@/server/services/project-invitations";
+import { assertProjectSharingEnabled } from "@/server/features/project-sharing";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { z } from "zod";
 
@@ -22,6 +23,7 @@ const actionSchema = z.object({
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    assertProjectSharingEnabled();
     const { workspaceSlug, projectId, invitationId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
     const access = await requireProjectAccess(workspace.id, userId, projectId);
@@ -36,6 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (body.action === "resend") {
       const updated = await resendProjectInvitation({
         workspaceId: workspace.id,
+        projectId,
         invitationId,
         actorId: userId,
       });
@@ -44,6 +47,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     await revokeProjectInvitation({
       workspaceId: workspace.id,
+      projectId,
       invitationId,
       actorId: userId,
     });

@@ -4,8 +4,27 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PROJECT_SHARING_ENABLED } from "@/lib/project-sharing-feature";
 
 export default function AcceptInvitationPage() {
+  if (!PROJECT_SHARING_ENABLED) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-canvas)] p-4">
+        <Card className="max-w-md w-full text-center space-y-4">
+          <h1 className="text-[18px] font-semibold text-[var(--color-ink)]">
+            Project sharing is coming soon
+          </h1>
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            Project sharing remains disabled until project-scoped authorization is fully enforced.
+          </p>
+          <Button variant="secondary" onClick={() => (window.location.href = "/workspaces")}>
+            Go to workspaces
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"idle" | "accepting" | "success" | "error">("idle");

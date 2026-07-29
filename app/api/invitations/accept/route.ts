@@ -1,5 +1,6 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import { requireAuth } from "@/server/auth/require-auth";
+import { assertProjectSharingEnabled } from "@/server/features/project-sharing";
 import { acceptProjectInvitation } from "@/server/services/project-invitations";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { z } from "zod";
@@ -10,6 +11,7 @@ const acceptSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    assertProjectSharingEnabled();
     const session = await requireAuth();
     const body = parseRequestOrThrow(acceptSchema, await request.json());
 

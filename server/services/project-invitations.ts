@@ -6,6 +6,7 @@ import { getEnv } from "@/server/env";
 import { sendCampaignEmail } from "@/server/email/resend";
 import {
   createProjectInvitation,
+  findInvitationByIdInProject,
   findInvitationByTokenHash,
   findInvitationsForProject,
   findPendingInvitation,
@@ -92,7 +93,10 @@ export async function sendProjectInvitation(input: {
   projectRole: ProjectRoleKey;
   actorId: string;
   message?: string;
-}): Promise<{ invitation: InvitationListItem; isExistingMember: boolean }> {
+}): Promise<
+  | { mode: "invitation"; invitation: InvitationListItem; isExistingMember: boolean }
+  | { mode: "grant"; grant: Awaited<ReturnType<typeof import("@/server/services/project-grants").addProjectGrant>> }
+> {
   if (!isProjectRoleKey(input.projectRole)) {
     throw new AppError("VALIDATION_ERROR", "Invalid project role.");
   }
@@ -109,11 +113,10 @@ export async function sendProjectInvitation(input: {
 
   const normalizedEmail = input.email.toLowerCase().trim();
 
-  const existingGrant = await (async () => {
-    const user = await findUserByEmail(normalizedEmail);
-    if (!user) return null;
-    return findActiveProjectGrant(input.workspaceId, input.projectId, user.id);
-  })();
+  const existingUser = await findUserByEmail(normalizedEmail);
+  const existingGrant = existingUser
+    ? await findActiveProjectGrant(input.workspaceId, input.projectId, existingUser.id)
+    : null;
 
   if (existingGrant) {
     throw new AppError(
@@ -132,6 +135,26 @@ export async function sendProjectInvitation(input: {
       "CONFLICT",
       "A pending invitation already exists for this email. Resend or revoke it first.",
     );
+  }
+
+  const activeMembership = existingUser
+    ? await findMembership(existingUser.id, input.workspaceId)
+    : null;
+
+  if (existingUser && activeMembership?.status === "active") {
+    const { addProjectGrant } = await import("@/server/services/project-grants");
+    const grant = await addProjectGrant({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      targetEmail: normalizedEmail,
+      projectRole: input.projectRole,
+      actorId: input.actorId,
+    });
+
+    return {
+      mode: "grant",
+      grant,
+    };
   }
 
   const { raw: token, hash: tokenHash } = generateInvitationToken();
@@ -153,7 +176,7 @@ export async function sendProjectInvitation(input: {
   const env = getEnv();
   const acceptUrl = `${env.NEXT_PUBLIC_APP_URL}/invitations/accept?token=${token}`;
 
-  await sendCampaignEmail({
+  const sendResult = await sendCampaignEmail({
     to: normalizedEmail,
     subject: `${inviter?.name ?? "Someone"} invited you to collaborate on ${project.name}`,
     html: buildInvitationEmailHtml({
@@ -177,6 +200,13 @@ export async function sendProjectInvitation(input: {
     fromName: workspace.name,
   });
 
+  if (!sendResult.success) {
+    throw new AppError(
+      "INTERNAL_ERROR",
+      `Could not send invitation email: ${sendResult.error}`,
+    );
+  }
+
   await createAuditLog({
     workspaceId: input.workspaceId,
     actorId: input.actorId,
@@ -190,9 +220,8 @@ export async function sendProjectInvitation(input: {
     },
   });
 
-  const existingUser = await findUserByEmail(normalizedEmail);
-
   return {
+    mode: "invitation",
     invitation: await toInvitationListItem(invitation),
     isExistingMember: Boolean(existingUser),
   };
@@ -200,9 +229,20 @@ export async function sendProjectInvitation(input: {
 
 export async function resendProjectInvitation(input: {
   workspaceId: string;
+  projectId: string;
   invitationId: string;
   actorId: string;
 }): Promise<InvitationListItem> {
+  const existing = await findInvitationByIdInProject(
+    input.workspaceId,
+    input.projectId,
+    input.invitationId,
+  );
+
+  if (!existing || existing.status !== "pending") {
+    throw new AppError("NOT_FOUND", "Pending invitation not found.");
+  }
+
   const { raw: token, hash: tokenHash } = generateInvitationToken();
   const expiresAt = getExpiryDate();
 
@@ -260,9 +300,20 @@ export async function resendProjectInvitation(input: {
 
 export async function revokeProjectInvitation(input: {
   workspaceId: string;
+  projectId: string;
   invitationId: string;
   actorId: string;
 }): Promise<void> {
+  const existing = await findInvitationByIdInProject(
+    input.workspaceId,
+    input.projectId,
+    input.invitationId,
+  );
+
+  if (!existing || existing.status !== "pending") {
+    throw new AppError("NOT_FOUND", "Pending invitation not found.");
+  }
+
   const revoked = await revokeInvitation(input.invitationId, input.actorId);
 
   if (!revoked) {
