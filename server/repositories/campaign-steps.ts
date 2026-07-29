@@ -237,6 +237,48 @@ export async function deleteCampaignStep(
   return result.deletedCount > 0;
 }
 
+/**
+ * Apply a new campaign contact/from name to steps that still use a blank value,
+ * the campaign title, or a previous campaign-level sender name.
+ * Steps with a custom fromName are left unchanged.
+ */
+export async function syncCampaignStepFromNames(
+  workspaceId: string,
+  campaignId: string,
+  input: {
+    nextFromName: string;
+    previousValues: Array<string | null | undefined>;
+  },
+): Promise<number> {
+  const nextFromName = input.nextFromName.trim();
+  if (!nextFromName) {
+    return 0;
+  }
+
+  await connectDb();
+
+  const replaceable = new Set(
+    input.previousValues
+      .map((value) => value?.trim() ?? "")
+      .filter((value) => value.length > 0 && value !== nextFromName),
+  );
+
+  const filter = {
+    ...withWorkspaceScope(workspaceId, { campaignId }),
+    $or: [
+      { fromName: null },
+      { fromName: "" },
+      ...(replaceable.size > 0 ? [{ fromName: { $in: [...replaceable] } }] : []),
+    ],
+  };
+
+  const result = await CampaignStepModel.updateMany(filter, {
+    $set: { fromName: nextFromName },
+  });
+
+  return result.modifiedCount ?? 0;
+}
+
 export async function findStepByOrder(
   workspaceId: string,
   campaignId: string,

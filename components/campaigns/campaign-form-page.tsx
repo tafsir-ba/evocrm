@@ -217,16 +217,17 @@ export function CampaignFormPage({
           </>
         ) : null}
         <div>
-          <Label htmlFor="campaign-default-from">Default from name (optional)</Label>
+          <Label htmlFor="campaign-default-from">Sender contact name</Label>
           <Input
             id="campaign-default-from"
             value={form.defaultFromName}
             onChange={(e) => setForm((f) => ({ ...f, defaultFromName: e.target.value }))}
-            placeholder="e.g. Grosvenor Vistas"
+            placeholder="e.g. Grosvenor"
             maxLength={120}
           />
           <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
-            Pre-fills new email steps. Each step can override this sender name.
+            Shown as the From name in recipients&apos; inboxes. Keep it short (e.g. Grosvenor),
+            not the full campaign title. Each email step can override this.
           </p>
         </div>
 

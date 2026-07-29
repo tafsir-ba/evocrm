@@ -371,7 +371,7 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 
 **Purge (permanent delete):** Only `draft` campaigns with zero enrollments. Deletes all campaign steps, then the campaign document. Cannot be undone. Requires `campaign:delete` (separate from archive).
 
-**Step fields:** Each step requires `order`, `delayDays`, `sendTime` (HH:mm, default `09:00`), `fromName`, `subject`, `body`. Campaign `defaultFromName` pre-fills new steps in the UI only; API create/update still requires a non-empty step `fromName`.
+**Step fields:** Each step has `order`, `delayDays`, `sendTime` (HH:mm, default `09:00`), `fromName` (optional; sender contact name shown in the inbox), `subject`, `body`. Campaign `senderName` / `defaultFromName` pre-fills new steps in the UI and is used at send time when a step `fromName` is empty. Updating the campaign sender contact name also rewrites steps that still use a blank from name, the campaign title, or the previous campaign sender name. Launch readiness requires an explicit campaign sender contact name so recipients do not see the internal campaign title as the From name.
 
 **Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
 

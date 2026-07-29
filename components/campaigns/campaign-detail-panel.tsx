@@ -24,6 +24,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconMail, IconPlus } from "@/lib/icons";
+import { resolveCampaignStepFromName } from "@/lib/campaign-from-name";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
 import {
   formatDateTimeInWorkspaceTimezone,
@@ -870,11 +871,17 @@ export function CampaignDetailPanel({
         <p className="text-[12px] text-[var(--color-ink-muted)] mb-4">
           Attachments linked to this email are included when the campaign sends.
         </p>
-        {previewStep && (
+        {previewStep && campaign && (
           <div className="space-y-3">
             <div>
               <p className="text-[11px] uppercase text-[var(--color-ink-muted)] font-semibold">From</p>
-              <p className="text-[14px] font-medium mt-1">{previewStep.fromName}</p>
+              <p className="text-[14px] font-medium mt-1">
+                {resolveCampaignStepFromName(previewStep.fromName, {
+                  senderName: campaign.senderName,
+                  defaultFromName: campaign.defaultFromName,
+                  name: campaign.name,
+                })}
+              </p>
             </div>
             <div>
               <p className="text-[11px] uppercase text-[var(--color-ink-muted)] font-semibold">Subject</p>

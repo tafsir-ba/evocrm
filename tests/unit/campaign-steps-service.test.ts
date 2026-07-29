@@ -118,6 +118,55 @@ describe("campaign step service readiness enforcement", () => {
     expect(createCampaignStep).not.toHaveBeenCalled();
   });
 
+  it("stores an explicit step fromName and falls back to campaign sender name", async () => {
+    vi.mocked(findCampaignSteps).mockResolvedValue([]);
+    vi.mocked(createCampaignStep).mockResolvedValue({
+      ...readyStep,
+      id: "step-new",
+      status: "draft",
+      fromName: "Grosvenor",
+    });
+
+    await createCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", {
+      order: 1,
+      delayDays: 0,
+      sendTime: "09:00",
+      channel: "email",
+      status: "draft",
+      fromName: "Grosvenor",
+      subject: "Hello",
+      body: "Thanks\n{unsubscribe_url}",
+    });
+
+    expect(createCampaignStep).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({ fromName: "Grosvenor" }),
+    );
+
+    vi.mocked(createCampaignStep).mockClear();
+    vi.mocked(createCampaignStep).mockResolvedValue({
+      ...readyStep,
+      id: "step-new-2",
+      status: "draft",
+      fromName: "EvoHome",
+    });
+
+    await createCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", {
+      order: 2,
+      delayDays: 1,
+      sendTime: "09:00",
+      channel: "email",
+      status: "draft",
+      subject: "Follow up",
+      body: "Thanks\n{unsubscribe_url}",
+    });
+
+    expect(createCampaignStep).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({ fromName: "EvoHome" }),
+    );
+  });
+
   it("allows send-time-only updates on ready steps without re-validating unsubscribe", async () => {
     vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
     vi.mocked(updateCampaignStep).mockResolvedValue({

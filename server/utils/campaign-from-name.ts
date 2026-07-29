@@ -1,33 +1,6 @@
 import "server-only";
 
-/**
- * Defensive sender resolution for send-time only.
- * API create/update requires a non-empty step fromName; this fallback covers legacy DB rows.
- */
-export function resolveCampaignStepFromName(
-  stepFromName: string | null | undefined,
-  campaign: {
-    senderName?: string | null;
-    defaultFromName: string | null;
-    name: string;
-  },
-): string {
-  const trimmedStepFromName = stepFromName?.trim() ?? "";
-
-  if (trimmedStepFromName.length > 0) {
-    return trimmedStepFromName;
-  }
-
-  const senderName = campaign.senderName?.trim();
-  if (senderName) {
-    return senderName;
-  }
-
-  const defaultFromName = campaign.defaultFromName?.trim();
-
-  if (defaultFromName) {
-    return defaultFromName;
-  }
-
-  return campaign.name.trim();
-}
+export {
+  campaignHasSenderContactName,
+  resolveCampaignStepFromName,
+} from "@/lib/campaign-from-name";

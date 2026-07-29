@@ -41,6 +41,7 @@ type StepFormState = {
   order: string;
   delayDays: string;
   sendTime: string;
+  fromName: string;
   subject: string;
   previewText: string;
   contentMode: ContentMode;
@@ -56,6 +57,7 @@ type CampaignStepApiRecord = {
   order: number;
   delayDays: number;
   sendTime: string;
+  fromName?: string | null;
   subject?: string | null;
   previewText?: string | null;
   contentMode?: ContentMode;
@@ -73,12 +75,16 @@ type AttachmentItem = {
   mimeType: string;
 };
 
-function mapStepToFormState(step: CampaignStepApiRecord): StepFormState {
+function mapStepToFormState(
+  step: CampaignStepApiRecord,
+  campaignDefaultFromName = "",
+): StepFormState {
   return {
     name: step.name ?? step.subject ?? "",
     order: String(step.order),
     delayDays: String(step.delayDays),
     sendTime: step.sendTime,
+    fromName: step.fromName?.trim() || campaignDefaultFromName,
     subject: step.subject ?? "",
     previewText: step.previewText ?? "",
     contentMode: step.contentMode ?? "rich_text",
@@ -97,6 +103,7 @@ const emptyStepForm: StepFormState = {
   order: "1",
   delayDays: "0",
   sendTime: "09:00",
+  fromName: "",
   subject: "",
   previewText: "",
   contentMode: "rich_text",
@@ -127,6 +134,7 @@ export function CampaignStepFormPage({
 
   const [campaignName, setCampaignName] = useState("");
   const [campaignStatus, setCampaignStatus] = useState<string>("draft");
+  const [campaignDefaultFromName, setCampaignDefaultFromName] = useState("");
   const [stepPosition, setStepPosition] = useState({ current: 1, total: 1 });
   const [form, setForm] = useState<StepFormState>(emptyStepForm);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
@@ -207,8 +215,11 @@ export function CampaignStepFormPage({
 
         const campaign = campaignPayload.data?.campaign;
         const steps = stepsPayload.data?.steps ?? [];
+        const defaultFromName =
+          (campaign?.senderName ?? campaign?.defaultFromName ?? "").trim();
         setCampaignName(campaign?.name ?? "Campaign");
         setCampaignStatus(campaign?.status ?? "draft");
+        setCampaignDefaultFromName(defaultFromName);
 
         if (isEdit && stepId) {
           const step = steps.find((item: { id: string }) => item.id === stepId);
@@ -220,7 +231,7 @@ export function CampaignStepFormPage({
             current: step.order,
             total: steps.length,
           });
-          const mapped = mapStepToFormState(step);
+          const mapped = mapStepToFormState(step, defaultFromName);
           setForm(mapped);
           await loadAttachments(mapped.documentIds);
           return;
@@ -231,6 +242,7 @@ export function CampaignStepFormPage({
           ...emptyStepForm,
           order: String(steps.length + 1),
           name: `Email ${steps.length + 1}`,
+          fromName: defaultFromName,
         });
         setAttachments([]);
       } catch (error) {
@@ -285,6 +297,7 @@ export function CampaignStepFormPage({
     const trimmedName = form.name.trim();
     const normalizedSendTime = normalizeCampaignSendTime(form.sendTime);
 
+    const trimmedFromName = form.fromName.trim();
     const payload = {
       order: parseInt(form.order, 10),
       ...(trimmedName
@@ -306,6 +319,7 @@ export function CampaignStepFormPage({
     if (!isEdit) {
       return {
         ...payload,
+        ...(trimmedFromName ? { fromName: trimmedFromName } : {}),
         status: intent === "ready" ? "ready" : "draft",
         channel: "email" as const,
       };
@@ -320,10 +334,17 @@ export function CampaignStepFormPage({
         };
       }
 
-      return payload;
+      return {
+        ...payload,
+        fromName: trimmedFromName || null,
+      };
     }
 
-    return { ...payload, status: intent };
+    return {
+      ...payload,
+      fromName: trimmedFromName || null,
+      status: intent,
+    };
   }
 
   function formatSaveError(payload: {
@@ -388,7 +409,10 @@ export function CampaignStepFormPage({
 
       const savedStep = payload.data?.step;
       if (savedStep && typeof savedStep === "object") {
-        const mapped = mapStepToFormState(savedStep as CampaignStepApiRecord);
+        const mapped = mapStepToFormState(
+          savedStep as CampaignStepApiRecord,
+          campaignDefaultFromName,
+        );
         setForm((current) => ({
           ...current,
           ...mapped,
@@ -734,6 +758,23 @@ export function CampaignStepFormPage({
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.85fr)] gap-4">
           <Card padded={false} className="overflow-hidden">
             <div className="border-b border-[var(--color-line)] px-4 py-3 space-y-3">
+              <div className="flex items-center gap-3">
+                <label
+                  htmlFor="step-from-name"
+                  className="w-16 shrink-0 text-[12px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]"
+                >
+                  From
+                </label>
+                <input
+                  id="step-from-name"
+                  value={form.fromName}
+                  disabled={contentLocked}
+                  onChange={(e) => setForm((f) => ({ ...f, fromName: e.target.value }))}
+                  maxLength={120}
+                  placeholder="Contact name shown in the inbox (e.g. Grosvenor)"
+                  className="h-9 w-full bg-transparent text-[14px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] outline-none focus-ring rounded-md"
+                />
+              </div>
               <div className="flex items-center gap-3">
                 <label
                   htmlFor="step-subject"

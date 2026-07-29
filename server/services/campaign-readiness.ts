@@ -4,6 +4,7 @@ import { AppError } from "@/server/errors";
 import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findVerifiedSendingDomainById } from "@/server/repositories/sending-domains";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
+import { campaignHasSenderContactName } from "@/lib/campaign-from-name";
 import { validateCampaignHtml, emailBodyHasUnsubscribe } from "@/lib/campaign-email";
 import { isCampaignStepLaunchReady } from "@/lib/campaign-step-readiness";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
@@ -69,6 +70,13 @@ export async function evaluateCampaignReadiness(
       label: "Sender email selected",
       passed: Boolean(campaign.senderEmail),
       requiredFix: "Select a sender email.",
+    },
+    {
+      key: "sender_contact_name",
+      label: "Sender contact name set",
+      passed: campaignHasSenderContactName(campaign),
+      requiredFix:
+        "Add a sender contact name (what recipients see in their inbox, e.g. Grosvenor).",
     },
     {
       key: "step_count",

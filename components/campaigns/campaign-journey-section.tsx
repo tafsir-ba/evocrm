@@ -379,14 +379,20 @@ export function CampaignJourneySection({
             ) : null}
           </div>
           <div>
-            <Label htmlFor="sender-name">Sender name</Label>
+            <Label htmlFor="sender-name">Sender contact name</Label>
             <Input
               id="sender-name"
               className="mt-1"
               value={localSenderName}
               disabled={!canUpdate || actionPending}
               onChange={(event) => setLocalSenderName(event.target.value)}
+              placeholder="e.g. Grosvenor"
+              maxLength={120}
             />
+            <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">
+              What recipients see as the sender in their inbox. Use a short contact name instead of
+              the campaign title.
+            </p>
           </div>
           <div>
             <Label htmlFor="sender-email">Sender email</Label>

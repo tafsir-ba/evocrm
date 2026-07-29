@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isEnrollmentRulesReady } from "@/server/services/campaign-readiness";
+import { campaignHasSenderContactName } from "@/lib/campaign-from-name";
 import { isCampaignStepLaunchReady } from "@/lib/campaign-step-readiness";
 
 describe("campaign readiness", () => {
@@ -20,6 +21,21 @@ describe("campaign readiness", () => {
         autoEnrollmentEnabled: true,
         enrollmentTrigger: "new_lead",
         enrollmentRules: { logic: "AND", conditions: [] },
+      }),
+    ).toBe(true);
+  });
+
+  it("requires an explicit sender contact name for launch readiness", () => {
+    expect(
+      campaignHasSenderContactName({
+        senderName: null,
+        defaultFromName: null,
+      }),
+    ).toBe(false);
+    expect(
+      campaignHasSenderContactName({
+        senderName: "Grosvenor",
+        defaultFromName: null,
       }),
     ).toBe(true);
   });

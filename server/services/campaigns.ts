@@ -20,7 +20,11 @@ import {
   pauseEnrollmentsForCampaign,
   resumeEnrollmentsForCampaign,
 } from "@/server/repositories/campaign-enrollments";
-import { countCampaignSteps, deleteCampaignStepsForCampaign } from "@/server/repositories/campaign-steps";
+import {
+  countCampaignSteps,
+  deleteCampaignStepsForCampaign,
+  syncCampaignStepFromNames,
+} from "@/server/repositories/campaign-steps";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findProjectById } from "@/server/repositories/projects";
 import { findTagById } from "@/server/repositories/tags";
@@ -437,6 +441,29 @@ export async function updateCampaignForWorkspace(
 
   if (!updated) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  const nextSenderContactName = (
+    updated.senderName ??
+    updated.defaultFromName ??
+    ""
+  ).trim();
+  const senderContactChanged =
+    (normalizedInput.senderName !== undefined &&
+      (normalizedInput.senderName?.trim() ?? "") !== (existing.senderName?.trim() ?? "")) ||
+    (normalizedInput.defaultFromName !== undefined &&
+      (normalizedInput.defaultFromName?.trim() ?? "") !==
+        (existing.defaultFromName?.trim() ?? ""));
+
+  if (senderContactChanged && nextSenderContactName) {
+    await syncCampaignStepFromNames(workspaceId, campaignId, {
+      nextFromName: nextSenderContactName,
+      previousValues: [
+        existing.senderName,
+        existing.defaultFromName,
+        existing.name,
+      ],
+    });
   }
 
   if (normalizedInput.status === "paused" && existing.status === "active") {

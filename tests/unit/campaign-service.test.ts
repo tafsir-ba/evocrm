@@ -15,6 +15,7 @@ vi.mock("@/server/repositories/campaigns", () => ({
 vi.mock("@/server/repositories/campaign-steps", () => ({
   countCampaignSteps: vi.fn(),
   deleteCampaignStepsForCampaign: vi.fn(),
+  syncCampaignStepFromNames: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
@@ -57,7 +58,7 @@ import {
 import { countCampaignEnrollments, cancelEnrollmentsForCampaign, pauseEnrollmentsForCampaign, resumeEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
 import { rescheduleActiveEnrollmentSendsForCampaign } from "@/server/services/campaign-enrollments";
 import { sendCampaignEnrollmentsImmediately } from "@/server/services/campaign-sending";
-import { countCampaignSteps, deleteCampaignStepsForCampaign } from "@/server/repositories/campaign-steps";
+import { countCampaignSteps, deleteCampaignStepsForCampaign, syncCampaignStepFromNames } from "@/server/repositories/campaign-steps";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   archiveCampaignForWorkspace,
@@ -181,6 +182,33 @@ describe("campaign service", () => {
         enrollmentTrigger: "new_lead",
       }),
     );
+    expect(syncCampaignStepFromNames).not.toHaveBeenCalled();
+  });
+
+  it("syncs step from names when sender contact name changes", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...baseCampaign,
+      name: "Grosvenor Vistas website contact form dripping",
+      senderName: null,
+      defaultFromName: null,
+    });
+    vi.mocked(updateCampaign).mockResolvedValue({
+      ...baseCampaign,
+      name: "Grosvenor Vistas website contact form dripping",
+      senderName: "Grosvenor",
+      defaultFromName: "Grosvenor",
+    });
+    vi.mocked(syncCampaignStepFromNames).mockResolvedValue(2);
+
+    await updateCampaignForWorkspace("ws-1", "user-1", "camp-1", {
+      senderName: "Grosvenor",
+      defaultFromName: "Grosvenor",
+    });
+
+    expect(syncCampaignStepFromNames).toHaveBeenCalledWith("ws-1", "camp-1", {
+      nextFromName: "Grosvenor",
+      previousValues: [null, null, "Grosvenor Vistas website contact form dripping"],
+    });
   });
 
   it("archive sets status=archived and archivedAt", async () => {
