@@ -3,7 +3,9 @@ import {
   propertyFormValuesFromSqm,
 } from "@/components/properties/property-form-page";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getPropertyForWorkspace } from "@/server/services/properties";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
@@ -49,19 +51,28 @@ export default async function EditPropertyPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <PropertyFormPage
-        workspaceSlug={workspaceSlug}
-        defaultCurrency={defaultCurrency}
-        mode="edit"
-        propertyId={propertyId}
-        canCreateDocument={hasPermission(permissions, "document:create")}
-        initialValues={propertyFormValuesFromSqm(property, defaultCurrency)}
-        cancelHref={workspacePath(workspaceSlug, "properties", propertyId)}
-        back={{
-          href: workspacePath(workspaceSlug, "properties", propertyId),
-          label: "Back to property",
-        }}
-      />
+      <ProjectFilterSuspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
+        }
+      >
+        <PropertyFormPage
+          workspaceSlug={workspaceSlug}
+          defaultCurrency={defaultCurrency}
+          mode="edit"
+          propertyId={propertyId}
+          canCreateDocument={hasPermission(permissions, "document:create")}
+          initialValues={propertyFormValuesFromSqm(property, defaultCurrency)}
+          cancelHref={workspacePath(workspaceSlug, "properties", propertyId)}
+          back={{
+            href: workspacePath(workspaceSlug, "properties", propertyId),
+            label: "Back to property",
+          }}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }

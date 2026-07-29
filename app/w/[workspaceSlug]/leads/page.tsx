@@ -1,5 +1,6 @@
 import { LeadsPanel } from "@/components/leads/leads-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
@@ -25,13 +26,15 @@ export default async function LeadsPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <LeadsPanel
-        workspaceSlug={workspaceSlug}
-        canCreate={hasPermission(permissions, "lead:create")}
-        canCreateProject={hasPermission(permissions, "project:create")}
-        canArchive={hasPermission(permissions, "lead:archive")}
-        canDelete={hasPermission(permissions, "lead:delete")}
-      />
+      <ProjectFilterSuspense>
+        <LeadsPanel
+          workspaceSlug={workspaceSlug}
+          canCreate={hasPermission(permissions, "lead:create")}
+          canCreateProject={hasPermission(permissions, "project:create")}
+          canArchive={hasPermission(permissions, "lead:archive")}
+          canDelete={hasPermission(permissions, "lead:delete")}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }

@@ -1,5 +1,6 @@
 import { PropertiesPanel } from "@/components/properties/properties-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
@@ -25,13 +26,15 @@ export default async function PropertiesPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <PropertiesPanel
-        workspaceSlug={workspaceSlug}
-        defaultCurrency={access.context.workspace.defaultCurrency}
-        canCreate={hasPermission(permissions, "property:create")}
-        canCreateProject={hasPermission(permissions, "project:create")}
-        canArchive={hasPermission(permissions, "property:archive")}
-      />
+      <ProjectFilterSuspense>
+        <PropertiesPanel
+          workspaceSlug={workspaceSlug}
+          defaultCurrency={access.context.workspace.defaultCurrency}
+          canCreate={hasPermission(permissions, "property:create")}
+          canCreateProject={hasPermission(permissions, "project:create")}
+          canArchive={hasPermission(permissions, "property:archive")}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }

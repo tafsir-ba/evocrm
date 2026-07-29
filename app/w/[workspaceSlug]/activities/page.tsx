@@ -1,5 +1,6 @@
 import { ActivitiesPanel } from "@/components/activities/activities-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
@@ -25,14 +26,16 @@ export default async function ActivitiesPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <ActivitiesPanel
-        workspaceSlug={workspaceSlug}
-        workspaceTimezone={access.context.workspace.timezone}
-        canCreate={hasPermission(permissions, "activity:create")}
-        canUpdate={hasPermission(permissions, "activity:update")}
-        canArchive={hasPermission(permissions, "activity:archive")}
-        allowGlobalCreate={false}
-      />
+      <ProjectFilterSuspense>
+        <ActivitiesPanel
+          workspaceSlug={workspaceSlug}
+          workspaceTimezone={access.context.workspace.timezone}
+          canCreate={hasPermission(permissions, "activity:create")}
+          canUpdate={hasPermission(permissions, "activity:update")}
+          canArchive={hasPermission(permissions, "activity:archive")}
+          allowGlobalCreate={false}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }

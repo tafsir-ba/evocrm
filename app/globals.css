@@ -78,9 +78,8 @@ body {
     "ss01" on,
     "cv11" on;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 ::selection {

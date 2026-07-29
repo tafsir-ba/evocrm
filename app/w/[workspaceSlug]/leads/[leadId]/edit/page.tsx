@@ -1,6 +1,8 @@
 import { LeadFormPage, type LeadFormInitialValues } from "@/components/leads/lead-form-page";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Skeleton } from "@/components/ui/skeleton";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getLeadForWorkspace } from "@/server/services/leads";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
@@ -65,17 +67,26 @@ export default async function EditLeadPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <LeadFormPage
-        workspaceSlug={workspaceSlug}
-        mode="edit"
-        leadId={leadId}
-        initialValues={initialValues}
-        cancelHref={workspacePath(workspaceSlug, "leads", leadId)}
-        back={{
-          href: workspacePath(workspaceSlug, "leads", leadId),
-          label: "Back to lead",
-        }}
-      />
+      <ProjectFilterSuspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
+        }
+      >
+        <LeadFormPage
+          workspaceSlug={workspaceSlug}
+          mode="edit"
+          leadId={leadId}
+          initialValues={initialValues}
+          cancelHref={workspacePath(workspaceSlug, "leads", leadId)}
+          back={{
+            href: workspacePath(workspaceSlug, "leads", leadId),
+            label: "Back to lead",
+          }}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }

@@ -40,7 +40,7 @@ export function Topbar({
     .join("") || "U";
 
   return (
-    <header className="h-[60px] bg-white border-b border-[var(--color-line)] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 sticky top-0 z-30 min-w-0 overflow-x-hidden">
+    <header className="h-[60px] bg-white border-b border-[var(--color-line)] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 sticky top-0 z-30 min-w-0">
       <button
         onClick={onOpenMobileNav}
         className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-[var(--color-muted)] focus-ring"

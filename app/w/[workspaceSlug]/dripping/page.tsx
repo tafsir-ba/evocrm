@@ -1,5 +1,6 @@
 import { CampaignsPanel } from "@/components/campaigns/campaigns-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
@@ -25,12 +26,14 @@ export default async function DrippingPage({ params }: { params: Params }) {
 
   return (
     <PageContainer>
-      <CampaignsPanel
-        workspaceSlug={workspaceSlug}
-        canCreate={hasPermission(permissions, "campaign:create")}
-        canUpdate={hasPermission(permissions, "campaign:update")}
-        canArchive={hasPermission(permissions, "campaign:archive")}
-      />
+      <ProjectFilterSuspense>
+        <CampaignsPanel
+          workspaceSlug={workspaceSlug}
+          canCreate={hasPermission(permissions, "campaign:create")}
+          canUpdate={hasPermission(permissions, "campaign:update")}
+          canArchive={hasPermission(permissions, "campaign:archive")}
+        />
+      </ProjectFilterSuspense>
     </PageContainer>
   );
 }
