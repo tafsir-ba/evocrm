@@ -868,7 +868,7 @@ export function CampaignDetailPanel({
         title="Email preview"
       >
         <p className="text-[12px] text-[var(--color-ink-muted)] mb-4">
-          Preview only — document attachments are not included in sent emails in V1.
+          Attachments linked to this email are included when the campaign sends.
         </p>
         {previewStep && (
           <div className="space-y-3">

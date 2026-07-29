@@ -5,6 +5,12 @@ import { Resend } from "resend";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
 
+export type SendCampaignEmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
 export type SendCampaignEmailInput = {
   to: string;
   subject: string;
@@ -13,6 +19,7 @@ export type SendCampaignEmailInput = {
   fromName: string;
   fromEmail?: string;
   tags?: Array<{ name: string; value: string }>;
+  attachments?: SendCampaignEmailAttachment[];
 };
 
 export type SendCampaignEmailResult =
@@ -98,6 +105,15 @@ export async function sendCampaignEmail(
       text: input.text,
       replyTo: env.EMAIL_REPLY_TO,
       tags: sanitizeResendTags(input.tags),
+      ...(input.attachments && input.attachments.length > 0
+        ? {
+            attachments: input.attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType,
+            })),
+          }
+        : {}),
     });
 
     if (result.error) {

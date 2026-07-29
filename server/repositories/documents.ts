@@ -123,6 +123,36 @@ export async function findDocumentById(
   return toDocumentRecord(document as DocumentDocument);
 }
 
+export async function findDocumentsByIds(
+  workspaceId: string,
+  documentIds: string[],
+): Promise<DocumentRecord[]> {
+  if (documentIds.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+
+  const documents = await DocumentModel.find(
+    withWorkspaceScope(workspaceId, {
+      _id: { $in: documentIds },
+      status: "active",
+      archivedAt: null,
+    }),
+  ).lean();
+
+  const byId = new Map(
+    documents.map((document) => {
+      const record = toDocumentRecord(document as DocumentDocument);
+      return [record.id, record] as const;
+    }),
+  );
+
+  return documentIds
+    .map((documentId) => byId.get(documentId))
+    .filter((document): document is DocumentRecord => Boolean(document));
+}
+
 export type CreateDocumentInput = {
   linkedEntityType: "lead" | "property" | "opportunity" | "campaign";
   linkedEntityId: string;

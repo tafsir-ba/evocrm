@@ -78,6 +78,13 @@ export function IconBell(p: IconProps) { return (<svg {...base(p)}><path d="M6 1
 export function IconArrowUp(p: IconProps) { return (<svg {...base(p)}><path d="m6 14 6-6 6 6"/></svg>); }
 export function IconArrowDown(p: IconProps) { return (<svg {...base(p)}><path d="m6 10 6 6 6-6"/></svg>); }
 export function IconExternalLink(p: IconProps) { return (<svg {...base(p)}><path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M14 4h6v6M20 4 11 13"/></svg>); }
+export function IconBold(p: IconProps) { return (<svg {...base(p)}><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7V5Z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7v-7Z"/></svg>); }
+export function IconItalic(p: IconProps) { return (<svg {...base(p)}><path d="M11 5h7M6 19h7M14 5l-4 14"/></svg>); }
+export function IconUnderline(p: IconProps) { return (<svg {...base(p)}><path d="M7 5v6a5 5 0 0 0 10 0V5M5 19h14"/></svg>); }
+export function IconLink(p: IconProps) { return (<svg {...base(p)}><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></svg>); }
+export function IconList(p: IconProps) { return (<svg {...base(p)}><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>); }
+export function IconListOrdered(p: IconProps) { return (<svg {...base(p)}><path d="M11 6h10M11 12h10M11 18h10M4 6h1v4M4 10h2M5 14v4h1M4 18h2"/></svg>); }
+export function IconPaperclip(p: IconProps) { return (<svg {...base(p)}><path d="m21.4 11.6-8.8 8.8a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.5 3.5 0 0 1 5 5l-8.2 8.1a1.5 1.5 0 0 1-2.1-2.1l7.1-7"/></svg>); }
 export function IconPlug(p: IconProps) { return (<svg {...base(p)}><path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M7 8h10v4a5 5 0 0 1-10 0V8Z"/></svg>); }
 export function IconTag(p: IconProps) { return (<svg {...base(p)}><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10L14 2h-2Z"/><circle cx="7" cy="7" r="1.5"/></svg>); }
 export function IconFolder(p: IconProps) { return (<svg {...base(p)}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>); }

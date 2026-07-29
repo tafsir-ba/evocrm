@@ -46,7 +46,7 @@ export function validateDocumentFileClient(file: File): string | null {
   return null;
 }
 
-export type DocumentLinkedEntityType = "lead" | "property" | "opportunity";
+export type DocumentLinkedEntityType = "lead" | "property" | "opportunity" | "campaign";
 
 export type DocumentListItem = {
   id: string;
