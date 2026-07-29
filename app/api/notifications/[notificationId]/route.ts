@@ -2,6 +2,7 @@ import { handleRouteError, successResponse } from "@/server/api/responses";
 import { requireAuth } from "@/server/auth/require-auth";
 import { AppError } from "@/server/errors";
 import { markNotificationReadForCurrentUser } from "@/server/services/notifications";
+import { objectIdSchema } from "@/server/validation/common";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { z } from "zod";
 
@@ -16,7 +17,8 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const session = await requireAuth();
-    const { notificationId } = await context.params;
+    const { notificationId: rawNotificationId } = await context.params;
+    const notificationId = parseRequestOrThrow(objectIdSchema, rawNotificationId);
     parseRequestOrThrow(markReadSchema, await request.json());
 
     const updated = await markNotificationReadForCurrentUser({

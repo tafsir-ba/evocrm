@@ -80,27 +80,39 @@ export function NotificationsMenu() {
   }, [open, loadNotifications]);
 
   async function markRead(notificationId: string) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === notificationId && !item.readAt
-          ? { ...item, readAt: new Date().toISOString() }
-          : item,
-      ),
-    );
-    setUnreadCount((count) => Math.max(0, count - 1));
+    const target = items.find((item) => item.id === notificationId);
+    const wasUnread = Boolean(target && !target.readAt);
+
+    if (wasUnread) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === notificationId && !item.readAt
+            ? { ...item, readAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
 
     try {
-      await fetch(`/api/notifications/${notificationId}`, {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ read: true }),
       });
+
+      if (!response.ok) {
+        void loadNotifications();
+      }
     } catch {
       void loadNotifications();
     }
   }
 
   async function markAllRead() {
+    const previousItems = items;
+    const previousUnread = unreadCount;
+
     setItems((current) =>
       current.map((item) => ({
         ...item,
@@ -110,8 +122,15 @@ export function NotificationsMenu() {
     setUnreadCount(0);
 
     try {
-      await fetch("/api/notifications", { method: "PATCH" });
+      const response = await fetch("/api/notifications", { method: "PATCH" });
+      if (!response.ok) {
+        setItems(previousItems);
+        setUnreadCount(previousUnread);
+        void loadNotifications();
+      }
     } catch {
+      setItems(previousItems);
+      setUnreadCount(previousUnread);
       void loadNotifications();
     }
   }
