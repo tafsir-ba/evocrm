@@ -236,25 +236,47 @@ export function ActivityFormPage({
     void loadActivity();
   }, [activityId, apiBase, initialValues, isEdit, workspaceTimezone]);
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
+      // Prefer live DOM values: datetime-local can show a committed picker value
+      // before React state catches up (especially with footer submit).
+      const formData = new FormData(event.currentTarget);
+      const dueDateLocal = String(formData.get("dueDate") ?? "").trim();
+      const nextActionDateLocal = String(formData.get("nextActionDate") ?? "").trim();
+
+      const dueDateIso = fromDatetimeLocalInWorkspaceTimezone(
+        dueDateLocal,
+        workspaceTimezone,
+      );
+      const nextActionDateIso = fromDatetimeLocalInWorkspaceTimezone(
+        nextActionDateLocal,
+        workspaceTimezone,
+      );
+
       const payload: Record<string, unknown> = {
         typeId: form.typeId,
         statusId: form.statusId,
         title: form.title,
         description: form.description.trim() || undefined,
-        dueDate: fromDatetimeLocalInWorkspaceTimezone(form.dueDate, workspaceTimezone),
-        nextActionDate: fromDatetimeLocalInWorkspaceTimezone(
-          form.nextActionDate,
-          workspaceTimezone,
-        ),
         assignedTo: form.assignedTo || undefined,
         outcome: form.outcome.trim() || undefined,
       };
+
+      if (dueDateIso) {
+        payload.dueDate = dueDateIso;
+      } else if (isEdit) {
+        payload.dueDate = null;
+      }
+
+      if (nextActionDateIso) {
+        payload.nextActionDate = nextActionDateIso;
+      } else if (isEdit) {
+        payload.nextActionDate = null;
+      }
 
       if (!isEdit) {
         if (context?.opportunityId) {
@@ -424,9 +446,10 @@ export function ActivityFormPage({
           <Label htmlFor="activity-due">Due date</Label>
           <Input
             id="activity-due"
+            key={`due-${isEdit ? activityId : "new"}-${form.dueDate || "empty"}`}
+            name="dueDate"
             type="datetime-local"
-            value={form.dueDate}
-            onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+            defaultValue={form.dueDate}
           />
         </div>
 
@@ -434,11 +457,10 @@ export function ActivityFormPage({
           <Label htmlFor="activity-next">Next action date</Label>
           <Input
             id="activity-next"
+            key={`next-${isEdit ? activityId : "new"}-${form.nextActionDate || "empty"}`}
+            name="nextActionDate"
             type="datetime-local"
-            value={form.nextActionDate}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, nextActionDate: event.target.value }))
-            }
+            defaultValue={form.nextActionDate}
           />
         </div>
 

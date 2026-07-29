@@ -188,6 +188,9 @@ export function CampaignStepFormPage({
     [campaignId, documentsApiBase],
   );
 
+  const loadAttachmentsRef = useRef(loadAttachments);
+  loadAttachmentsRef.current = loadAttachments;
+
   useEffect(() => {
     let active = true;
 
@@ -233,7 +236,7 @@ export function CampaignStepFormPage({
           });
           const mapped = mapStepToFormState(step, defaultFromName);
           setForm(mapped);
-          await loadAttachments(mapped.documentIds);
+          await loadAttachmentsRef.current(mapped.documentIds);
           return;
         }
 
@@ -261,7 +264,7 @@ export function CampaignStepFormPage({
     return () => {
       active = false;
     };
-  }, [apiBase, isEdit, loadAttachments, stepId]);
+  }, [apiBase, isEdit, stepId]);
 
   const htmlWarnings = useMemo(() => {
     if (form.contentMode !== "html") {
@@ -294,6 +297,20 @@ export function CampaignStepFormPage({
     });
   }, [form.body, form.bodyHtml, form.contentMode, form.previewText]);
 
+  function readLiveSendTime(): string {
+    if (typeof document !== "undefined") {
+      const formElement = document.getElementById(formId);
+      if (formElement instanceof HTMLFormElement) {
+        const formData = new FormData(formElement);
+        const live = String(formData.get("sendTime") ?? "").trim();
+        if (live) {
+          return normalizeCampaignSendTime(live);
+        }
+      }
+    }
+    return normalizeCampaignSendTime(form.sendTime);
+  }
+
   function buildPayload(intent: SaveIntent) {
     const contentMode = form.contentMode;
     const body =
@@ -310,7 +327,7 @@ export function CampaignStepFormPage({
         : form.bodyText || form.body;
 
     const trimmedName = form.name.trim();
-    const normalizedSendTime = normalizeCampaignSendTime(form.sendTime);
+    const normalizedSendTime = readLiveSendTime();
 
     const trimmedFromName = form.fromName.trim();
     const payload = {
@@ -389,11 +406,27 @@ export function CampaignStepFormPage({
     setSubmitting(true);
 
     try {
+      const requestPayload = buildPayload(intent);
+      const requestedSendTime = normalizeCampaignSendTime(
+        String(
+          "sendTime" in requestPayload && typeof requestPayload.sendTime === "string"
+            ? requestPayload.sendTime
+            : form.sendTime,
+        ),
+      );
+
+      // Keep React state aligned with the live input before/after save.
+      setForm((current) =>
+        current.sendTime === requestedSendTime
+          ? current
+          : { ...current, sendTime: requestedSendTime },
+      );
+
       const url = isEdit ? `${apiBase}/steps/${stepId}` : `${apiBase}/steps`;
       const response = await fetch(url, {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(intent)),
+        body: JSON.stringify(requestPayload),
       });
       const payload = await response.json();
 
@@ -420,16 +453,24 @@ export function CampaignStepFormPage({
           savedStep as CampaignStepApiRecord,
           campaignDefaultFromName,
         );
+        const savedSendTime = normalizeCampaignSendTime(mapped.sendTime);
+        if (savedSendTime !== requestedSendTime) {
+          setFormError(
+            `Send time did not save (wanted ${requestedSendTime}, got ${savedSendTime}). Try again.`,
+          );
+          setForm((current) => ({
+            ...current,
+            ...mapped,
+            sendTime: requestedSendTime,
+          }));
+          return;
+        }
         setForm((current) => ({
           ...current,
           ...mapped,
+          sendTime: savedSendTime,
         }));
         await loadAttachments(mapped.documentIds);
-      } else if (intent === "preserve") {
-        const savedSendTime = payload.data?.step?.sendTime;
-        if (typeof savedSendTime === "string") {
-          setForm((current) => ({ ...current, sendTime: savedSendTime }));
-        }
       }
 
       setFormMessage(
@@ -1057,15 +1098,11 @@ export function CampaignStepFormPage({
                 <Label htmlFor="step-send-time">Send time</Label>
                 <Input
                   id="step-send-time"
+                  key={`send-time-${stepId ?? "new"}-${form.sendTime}`}
+                  name="sendTime"
                   type="time"
                   step={60}
-                  value={form.sendTime}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      sendTime: normalizeCampaignSendTime(e.target.value),
-                    }))
-                  }
+                  defaultValue={form.sendTime}
                 />
                 <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
                   {formatWorkspaceTimezoneLabel(workspace.timezone)}

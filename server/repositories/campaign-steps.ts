@@ -2,6 +2,7 @@ import "server-only";
 
 import { connectDb } from "@/server/db/mongoose";
 import { CampaignStepModel, type CampaignStepDocument } from "@/models/campaign-step";
+import { normalizeCampaignSendTime } from "@/lib/campaign-email";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 import { AppError } from "@/server/errors";
 
@@ -57,7 +58,7 @@ function toCampaignStepRecord(document: CampaignStepDocument): CampaignStepRecor
     delayDays: document.delayDays,
     delayAmount: document.delayAmount ?? document.delayDays,
     delayUnit: (document.delayUnit as CampaignStepRecord["delayUnit"]) ?? "days",
-    sendTime: document.sendTime ?? "09:00",
+    sendTime: normalizeCampaignSendTime(document.sendTime ?? "09:00"),
     fromName: document.fromName ?? null,
     channel: "email",
     status: resolveStepStatus(document),
@@ -204,9 +205,14 @@ export async function updateCampaignStep(
   await connectDb();
 
   try {
+    const updateInput =
+      input.sendTime !== undefined
+        ? { ...input, sendTime: normalizeCampaignSendTime(input.sendTime) }
+        : input;
+
     const document = await CampaignStepModel.findOneAndUpdate(
       withWorkspaceScope(workspaceId, { _id: stepId, campaignId }),
-      { $set: input },
+      { $set: updateInput },
       { new: true },
     ).lean();
 

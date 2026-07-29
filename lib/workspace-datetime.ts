@@ -109,6 +109,9 @@ export function fromDatetimeLocalInWorkspaceTimezone(
     return undefined;
   }
 
+  // Browsers may emit seconds (…T10:00:00); compare using HH:mm only.
+  const normalizedLocal = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}`;
+
   const zone = normalizeTimeZone(timeZone);
   let candidate = new Date(
     Date.UTC(
@@ -122,7 +125,7 @@ export function fromDatetimeLocalInWorkspaceTimezone(
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const formatted = toDatetimeLocalInWorkspaceTimezone(candidate, zone);
-    if (formatted === localValue) {
+    if (formatted === normalizedLocal) {
       return candidate.toISOString();
     }
 

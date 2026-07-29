@@ -196,20 +196,24 @@ export function OpportunityFormPage({
     }));
   }
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
       if (isEdit) {
+        const formData = new FormData(event.currentTarget);
+        const expectedCloseDate =
+          String(formData.get("expectedCloseDate") ?? "").trim() || null;
+
         const response = await fetch(`${apiBase}/opportunities/${opportunityId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             value: form.value ? Number(form.value) : null,
             currency: form.currency,
-            expectedCloseDate: form.expectedCloseDate || null,
+            expectedCloseDate,
             notes: form.notes || null,
             assignedTo: form.assignedTo || null,
             tags: form.tagIds,
@@ -223,6 +227,9 @@ export function OpportunityFormPage({
 
         router.push(workspacePath(workspaceSlug, "opportunities", opportunityId!));
       } else {
+        const formData = new FormData(event.currentTarget);
+        const expectedCloseDate = String(formData.get("expectedCloseDate") ?? "").trim();
+
         const payload: Record<string, unknown> = {
           leadId: form.leadId,
           propertyId: form.propertyId,
@@ -234,7 +241,7 @@ export function OpportunityFormPage({
         if (form.assignedTo) payload.assignedTo = form.assignedTo;
         if (form.value) payload.value = Number(form.value);
         if (form.currency) payload.currency = form.currency;
-        if (form.expectedCloseDate) payload.expectedCloseDate = form.expectedCloseDate;
+        if (expectedCloseDate) payload.expectedCloseDate = expectedCloseDate;
         if (requiresLostReason) {
           payload.lostReasonId = form.lostReasonId;
           if (form.lostReasonText) payload.lostReasonText = form.lostReasonText;
@@ -421,14 +428,10 @@ export function OpportunityFormPage({
           <Label htmlFor="opp-expected-close">Expected close date</Label>
           <Input
             id="opp-expected-close"
+            key={`close-${opportunityId ?? "new"}-${form.expectedCloseDate || "empty"}`}
+            name="expectedCloseDate"
             type="date"
-            value={form.expectedCloseDate}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                expectedCloseDate: event.target.value,
-              }))
-            }
+            defaultValue={form.expectedCloseDate}
           />
         </div>
 
