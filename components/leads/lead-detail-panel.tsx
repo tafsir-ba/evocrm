@@ -60,6 +60,7 @@ type LeadDetail = {
   usagePurpose: UsagePurpose | null;
   notes: string | null;
   createdAt: string;
+  archivedAt?: string | null;
   status: DictionaryItem | null;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
@@ -196,7 +197,7 @@ export function LeadDetailPanel({
   }, [apiBase]);
 
   async function handleArchive() {
-    if (!lead || !canArchive) {
+    if (!lead || !canArchive || lead.archivedAt) {
       return;
     }
     if (!window.confirm(`Archive lead "${lead.fullName}"?`)) {
@@ -211,6 +212,23 @@ export function LeadDetailPanel({
     }
 
     window.location.href = workspacePath(workspaceSlug, "leads");
+  }
+
+  async function handleRestore() {
+    if (!lead || !canArchive || !lead.archivedAt) {
+      return;
+    }
+
+    const response = await fetch(`${apiBase}/leads/${leadId}/restore`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const body = await response.json();
+      window.alert(body.error?.message ?? "Failed to restore lead.");
+      return;
+    }
+
+    await loadLead();
   }
 
   function formatDate(value: string) {
@@ -306,22 +324,34 @@ export function LeadDetailPanel({
             )}
           </span>
         }
-        description={`${lead.source?.label ?? "No source"} · Created ${formatDate(lead.createdAt)}`}
+        description={`${lead.source?.label ?? "No source"} · Created ${formatDate(lead.createdAt)}${
+          lead.archivedAt ? " · Archived" : ""
+        }`}
         actions={
           <>
-            {canUpdate && (
+            {canUpdate && !lead.archivedAt && (
               <Link href={workspacePath(workspaceSlug, "leads", leadId, "edit")}>
                 <Button variant="secondary">Edit</Button>
               </Link>
             )}
-            {canArchive && (
+            {canArchive && lead.archivedAt ? (
+              <Button onClick={() => void handleRestore()}>Restore</Button>
+            ) : null}
+            {canArchive && !lead.archivedAt ? (
               <Button variant="ghost" onClick={() => void handleArchive()}>
                 Archive
               </Button>
-            )}
+            ) : null}
           </>
         }
       />
+
+      {lead.archivedAt ? (
+        <p className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+          This lead is <strong className="text-[var(--color-ink)]">archived</strong>. Restore it to
+          edit or use it in new opportunities.
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-1">

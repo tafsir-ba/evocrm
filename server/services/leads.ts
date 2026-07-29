@@ -11,6 +11,7 @@ import {
   findLeadByPhoneNormalized,
   findLeadIds,
   findLeads,
+  restoreLead,
   updateLead,
   type LeadListFilter,
   type LeadRecord,
@@ -701,6 +702,36 @@ export async function archiveLeadForWorkspace(
   });
 
   return enrichLeadRecord(archived);
+}
+
+export async function restoreLeadForWorkspace(
+  workspaceId: string,
+  leadId: string,
+  actorId: string,
+): Promise<LeadDetail> {
+  const existing = await findLeadById(workspaceId, leadId);
+
+  if (!existing || !existing.archivedAt) {
+    throw new AppError("NOT_FOUND", "Archived lead not found.");
+  }
+
+  const restored = await restoreLead(workspaceId, leadId);
+
+  if (!restored) {
+    throw new AppError("NOT_FOUND", "Archived lead not found.");
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "lead.restored",
+    entityType: "lead",
+    entityId: leadId,
+    before: { archivedAt: existing.archivedAt },
+    after: { archivedAt: null },
+  });
+
+  return enrichLeadRecord(restored);
 }
 
 function buildBulkDeleteLeadFilter(

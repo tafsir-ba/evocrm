@@ -40,6 +40,7 @@ type LeadListItem = {
   email: string | null;
   phone: string | null;
   createdAt: string;
+  archivedAt?: string | null;
   status: DictionaryItem | null;
   source: DictionaryItem | null;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
@@ -95,6 +96,7 @@ export function LeadsPanel({
   const [selectAllMatching, setSelectAllMatching] = useState(false);
   const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -192,6 +194,7 @@ export function LeadsPanel({
     transactionIntentFilter,
     usagePurposeFilter,
     projectId,
+    showArchived,
   ]);
 
   useEffect(() => {
@@ -218,6 +221,7 @@ export function LeadsPanel({
     utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    showArchived,
   ]);
 
   const selectedCount = useMemo(() => {
@@ -279,6 +283,9 @@ export function LeadsPanel({
     }
     if (projectId) {
       filters.projectId = projectId;
+    }
+    if (showArchived) {
+      filters.includeArchived = "true";
     }
     return filters;
   }
@@ -411,6 +418,26 @@ export function LeadsPanel({
     await loadLeads();
   }
 
+  async function handleRestore(leadId: string, leadName: string) {
+    if (!canArchive) {
+      return;
+    }
+    if (!window.confirm(`Restore lead "${leadName}"?`)) {
+      return;
+    }
+
+    const response = await fetch(`${apiBase}/leads/${leadId}/restore`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const body = await response.json();
+      window.alert(body.error?.message ?? "Failed to restore lead.");
+      return;
+    }
+
+    await loadLeads();
+  }
+
   function formatDate(value: string) {
     return new Date(value).toLocaleDateString(undefined, {
       year: "numeric",
@@ -476,6 +503,17 @@ export function LeadsPanel({
             fieldSize="sm"
           />
         </div>
+        <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => {
+              setPage(1);
+              setShowArchived(event.target.checked);
+            }}
+          />
+          Show archived
+        </label>
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
@@ -770,7 +808,16 @@ export function LeadsPanel({
                         >
                           <IconChevronRight size={14} />
                         </Link>
-                        {canArchive && (
+                        {canArchive && lead.archivedAt ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleRestore(lead.id, lead.fullName)}
+                          >
+                            Restore
+                          </Button>
+                        ) : null}
+                        {canArchive && !lead.archivedAt ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -778,7 +825,7 @@ export function LeadsPanel({
                           >
                             Archive
                           </Button>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>

@@ -83,7 +83,7 @@ function mapStepToFormState(
     name: step.name ?? step.subject ?? "",
     order: String(step.order),
     delayDays: String(step.delayDays),
-    sendTime: step.sendTime,
+    sendTime: normalizeCampaignSendTime(step.sendTime),
     fromName: step.fromName?.trim() || campaignDefaultFromName,
     subject: step.subject ?? "",
     previewText: step.previewText ?? "",
@@ -757,14 +757,24 @@ export function CampaignStepFormPage({
           </div>
           <div className="flex flex-wrap gap-2">
             {isEdit ? (
-              <Button disabled={submitting} onClick={() => void saveStep("preserve")}>
+              <Button
+                type="button"
+                disabled={submitting}
+                onClick={() => void saveStep("preserve")}
+              >
                 Save
               </Button>
             ) : null}
-            <Button variant="secondary" disabled={submitting} onClick={() => void saveStep("draft")}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={submitting}
+              onClick={() => void saveStep("draft")}
+            >
               Save draft
             </Button>
             <Button
+              type="button"
               disabled={submitting}
               onClick={() => void saveStep("ready")}
             >
@@ -1048,6 +1058,7 @@ export function CampaignStepFormPage({
                 <Input
                   id="step-send-time"
                   type="time"
+                  step={60}
                   value={form.sendTime}
                   onChange={(e) =>
                     setForm((f) => ({

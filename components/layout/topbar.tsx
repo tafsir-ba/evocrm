@@ -5,13 +5,12 @@ import { useState } from "react";
 
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { ProjectFilter } from "@/components/layout/project-filter";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { Avatar } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import {
   IconChevronDown,
   IconMenu,
-  IconSearch,
   IconLogout,
   IconUser,
   IconSettings,
@@ -49,14 +48,7 @@ export function Topbar({
         <IconMenu size={18} />
       </button>
 
-      <div className="flex-1 max-w-md hidden md:block">
-        <Input
-          placeholder="Search leads, properties, activities…"
-          leadingIcon={<IconSearch size={15} />}
-          trailingIcon={<span className="kbd">⌘K</span>}
-          fieldSize="sm"
-        />
-      </div>
+      <GlobalSearch />
 
       <div className="flex-1 md:hidden" />
 

@@ -8,6 +8,7 @@ vi.mock("@/server/repositories/leads", () => ({
   createLead: vi.fn(),
   findLeadById: vi.fn(),
   archiveLead: vi.fn(),
+  restoreLead: vi.fn(),
   updateLead: vi.fn(),
   findLeads: vi.fn(),
 }));
@@ -51,6 +52,7 @@ import {
   findLeadById,
   findLeadByPhoneNormalized,
   findLeads,
+  restoreLead,
   updateLead,
 } from "@/server/repositories/leads";
 import { findTagById } from "@/server/repositories/tags";
@@ -61,6 +63,7 @@ import {
   listLeadsForWorkspace,
   normalizeLeadEmail,
   normalizeLeadPhone,
+  restoreLeadForWorkspace,
   updateLeadForWorkspace,
 } from "@/server/services/leads";
 
@@ -380,5 +383,22 @@ describe("lead service", () => {
 
     expect(archiveLead).toHaveBeenCalledWith("ws-1", "lead-1");
     expect(archived.archivedAt).toBeTruthy();
+  });
+
+  it("restores archived lead by clearing archivedAt", async () => {
+    const archivedAt = new Date("2026-01-01");
+    vi.mocked(findLeadById).mockResolvedValue({
+      ...baseLead,
+      archivedAt,
+    });
+    vi.mocked(restoreLead).mockResolvedValue({
+      ...baseLead,
+      archivedAt: null,
+    });
+
+    const restored = await restoreLeadForWorkspace("ws-1", "lead-1", "user-1");
+
+    expect(restoreLead).toHaveBeenCalledWith("ws-1", "lead-1");
+    expect(restored.archivedAt).toBeNull();
   });
 });

@@ -37,6 +37,22 @@ import {
 } from "@/lib/import-mapping-validation";
 import { IconUpload } from "@/lib/icons";
 
+function pluralizeImportEntityLabel(label: string): string {
+  const normalized = label.trim();
+  if (!normalized) {
+    return "items";
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.endsWith("y") && !/[aeiou]y$/i.test(normalized)) {
+    return `${normalized.slice(0, -1)}ies`;
+  }
+  if (lower.endsWith("s")) {
+    return normalized;
+  }
+  return `${normalized}s`;
+}
+
 type WizardStep = "upload" | "map" | "validate" | "results";
 
 type ColumnPreview = {
@@ -140,6 +156,7 @@ export function ImportWizard({
   >(null);
 
   const entityLabel = config?.label ?? entityType;
+  const entityLabelPlural = pluralizeImportEntityLabel(entityLabel);
 
   const applyParsePreview = useCallback(
     (data: ParsePreviewResponse, options?: { preserveMappings?: boolean }) => {
@@ -765,7 +782,7 @@ export function ImportWizard({
           onClose();
         }
       }}
-      title={`Import ${entityLabel}s`}
+      title={`Import ${entityLabelPlural}`}
       className="max-w-5xl"
       footer={footer}
     >
@@ -1766,7 +1783,7 @@ function ResultsStep({
       ? `/w/${workspaceSlug}/leads`
       : `/w/${workspaceSlug}/properties`;
 
-  const listLabel = `${entityLabel.toLowerCase()}s`;
+  const listLabel = pluralizeImportEntityLabel(entityLabel).toLowerCase();
 
   return (
     <div className="space-y-4">

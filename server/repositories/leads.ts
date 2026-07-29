@@ -482,3 +482,19 @@ export async function archiveLead(
   ).lean<LeadDocument>();
   return document ? toLeadRecord(document) : null;
 }
+
+export async function restoreLead(
+  workspaceId: string,
+  leadId: string,
+): Promise<LeadRecord | null> {
+  await connectDb();
+  const document = await LeadModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: leadId,
+      archivedAt: { $ne: null },
+    }),
+    { $set: { archivedAt: null } },
+    { new: true },
+  ).lean<LeadDocument>();
+  return document ? toLeadRecord(document) : null;
+}

@@ -3,11 +3,15 @@ import "server-only";
 import { z } from "zod";
 
 import { objectIdSchema } from "@/server/validation/campaigns";
+import { normalizeCampaignSendTime } from "@/lib/campaign-email";
 
-const sendTimeSchema = z
-  .string()
-  .trim()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Send time must use HH:mm format (e.g. 09:00).");
+const sendTimeSchema = z.preprocess(
+  (value) => (typeof value === "string" ? normalizeCampaignSendTime(value) : value),
+  z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Send time must use HH:mm format (e.g. 09:00)."),
+);
 
 const stepStatusSchema = z.enum(["draft", "ready", "active", "paused"]);
 const contentModeSchema = z.enum(["rich_text", "plain_text", "html"]);

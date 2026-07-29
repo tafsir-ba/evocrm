@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { CurrencySelect } from "@/components/domain/locale-selectors";
@@ -102,6 +102,7 @@ export function OpportunityFormPage({
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hydratedInitialValues = useRef(Boolean(initialValues));
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const formId = mode === "create" ? "create-opportunity-form" : "edit-opportunity-form";
@@ -158,13 +159,18 @@ export function OpportunityFormPage({
   }, [loadOptions]);
 
   useEffect(() => {
-    if (initialValues) {
-      setForm({
-        ...emptyForm(defaultCurrency),
-        ...initialValues,
-        currency: initialValues.currency ?? defaultCurrency,
-      });
+    if (!initialValues || hydratedInitialValues.current) {
+      return;
     }
+
+    // Hydrate once from server props. Re-applying on every initialValues
+    // identity change wipes expectedCloseDate entered before save.
+    hydratedInitialValues.current = true;
+    setForm({
+      ...emptyForm(defaultCurrency),
+      ...initialValues,
+      currency: initialValues.currency ?? defaultCurrency,
+    });
   }, [defaultCurrency, initialValues]);
 
   useEffect(() => {
