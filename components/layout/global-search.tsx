@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useId,
@@ -15,6 +16,8 @@ import {
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { Input } from "@/components/ui/input";
 import { IconSearch } from "@/lib/icons";
+import { appendProjectIdToSearchParams } from "@/lib/project-scope";
+import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 import { cn } from "@/lib/utils";
 
@@ -33,11 +36,34 @@ const TYPE_LABEL: Record<SearchHit["type"], string> = {
 };
 
 export function GlobalSearch() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Input
+            placeholder="Search leads, properties, activities…"
+            leadingIcon={<IconSearch size={15} />}
+            trailingIcon={<span className="kbd hidden sm:inline">⌘K</span>}
+            fieldSize="sm"
+            disabled
+            aria-hidden
+          />
+        </div>
+      }
+    >
+      <GlobalSearchInner />
+    </Suspense>
+  );
+}
+
+function GlobalSearchInner() {
   const router = useRouter();
   const { workspace } = useWorkspaceShell();
+  const projectId = useWorkspaceProjectFilter();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -57,6 +83,7 @@ export function GlobalSearch() {
         return;
       }
 
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError(null);
 
@@ -65,6 +92,7 @@ export function GlobalSearch() {
           search: trimmed,
           pageSize: "5",
         });
+        appendProjectIdToSearchParams(params, projectId);
 
         const [leadsRes, propertiesRes, activitiesRes] = await Promise.all([
           fetch(`${apiBase}/leads?${params.toString()}`),
@@ -77,6 +105,10 @@ export function GlobalSearch() {
           propertiesRes.json(),
           activitiesRes.json(),
         ]);
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
 
         const nextHits: SearchHit[] = [];
 
@@ -133,21 +165,22 @@ export function GlobalSearch() {
 
         setHits(nextHits);
         setActiveIndex(0);
-        if (
-          !leadsRes.ok &&
-          !propertiesRes.ok &&
-          !activitiesRes.ok
-        ) {
+        if (!leadsRes.ok && !propertiesRes.ok && !activitiesRes.ok) {
           setError("Search is unavailable right now.");
         }
       } catch {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
         setHits([]);
         setError("Search failed. Try again.");
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [apiBase, workspace.slug],
+    [apiBase, projectId, workspace.slug],
   );
 
   useEffect(() => {
@@ -168,14 +201,20 @@ export function GlobalSearch() {
 
   useEffect(() => {
     function onKeyDown(event: globalThis.KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        const input =
-          inputRef.current ??
-          containerRef.current?.querySelector<HTMLInputElement>("input");
-        input?.focus();
-        setOpen(true);
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
+        return;
       }
+
+      const input =
+        inputRef.current ??
+        containerRef.current?.querySelector<HTMLInputElement>("input");
+      if (!input || input.offsetParent === null) {
+        return;
+      }
+
+      event.preventDefault();
+      input.focus();
+      setOpen(true);
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -236,7 +275,7 @@ export function GlobalSearch() {
   const showPanel = open && query.trim().length >= 2;
 
   return (
-    <div ref={containerRef} className="relative flex-1 max-w-md hidden md:block">
+    <div ref={containerRef} className="relative flex-1 min-w-0 max-w-md">
       <form onSubmit={handleSubmit}>
         <Input
           value={query}
@@ -251,7 +290,7 @@ export function GlobalSearch() {
           onKeyDown={handleKeyDown}
           placeholder="Search leads, properties, activities…"
           leadingIcon={<IconSearch size={15} />}
-          trailingIcon={<span className="kbd">⌘K</span>}
+          trailingIcon={<span className="kbd hidden sm:inline">⌘K</span>}
           fieldSize="sm"
           role="combobox"
           aria-expanded={showPanel}

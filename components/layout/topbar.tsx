@@ -50,8 +50,6 @@ export function Topbar({
 
       <GlobalSearch />
 
-      <div className="flex-1 md:hidden" />
-
       <Suspense fallback={null}>
         <ProjectFilter />
       </Suspense>

@@ -488,13 +488,23 @@ export async function restoreLead(
   leadId: string,
 ): Promise<LeadRecord | null> {
   await connectDb();
-  const document = await LeadModel.findOneAndUpdate(
-    withWorkspaceScope(workspaceId, {
-      _id: leadId,
-      archivedAt: { $ne: null },
-    }),
-    { $set: { archivedAt: null } },
-    { new: true },
-  ).lean<LeadDocument>();
-  return document ? toLeadRecord(document) : null;
+  try {
+    const document = await LeadModel.findOneAndUpdate(
+      withWorkspaceScope(workspaceId, {
+        _id: leadId,
+        archivedAt: { $ne: null },
+      }),
+      { $set: { archivedAt: null } },
+      { new: true },
+    ).lean<LeadDocument>();
+    return document ? toLeadRecord(document) : null;
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw new AppError(
+        "CONFLICT",
+        "A lead with this email already exists in this project.",
+      );
+    }
+    throw error;
+  }
 }

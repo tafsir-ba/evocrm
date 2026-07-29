@@ -401,4 +401,23 @@ describe("lead service", () => {
     expect(restoreLead).toHaveBeenCalledWith("ws-1", "lead-1");
     expect(restored.archivedAt).toBeNull();
   });
+
+  it("rejects restore when another active lead already uses the email", async () => {
+    vi.mocked(findLeadById).mockResolvedValue({
+      ...baseLead,
+      archivedAt: new Date("2026-01-01"),
+      emailNormalized: "john@example.com",
+      projectId: "project-1",
+    });
+    vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue({
+      ...baseLead,
+      id: "lead-2",
+      archivedAt: null,
+    });
+
+    await expect(restoreLeadForWorkspace("ws-1", "lead-1", "user-1")).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    expect(restoreLead).not.toHaveBeenCalled();
+  });
 });

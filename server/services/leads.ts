@@ -715,6 +715,15 @@ export async function restoreLeadForWorkspace(
     throw new AppError("NOT_FOUND", "Archived lead not found.");
   }
 
+  if (existing.projectId && existing.emailNormalized) {
+    await assertUniqueEmail(
+      workspaceId,
+      existing.emailNormalized,
+      existing.projectId,
+      leadId,
+    );
+  }
+
   const restored = await restoreLead(workspaceId, leadId);
 
   if (!restored) {
