@@ -1,11 +1,12 @@
 import "server-only";
 
+import {
+  PROJECT_ROLE_DISPLAY_DEFINITIONS,
+  PROJECT_ROLE_KEYS,
+  type ProjectRoleKey,
+} from "@/lib/project-sharing-roles";
 import type { PermissionKey } from "@/server/permissions/permissions";
 import { validatePermissions } from "@/server/permissions/permissions";
-
-export const PROJECT_ROLE_KEYS = ["project_admin", "contributor", "viewer"] as const;
-
-export type ProjectRoleKey = (typeof PROJECT_ROLE_KEYS)[number];
 
 export type ProjectRoleDefinition = {
   name: string;
@@ -70,21 +71,15 @@ const VIEWER_PERMISSIONS = validatePermissions([
 
 export const PROJECT_ROLE_DEFINITIONS: ProjectRoleDefinition[] = [
   {
-    name: "Project Admin",
-    key: "project_admin",
-    description: "Full project management including inviting collaborators",
+    ...PROJECT_ROLE_DISPLAY_DEFINITIONS[0]!,
     permissions: PROJECT_ADMIN_PERMISSIONS,
   },
   {
-    name: "Contributor",
-    key: "contributor",
-    description: "Create and edit leads, opportunities, and activities",
+    ...PROJECT_ROLE_DISPLAY_DEFINITIONS[1]!,
     permissions: CONTRIBUTOR_PERMISSIONS,
   },
   {
-    name: "Viewer",
-    key: "viewer",
-    description: "Read-only access to project data",
+    ...PROJECT_ROLE_DISPLAY_DEFINITIONS[2]!,
     permissions: VIEWER_PERMISSIONS,
   },
 ];

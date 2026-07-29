@@ -10,8 +10,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus, IconMail } from "@/lib/icons";
-import { cn } from "@/lib/utils";
-import { PROJECT_ROLE_DEFINITIONS } from "@/server/permissions/project-roles";
+import { PROJECT_ROLE_DISPLAY_DEFINITIONS } from "@/lib/project-sharing-roles";
 
 type GrantItem = {
   id: string;
@@ -55,7 +54,7 @@ function formatWhen(iso: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const ROLE_OPTIONS = PROJECT_ROLE_DEFINITIONS.map((r) => ({
+const ROLE_OPTIONS = PROJECT_ROLE_DISPLAY_DEFINITIONS.map((r) => ({
   key: r.key,
   name: r.name,
   description: r.description,

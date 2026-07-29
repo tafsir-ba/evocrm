@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
@@ -32,7 +33,6 @@ import {
 import {
   isProjectRoleKey,
   getProjectRoleDefinition,
-  type ProjectRoleKey,
 } from "@/server/permissions/project-roles";
 
 const INVITATION_EXPIRY_DAYS = 7;

@@ -3,7 +3,6 @@ import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import {
   listProjectGrantsForProject,
-  addProjectGrant,
   changeProjectGrantRole,
   removeProjectGrant,
 } from "@/server/services/project-grants";

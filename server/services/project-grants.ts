@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import {
@@ -16,7 +17,6 @@ import {
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById, findUserByEmail } from "@/server/repositories/users";
 import {
-  type ProjectRoleKey,
   isProjectRoleKey,
   getProjectRoleDefinition,
 } from "@/server/permissions/project-roles";

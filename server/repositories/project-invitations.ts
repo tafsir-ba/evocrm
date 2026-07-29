@@ -1,11 +1,11 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { connectDb } from "@/server/db/mongoose";
 import {
   ProjectInvitationModel,
   type ProjectInvitationDocument,
 } from "@/models/project-invitation";
-import type { ProjectRoleKey } from "@/server/permissions/project-roles";
 
 export type ProjectInvitationRecord = {
   id: string;

@@ -1,11 +1,9 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { AppError } from "@/server/errors";
 import type { PermissionKey } from "@/server/permissions/permissions";
-import {
-  resolveEffectiveProjectPermissions,
-  type ProjectRoleKey,
-} from "@/server/permissions/project-roles";
+import { resolveEffectiveProjectPermissions } from "@/server/permissions/project-roles";
 import { requireMembership } from "@/server/permissions/require-membership";
 import {
   findActiveProjectGrant,

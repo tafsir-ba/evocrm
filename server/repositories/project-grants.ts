@@ -1,11 +1,11 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { connectDb } from "@/server/db/mongoose";
 import {
   ProjectGrantModel,
   type ProjectGrantDocument,
 } from "@/models/project-grant";
-import type { ProjectRoleKey } from "@/server/permissions/project-roles";
 
 export type ProjectGrantRecord = {
   id: string;

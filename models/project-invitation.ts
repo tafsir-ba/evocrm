@@ -1,6 +1,6 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
-import { PROJECT_ROLE_KEYS } from "@/server/permissions/project-roles";
+import { PROJECT_ROLE_KEYS } from "@/lib/project-sharing-roles";
 
 const INVITATION_STATUSES = ["pending", "accepted", "expired", "revoked"] as const;
 

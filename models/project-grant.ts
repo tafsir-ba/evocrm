@@ -1,6 +1,6 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
-import { PROJECT_ROLE_KEYS } from "@/server/permissions/project-roles";
+import { PROJECT_ROLE_KEYS } from "@/lib/project-sharing-roles";
 
 const PROJECT_GRANT_STATUSES = ["active", "suspended", "removed"] as const;
 
