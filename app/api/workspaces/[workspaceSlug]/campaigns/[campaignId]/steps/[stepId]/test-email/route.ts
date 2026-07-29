@@ -82,7 +82,10 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const plainTextSource = step.bodyText?.trim() || resolvedBody || "";
-    const plainText = buildCampaignEmailPlainText(plainTextSource, previewUrl);
+    const plainText = buildCampaignEmailPlainText(
+      applyCampaignVariables(plainTextSource, previewContext),
+      previewUrl,
+    );
 
     const result = await sendCampaignEmail({
       to: input.to,

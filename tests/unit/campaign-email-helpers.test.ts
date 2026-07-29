@@ -76,6 +76,16 @@ describe("campaign email helpers", () => {
     ).toBe(true);
   });
 
+  it("preserves non-href attributes that contain unsubscribe", () => {
+    const url = "https://crm.evo-home.ch/unsubscribe?token=abc";
+    const html =
+      '<img src="https://cdn.example.com/unsubscribe-icon.png" alt="x" /><p>Hi</p>\n' + url;
+
+    expect(stripBareUnsubscribeUrls(html, url)).toBe(
+      '<img src="https://cdn.example.com/unsubscribe-icon.png" alt="x" /><p>Hi</p>',
+    );
+  });
+
   it("builds plain text with a single unsubscribe line", () => {
     const url = "https://crm.evo-home.ch/unsubscribe?token=abc";
 
@@ -84,6 +94,12 @@ describe("campaign email helpers", () => {
     );
     expect(buildCampaignEmailPlainText(`Hello\nUnsubscribe: ${url}`, url)).toBe(
       `Hello\n\nUnsubscribe: ${url}`,
+    );
+  });
+
+  it("always appends plain-text unsubscribe footer for short placeholder urls", () => {
+    expect(buildCampaignEmailPlainText("Please unsubscribe #notes", "#")).toBe(
+      "Please unsubscribe #notes\n\nUnsubscribe: #",
     );
   });
 

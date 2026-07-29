@@ -135,18 +135,23 @@ function escapeRegExp(value: string): string {
 
 /**
  * Removes bare unsubscribe URLs / merge tokens from email content while
- * preserving href attributes on existing anchors. Campaign sends always append
- * a formatted "Unsubscribe" footer unless a custom unsubscribe anchor remains.
+ * preserving quoted HTML attribute values (href, src, etc.). Campaign sends
+ * always append a formatted "Unsubscribe" footer unless a custom unsubscribe
+ * anchor remains.
  */
 export function stripBareUnsubscribeUrls(
   content: string,
   unsubscribeUrl?: string | null,
 ): string {
-  const hrefPlaceholders: string[] = [];
-  let result = content.replace(/\bhref\s*=\s*(["'])[\s\S]*?\1/gi, (match) => {
-    hrefPlaceholders.push(match);
-    return `__UNSUB_HREF_${hrefPlaceholders.length - 1}__`;
-  });
+  const attrPlaceholders: string[] = [];
+  // Protect all quoted attribute values so src/href/action/etc. are not stripped.
+  let result = content.replace(
+    /(\b[a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)(["'])([\s\S]*?)\3/g,
+    (match) => {
+      attrPlaceholders.push(match);
+      return `__UNSUB_ATTR_${attrPlaceholders.length - 1}__`;
+    },
+  );
 
   const trimmedUrl = unsubscribeUrl?.trim() ?? "";
   if (trimmedUrl && /unsubscribe/i.test(trimmedUrl)) {
@@ -160,8 +165,8 @@ export function stripBareUnsubscribeUrls(
   result = result.replace(/\{\{?unsubscribe_url\}\}?/gi, "");
   result = result.replace(/https?:\/\/[^\s<>"']*unsubscribe[^\s<>"']*/gi, "");
 
-  result = result.replace(/__UNSUB_HREF_(\d+)__/g, (_, index: string) => {
-    return hrefPlaceholders[Number(index)] ?? "";
+  result = result.replace(/__UNSUB_ATTR_(\d+)__/g, (_, index: string) => {
+    return attrPlaceholders[Number(index)] ?? "";
   });
 
   return result
@@ -185,11 +190,51 @@ export function buildCampaignEmailPlainText(
     return footer;
   }
 
-  if (/unsubscribe/i.test(cleaned) && cleaned.includes(unsubscribeUrl)) {
+  const hasExactFooter = cleaned
+    .split(/\n/)
+    .some((line) => line.trim().toLowerCase() === footer.toLowerCase());
+
+  if (hasExactFooter) {
     return cleaned;
   }
 
   return `${cleaned}\n\n${footer}`;
+}
+
+export function buildCampaignEmailHtml(
+  body: string,
+  unsubscribeUrl: string,
+  options?: { htmlBody?: string | null; previewText?: string | null },
+): string {
+  const rawContent = options?.htmlBody?.trim()
+    ? options.htmlBody
+    : body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, "<br />");
+
+  const content = stripBareUnsubscribeUrls(rawContent, unsubscribeUrl);
+
+  const preview = options?.previewText
+    ? `<div style="display:none;max-height:0;overflow:hidden;">${options.previewText.replace(/</g, "&lt;")}</div>`
+    : "";
+
+  const footer = contentHasUnsubscribeAnchor(content)
+    ? ""
+    : `
+      <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e5e5;" />
+      <p style="font-size: 12px; color: #666;">
+        <a href="${unsubscribeUrl}">Unsubscribe</a> from future campaign emails.
+      </p>`;
+
+  return `
+    <div style="font-family: sans-serif; line-height: 1.5; color: #111;">
+      ${preview}
+      <div>${content}</div>
+      ${footer}
+    </div>
+  `.trim();
 }
 
 function countUnclosedHtmlTags(html: string): number {

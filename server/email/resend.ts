@@ -2,12 +2,11 @@ import "server-only";
 
 import { Resend } from "resend";
 
-import {
-  contentHasUnsubscribeAnchor,
-  stripBareUnsubscribeUrls,
-} from "@/lib/campaign-email";
+import { buildCampaignEmailHtml as buildCampaignEmailHtmlShared } from "@/lib/campaign-email";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
+
+export { buildCampaignEmailHtmlShared as buildCampaignEmailHtml };
 
 export type SendCampaignEmailAttachment = {
   filename: string;
@@ -225,40 +224,4 @@ export async function sendFeedbackResolvedEmail(input: {
     text: buildFeedbackResolvedEmailText(input),
     fromName: "EvoHome",
   });
-}
-
-export function buildCampaignEmailHtml(
-  body: string,
-  unsubscribeUrl: string,
-  options?: { htmlBody?: string | null; previewText?: string | null },
-): string {
-  const rawContent = options?.htmlBody?.trim()
-    ? options.htmlBody
-    : body
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\n/g, "<br />");
-
-  const content = stripBareUnsubscribeUrls(rawContent, unsubscribeUrl);
-
-  const preview = options?.previewText
-    ? `<div style="display:none;max-height:0;overflow:hidden;">${options.previewText.replace(/</g, "&lt;")}</div>`
-    : "";
-
-  const footer = contentHasUnsubscribeAnchor(content)
-    ? ""
-    : `
-      <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e5e5;" />
-      <p style="font-size: 12px; color: #666;">
-        <a href="${unsubscribeUrl}">Unsubscribe</a> from future campaign emails.
-      </p>`;
-
-  return `
-    <div style="font-family: sans-serif; line-height: 1.5; color: #111;">
-      ${preview}
-      <div>${content}</div>
-      ${footer}
-    </div>
-  `.trim();
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCampaignEmailHtml } from "@/server/email/resend";
+import { buildCampaignEmailHtml } from "@/lib/campaign-email";
 
 describe("buildCampaignEmailHtml", () => {
   const url =
@@ -31,6 +31,15 @@ describe("buildCampaignEmailHtml", () => {
     const html = buildCampaignEmailHtml("Hello there", url);
 
     expect(html).toContain("Hello there");
+    expect(html).toContain('<a href="' + url + '">Unsubscribe</a> from future campaign emails.');
+  });
+
+  it("preserves image src attributes that contain unsubscribe", () => {
+    const html = buildCampaignEmailHtml("unused", url, {
+      htmlBody: `<img src="https://cdn.example.com/unsubscribe-icon.png" alt="icon" /><p>Hello</p>`,
+    });
+
+    expect(html).toContain('src="https://cdn.example.com/unsubscribe-icon.png"');
     expect(html).toContain('<a href="' + url + '">Unsubscribe</a> from future campaign emails.');
   });
 });
