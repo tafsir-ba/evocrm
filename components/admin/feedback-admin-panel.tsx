@@ -657,8 +657,8 @@ export function FeedbackAdminPanel() {
       >
         <div className="space-y-4">
           <p className="text-[13px] text-[var(--color-ink-muted)]">
-            The reporter will receive an email inviting them to test the app again. Feedback
-            status will not change if the notification cannot be sent.
+            The reporter will receive an email and an in-app notification that their bug or
+            feedback has been solved. Feedback status will not change if the email cannot be sent.
           </p>
           <div>
             <label

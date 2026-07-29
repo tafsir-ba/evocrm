@@ -5,10 +5,10 @@ import { useState } from "react";
 
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { ProjectFilter } from "@/components/layout/project-filter";
+import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
-  IconBell,
   IconChevronDown,
   IconMenu,
   IconSearch,
@@ -64,13 +64,7 @@ export function Topbar({
         <ProjectFilter />
       </Suspense>
 
-      <button
-        className="relative inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-[var(--color-muted)] focus-ring text-[var(--color-ink-soft)]"
-        aria-label="Notifications"
-      >
-        <IconBell size={17} />
-        <span className="absolute top-1.5 right-2 w-1.5 h-1.5 bg-[var(--color-brand-600)] rounded-full" />
-      </button>
+      <NotificationsMenu />
 
       <div className="relative">
         <button
