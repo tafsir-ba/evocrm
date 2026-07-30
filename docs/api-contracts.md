@@ -354,6 +354,8 @@ PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrol
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrollmentId]/pause
 PATCH  /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/enrollments/[enrollmentId]/resume
 GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
+GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/analytics
+GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/analytics/issues
 ```
 
 | Method | Permission |
