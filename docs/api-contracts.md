@@ -360,7 +360,7 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/analytics/issues
 
 | Method | Permission |
 |--------|------------|
-| GET list/detail/steps/enrollments/sends | `campaign:read` |
+| GET list/detail/steps/enrollments/sends/analytics | `campaign:read` |
 | POST create campaign | `campaign:create` |
 | PATCH update/pause/resume/steps/enrollments | `campaign:update` |
 | POST restore | `campaign:update` |
