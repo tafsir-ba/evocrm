@@ -15,8 +15,12 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
 
-  // Attempt unsubscribe; always return 2xx so clients do not retry.
-  await processUnsubscribe(token);
+  // Attempt unsubscribe; always return 2xx so mail clients do not retry.
+  try {
+    await processUnsubscribe(token);
+  } catch {
+    // Token was present; swallow infrastructure errors per RFC 8058.
+  }
 
   return new Response(null, { status: 200 });
 }

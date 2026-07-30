@@ -149,6 +149,7 @@ describe("campaign enrollment service", () => {
       sent: 1,
       skipped: 0,
       failed: 0,
+      deferred: 0,
     });
     vi.mocked(findCampaignSendsByEnrollmentIds).mockResolvedValue([]);
   });
@@ -335,6 +336,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
       sent: 1,
       skipped: 0,
       failed: 0,
+      deferred: 0,
     });
     vi.mocked(findCampaignSendsByEnrollmentIds).mockResolvedValue([]);
   });

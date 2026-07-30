@@ -296,6 +296,7 @@ describe("campaign API routes", () => {
       sent: 1,
       skipped: 1,
       failed: 0,
+      deferred: 0,
     });
 
     const response = await cronSendDue(

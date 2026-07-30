@@ -843,4 +843,87 @@ describe("campaign sending service", () => {
     expect(summary.deferred).toBe(1);
     expect(sendCampaignEmail).toHaveBeenCalledTimes(2);
   });
+
+  it("stops zero-delay chaining when the email budget is exhausted", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-14T17:30:00.000Z"));
+
+    const step2 = {
+      ...step,
+      id: "step-2",
+      order: 2,
+      subject: "Follow-up",
+      body: "Second email",
+      delayDays: 0,
+      sendTime: "17:30",
+    };
+
+    vi.mocked(findDueEnrollments).mockResolvedValue([
+      {
+        ...enrollment,
+        nextSendAt: new Date("2026-06-14T17:30:00.000Z"),
+      },
+    ]);
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-budget",
+    });
+    vi.mocked(findNextStepAfterOrder).mockResolvedValue(step2);
+    vi.mocked(findStepByOrder)
+      .mockResolvedValueOnce(step)
+      .mockResolvedValueOnce(step2);
+    vi.mocked(findEnrollmentByIdOnly).mockResolvedValue({
+      ...enrollment,
+      currentStep: 2,
+      nextSendAt: new Date("2026-06-14T17:30:00.000Z"),
+      lastSentAt: new Date("2026-06-14T17:30:00.000Z"),
+    });
+
+    const summary = await sendDueCampaignEmails(1);
+
+    expect(summary.sent).toBe(1);
+    expect(sendCampaignEmail).toHaveBeenCalledTimes(1);
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({
+        currentStep: 2,
+      }),
+    );
+  });
 });

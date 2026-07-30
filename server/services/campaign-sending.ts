@@ -56,6 +56,10 @@ const SKIP_RETRY_DELAY_DAYS = 1;
 const FAILURE_RETRY_DELAY_DAYS = 1;
 const MAX_ZERO_DELAY_CHAIN = 20;
 
+type EmailSendBudget = {
+  remaining: number;
+};
+
 export type ProcessEnrollmentResult = {
   outcome: "sent" | "skipped" | "failed";
   processed: number;
@@ -151,6 +155,7 @@ async function recordSkippedSend(params: {
 async function processEnrollment(
   enrollment: CampaignEnrollmentRecord,
   chainDepth = 0,
+  emailBudget?: EmailSendBudget,
 ): Promise<ProcessEnrollmentResult> {
   const workspaceId = enrollment.workspaceId;
 
@@ -211,6 +216,10 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
+  if (emailBudget && emailBudget.remaining <= 0) {
+    return singleOutcomeResult("skipped");
+  }
+
   const claimedEnrollment = await claimEnrollmentForSend(
     workspaceId,
     enrollment.id,
@@ -225,6 +234,9 @@ async function processEnrollment(
   let shouldReleaseSendClaim = true;
 
   try {
+    if (emailBudget && emailBudget.remaining <= 0) {
+      return singleOutcomeResult("skipped");
+    }
     const existingSend = await findSentCampaignSendForEnrollmentStep(
       workspaceId,
       enrollment.id,
@@ -472,6 +484,10 @@ async function processEnrollment(
     sentAt: now,
   });
 
+  if (emailBudget) {
+    emailBudget.remaining = Math.max(0, emailBudget.remaining - 1);
+  }
+
   await createAuditLog({
     workspaceId,
     actorId: "system",
@@ -511,14 +527,15 @@ async function processEnrollment(
     if (
       nextStep.delayDays <= 0 &&
       chainDepth < MAX_ZERO_DELAY_CHAIN &&
-      nextSendAt <= now
+      nextSendAt <= now &&
+      (!emailBudget || emailBudget.remaining > 0)
     ) {
       const refreshed = await findEnrollmentByIdOnly(workspaceId, enrollment.id);
 
       if (refreshed && refreshed.status === "active") {
         return mergeProcessResults(
           singleOutcomeResult("sent"),
-          await processEnrollment(refreshed, chainDepth + 1),
+          await processEnrollment(refreshed, chainDepth + 1, emailBudget),
         );
       }
     }
@@ -550,6 +567,7 @@ async function processEnrollment(
 
 async function summarizeEnrollmentProcessing(
   enrollments: CampaignEnrollmentRecord[],
+  options?: { maxEmails?: number },
 ): Promise<SendDueSummary> {
   const summary: SendDueSummary = {
     processed: 0,
@@ -559,13 +577,23 @@ async function summarizeEnrollmentProcessing(
     deferred: 0,
   };
 
+  const emailBudget: EmailSendBudget | undefined =
+    options?.maxEmails !== undefined
+      ? { remaining: options.maxEmails }
+      : undefined;
+
   for (const enrollment of enrollments) {
+    if (emailBudget && emailBudget.remaining <= 0) {
+      summary.deferred += 1;
+      continue;
+    }
+
     try {
       const reconciled = await reconcileEnrollmentBeforeSend(
         enrollment.workspaceId,
         enrollment,
       );
-      const result = await processEnrollment(reconciled);
+      const result = await processEnrollment(reconciled, 0, emailBudget);
       summary.processed += result.processed;
       summary.sent += result.sent;
       summary.skipped += result.skipped;
@@ -621,8 +649,10 @@ export async function sendCampaignEnrollmentsImmediately(
 
   const batchLimit = clampCampaignSendBatchLimit(limit);
   const batch = eligible.slice(0, batchLimit);
-  const summary = await summarizeEnrollmentProcessing(batch);
-  summary.deferred = Math.max(0, eligible.length - batch.length);
+  const summary = await summarizeEnrollmentProcessing(batch, {
+    maxEmails: batchLimit,
+  });
+  summary.deferred += Math.max(0, eligible.length - batch.length);
 
   return summary;
 }
@@ -633,7 +663,9 @@ export async function sendDueCampaignEmails(
   const batchLimit = clampCampaignSendBatchLimit(limit);
   const dueEnrollments = await findDueEnrollments(batchLimit);
 
-  return summarizeEnrollmentProcessing(dueEnrollments);
+  return summarizeEnrollmentProcessing(dueEnrollments, {
+    maxEmails: batchLimit,
+  });
 }
 
 export async function listCampaignSendsForWorkspace(

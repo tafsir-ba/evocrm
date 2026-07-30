@@ -101,6 +101,7 @@ describe("campaign service", () => {
       sent: 0,
       skipped: 0,
       failed: 0,
+      deferred: 0,
     });
   });
 

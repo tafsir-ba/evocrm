@@ -208,6 +208,27 @@ describe("unsubscribe service", () => {
     expect(updateLead).toHaveBeenCalled();
   });
 
+  it("returns 200 on one-click POST even when unsubscribe processing throws", async () => {
+    const token = createUnsubscribeToken({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      enrollmentId: "enroll-1",
+      campaignId: "camp-1",
+    });
+
+    vi.mocked(findLeadById).mockRejectedValue(new Error("db down"));
+
+    const response = await postUnsubscribeApi(
+      new Request(`http://localhost:3000/api/unsubscribe?token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        body: "List-Unsubscribe=One-Click",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+  });
+
   it("redirects GET one-click URL to the human unsubscribe page", async () => {
     const response = await getUnsubscribeApi(
       new Request("http://localhost:3000/api/unsubscribe?token=abc", {
