@@ -38,7 +38,7 @@ describe("resend webhook processing", () => {
     vi.clearAllMocks();
   });
 
-  it("ignores unknown provider email ids without throwing", async () => {
+  it("ignores unknown non-campaign provider email ids without throwing", async () => {
     vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue(null);
 
     const result = await processResendWebhookPayload(
@@ -54,6 +54,52 @@ describe("resend webhook processing", () => {
       reason: "unknown_provider_email_id",
     });
     expect(createEmailEventIdempotent).not.toHaveBeenCalled();
+  });
+
+  it("requests retry when campaign-tagged email is not yet persisted", async () => {
+    vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue(null);
+
+    const result = await processResendWebhookPayload(
+      {
+        type: "email.delivered",
+        data: {
+          email_id: "re_pending",
+          created_at: "2026-07-30T12:00:00.000Z",
+          tags: { campaign_id: "camp-1", workspace_id: "ws-1" },
+        },
+      },
+      "svix_race",
+    );
+
+    expect(result).toEqual({
+      retry: true,
+      reason: "unknown_provider_email_id",
+    });
+    expect(createEmailEventIdempotent).not.toHaveBeenCalled();
+  });
+
+  it("requests retry when campaign tags arrive as a name/value array", async () => {
+    vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue(null);
+
+    const result = await processResendWebhookPayload(
+      {
+        type: "email.opened",
+        data: {
+          email_id: "re_pending_2",
+          created_at: "2026-07-30T12:00:00.000Z",
+          tags: [
+            { name: "campaign_id", value: "camp-1" },
+            { name: "workspace_id", value: "ws-1" },
+          ],
+        },
+      },
+      "svix_race_2",
+    );
+
+    expect(result).toEqual({
+      retry: true,
+      reason: "unknown_provider_email_id",
+    });
   });
 
   it("stores events idempotently and updates send first-touch fields once", async () => {

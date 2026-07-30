@@ -12,6 +12,10 @@ import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
 import { Webhook } from "svix";
 
+type ResendWebhookTags =
+  | Record<string, string>
+  | Array<{ name?: string; value?: string }>;
+
 type ResendWebhookPayload = {
   type?: string;
   created_at?: string;
@@ -20,7 +24,7 @@ type ResendWebhookPayload = {
     created_at?: string;
     bounce?: { message?: string; type?: string };
     failed?: { reason?: string };
-    tags?: Record<string, string>;
+    tags?: ResendWebhookTags;
   };
 };
 
@@ -37,7 +41,31 @@ const EVENT_TYPE_MAP: Record<string, CampaignSendProviderEventType> = {
 
 export type ResendWebhookProcessResult =
   | { ignored: true; reason: string }
+  | { retry: true; reason: string }
   | { received: true; created: boolean; duplicate: boolean };
+
+function normalizeWebhookTags(tags: ResendWebhookTags | undefined): Record<string, string> {
+  if (!tags) {
+    return {};
+  }
+
+  if (Array.isArray(tags)) {
+    const out: Record<string, string> = {};
+    for (const tag of tags) {
+      if (tag?.name && typeof tag.value === "string") {
+        out[tag.name] = tag.value;
+      }
+    }
+    return out;
+  }
+
+  return tags;
+}
+
+/** Campaign sends always attach campaign_id (see campaign-sending tags). */
+function isCampaignTaggedEmail(tags: Record<string, string>): boolean {
+  return Boolean(tags.campaign_id);
+}
 
 function extractProviderError(
   eventType: CampaignSendProviderEventType,
@@ -104,9 +132,15 @@ export async function processResendWebhookPayload(
   }
 
   const send = await findCampaignSendByProviderMessageId(payload.data.email_id);
+  const tags = normalizeWebhookTags(payload.data.tags);
 
   if (!send) {
-    // Event may arrive before local send commit; acknowledge without failing permanently.
+    // Campaign emails can race ahead of CampaignSend insert. Ask the provider to
+    // retry. Non-campaign Resend traffic (invites, feedback, etc.) is ignored.
+    if (isCampaignTaggedEmail(tags)) {
+      return { retry: true, reason: "unknown_provider_email_id" };
+    }
+
     return { ignored: true, reason: "unknown_provider_email_id" };
   }
 
@@ -114,7 +148,6 @@ export async function processResendWebhookPayload(
   const eventTimestamp = new Date(
     payload.data.created_at ?? payload.created_at ?? Date.now(),
   );
-  const tags = payload.data.tags ?? {};
   const providerError = extractProviderError(eventType, payload);
 
   const { created } = await createEmailEventIdempotent(workspaceId, {

@@ -4,17 +4,15 @@ import {
   paginatedResponse,
 } from "@/server/api/responses";
 import {
-  getCampaignAnalyticsForWorkspace,
   listCampaignAnalyticsIssuesForWorkspace,
+  resolveCampaignAnalyticsPeriod,
 } from "@/server/services/campaign-analytics";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
-import type { CampaignAnalyticsPeriodPreset } from "@/lib/campaign-analytics";
+import { parseCampaignAnalyticsPeriod } from "@/lib/campaign-analytics";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; campaignId: string }>;
 };
-
-const PERIODS = new Set(["7d", "30d", "90d", "all"]);
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -25,18 +23,14 @@ export async function GET(request: Request, context: RouteContext) {
     );
 
     const url = new URL(request.url);
-    const periodParam = url.searchParams.get("period") ?? "30d";
-    const period = (
-      PERIODS.has(periodParam) ? periodParam : "30d"
-    ) as CampaignAnalyticsPeriodPreset;
+    const period = parseCampaignAnalyticsPeriod(url.searchParams.get("period"));
     const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
     const pageSize = Math.min(
       100,
       Math.max(1, Number.parseInt(url.searchParams.get("pageSize") ?? "25", 10) || 25),
     );
 
-    // Reuse period resolution from the main analytics report.
-    const report = await getCampaignAnalyticsForWorkspace(workspace.id, campaignId, {
+    const resolved = await resolveCampaignAnalyticsPeriod(workspace.id, campaignId, {
       period,
     });
 
@@ -44,8 +38,8 @@ export async function GET(request: Request, context: RouteContext) {
       workspace.id,
       campaignId,
       {
-        from: new Date(report.period.from),
-        to: new Date(report.period.to),
+        from: resolved.from,
+        to: resolved.to,
         page,
         pageSize,
       },

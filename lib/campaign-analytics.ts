@@ -27,6 +27,24 @@ export const CAMPAIGN_ANALYTICS_THRESHOLDS = {
 
 export type CampaignAnalyticsPeriodPreset = "7d" | "30d" | "90d" | "all";
 
+export const CAMPAIGN_ANALYTICS_PERIOD_PRESETS: readonly CampaignAnalyticsPeriodPreset[] =
+  ["7d", "30d", "90d", "all"] as const;
+
+export function parseCampaignAnalyticsPeriod(
+  raw: string | null | undefined,
+): CampaignAnalyticsPeriodPreset {
+  if (
+    raw === "7d" ||
+    raw === "30d" ||
+    raw === "90d" ||
+    raw === "all"
+  ) {
+    return raw;
+  }
+
+  return "30d";
+}
+
 export type CampaignHealthStatus =
   | "healthy"
   | "needs_attention"

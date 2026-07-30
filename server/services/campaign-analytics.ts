@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import {
   CAMPAIGN_ANALYTICS_AVAILABLE_FROM,
+  CAMPAIGN_ANALYTICS_THRESHOLDS,
   evaluateCampaignDeliveryHealth,
   ratePercent,
   resolveAnalyticsPeriodDays,
@@ -433,6 +434,13 @@ function buildCards(
   const unsubRate = ratePercent(current.unsubscribed, current.delivered);
   const complaintRate = ratePercent(current.complained, current.delivered);
 
+  const deliveryWarningPct = CAMPAIGN_ANALYTICS_THRESHOLDS.deliveryNeedsAttention * 100;
+  const deliveryCriticalPct = CAMPAIGN_ANALYTICS_THRESHOLDS.deliveryCritical * 100;
+  const bounceWarningPct = CAMPAIGN_ANALYTICS_THRESHOLDS.bounceNeedsAttention * 100;
+  const bounceCriticalPct = CAMPAIGN_ANALYTICS_THRESHOLDS.bounceCritical * 100;
+  const complaintWarningPct = CAMPAIGN_ANALYTICS_THRESHOLDS.complaintNeedsAttention * 100;
+  const complaintCriticalPct = CAMPAIGN_ANALYTICS_THRESHOLDS.complaintCritical * 100;
+
   return [
     {
       key: "sent",
@@ -451,8 +459,8 @@ function buildCards(
       denominator: current.sent,
       rate: deliveryRate,
       hint: `${current.delivered} of ${current.sent} emails delivered`,
-      warning: deliveryRate !== null && deliveryRate < 95,
-      critical: deliveryRate !== null && deliveryRate < 90,
+      warning: deliveryRate !== null && deliveryRate < deliveryWarningPct,
+      critical: deliveryRate !== null && deliveryRate < deliveryCriticalPct,
       previousRate: previousDelivery,
       rateDelta:
         deliveryRate !== null && previousDelivery !== null
@@ -467,8 +475,8 @@ function buildCards(
       denominator: current.sent,
       rate: bounceRate,
       hint: `${current.bounced} bounced of ${current.sent} sent`,
-      warning: bounceRate !== null && bounceRate >= 2,
-      critical: bounceRate !== null && bounceRate >= 5,
+      warning: bounceRate !== null && bounceRate >= bounceWarningPct,
+      critical: bounceRate !== null && bounceRate >= bounceCriticalPct,
     },
     {
       key: "open",
@@ -505,8 +513,8 @@ function buildCards(
       denominator: current.delivered,
       rate: complaintRate,
       hint: `${current.complained} spam complaint${current.complained === 1 ? "" : "s"}`,
-      warning: current.complained > 0,
-      critical: complaintRate !== null && complaintRate >= 0.1,
+      warning: complaintRate !== null && complaintRate >= complaintWarningPct,
+      critical: complaintRate !== null && complaintRate >= complaintCriticalPct,
     },
     {
       key: "pending",
@@ -520,11 +528,29 @@ function buildCards(
   ];
 }
 
-export async function getCampaignAnalyticsForWorkspace(
+export type ResolvedCampaignAnalyticsPeriod = {
+  campaign: {
+    id: string;
+    name: string;
+    status: string;
+    createdAt: Date;
+  };
+  preset: CampaignAnalyticsPeriodPreset | "custom";
+  from: Date;
+  to: Date;
+  previousFrom: Date;
+  previousTo: Date;
+  timezone: string;
+};
+
+/**
+ * Shared period resolution for analytics report + issues list (SSOT).
+ */
+export async function resolveCampaignAnalyticsPeriod(
   workspaceId: string,
   campaignId: string,
   query: CampaignAnalyticsQuery = {},
-): Promise<CampaignAnalyticsReport> {
+): Promise<ResolvedCampaignAnalyticsPeriod> {
   const campaign = await findCampaignById(workspaceId, campaignId);
 
   if (!campaign) {
@@ -546,16 +572,16 @@ export async function getCampaignAnalyticsForWorkspace(
     timezone,
   );
 
-  // Default 30d, but if campaign is newer, clamp from to campaign createdAt.
   let from = range.from;
   if (preset !== "all" && !query.dateFrom && campaign.createdAt > from) {
     from = campaign.createdAt;
   }
 
   if (preset === "all") {
-    from = campaign.createdAt < CAMPAIGN_ANALYTICS_AVAILABLE_FROM
-      ? CAMPAIGN_ANALYTICS_AVAILABLE_FROM
-      : campaign.createdAt;
+    from =
+      campaign.createdAt < CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        ? CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        : campaign.createdAt;
   }
 
   if (from < CAMPAIGN_ANALYTICS_AVAILABLE_FROM) {
@@ -566,6 +592,31 @@ export async function getCampaignAnalyticsForWorkspace(
   const durationMs = Math.max(to.getTime() - from.getTime(), 24 * 60 * 60 * 1000);
   const previousTo = new Date(from.getTime() - 1);
   const previousFrom = new Date(previousTo.getTime() - durationMs);
+
+  return {
+    campaign: {
+      id: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      createdAt: campaign.createdAt,
+    },
+    preset: query.dateFrom && query.dateTo ? "custom" : preset,
+    from,
+    to,
+    previousFrom,
+    previousTo,
+    timezone,
+  };
+}
+
+export async function getCampaignAnalyticsForWorkspace(
+  workspaceId: string,
+  campaignId: string,
+  query: CampaignAnalyticsQuery = {},
+): Promise<CampaignAnalyticsReport> {
+  const resolved = await resolveCampaignAnalyticsPeriod(workspaceId, campaignId, query);
+  const { from, to, previousFrom, previousTo, preset } = resolved;
+  const campaign = resolved.campaign;
 
   const envConfigured = Boolean(getEnv().RESEND_WEBHOOK_SECRET);
   const [current, previous, unsubscribed, series, steps] = await Promise.all([
@@ -594,7 +645,7 @@ export async function getCampaignAnalyticsForWorkspace(
       createdAt: campaign.createdAt.toISOString(),
     },
     period: {
-      preset: query.dateFrom && query.dateTo ? "custom" : preset,
+      preset,
       from: from.toISOString(),
       to: to.toISOString(),
       previousFrom: previousFrom.toISOString(),

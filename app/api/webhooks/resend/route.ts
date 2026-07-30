@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import {
   processResendWebhookPayload,
@@ -21,11 +23,16 @@ export async function POST(request: Request) {
         created_at?: string;
         bounce?: { message?: string; type?: string };
         failed?: { reason?: string };
-        tags?: Record<string, string>;
+        tags?: Record<string, string> | Array<{ name?: string; value?: string }>;
       };
     };
 
     const result = await processResendWebhookPayload(payload, providerEventId);
+
+    // 503 so Svix/Resend retries until CampaignSend is queryable by providerMessageId.
+    if ("retry" in result && result.retry) {
+      return NextResponse.json({ data: result }, { status: 503 });
+    }
 
     return successResponse(result);
   } catch (error) {
