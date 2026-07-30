@@ -1,6 +1,7 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
+import { clampCampaignSendBatchLimit } from "@/lib/campaign-send-limits";
 import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
 
 function requireCronAuth(request: Request): void {
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
 
     const url = new URL(request.url);
     const limitParam = url.searchParams.get("limit");
-    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 200) : 50;
+    const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const limit = clampCampaignSendBatchLimit(parsedLimit);
 
     const summary = await sendDueCampaignEmails(limit);
 

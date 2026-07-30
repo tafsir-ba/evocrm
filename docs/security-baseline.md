@@ -308,13 +308,15 @@ Campaign emails must support:
 
 | Requirement | Detail |
 |-------------|--------|
-| Unsubscribe link | Tokenized public endpoint |
+| Unsubscribe link | Tokenized public endpoint + RFC 8058 `List-Unsubscribe` headers |
+| One-click unsubscribe | `POST /api/unsubscribe?token=...` returns 200 |
 | Sender identity | `EMAIL_FROM` with workspace-appropriate name |
 | Reply-to | `EMAIL_REPLY_TO` |
 | Skip if no email | Do not send; log as `skipped` |
 | Skip if unsubscribed | Check `emailUnsubscribedAt` / consent |
 | Send log | `CampaignSend` with `sent` status |
 | Failure log | `CampaignSend` with `failed` + error |
+| Immediate send batching | Activation/resume/enrollment capped (default 50, max 200); remainder left for cron |
 
 ### Sending rules
 

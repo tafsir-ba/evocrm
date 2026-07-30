@@ -22,6 +22,7 @@ export type SendCampaignEmailInput = {
   fromName: string;
   fromEmail?: string;
   tags?: Array<{ name: string; value: string }>;
+  headers?: Record<string, string>;
   attachments?: SendCampaignEmailAttachment[];
 };
 
@@ -79,6 +80,23 @@ function formatFromHeader(fromName: string, emailFrom: string): string {
   return `${safeName} <${address}>`;
 }
 
+function isResendRateLimitError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("rate_limit") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests")
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+const RESEND_RATE_LIMIT_RETRIES = 2;
+
 export async function sendCampaignEmail(
   input: SendCampaignEmailInput,
 ): Promise<SendCampaignEmailResult> {
@@ -100,7 +118,7 @@ export async function sendCampaignEmail(
       return { success: false, error: "Email sending is not configured." };
     }
 
-    const result = await resend.emails.send({
+    const payload = {
       from: formatFromHeader(input.fromName, fromAddress),
       to: input.to,
       subject: input.subject,
@@ -108,6 +126,9 @@ export async function sendCampaignEmail(
       text: input.text,
       replyTo: env.EMAIL_REPLY_TO,
       tags: sanitizeResendTags(input.tags),
+      ...(input.headers && Object.keys(input.headers).length > 0
+        ? { headers: input.headers }
+        : {}),
       ...(input.attachments && input.attachments.length > 0
         ? {
             attachments: input.attachments.map((attachment) => ({
@@ -117,18 +138,32 @@ export async function sendCampaignEmail(
             })),
           }
         : {}),
-    });
+    };
 
-    if (result.error) {
-      return {
-        success: false,
-        error: result.error.message ?? "Resend send failed.",
-      };
+    let lastError = "Resend send failed.";
+
+    for (let attempt = 0; attempt <= RESEND_RATE_LIMIT_RETRIES; attempt += 1) {
+      const result = await resend.emails.send(payload);
+
+      if (!result.error) {
+        const messageId = result.data?.id ?? "unknown";
+        return { success: true, messageId };
+      }
+
+      lastError = result.error.message ?? "Resend send failed.";
+
+      if (
+        attempt < RESEND_RATE_LIMIT_RETRIES &&
+        isResendRateLimitError(lastError)
+      ) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+
+      return { success: false, error: lastError };
     }
 
-    const messageId = result.data?.id ?? "unknown";
-
-    return { success: true, messageId };
+    return { success: false, error: lastError };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown email send error.";

@@ -29,6 +29,7 @@ import { createCampaignSend, findSentCampaignSendForEnrollmentStep } from "@/ser
 import {
   createUnsubscribeToken,
   buildUnsubscribeUrl,
+  buildOneClickUnsubscribeUrl,
 } from "@/server/utils/unsubscribe-token";
 import { addDays, computeNextSendAt, isScheduledSendDue } from "@/server/utils/campaign-schedule";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
@@ -37,6 +38,8 @@ import {
   applyCampaignVariables,
   buildCampaignEmailPlainText,
 } from "@/lib/campaign-email";
+import { buildCampaignListUnsubscribeHeaders } from "@/lib/campaign-unsubscribe-headers";
+import { clampCampaignSendBatchLimit } from "@/lib/campaign-send-limits";
 import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
 import { reconcileEnrollmentBeforeSend } from "@/server/services/campaign-enrollment-reconcile";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
@@ -46,6 +49,7 @@ export type SendDueSummary = {
   sent: number;
   skipped: number;
   failed: number;
+  deferred: number;
 };
 
 const SKIP_RETRY_DELAY_DAYS = 1;
@@ -309,6 +313,7 @@ async function processEnrollment(
     campaignId: campaign.id,
   });
   const unsubscribeUrl = buildUnsubscribeUrl(token);
+  const oneClickUnsubscribeUrl = buildOneClickUnsubscribeUrl(token);
   const fromName = resolveCampaignStepFromName(step.fromName, campaign);
 
   if (!fromName) {
@@ -412,6 +417,7 @@ async function processEnrollment(
     fromName,
     fromEmail: campaign.senderEmail,
     attachments: attachmentResult.attachments,
+    headers: buildCampaignListUnsubscribeHeaders(oneClickUnsubscribeUrl),
     tags: [
       { name: "workspace_id", value: workspaceId },
       { name: "campaign_id", value: campaign.id },
@@ -550,6 +556,7 @@ async function summarizeEnrollmentProcessing(
     sent: 0,
     skipped: 0,
     failed: 0,
+    deferred: 0,
   };
 
   for (const enrollment of enrollments) {
@@ -601,21 +608,30 @@ export async function sendCampaignEnrollmentsImmediately(
   campaignId: string,
   mode: "activation" | "resume" | "enrollment",
   enrollmentIds?: string[],
+  limit?: number,
 ): Promise<SendDueSummary> {
   const enrollments =
     enrollmentIds && enrollmentIds.length > 0
       ? await findActiveEnrollmentsByIds(workspaceId, enrollmentIds)
       : await listAllCampaignEnrollments(workspaceId, campaignId, { status: "active" });
 
-  const eligible = filterEnrollmentsForImmediateSend(enrollments, mode, enrollmentIds);
+  const eligible = filterEnrollmentsForImmediateSend(enrollments, mode, enrollmentIds)
+    .slice()
+    .sort((left, right) => left.nextSendAt.getTime() - right.nextSendAt.getTime());
 
-  return summarizeEnrollmentProcessing(eligible);
+  const batchLimit = clampCampaignSendBatchLimit(limit);
+  const batch = eligible.slice(0, batchLimit);
+  const summary = await summarizeEnrollmentProcessing(batch);
+  summary.deferred = Math.max(0, eligible.length - batch.length);
+
+  return summary;
 }
 
 export async function sendDueCampaignEmails(
   limit = 50,
 ): Promise<SendDueSummary> {
-  const dueEnrollments = await findDueEnrollments(limit);
+  const batchLimit = clampCampaignSendBatchLimit(limit);
+  const dueEnrollments = await findDueEnrollments(batchLimit);
 
   return summarizeEnrollmentProcessing(dueEnrollments);
 }

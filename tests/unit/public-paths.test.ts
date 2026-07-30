@@ -12,6 +12,8 @@ describe("public path allowlist", () => {
   it("keeps existing public auth and unsubscribe paths", () => {
     expect(PUBLIC_PATHS).toContain("/login");
     expect(PUBLIC_PATHS).toContain("/unsubscribe");
+    expect(PUBLIC_PATHS).toContain("/api/unsubscribe");
+    expect(isPublicPath("/api/unsubscribe")).toBe(true);
     expect(isPublicPath("/api/auth/signin")).toBe(true);
   });
 });

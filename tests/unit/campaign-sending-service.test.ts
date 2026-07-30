@@ -75,6 +75,9 @@ vi.mock("@/server/services/campaign-email-attachments", () => ({
 vi.mock("@/server/utils/unsubscribe-token", () => ({
   createUnsubscribeToken: vi.fn(() => "token"),
   buildUnsubscribeUrl: vi.fn(() => "https://app.test/unsubscribe?token=token"),
+  buildOneClickUnsubscribeUrl: vi.fn(
+    () => "https://app.test/api/unsubscribe?token=token",
+  ),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({
@@ -84,8 +87,10 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { sendCampaignEmail } from "@/server/email/resend";
 import {
   claimEnrollmentForSend,
+  findActiveEnrollmentsByIds,
   findDueEnrollments,
   findEnrollmentByIdOnly,
+  listAllCampaignEnrollments,
   releaseEnrollmentSendClaim,
   updateCampaignEnrollment,
 } from "@/server/repositories/campaign-enrollments";
@@ -96,7 +101,10 @@ import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findLeadById } from "@/server/repositories/leads";
 import { findSuppressionByEmail } from "@/server/repositories/email-suppressions";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
-import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
+import {
+  sendCampaignEnrollmentsImmediately,
+  sendDueCampaignEmails,
+} from "@/server/services/campaign-sending";
 
 const enrollment = {
   id: "enroll-1",
@@ -547,6 +555,15 @@ describe("campaign sending service", () => {
     const summary = await sendDueCampaignEmails(50);
 
     expect(summary.sent).toBe(1);
+    expect(summary.deferred).toBe(0);
+    expect(sendCampaignEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: {
+          "List-Unsubscribe": "<https://app.test/api/unsubscribe?token=token>",
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      }),
+    );
     expect(createCampaignSend).toHaveBeenCalledWith(
       "ws-1",
       expect.objectContaining({ status: "sent", providerMessageId: "msg-1" }),
@@ -757,5 +774,73 @@ describe("campaign sending service", () => {
 
     expect(summary.skipped).toBe(1);
     expect(sendCampaignEmail).not.toHaveBeenCalled();
+  });
+
+  it("caps immediate activation sends and defers the rest for cron", async () => {
+    const dueEnrollments = Array.from({ length: 3 }, (_, index) => ({
+      ...enrollment,
+      id: `enroll-${index + 1}`,
+      leadId: `lead-${index + 1}`,
+      nextSendAt: new Date(Date.now() - (3 - index) * 1000),
+    }));
+
+    vi.mocked(listAllCampaignEnrollments).mockResolvedValue(dueEnrollments);
+    vi.mocked(findActiveEnrollmentsByIds).mockResolvedValue(dueEnrollments);
+    vi.mocked(claimEnrollmentForSend).mockImplementation(
+      async (_workspaceId, enrollmentId) =>
+        dueEnrollments.find((item) => item.id === enrollmentId) ?? null,
+    );
+    vi.mocked(findLeadById).mockImplementation(async (_workspaceId, leadId) => ({
+      id: leadId,
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: `${leadId}@example.com`,
+      emailNormalized: `${leadId}@example.com`,
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-batch",
+    });
+    vi.mocked(findNextStepAfterOrder).mockResolvedValue(null);
+
+    const summary = await sendCampaignEnrollmentsImmediately(
+      "ws-1",
+      "camp-1",
+      "activation",
+      undefined,
+      2,
+    );
+
+    expect(summary.sent).toBe(2);
+    expect(summary.deferred).toBe(1);
+    expect(sendCampaignEmail).toHaveBeenCalledTimes(2);
   });
 });

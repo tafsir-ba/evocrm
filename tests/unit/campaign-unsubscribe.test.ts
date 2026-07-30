@@ -24,10 +24,13 @@ import { findEnrollmentByIdOnly } from "@/server/repositories/campaign-enrollmen
 import { findLeadById, updateLead } from "@/server/repositories/leads";
 import { processUnsubscribe } from "@/server/services/unsubscribe";
 import {
+  buildOneClickUnsubscribeUrl,
+  buildUnsubscribeUrl,
   createUnsubscribeToken,
   verifyUnsubscribeToken,
 } from "@/server/utils/unsubscribe-token";
 import { resetEnvCacheForTests } from "@/server/env";
+import { GET as getUnsubscribeApi, POST as postUnsubscribeApi } from "@/app/api/unsubscribe/route";
 
 describe("unsubscribe service", () => {
   beforeEach(() => {
@@ -116,5 +119,106 @@ describe("unsubscribe service", () => {
 
   it("rejects invalid token", () => {
     expect(() => verifyUnsubscribeToken("bad.token")).toThrow();
+  });
+
+  it("builds human and one-click unsubscribe URLs", () => {
+    const token = createUnsubscribeToken({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      enrollmentId: "enroll-1",
+      campaignId: "camp-1",
+    });
+
+    expect(buildUnsubscribeUrl(token)).toContain("/unsubscribe?token=");
+    expect(buildOneClickUnsubscribeUrl(token)).toContain("/api/unsubscribe?token=");
+  });
+
+  it("handles RFC 8058 one-click POST unsubscribe", async () => {
+    const token = createUnsubscribeToken({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      enrollmentId: "enroll-1",
+      campaignId: "camp-1",
+    });
+
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findEnrollmentByIdOnly).mockResolvedValue({
+      id: "enroll-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      leadId: "lead-1",
+      opportunityId: null,
+      ...enrollmentRecordExtras,
+      status: "active",
+      currentStep: 1,
+      nextSendAt: new Date(),
+      lastSentAt: null,
+      completedAt: null,
+      unsubscribedAt: null,
+      failedAt: null,
+      failureReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const response = await postUnsubscribeApi(
+      new Request(`http://localhost:3000/api/unsubscribe?token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "List-Unsubscribe=One-Click",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+    expect(updateLead).toHaveBeenCalled();
+  });
+
+  it("redirects GET one-click URL to the human unsubscribe page", async () => {
+    const response = await getUnsubscribeApi(
+      new Request("http://localhost:3000/api/unsubscribe?token=abc", {
+        method: "GET",
+        redirect: "manual",
+      }),
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/unsubscribe?token=abc",
+    );
   });
 });

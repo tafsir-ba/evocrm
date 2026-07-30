@@ -375,7 +375,7 @@ GET    /api/workspaces/[workspaceSlug]/campaigns/[campaignId]/sends
 
 **Enrollment:** Requires at least one step. Lead campaigns require `leadId`; opportunity campaigns require `opportunityId` (lead derived from opportunity). Duplicate active/paused enrollment blocked.
 
-**Scheduling:** Each enrollment stores `nextSendAt` as the exact order datetime (workspace timezone wall-clock + delay days). Sends run when `nextSendAt <= now` via `POST /api/cron/campaigns/send-due` or the built-in internal cron worker (production default when `CRON_SECRET` is set). Activate/resume after the configured order time reschedules to immediate pickup (`nextSendAt = now`). Activation, enrollment, and resume trigger an immediate backend send pass only for enrollments already due. Consecutive zero-delay steps chain in the same pass when the next step is also due. Disable internal cron with `CAMPAIGN_CRON_INTERNAL=false` when using an external scheduler.
+**Scheduling:** Each enrollment stores `nextSendAt` as the exact order datetime (workspace timezone wall-clock + delay days). Sends run when `nextSendAt <= now` via `POST /api/cron/campaigns/send-due` or the built-in internal cron worker (production default when `CRON_SECRET` is set). Activate/resume after the configured order time reschedules to immediate pickup (`nextSendAt = now`). Activation, enrollment, and resume trigger an immediate backend send pass only for enrollments already due, **capped at the same batch limit as cron (default 50, max 200)**; remaining due enrollments stay queued for subsequent cron ticks. Consecutive zero-delay steps chain in the same pass when the next step is also due. Disable internal cron with `CAMPAIGN_CRON_INTERNAL=false` when using an external scheduler.
 
 **Enrollment UI:** Campaign detail uses searchable multi-select lead/opportunity selectors backed by workspace `GET /leads` and `GET /opportunities`. The UI submits canonical entity IDs — not names, emails, or raw text labels. Enrollment list responses include `scheduledSteps[]` (backend-projected per-step lifecycle: `sent` only when a `CampaignSend` has `status = sent` and a provider message ID; `scheduled`, `queued`, `sending`, `pending`, `failed`, `skipped`, `paused`, and `cancelled` otherwise). The current step uses stored `nextSendAt`; follow-up steps chain from confirmed send anchors.
 
@@ -683,9 +683,10 @@ POST /api/cron/campaigns/send-due
 - Find enrollments with `nextSendAt <= now` and `status = active`
 - Skip if lead has no email
 - Skip if lead is unsubscribed
-- Send via Resend with unsubscribe link, sender identity, reply-to
+- Send via Resend with unsubscribe link, RFC 8058 `List-Unsubscribe` headers, sender identity, reply-to
 - Log `CampaignSend` with `sent`, `failed`, or `skipped`
 - Advance enrollment step or mark complete/failed
+- Batch size defaults to 50 (max 200); activation/resume immediate passes use the same cap and report `deferred` for remainder
 
 Must not be callable from the browser without the secret.
 
@@ -720,9 +721,11 @@ Signed URL TTL should be short (e.g. 5–15 minutes). Regenerate on demand.
 
 ```txt
 GET /unsubscribe?token=...
+POST /api/unsubscribe?token=...
+GET /api/unsubscribe?token=...   # redirects to /unsubscribe
 ```
 
-Token-based HMAC-signed payload (`workspaceId`, `leadId`, `enrollmentId`, `campaignId`, `exp`). No session required. Updates `Lead.emailConsentStatus = unsubscribed`, `Lead.emailUnsubscribedAt`, and active `CampaignEnrollment` to `unsubscribed`. Public route is allowlisted in middleware.
+Token-based HMAC-signed payload (`workspaceId`, `leadId`, `enrollmentId`, `campaignId`, `exp`). No session required. Updates `Lead.emailConsentStatus = unsubscribed`, `Lead.emailUnsubscribedAt`, and active `CampaignEnrollment` to `unsubscribed`. Campaign sends include `List-Unsubscribe` / `List-Unsubscribe-Post` headers pointing at the POST endpoint (RFC 8058 one-click). Public routes are allowlisted in middleware.
 
 ---
 

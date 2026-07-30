@@ -7,6 +7,7 @@ export const PUBLIC_PATHS = [
   "/signup",
   "/api/auth",
   "/unsubscribe",
+  "/api/unsubscribe",
   "/api/integrations/website/leads",
 ] as const;
 

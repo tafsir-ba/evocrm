@@ -108,3 +108,10 @@ export function buildUnsubscribeUrl(token: string): string {
   const base = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
   return `${base}/unsubscribe?token=${encodeURIComponent(token)}`;
 }
+
+/** RFC 8058 one-click endpoint (POST). Used in List-Unsubscribe headers. */
+export function buildOneClickUnsubscribeUrl(token: string): string {
+  const env = getEnv();
+  const base = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  return `${base}/api/unsubscribe?token=${encodeURIComponent(token)}`;
+}
