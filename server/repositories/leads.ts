@@ -254,6 +254,23 @@ export async function findLeadById(
   return document ? toLeadRecord(document) : null;
 }
 
+export async function findLeadsByIds(
+  workspaceId: string,
+  leadIds: string[],
+): Promise<LeadRecord[]> {
+  if (leadIds.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+
+  const documents = await LeadModel.find(
+    withWorkspaceScope(workspaceId, { _id: { $in: leadIds } }),
+  ).lean();
+
+  return documents.map((document) => toLeadRecord(document as LeadDocument));
+}
+
 export async function findActiveLeadsByEmailNormalized(
   workspaceId: string,
   emailNormalizedValues: string[],

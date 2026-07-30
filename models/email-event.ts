@@ -19,6 +19,7 @@ const emailEventSchema = new Schema(
     contactId: { type: Schema.Types.ObjectId, default: null },
     emailSendId: { type: Schema.Types.ObjectId, ref: "CampaignSend", default: null },
     provider: { type: String, enum: ["resend"], default: "resend" },
+    /** Svix delivery id — unique for idempotent webhook ingestion. */
     providerEventId: { type: String, trim: true, default: null },
     providerEmailId: { type: String, trim: true, default: null },
     eventType: { type: String, enum: EMAIL_EVENT_TYPES, required: true },
@@ -32,8 +33,9 @@ const emailEventSchema = new Schema(
 emailEventSchema.index({ workspaceId: 1, createdAt: -1 });
 emailEventSchema.index({ workspaceId: 1, campaignId: 1 });
 emailEventSchema.index({ workspaceId: 1, emailSendId: 1 });
+emailEventSchema.index({ workspaceId: 1, campaignId: 1, eventType: 1, eventTimestamp: 1 });
 emailEventSchema.index({ providerEmailId: 1 });
-emailEventSchema.index({ providerEventId: 1 }, { sparse: true });
+emailEventSchema.index({ providerEventId: 1 }, { unique: true, sparse: true });
 
 export type EmailEventDocument = InferSchemaType<typeof emailEventSchema> & {
   _id: mongoose.Types.ObjectId;

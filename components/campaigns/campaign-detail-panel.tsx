@@ -23,7 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IconChevronLeft, IconMail, IconPlus } from "@/lib/icons";
+import { IconChevronLeft, IconMail, IconPlus, IconChart } from "@/lib/icons";
 import { resolveCampaignStepFromName } from "@/lib/campaign-from-name";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
 import {
@@ -515,6 +515,17 @@ export function CampaignDetailPanel({
         meta={<StatusBadge status={campaign.status} size="sm" />}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              leadingIcon={<IconChart size={14} />}
+              onClick={() =>
+                router.push(
+                  workspacePath(workspaceSlug, `dripping/${campaignId}/analytics`),
+                )
+              }
+            >
+              Analytics
+            </Button>
             {canUpdate && !isArchived && (
               <Button
                 variant="secondary"

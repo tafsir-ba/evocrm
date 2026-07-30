@@ -216,16 +216,24 @@ export function CampaignsPanel({
                   <span>{campaign.enrollmentCount} enrolled</span>
                 </div>
               </div>
-              <div className="p-5 flex items-center justify-between text-[12px]">
+              <div className="p-5 flex items-center justify-between gap-3 text-[12px]">
                 <span className="text-[var(--color-ink-muted)]">
                   Updated {new Date(campaign.updatedAt).toLocaleDateString()}
                 </span>
-                <Link
-                  href={workspacePath(workspaceSlug, `dripping/${campaign.id}`)}
-                  className="text-[var(--color-brand-700)] font-medium inline-flex items-center gap-1 hover:underline"
-                >
-                  Open <IconChevronRight size={12} />
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={workspacePath(workspaceSlug, `dripping/${campaign.id}/analytics`)}
+                    className="text-[var(--color-ink-soft)] font-medium inline-flex items-center gap-1 hover:underline"
+                  >
+                    Analytics
+                  </Link>
+                  <Link
+                    href={workspacePath(workspaceSlug, `dripping/${campaign.id}`)}
+                    className="text-[var(--color-brand-700)] font-medium inline-flex items-center gap-1 hover:underline"
+                  >
+                    Open <IconChevronRight size={12} />
+                  </Link>
+                </div>
               </div>
             </Card>
           ))}

@@ -17,6 +17,15 @@ export type CampaignSendRecord = {
   error: string | null;
   scheduledFor: Date;
   sentAt: Date | null;
+  deliveredAt: Date | null;
+  firstOpenedAt: Date | null;
+  firstClickedAt: Date | null;
+  bouncedAt: Date | null;
+  complainedAt: Date | null;
+  deliveryDelayedAt: Date | null;
+  providerFailedAt: Date | null;
+  providerError: string | null;
+  lastProviderEventAt: Date | null;
   createdAt: Date;
 };
 
@@ -34,6 +43,15 @@ function toCampaignSendRecord(document: CampaignSendDocument): CampaignSendRecor
     error: document.error ?? null,
     scheduledFor: document.scheduledFor,
     sentAt: document.sentAt ?? null,
+    deliveredAt: document.deliveredAt ?? null,
+    firstOpenedAt: document.firstOpenedAt ?? null,
+    firstClickedAt: document.firstClickedAt ?? null,
+    bouncedAt: document.bouncedAt ?? null,
+    complainedAt: document.complainedAt ?? null,
+    deliveryDelayedAt: document.deliveryDelayedAt ?? null,
+    providerFailedAt: document.providerFailedAt ?? null,
+    providerError: document.providerError ?? null,
+    lastProviderEventAt: document.lastProviderEventAt ?? null,
     createdAt: document.createdAt,
   };
 }
@@ -160,4 +178,61 @@ export async function findSentCampaignSendForEnrollmentStep(
   ).lean();
 
   return document ? toCampaignSendRecord(document as CampaignSendDocument) : null;
+}
+
+export type CampaignSendProviderEventType =
+  | "delivered"
+  | "bounced"
+  | "complained"
+  | "opened"
+  | "clicked"
+  | "delivery_delayed"
+  | "failed"
+  | "sent";
+
+/**
+ * Apply first-touch provider lifecycle timestamps. Safe to call repeatedly —
+ * first non-null timestamp wins per field.
+ */
+export async function applyCampaignSendProviderEvent(
+  workspaceId: string,
+  sendId: string,
+  eventType: CampaignSendProviderEventType,
+  eventTimestamp: Date,
+  providerError?: string | null,
+): Promise<void> {
+  await connectDb();
+
+  const firstTouchField: Partial<Record<CampaignSendProviderEventType, string>> = {
+    delivered: "deliveredAt",
+    opened: "firstOpenedAt",
+    clicked: "firstClickedAt",
+    bounced: "bouncedAt",
+    complained: "complainedAt",
+    delivery_delayed: "deliveryDelayedAt",
+    failed: "providerFailedAt",
+  };
+
+  const field = firstTouchField[eventType];
+  const sharedSet: Record<string, unknown> = {
+    lastProviderEventAt: eventTimestamp,
+  };
+
+  if (
+    providerError &&
+    (eventType === "failed" || eventType === "bounced")
+  ) {
+    sharedSet.providerError = providerError;
+  }
+
+  if (field) {
+    await CampaignSendModel.updateOne(
+      withWorkspaceScope(workspaceId, { _id: sendId, [field]: null }),
+      { $set: { ...sharedSet, [field]: eventTimestamp } },
+    );
+  }
+
+  await CampaignSendModel.updateOne(withWorkspaceScope(workspaceId, { _id: sendId }), {
+    $set: sharedSet,
+  });
 }

@@ -75,6 +75,7 @@ export function IconUser(p: IconProps) { return (<svg {...base(p)}><circle cx="1
 export function IconLogout(p: IconProps) { return (<svg {...base(p)}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="m10 17-5-5 5-5M5 12h11"/></svg>); }
 export function IconMenu(p: IconProps) { return (<svg {...base(p)}><path d="M4 6h16M4 12h16M4 18h16"/></svg>); }
 export function IconBell(p: IconProps) { return (<svg {...base(p)}><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>); }
+export function IconChart(p: IconProps) { return (<svg {...base(p)}><path d="M4 19V5M4 19h16"/><path d="M8 16v-5M12 16V8M16 16v-3"/></svg>); }
 export function IconArrowUp(p: IconProps) { return (<svg {...base(p)}><path d="m6 14 6-6 6 6"/></svg>); }
 export function IconArrowDown(p: IconProps) { return (<svg {...base(p)}><path d="m6 10 6 6 6-6"/></svg>); }
 export function IconExternalLink(p: IconProps) { return (<svg {...base(p)}><path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M14 4h6v6M20 4 11 13"/></svg>); }

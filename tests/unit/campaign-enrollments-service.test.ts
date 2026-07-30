@@ -5,6 +5,7 @@ import {
   campaignRecordExtras,
   campaignStepRecordExtras,
   enrollmentRecordExtras,
+  campaignSendRecordExtras,
 } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/campaigns", () => ({
@@ -553,6 +554,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
         scheduledFor: new Date("2026-06-18T18:37:00.000Z"),
         sentAt: new Date("2026-06-18T18:37:00.000Z"),
         createdAt: new Date("2026-06-18T18:37:00.000Z"),
+        ...campaignSendRecordExtras,
       },
       {
         id: "send-2",
@@ -568,6 +570,7 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
         scheduledFor: new Date("2026-06-18T18:37:00.000Z"),
         sentAt: new Date("2026-06-18T18:37:00.000Z"),
         createdAt: new Date("2026-06-18T18:37:00.000Z"),
+        ...campaignSendRecordExtras,
       },
     ]);
 

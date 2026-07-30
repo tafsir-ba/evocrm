@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { enrollmentRecordExtras } from "@/tests/helpers/crm-fixtures";
+import { campaignSendRecordExtras, enrollmentRecordExtras } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   updateCampaignEnrollment: vi.fn(),
@@ -126,6 +126,7 @@ describe("campaign enrollment reconcile", () => {
         scheduledFor: new Date("2026-06-18T18:37:00.000Z"),
         sentAt: new Date("2026-06-18T18:37:00.000Z"),
         createdAt: new Date("2026-06-18T18:37:00.000Z"),
+        ...campaignSendRecordExtras,
       },
     ]);
 
@@ -193,6 +194,7 @@ describe("campaign enrollment reconcile", () => {
         scheduledFor: sentAt,
         sentAt,
         createdAt: sentAt,
+        ...campaignSendRecordExtras,
       },
       {
         id: "send-2",
@@ -208,6 +210,7 @@ describe("campaign enrollment reconcile", () => {
         scheduledFor: sentAt,
         sentAt,
         createdAt: sentAt,
+        ...campaignSendRecordExtras,
       },
     ]);
 
@@ -265,6 +268,7 @@ describe("campaign enrollment reconcile", () => {
         scheduledFor: sentAt,
         sentAt,
         createdAt: sentAt,
+        ...campaignSendRecordExtras,
       },
     ]);
 

@@ -19,6 +19,18 @@ const campaignSendSchema = new Schema(
     error: { type: String, trim: true, default: null },
     scheduledFor: { type: Date, required: true },
     sentAt: { type: Date, default: null },
+    /** First Resend delivered event (unique delivery). */
+    deliveredAt: { type: Date, default: null },
+    /** First Resend opened event (unique open). */
+    firstOpenedAt: { type: Date, default: null },
+    /** First Resend clicked event (unique click). */
+    firstClickedAt: { type: Date, default: null },
+    bouncedAt: { type: Date, default: null },
+    complainedAt: { type: Date, default: null },
+    deliveryDelayedAt: { type: Date, default: null },
+    providerFailedAt: { type: Date, default: null },
+    providerError: { type: String, trim: true, default: null },
+    lastProviderEventAt: { type: Date, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );
@@ -30,6 +42,8 @@ campaignSendSchema.index({ workspaceId: 1, campaignStepId: 1 });
 campaignSendSchema.index({ workspaceId: 1, status: 1 });
 campaignSendSchema.index({ workspaceId: 1, scheduledFor: 1 });
 campaignSendSchema.index({ workspaceId: 1, sentAt: 1 });
+campaignSendSchema.index({ workspaceId: 1, campaignId: 1, sentAt: 1 });
+campaignSendSchema.index({ workspaceId: 1, campaignId: 1, deliveredAt: 1 });
 campaignSendSchema.index({ providerMessageId: 1 }, { sparse: true });
 campaignSendSchema.index(
   { workspaceId: 1, enrollmentId: 1, campaignStepId: 1 },

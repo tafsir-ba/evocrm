@@ -1,6 +1,7 @@
 import type { CampaignStepRecord } from "@/server/repositories/campaign-steps";
 import type { CampaignRecord } from "@/server/repositories/campaigns";
 import type { CampaignEnrollmentRecord } from "@/server/repositories/campaign-enrollments";
+import type { CampaignSendRecord } from "@/server/repositories/campaign-sends";
 import type { LeadRecord } from "@/server/repositories/leads";
 import type { ProjectRecord } from "@/server/repositories/projects";
 
@@ -41,6 +42,29 @@ export const enrollmentRecordExtras: Pick<
   enrollmentSource: "manual",
   enrollmentReason: null,
   sendClaimExpiresAt: null,
+};
+
+export const campaignSendRecordExtras: Pick<
+  CampaignSendRecord,
+  | "deliveredAt"
+  | "firstOpenedAt"
+  | "firstClickedAt"
+  | "bouncedAt"
+  | "complainedAt"
+  | "deliveryDelayedAt"
+  | "providerFailedAt"
+  | "providerError"
+  | "lastProviderEventAt"
+> = {
+  deliveredAt: null,
+  firstOpenedAt: null,
+  firstClickedAt: null,
+  bouncedAt: null,
+  complainedAt: null,
+  deliveryDelayedAt: null,
+  providerFailedAt: null,
+  providerError: null,
+  lastProviderEventAt: null,
 };
 
 export const campaignStepRecordExtras: Pick<
