@@ -1,6 +1,8 @@
 const DEFAULT_INTERVAL_MS = 60_000;
 const MIN_INTERVAL_MS = 30_000;
 const MAX_INTERVAL_MS = 15 * 60_000;
+/** Keep below the default tick interval so a hung HTTP call cannot pin workerRunning. */
+const CRON_FETCH_TIMEOUT_MS = 55_000;
 
 let workerStarted = false;
 let workerRunning = false;
@@ -72,6 +74,7 @@ async function runCampaignCronTick(): Promise<void> {
         headers: {
           Authorization: `Bearer ${cronSecret}`,
         },
+        signal: AbortSignal.timeout(CRON_FETCH_TIMEOUT_MS),
       },
     );
 

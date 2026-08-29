@@ -195,7 +195,85 @@ describe("resend webhook processing", () => {
     );
 
     expect(second).toEqual({ received: true, created: false, duplicate: true });
-    expect(applyCampaignSendProviderEvent).not.toHaveBeenCalled();
+    // Side effects still run on retry so a partial failure after event insert heals.
+    expect(applyCampaignSendProviderEvent).toHaveBeenCalledWith(
+      "ws-1",
+      "send-1",
+      "opened",
+      new Date("2026-07-30T12:00:00.000Z"),
+      null,
+    );
+  });
+
+  it("applies hard-bounce suppression on webhook retry after event already exists", async () => {
+    vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue({
+      id: "send-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      campaignStepId: "step-1",
+      enrollmentId: "enroll-1",
+      leadId: "lead-1",
+      opportunityId: null,
+      status: "sent",
+      providerMessageId: "re_dup",
+      error: null,
+      scheduledFor: new Date(),
+      sentAt: new Date(),
+      deliveredAt: null,
+      firstOpenedAt: null,
+      firstClickedAt: null,
+      bouncedAt: null,
+      complainedAt: null,
+      deliveryDelayedAt: null,
+      providerFailedAt: null,
+      providerError: null,
+      lastProviderEventAt: null,
+      createdAt: new Date(),
+    });
+    vi.mocked(createEmailEventIdempotent).mockResolvedValue({
+      created: false,
+      event: {
+        id: "evt-dup",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-1",
+        contactId: "lead-1",
+        emailSendId: "send-1",
+        provider: "resend",
+        providerEventId: "svix_dup",
+        providerEmailId: "re_dup",
+        eventType: "bounced",
+        eventTimestamp: new Date("2026-07-30T12:05:00.000Z"),
+        rawPayload: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+    });
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      email: "person@example.com",
+    } as never);
+
+    await processResendWebhookPayload(
+      {
+        type: "email.bounced",
+        data: {
+          email_id: "re_dup",
+          created_at: "2026-07-30T12:05:00.000Z",
+          bounce: { message: "user unknown", type: "Permanent" },
+        },
+      },
+      "svix_dup",
+    );
+
+    expect(upsertEmailSuppression).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        email: "person@example.com",
+        reason: "hard_bounce",
+      }),
+    );
   });
 
   it("suppresses only permanent bounced recipients", async () => {

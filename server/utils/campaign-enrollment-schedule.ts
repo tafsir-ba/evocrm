@@ -83,6 +83,18 @@ function isDeferredRetryForCurrentStep(
   return enrollment.nextSendAt.getTime() > sendLog.scheduledFor.getTime();
 }
 
+/** True when nextSendAt was intentionally bumped after a failed/skipped attempt. */
+export function enrollmentHasDeferredRetry(
+  enrollment: Pick<CampaignEnrollmentRecord, "currentStep" | "status" | "nextSendAt">,
+  sendLogsByStepOrder: Map<number, EnrollmentStepSendLog>,
+): boolean {
+  return isDeferredRetryForCurrentStep(
+    enrollment,
+    enrollment.currentStep,
+    sendLogsByStepOrder.get(enrollment.currentStep),
+  );
+}
+
 export function mapLatestSendLogsByStepOrder(
   steps: Array<Pick<CampaignStepScheduleInput, "id" | "order">>,
   sends: Array<

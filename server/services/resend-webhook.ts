@@ -167,61 +167,62 @@ export async function processResendWebhookPayload(
     },
   });
 
-  if (created) {
-    await applyCampaignSendProviderEvent(
-      workspaceId,
-      send.id,
-      eventType,
-      eventTimestamp,
-      providerError,
-    );
+  // Side effects are idempotent (first-touch timestamps + suppression upsert).
+  // Always run them so a retry after a partial failure still applies bounce /
+  // complaint suppressions when the event row already exists.
+  await applyCampaignSendProviderEvent(
+    workspaceId,
+    send.id,
+    eventType,
+    eventTimestamp,
+    providerError,
+  );
 
-    if (eventType === "complained") {
-      let recipientEmail =
-        typeof tags.to === "string"
-          ? tags.to
-          : typeof tags.email === "string"
-            ? tags.email
-            : null;
+  if (eventType === "complained") {
+    let recipientEmail =
+      typeof tags.to === "string"
+        ? tags.to
+        : typeof tags.email === "string"
+          ? tags.email
+          : null;
 
-      if (!recipientEmail && send.leadId) {
-        const lead = await findLeadById(workspaceId, send.leadId);
-        recipientEmail = lead?.email ?? null;
-      }
-
-      if (recipientEmail && send.leadId) {
-        await upsertEmailSuppression(workspaceId, {
-          email: recipientEmail,
-          contactId: send.leadId,
-          reason: "complaint",
-          source: "webhook",
-        });
-      }
+    if (!recipientEmail && send.leadId) {
+      const lead = await findLeadById(workspaceId, send.leadId);
+      recipientEmail = lead?.email ?? null;
     }
 
-    // Soft/transient bounces (mailbox full, temporary DNS) must not permanently
-    // suppress — that blocked Grosvenor Vistas drip retries for recoverable addresses.
-    if (eventType === "bounced" && isPermanentResendBounce(payload.data?.bounce)) {
-      let recipientEmail =
-        typeof tags.to === "string"
-          ? tags.to
-          : typeof tags.email === "string"
-            ? tags.email
-            : null;
+    if (recipientEmail && send.leadId) {
+      await upsertEmailSuppression(workspaceId, {
+        email: recipientEmail,
+        contactId: send.leadId,
+        reason: "complaint",
+        source: "webhook",
+      });
+    }
+  }
 
-      if (!recipientEmail && send.leadId) {
-        const lead = await findLeadById(workspaceId, send.leadId);
-        recipientEmail = lead?.email ?? null;
-      }
+  // Soft/transient bounces (mailbox full, temporary DNS) must not permanently
+  // suppress — that blocked Grosvenor Vistas drip retries for recoverable addresses.
+  if (eventType === "bounced" && isPermanentResendBounce(payload.data?.bounce)) {
+    let recipientEmail =
+      typeof tags.to === "string"
+        ? tags.to
+        : typeof tags.email === "string"
+          ? tags.email
+          : null;
 
-      if (recipientEmail && send.leadId) {
-        await upsertEmailSuppression(workspaceId, {
-          email: recipientEmail,
-          contactId: send.leadId,
-          reason: "hard_bounce",
-          source: "webhook",
-        });
-      }
+    if (!recipientEmail && send.leadId) {
+      const lead = await findLeadById(workspaceId, send.leadId);
+      recipientEmail = lead?.email ?? null;
+    }
+
+    if (recipientEmail && send.leadId) {
+      await upsertEmailSuppression(workspaceId, {
+        email: recipientEmail,
+        contactId: send.leadId,
+        reason: "hard_bounce",
+        source: "webhook",
+      });
     }
   }
 

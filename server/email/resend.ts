@@ -146,7 +146,13 @@ export async function sendCampaignEmail(
       const result = await resend.emails.send(payload);
 
       if (!result.error) {
-        const messageId = result.data?.id ?? "unknown";
+        const messageId = result.data?.id?.trim();
+        if (!messageId) {
+          return {
+            success: false,
+            error: "Resend returned no message id.",
+          };
+        }
         return { success: true, messageId };
       }
 

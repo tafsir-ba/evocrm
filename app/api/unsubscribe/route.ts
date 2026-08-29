@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  consumeUnsubscribeRateLimit,
+  getClientIpFromRequest,
+} from "@/server/security/public-route-rate-limit";
 import { processUnsubscribe } from "@/server/services/unsubscribe";
 
 /**
@@ -16,8 +20,11 @@ export async function POST(request: Request) {
   }
 
   // Attempt unsubscribe; always return 2xx so mail clients do not retry.
+  // Rate-limit by IP to reduce token-guessing / flood abuse without breaking RFC.
   try {
-    await processUnsubscribe(token);
+    if (consumeUnsubscribeRateLimit(getClientIpFromRequest(request))) {
+      await processUnsubscribe(token);
+    }
   } catch {
     // Token was present; swallow infrastructure errors per RFC 8058.
   }

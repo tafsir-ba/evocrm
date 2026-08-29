@@ -22,8 +22,8 @@ _None at Phase 13 gate._
 
 | ID | Severity | Area | Roles | Steps | Expected | Actual | Status | Owner/Fix |
 |----|----------|------|-------|-------|----------|--------|--------|-----------|
-| BUG-002 | Medium | Rate limiting | Public | Burst requests to `/api/auth/signup` | Rate limited | No in-process limiter on auth signup yet | Open | Accepted beta risk — see security review |
-| BUG-003 | Medium | Rate limiting | Public | Burst requests to `/unsubscribe` | Rate limited | No dedicated unsubscribe limiter | Open | Accepted beta risk |
+| BUG-002 | Medium | Rate limiting | Public | Burst requests to `/api/auth/signup` | Rate limited | In-process IP limiter (10 / 15 min) | Fixed | `server/security/public-route-rate-limit.ts` |
+| BUG-003 | Medium | Rate limiting | Public | Burst requests to `/unsubscribe` | Rate limited | IP limiter on one-click POST (still HTTP 200) | Fixed | `server/security/public-route-rate-limit.ts` |
 | BUG-004 | Medium | Export | Owner/Admin | Export very large workspace (>10k records) | Async job or streaming | Synchronous JSON bundle may be slow/large | Open | Beta uses sync export; monitor size |
 
 ---
@@ -47,3 +47,9 @@ _None at Phase 13 gate._
 | FIX-004 | Error handling | `handleRouteError` logs non-exposed errors via `captureError` |
 | FIX-006 | Export permission | Restricted to `settings:update` only (viewers/agents cannot bulk export) |
 | FIX-007 | Export document metadata | Uses model fields `fileName` and `fileSize` |
+| FIX-008 | Auth signup rate limit | BUG-002 — IP limiter on `/api/auth/signup` |
+| FIX-009 | Unsubscribe rate limit | BUG-003 — IP limiter on one-click unsubscribe POST |
+| FIX-010 | Drip soft-bounce | Transient Resend bounces no longer permanent suppressions |
+| FIX-011 | Enrollment defer sync | Passive list/detail loads no longer undo skip/fail retry backoff |
+| FIX-012 | Webhook side effects | Bounce/complaint suppressions still apply on provider retry |
+| FIX-013 | Campaign cron hang | Fetch timeout so hung ticks cannot pin `workerRunning` |

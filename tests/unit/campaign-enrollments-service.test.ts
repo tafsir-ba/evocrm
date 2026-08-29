@@ -442,6 +442,131 @@ describe("listCampaignEnrollmentsForWorkspace sync", () => {
     vi.useRealTimers();
   });
 
+  it("does not undo failure/skip retry backoff on passive list loads", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-18T15:10:00.000Z"));
+
+    const createdAt = new Date("2026-06-16T09:00:00.000Z");
+    const lastSentAt = new Date("2026-06-16T09:00:00.000Z");
+    const deferredNextSendAt = new Date("2026-06-19T15:10:00.000Z");
+
+    vi.mocked(findCampaignSteps).mockResolvedValue([
+      {
+        id: "step-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        order: 1,
+        delayDays: 0,
+        sendTime: "09:00",
+        fromName: "Test",
+        channel: "email",
+        subject: "Hello",
+        body: "Welcome {unsubscribe_url}",
+        documentIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...campaignStepRecordExtras,
+      },
+      {
+        id: "step-2",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        order: 2,
+        delayDays: 1,
+        sendTime: "09:00",
+        fromName: "Test",
+        channel: "email",
+        subject: "Follow-up",
+        body: "Hi {unsubscribe_url}",
+        documentIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...campaignStepRecordExtras,
+      },
+    ]);
+
+    vi.mocked(findCampaignEnrollments).mockResolvedValue({
+      enrollments: [
+        {
+          id: "enroll-1",
+          workspaceId: "ws-1",
+          campaignId: "camp-1",
+          leadId: "lead-1",
+          opportunityId: null,
+          ...enrollmentRecordExtras,
+          status: "active",
+          currentStep: 2,
+          nextSendAt: deferredNextSendAt,
+          lastSentAt,
+          completedAt: null,
+          unsubscribedAt: null,
+          failedAt: null,
+          failureReason: null,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      ],
+      total: 1,
+    });
+
+    vi.mocked(findCampaignSendsByEnrollmentIds).mockResolvedValue([
+      {
+        id: "send-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-1",
+        enrollmentId: "enroll-1",
+        leadId: "lead-1",
+        opportunityId: null,
+        status: "sent",
+        providerMessageId: "msg-1",
+        error: null,
+        scheduledFor: lastSentAt,
+        sentAt: lastSentAt,
+        deliveredAt: null,
+        firstOpenedAt: null,
+        firstClickedAt: null,
+        bouncedAt: null,
+        complainedAt: null,
+        deliveryDelayedAt: null,
+        providerFailedAt: null,
+        providerError: null,
+        lastProviderEventAt: null,
+        createdAt: lastSentAt,
+      },
+      {
+        id: "send-skip",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-2",
+        enrollmentId: "enroll-1",
+        leadId: "lead-1",
+        opportunityId: null,
+        status: "skipped",
+        providerMessageId: null,
+        error: "Lead has no email address.",
+        scheduledFor: new Date("2026-06-17T09:00:00.000Z"),
+        sentAt: null,
+        deliveredAt: null,
+        firstOpenedAt: null,
+        firstClickedAt: null,
+        bouncedAt: null,
+        complainedAt: null,
+        deliveryDelayedAt: null,
+        providerFailedAt: null,
+        providerError: null,
+        lastProviderEventAt: null,
+        createdAt: new Date("2026-06-18T15:09:00.000Z"),
+      },
+    ]);
+
+    await listCampaignEnrollmentsForWorkspace("ws-1", "camp-1");
+
+    expect(updateCampaignEnrollment).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   it("rewinds currentStep when enrollment advanced past unsent steps", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-18T18:39:00.000Z"));

@@ -56,11 +56,11 @@ export function BarChart({
   data: { stage: string; count: number }[];
   max?: number;
 }) {
-  const top = max ?? Math.max(...data.map((d) => d.count));
+  const top = max ?? (data.length > 0 ? Math.max(...data.map((d) => d.count)) : 0);
   return (
     <div className="space-y-3">
       {data.map((d) => {
-        const pct = Math.max(2, (d.count / top) * 100);
+        const pct = top > 0 ? Math.max(2, (d.count / top) * 100) : 0;
         return (
           <div key={d.stage} className="flex items-center gap-3">
             <span className="w-24 shrink-0 text-[12.5px] text-[var(--color-ink-soft)]">

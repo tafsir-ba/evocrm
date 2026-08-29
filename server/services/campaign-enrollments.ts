@@ -33,6 +33,7 @@ import {
 import {
   buildEnrollmentScheduledSteps,
   computeEnrollmentNextSendAt,
+  enrollmentHasDeferredRetry,
   mapLatestSendLogsByStepOrder,
   type CampaignStepScheduleInput,
   type EnrollmentScheduledStep,
@@ -119,6 +120,7 @@ async function syncEnrollmentNextSendAtIfNeeded(
   enrollment: CampaignEnrollmentRecord,
   steps: Array<{ order: number; delayDays: number; sendTime: string; subject: string }>,
   timeZone: string,
+  sendLogsByStepOrder: Map<number, EnrollmentStepSendLog> = new Map(),
 ): Promise<CampaignEnrollmentRecord> {
   if (enrollment.status !== "active" && enrollment.status !== "paused") {
     return enrollment;
@@ -127,6 +129,12 @@ async function syncEnrollmentNextSendAtIfNeeded(
   const currentStep = steps.find((step) => step.order === enrollment.currentStep);
 
   if (!currentStep) {
+    return enrollment;
+  }
+
+  // Failure/skip retries intentionally bump nextSendAt. Passive list/detail loads
+  // must not collapse that backoff back to the step's projected order time.
+  if (enrollmentHasDeferredRetry(enrollment, sendLogsByStepOrder)) {
     return enrollment;
   }
 
@@ -205,6 +213,7 @@ async function enrichEnrollment(
     ),
     steps,
     timeZone,
+    sendLogsByStepOrder,
   );
 
   return {

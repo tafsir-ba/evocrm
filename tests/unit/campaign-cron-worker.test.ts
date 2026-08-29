@@ -55,6 +55,7 @@ describe("campaign-cron-worker", () => {
         expect.objectContaining({
           method: "POST",
           headers: { Authorization: "Bearer test-cron-secret" },
+          signal: expect.any(AbortSignal),
         }),
       );
     });

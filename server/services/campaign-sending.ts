@@ -43,6 +43,7 @@ import { clampCampaignSendBatchLimit } from "@/lib/campaign-send-limits";
 import { buildCampaignVariableContext } from "@/server/utils/campaign-variable-context";
 import { reconcileEnrollmentBeforeSend } from "@/server/services/campaign-enrollment-reconcile";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
+import { captureError } from "@/server/observability/capture-error";
 
 export type SendDueSummary = {
   processed: number;
@@ -633,7 +634,15 @@ async function summarizeEnrollmentProcessing(
       summary.sent += result.sent;
       summary.skipped += result.skipped;
       summary.failed += result.failed;
-    } catch {
+    } catch (error) {
+      captureError(error, {
+        workspaceId: enrollment.workspaceId,
+        tags: {
+          domain: "campaign_sending",
+          enrollmentId: enrollment.id,
+          campaignId: enrollment.campaignId,
+        },
+      });
       summary.processed += 1;
       summary.failed += 1;
     }
