@@ -22,23 +22,65 @@ export const integrationListQuerySchema = z.object({
   status: z.enum(INTEGRATION_STATUSES).optional(),
 });
 
+const projectRoutingTypes = new Set(["website", "hubspot"]);
+
 export const createIntegrationInputSchema = z
   .object({
     type: z.enum(INTEGRATION_TYPES),
     name: z.string().trim().min(1).max(120),
     defaultProjectId: objectIdSchema.nullable().optional(),
     allowProjectOverride: z.boolean().optional(),
+    hubspotAccessToken: z.string().trim().min(10).max(500).optional(),
+    hubspotClientSecret: z.string().trim().min(10).max(500).optional(),
+    hubspotPortalId: z.string().trim().min(1).max(64).optional(),
   })
   .strict()
-  .refine(
-    (value) =>
-      value.type === "website" ||
-      (value.defaultProjectId === undefined && value.allowProjectOverride === undefined),
-    {
-      message: "Project routing fields are only supported for website integrations.",
-      path: ["defaultProjectId"],
-    },
-  );
+  .superRefine((value, ctx) => {
+    const hasProjectRouting =
+      value.defaultProjectId !== undefined || value.allowProjectOverride !== undefined;
+
+    if (hasProjectRouting && !projectRoutingTypes.has(value.type)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Project routing fields are only supported for website and HubSpot integrations.",
+        path: ["defaultProjectId"],
+      });
+    }
+
+    if (value.type === "hubspot") {
+      if (!value.hubspotAccessToken) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "HubSpot private app access token is required.",
+          path: ["hubspotAccessToken"],
+        });
+      }
+      if (!value.hubspotClientSecret) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "HubSpot client secret is required for webhook verification.",
+          path: ["hubspotClientSecret"],
+        });
+      }
+      if (!value.hubspotPortalId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "HubSpot portal ID is required.",
+          path: ["hubspotPortalId"],
+        });
+      }
+    } else if (
+      value.hubspotAccessToken !== undefined ||
+      value.hubspotClientSecret !== undefined ||
+      value.hubspotPortalId !== undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "HubSpot credential fields are only supported for HubSpot integrations.",
+        path: ["hubspotAccessToken"],
+      });
+    }
+  });
 
 export const updateIntegrationInputSchema = z
   .object({
@@ -46,6 +88,9 @@ export const updateIntegrationInputSchema = z
     status: z.enum(INTEGRATION_STATUSES).optional(),
     defaultProjectId: objectIdSchema.nullable().optional(),
     allowProjectOverride: z.boolean().optional(),
+    hubspotAccessToken: z.string().trim().min(10).max(500).optional(),
+    hubspotClientSecret: z.string().trim().min(10).max(500).optional(),
+    hubspotPortalId: z.string().trim().min(1).max(64).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

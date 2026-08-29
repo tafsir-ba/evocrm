@@ -22,6 +22,11 @@ import {
 } from "@/server/services/integration-api-keys";
 import { validateActiveProjectId } from "@/server/services/project-scope";
 import { findProjects } from "@/server/repositories/projects";
+import {
+  encodeHubSpotCredentials,
+  decodeHubSpotCredentials,
+} from "@/server/security/integration-credentials";
+import { assertHubSpotAccessToken } from "@/server/services/hubspot-client";
 import type {
   CreateIntegrationInput,
   UpdateIntegrationInput,
@@ -33,6 +38,8 @@ export type IntegrationPublicRecord = {
   name: string;
   status: IntegrationStatus;
   hasApiKey: boolean;
+  hasCredentials: boolean;
+  externalAccountId: string | null;
   defaultProjectId: string | null;
   allowProjectOverride: boolean;
   createdBy: string;
@@ -47,7 +54,7 @@ export type IntegrationCreateResult = {
 };
 
 function defaultStatusForType(type: IntegrationType): IntegrationStatus {
-  return type === "website" ? "active" : "paused";
+  return type === "website" || type === "hubspot" ? "active" : "paused";
 }
 
 export function toIntegrationPublicRecord(
@@ -59,6 +66,9 @@ export function toIntegrationPublicRecord(
     name: integration.name,
     status: integration.status,
     hasApiKey: integration.type === "website" && Boolean(integration.apiKeyHash),
+    hasCredentials:
+      integration.type === "hubspot" && Boolean(integration.credentialsEncrypted),
+    externalAccountId: integration.externalAccountId,
     defaultProjectId: integration.defaultProjectId,
     allowProjectOverride: integration.allowProjectOverride,
     createdBy: integration.createdBy,
@@ -74,6 +84,8 @@ function integrationSnapshot(integration: IntegrationRecord): Record<string, unk
     name: integration.name,
     status: integration.status,
     hasApiKey: Boolean(integration.apiKeyHash),
+    hasCredentials: Boolean(integration.credentialsEncrypted),
+    externalAccountId: integration.externalAccountId,
     defaultProjectId: integration.defaultProjectId,
     allowProjectOverride: integration.allowProjectOverride,
   };
@@ -121,6 +133,24 @@ async function assertWebsiteDefaultProjectConfigured(
   }
 }
 
+async function assertHubSpotDefaultProjectConfigured(
+  workspaceId: string,
+  defaultProjectId: string | null | undefined,
+): Promise<void> {
+  if (defaultProjectId) {
+    return;
+  }
+
+  const projects = await findProjects(workspaceId, { includeArchived: false });
+
+  if (projects.length !== 1) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Set a default project for this HubSpot integration.",
+    );
+  }
+}
+
 export async function listIntegrationsForWorkspace(
   workspaceId: string,
   filter: IntegrationListFilter = {},
@@ -149,6 +179,8 @@ export async function createIntegrationForWorkspace(
 ): Promise<IntegrationCreateResult> {
   let apiKeyHash: string | null = null;
   let rawApiKey: string | undefined;
+  let credentialsEncrypted: string | null = null;
+  let externalAccountId: string | null = null;
 
   if (input.type === "website") {
     rawApiKey = generateIntegrationApiKey();
@@ -162,7 +194,9 @@ export async function createIntegrationForWorkspace(
   const allowProjectOverride =
     input.type === "website" ? (input.allowProjectOverride ?? false) : false;
   const defaultProjectId =
-    input.type === "website" ? (input.defaultProjectId ?? null) : null;
+    input.type === "website" || input.type === "hubspot"
+      ? (input.defaultProjectId ?? null)
+      : null;
 
   if (input.type === "website") {
     await assertWebsiteDefaultProjectConfigured(
@@ -172,12 +206,34 @@ export async function createIntegrationForWorkspace(
     );
   }
 
+  if (input.type === "hubspot") {
+    await assertHubSpotDefaultProjectConfigured(workspaceId, defaultProjectId);
+
+    const accessToken = input.hubspotAccessToken!.trim();
+    const clientSecret = input.hubspotClientSecret!.trim();
+    const portalId = input.hubspotPortalId!.trim();
+
+    await assertHubSpotAccessToken(accessToken);
+
+    credentialsEncrypted = encodeHubSpotCredentials({
+      accessToken,
+      clientSecret,
+      portalId,
+    });
+    externalAccountId = portalId;
+
+    // Ensure encoded credentials round-trip before persisting.
+    decodeHubSpotCredentials(credentialsEncrypted);
+  }
+
   const integration = await createIntegration({
     workspaceId,
     type: input.type,
     name: input.name,
     status: defaultStatusForType(input.type),
     apiKeyHash,
+    credentialsEncrypted,
+    externalAccountId,
     defaultProjectId,
     allowProjectOverride,
     createdBy: actorId,
@@ -212,11 +268,19 @@ export async function updateIntegrationForWorkspace(
 
   if (
     existing.type !== "website" &&
+    existing.type !== "hubspot" &&
     (input.defaultProjectId !== undefined || input.allowProjectOverride !== undefined)
   ) {
     throw new AppError(
       "VALIDATION_ERROR",
-      "Project routing fields are only supported for website integrations.",
+      "Project routing fields are only supported for website and HubSpot integrations.",
+    );
+  }
+
+  if (existing.type === "hubspot" && input.allowProjectOverride !== undefined) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "HubSpot integrations do not support project override.",
     );
   }
 
@@ -241,6 +305,56 @@ export async function updateIntegrationForWorkspace(
     );
   }
 
+  if (existing.type === "hubspot") {
+    await assertHubSpotDefaultProjectConfigured(workspaceId, nextDefaultProjectId);
+  }
+
+  let credentialsEncrypted: string | undefined;
+  let externalAccountId: string | undefined;
+
+  if (existing.type === "hubspot") {
+    const hasCredentialUpdate =
+      input.hubspotAccessToken !== undefined ||
+      input.hubspotClientSecret !== undefined ||
+      input.hubspotPortalId !== undefined;
+
+    if (hasCredentialUpdate) {
+      const current = existing.credentialsEncrypted
+        ? decodeHubSpotCredentials(existing.credentialsEncrypted)
+        : null;
+
+      const accessToken =
+        input.hubspotAccessToken?.trim() || current?.accessToken;
+      const clientSecret =
+        input.hubspotClientSecret?.trim() || current?.clientSecret;
+      const portalId = input.hubspotPortalId?.trim() || current?.portalId;
+
+      if (!accessToken || !clientSecret || !portalId) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "HubSpot access token, client secret, and portal ID are required.",
+        );
+      }
+
+      await assertHubSpotAccessToken(accessToken);
+      credentialsEncrypted = encodeHubSpotCredentials({
+        accessToken,
+        clientSecret,
+        portalId,
+      });
+      externalAccountId = portalId;
+    }
+  } else if (
+    input.hubspotAccessToken !== undefined ||
+    input.hubspotClientSecret !== undefined ||
+    input.hubspotPortalId !== undefined
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "HubSpot credential fields are only supported for HubSpot integrations.",
+    );
+  }
+
   const updated = await updateIntegration(workspaceId, integrationId, {
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
@@ -250,6 +364,8 @@ export async function updateIntegrationForWorkspace(
     ...(input.allowProjectOverride !== undefined
       ? { allowProjectOverride: input.allowProjectOverride }
       : {}),
+    ...(credentialsEncrypted !== undefined ? { credentialsEncrypted } : {}),
+    ...(externalAccountId !== undefined ? { externalAccountId } : {}),
   });
 
   if (!updated) {

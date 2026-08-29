@@ -18,10 +18,12 @@ import { IconGoogle } from "@/lib/icons";
 
 type IntegrationRecord = {
   id: string;
-  type: "mls" | "website" | "google_ads" | "meta_ads";
+  type: "mls" | "website" | "google_ads" | "meta_ads" | "hubspot";
   name: string;
   status: "active" | "paused" | "archived" | "error";
   hasApiKey: boolean;
+  hasCredentials?: boolean;
+  externalAccountId?: string | null;
   defaultProjectId: string | null;
   allowProjectOverride: boolean;
   createdAt: string;
@@ -40,6 +42,7 @@ type IntegrationLogRecord = {
 
 const TYPE_LABELS: Record<IntegrationRecord["type"], string> = {
   website: "Website",
+  hubspot: "HubSpot",
   mls: "MLS Import",
   google_ads: "Google Ads",
   meta_ads: "Meta Ads",
@@ -98,12 +101,22 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
+  const [newHubSpotName, setNewHubSpotName] = useState("HubSpot CRM");
+  const [newHubSpotProjectId, setNewHubSpotProjectId] = useState<string | null>(null);
+  const [hubspotAccessToken, setHubspotAccessToken] = useState("");
+  const [hubspotClientSecret, setHubspotClientSecret] = useState("");
+  const [hubspotPortalId, setHubspotPortalId] = useState("");
+  const [hubspotCreating, setHubspotCreating] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const webhookUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/integrations/website/leads`
       : "/api/integrations/website/leads";
+  const hubspotWebhookUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/integrations/hubspot/webhooks`
+      : "/api/integrations/hubspot/webhooks";
 
   const loadProjects = useCallback(async () => {
     setProjectsLoadError(null);
@@ -193,7 +206,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   );
 
   useEffect(() => {
-    if (!selectedIntegration || selectedIntegration.type !== "website") {
+    if (!selectedIntegration || (selectedIntegration.type !== "website" && selectedIntegration.type !== "hubspot")) {
       return;
     }
 
@@ -202,6 +215,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   }, [selectedIntegration]);
 
   const websiteIntegrations = integrations.filter((integration) => integration.type === "website");
+  const hubspotIntegrations = integrations.filter((integration) => integration.type === "hubspot");
   const configuredTypes = new Set(integrations.map((integration) => integration.type));
   const projectNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -257,6 +271,60 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     setNewWebsiteName("Website Lead Capture");
     setNewDefaultProjectId(null);
     await loadIntegrations();
+  }
+
+  async function createHubSpotIntegration() {
+    setActionMessage(null);
+    setError(null);
+
+    if (projects.length === 0) {
+      setError("Create a project before connecting HubSpot.");
+      return;
+    }
+
+    if (projects.length > 1 && !newHubSpotProjectId) {
+      setError("Select a default project for HubSpot leads.");
+      return;
+    }
+
+    if (!hubspotAccessToken.trim() || !hubspotClientSecret.trim() || !hubspotPortalId.trim()) {
+      setError("HubSpot access token, client secret, and portal ID are required.");
+      return;
+    }
+
+    setHubspotCreating(true);
+
+    try {
+      const response = await fetch(`${apiBase}/integrations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "hubspot",
+          name: newHubSpotName.trim() || "HubSpot CRM",
+          defaultProjectId: newHubSpotProjectId,
+          hubspotAccessToken: hubspotAccessToken.trim(),
+          hubspotClientSecret: hubspotClientSecret.trim(),
+          hubspotPortalId: hubspotPortalId.trim(),
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to create HubSpot integration.");
+        return;
+      }
+
+      setSelectedId(payload.data.integration.id as string);
+      setHubspotAccessToken("");
+      setHubspotClientSecret("");
+      setActionMessage(
+        "HubSpot connected. In HubSpot Private App → Webhooks, subscribe to contact.creation and paste the webhook URL below.",
+      );
+      await loadIntegrations();
+    } finally {
+      setHubspotCreating(false);
+    }
   }
 
   async function createPlaceholder(type: IntegrationRecord["type"], name: string) {
@@ -326,6 +394,34 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       }
 
       setActionMessage("Website project routing saved.");
+      await loadIntegrations();
+    } finally {
+      setRoutingSaving(false);
+    }
+  }
+
+  async function saveHubSpotRouting(integrationId: string) {
+    setRoutingSaving(true);
+    setActionMessage(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`${apiBase}/integrations/${integrationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultProjectId: editDefaultProjectId,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to save HubSpot destination project.");
+        return;
+      }
+
+      setActionMessage("HubSpot destination project saved.");
       await loadIntegrations();
     } finally {
       setRoutingSaving(false);
@@ -646,20 +742,31 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                         {integration.status}
                       </Badge>
                     </div>
-                    <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
-                      Created {new Date(integration.createdAt).toLocaleString()}
-                    </p>
                     {integration.type === "website" && (
                       <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
                         Destination:{" "}
                         {integration.defaultProjectId
-                          ? (projectNameById.get(integration.defaultProjectId) ??
-                            integration.defaultProjectId)
-                          : "Auto (single project) / unset"}
+                          ? (projectNameById.get(integration.defaultProjectId) ?? "Unknown project")
+                          : "Auto (single project) / not set"}
                         {" · "}
-                        Override: {integration.allowProjectOverride ? "allowed" : "locked"}
+                        Override {integration.allowProjectOverride ? "enabled" : "locked"}
                       </p>
                     )}
+                    {integration.type === "hubspot" && (
+                      <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
+                        Portal {integration.externalAccountId ?? "—"}
+                        {" · "}
+                        Destination:{" "}
+                        {integration.defaultProjectId
+                          ? (projectNameById.get(integration.defaultProjectId) ?? "Unknown project")
+                          : "Auto (single project) / not set"}
+                        {" · "}
+                        Credentials {integration.hasCredentials ? "configured" : "missing"}
+                      </p>
+                    )}
+                    <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
+                      Created {new Date(integration.createdAt).toLocaleString()}
+                    </p>
                     {integration.type === "website" && integration.hasApiKey && !revealedApiKey && (
                       <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
                         API key cannot be viewed again. Rotate to generate a new key.
@@ -673,9 +780,13 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                       variant="secondary"
                       onClick={() => setSelectedId(integration.id)}
                     >
-                      {integration.type === "website" ? "Configure" : "View logs"}
+                      {integration.type === "website" || integration.type === "hubspot"
+                        ? "Configure"
+                        : "View logs"}
                     </Button>
-                    {canUpdate && integration.type === "website" && integration.status !== "archived" && (
+                    {canUpdate &&
+                      (integration.type === "website" || integration.type === "hubspot") &&
+                      integration.status !== "archived" && (
                       <>
                         {integration.status === "active" ? (
                           <Button
@@ -694,9 +805,11 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                             Resume
                           </Button>
                         )}
-                        <Button size="sm" onClick={() => void rotateApiKey(integration.id)}>
-                          Rotate API key
-                        </Button>
+                        {integration.type === "website" && (
+                          <Button size="sm" onClick={() => void rotateApiKey(integration.id)}>
+                            Rotate API key
+                          </Button>
+                        )}
                       </>
                     )}
                     {canUpdate && integration.status !== "archived" && (
@@ -717,12 +830,122 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       </section>
 
       <section className="space-y-3">
+        <div>
+          <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
+            HubSpot CRM
+          </h2>
+          <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
+            Connect a HubSpot Private App so new contacts create Evohome leads automatically.
+          </p>
+        </div>
+
+        <Card>
+          <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">Setup</h4>
+          <ol className="mt-3 list-decimal pl-5 space-y-1.5 text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
+            <li>In HubSpot: create a Private App with <code>crm.objects.contacts.read</code>.</li>
+            <li>Copy the access token, client secret, and Hub ID (portal ID).</li>
+            <li>Paste them below and choose the Evohome project for new leads.</li>
+            <li>
+              In the Private App → Webhooks, subscribe to <code>contact.creation</code> and set the
+              target URL to the webhook below.
+            </li>
+          </ol>
+          <div className="mt-4">
+            <Info label="HubSpot webhook URL" value={hubspotWebhookUrl} />
+            <div className="mt-2">
+              <Button size="sm" variant="secondary" onClick={() => void copyText("Webhook URL", hubspotWebhookUrl)}>
+                Copy webhook URL
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {canUpdate && (
+          <Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="hubspot-name">Integration name</Label>
+                <Input
+                  id="hubspot-name"
+                  value={newHubSpotName}
+                  onChange={(event) => setNewHubSpotName(event.target.value)}
+                  placeholder="HubSpot CRM"
+                />
+              </div>
+              <div>
+                <Label htmlFor="hubspot-project">Default project</Label>
+                <ProjectSelector
+                  id="hubspot-project"
+                  projects={projects}
+                  selectedProjectId={newHubSpotProjectId}
+                  onChange={setNewHubSpotProjectId}
+                  placeholder="Select destination project"
+                  emptyLabel="Create a project before connecting HubSpot."
+                />
+              </div>
+              <div>
+                <Label htmlFor="hubspot-portal">HubSpot portal / Hub ID</Label>
+                <Input
+                  id="hubspot-portal"
+                  value={hubspotPortalId}
+                  onChange={(event) => setHubspotPortalId(event.target.value)}
+                  placeholder="e.g. 12345678"
+                />
+              </div>
+              <div>
+                <Label htmlFor="hubspot-token">Private app access token</Label>
+                <Input
+                  id="hubspot-token"
+                  type="password"
+                  value={hubspotAccessToken}
+                  onChange={(event) => setHubspotAccessToken(event.target.value)}
+                  placeholder="pat-..."
+                  autoComplete="off"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="hubspot-secret">Client secret (webhook signature)</Label>
+                <Input
+                  id="hubspot-secret"
+                  type="password"
+                  value={hubspotClientSecret}
+                  onChange={(event) => setHubspotClientSecret(event.target.value)}
+                  placeholder="HubSpot app client secret"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Button
+                  disabled={hubspotCreating || projects.length === 0}
+                  onClick={() => void createHubSpotIntegration()}
+                >
+                  {hubspotCreating ? "Connecting…" : "Connect HubSpot"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {hubspotIntegrations.length > 0 && (
+          <Card>
+            <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+              Connected portals:{" "}
+              {hubspotIntegrations
+                .map((item) => item.externalAccountId ?? item.name)
+                .join(", ")}
+              . Select an integration above to pause, resume, archive, or inspect logs.
+            </p>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
           Placeholder integrations — not available yet
         </h2>
         <p className="text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
           MLS, Google Ads, and Meta Ads appear here for planning only. They are not production
-          integrations in V1 — only website lead capture is live.
+          integrations in V1 — website and HubSpot lead capture are live.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <PlaceholderCard
@@ -749,6 +972,63 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
           />
         </div>
       </section>
+
+      {selectedIntegration?.type === "hubspot" && (
+        <section className="space-y-3">
+          <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
+            HubSpot integration details
+          </h2>
+          <Card>
+            <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
+              {selectedIntegration.name}
+            </h4>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Info label="Portal / Hub ID" value={selectedIntegration.externalAccountId ?? "—"} />
+              <Info
+                label="Credentials"
+                value={selectedIntegration.hasCredentials ? "Configured" : "Missing"}
+              />
+              <div className="md:col-span-2">
+                <Info label="Webhook URL" value={hubspotWebhookUrl} />
+                <div className="mt-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void copyText("Webhook URL", hubspotWebhookUrl)}
+                  >
+                    Copy webhook URL
+                  </Button>
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-hubspot-default-project">Default project</Label>
+                <ProjectSelector
+                  id="edit-hubspot-default-project"
+                  projects={projects}
+                  selectedProjectId={editDefaultProjectId}
+                  onChange={setEditDefaultProjectId}
+                  disabled={!canUpdate || routingSaving}
+                  placeholder="Select destination project"
+                />
+                <p className="text-[12px] text-[var(--color-ink-muted)] mt-1.5">
+                  New HubSpot contacts are created as leads in this project.
+                </p>
+              </div>
+            </div>
+            {canUpdate && (
+              <div className="mt-4">
+                <Button
+                  size="sm"
+                  disabled={routingSaving}
+                  onClick={() => void saveHubSpotRouting(selectedIntegration.id)}
+                >
+                  {routingSaving ? "Saving…" : "Save destination project"}
+                </Button>
+              </div>
+            )}
+          </Card>
+        </section>
+      )}
 
       {selectedIntegration?.type === "website" && (
         <section className="space-y-3">
@@ -899,9 +1179,10 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
         </section>
       )}
 
-      {websiteIntegrations.length > 0 && !selectedId && (
+      {(websiteIntegrations.length > 0 || hubspotIntegrations.length > 0) && !selectedId && (
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-          Select a website integration and use Configure to set project routing and inspect logs.
+          Select a website or HubSpot integration and use Configure to set destination project and
+          inspect logs.
         </p>
       )}
     </div>

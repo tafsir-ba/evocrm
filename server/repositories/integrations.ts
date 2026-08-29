@@ -29,6 +29,7 @@ export type IntegrationRecord = {
   name: string;
   status: IntegrationStatus;
   credentialsEncrypted: string | null;
+  externalAccountId: string | null;
   apiKeyHash: string | null;
   defaultProjectId: string | null;
   allowProjectOverride: boolean;
@@ -46,6 +47,7 @@ function toIntegrationRecord(document: IntegrationDocument): IntegrationRecord {
     name: document.name,
     status: document.status as IntegrationStatus,
     credentialsEncrypted: document.credentialsEncrypted ?? null,
+    externalAccountId: document.externalAccountId ?? null,
     apiKeyHash: document.apiKeyHash ?? null,
     defaultProjectId: document.defaultProjectId?.toString() ?? null,
     allowProjectOverride: Boolean(document.allowProjectOverride),
@@ -136,12 +138,43 @@ export async function findWebsiteIntegrationByApiKeyHash(
   return document ? toIntegrationRecord(document) : null;
 }
 
+export async function findActiveHubSpotIntegrationByPortalId(
+  portalId: string,
+): Promise<IntegrationRecord | null> {
+  await connectDb();
+
+  const document = await IntegrationModel.findOne({
+    type: "hubspot",
+    externalAccountId: portalId,
+    status: "active",
+    archivedAt: null,
+  }).lean<IntegrationDocument>();
+
+  return document ? toIntegrationRecord(document) : null;
+}
+
+export async function findHubSpotIntegrationByPortalId(
+  portalId: string,
+): Promise<IntegrationRecord | null> {
+  await connectDb();
+
+  const document = await IntegrationModel.findOne({
+    type: "hubspot",
+    externalAccountId: portalId,
+    archivedAt: null,
+  }).lean<IntegrationDocument>();
+
+  return document ? toIntegrationRecord(document) : null;
+}
+
 export async function createIntegration(input: {
   workspaceId: string;
   type: IntegrationType;
   name: string;
   status: IntegrationStatus;
   apiKeyHash?: string | null;
+  credentialsEncrypted?: string | null;
+  externalAccountId?: string | null;
   defaultProjectId?: string | null;
   allowProjectOverride?: boolean;
   createdBy: string;
@@ -155,6 +188,8 @@ export async function createIntegration(input: {
       name: input.name.trim(),
       status: input.status,
       apiKeyHash: input.apiKeyHash ?? null,
+      credentialsEncrypted: input.credentialsEncrypted ?? null,
+      externalAccountId: input.externalAccountId ?? null,
       defaultProjectId: input.defaultProjectId ?? null,
       allowProjectOverride: input.allowProjectOverride ?? false,
       createdBy: input.createdBy,
@@ -163,7 +198,10 @@ export async function createIntegration(input: {
     return toIntegrationRecord(document);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      throw new AppError("CONFLICT", "An integration with this API key already exists.");
+      throw new AppError(
+        "CONFLICT",
+        "An integration with this API key or HubSpot portal already exists.",
+      );
     }
 
     throw error;
@@ -177,6 +215,8 @@ export async function updateIntegration(
     name?: string;
     status?: IntegrationStatus;
     apiKeyHash?: string | null;
+    credentialsEncrypted?: string | null;
+    externalAccountId?: string | null;
     defaultProjectId?: string | null;
     allowProjectOverride?: boolean;
     archivedAt?: Date | null;
@@ -194,7 +234,10 @@ export async function updateIntegration(
     return document ? toIntegrationRecord(document) : null;
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      throw new AppError("CONFLICT", "An integration with this API key already exists.");
+      throw new AppError(
+        "CONFLICT",
+        "An integration with this API key or HubSpot portal already exists.",
+      );
     }
 
     throw error;

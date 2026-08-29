@@ -9,6 +9,7 @@ export const PUBLIC_PATHS = [
   "/unsubscribe",
   "/api/unsubscribe",
   "/api/integrations/website/leads",
+  "/api/integrations/hubspot/webhooks",
 ] as const;
 
 export function isPublicPath(pathname: string): boolean {

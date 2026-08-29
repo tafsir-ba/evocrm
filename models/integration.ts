@@ -1,6 +1,12 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
-export const INTEGRATION_TYPES = ["mls", "website", "google_ads", "meta_ads"] as const;
+export const INTEGRATION_TYPES = [
+  "mls",
+  "website",
+  "google_ads",
+  "meta_ads",
+  "hubspot",
+] as const;
 export const INTEGRATION_STATUSES = ["active", "paused", "archived", "error"] as const;
 
 const integrationSchema = new Schema(
@@ -10,6 +16,8 @@ const integrationSchema = new Schema(
     name: { type: String, required: true, trim: true },
     status: { type: String, enum: INTEGRATION_STATUSES, required: true },
     credentialsEncrypted: { type: String, default: null },
+    /** Non-secret external account id (e.g. HubSpot portalId) for webhook routing. */
+    externalAccountId: { type: String, trim: true, default: null },
     apiKeyHash: { type: String, default: null },
     defaultProjectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
     allowProjectOverride: { type: Boolean, default: false },
@@ -31,6 +39,17 @@ integrationSchema.index(
     unique: true,
     partialFilterExpression: {
       apiKeyHash: { $type: "string", $ne: "" },
+    },
+  },
+);
+integrationSchema.index(
+  { type: 1, externalAccountId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      type: "hubspot",
+      externalAccountId: { $type: "string", $ne: "" },
+      archivedAt: null,
     },
   },
 );

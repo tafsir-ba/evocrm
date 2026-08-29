@@ -28,6 +28,19 @@ vi.mock("@/server/services/project-scope", () => ({
   validateActiveProjectId: vi.fn(),
 }));
 
+vi.mock("@/server/services/hubspot-client", () => ({
+  assertHubSpotAccessToken: vi.fn(),
+}));
+
+vi.mock("@/server/security/integration-credentials", () => ({
+  encodeHubSpotCredentials: vi.fn(() => "encrypted-hubspot"),
+  decodeHubSpotCredentials: vi.fn(() => ({
+    accessToken: "pat-test",
+    clientSecret: "secret-test",
+    portalId: "12345",
+  })),
+}));
+
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   createIntegration,
@@ -35,6 +48,7 @@ import {
   updateIntegration,
 } from "@/server/repositories/integrations";
 import { findProjects } from "@/server/repositories/projects";
+import { assertHubSpotAccessToken } from "@/server/services/hubspot-client";
 import {
   archiveIntegrationForWorkspace,
   createIntegrationForWorkspace,
@@ -50,6 +64,7 @@ const baseIntegration = {
   name: "Website Lead Capture",
   status: "active" as const,
   credentialsEncrypted: null,
+  externalAccountId: null,
   apiKeyHash: "hashed-key",
   defaultProjectId: null,
   allowProjectOverride: false,
@@ -284,5 +299,43 @@ describe("integrations service", () => {
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     expect(updateIntegration).not.toHaveBeenCalled();
+  });
+
+  it("creates a HubSpot integration with encrypted credentials and portal id", async () => {
+    const hubspotIntegration = {
+      ...baseIntegration,
+      id: "int-hs",
+      type: "hubspot" as const,
+      name: "HubSpot CRM",
+      apiKeyHash: null,
+      credentialsEncrypted: "encrypted-hubspot",
+      externalAccountId: "12345",
+      defaultProjectId: "project-1",
+    };
+    vi.mocked(createIntegration).mockResolvedValue(hubspotIntegration);
+
+    const result = await createIntegrationForWorkspace("ws-1", "user-1", {
+      type: "hubspot",
+      name: "HubSpot CRM",
+      defaultProjectId: "project-1",
+      hubspotAccessToken: "pat-xxxxxxxx",
+      hubspotClientSecret: "client-secret-xx",
+      hubspotPortalId: "12345",
+    });
+
+    expect(assertHubSpotAccessToken).toHaveBeenCalledWith("pat-xxxxxxxx");
+    expect(createIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hubspot",
+        credentialsEncrypted: "encrypted-hubspot",
+        externalAccountId: "12345",
+        defaultProjectId: "project-1",
+        allowProjectOverride: false,
+        apiKeyHash: null,
+      }),
+    );
+    expect(result.integration.hasCredentials).toBe(true);
+    expect(result.integration.externalAccountId).toBe("12345");
+    expect(result.apiKey).toBeUndefined();
   });
 });

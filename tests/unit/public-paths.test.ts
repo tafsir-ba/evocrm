@@ -5,6 +5,7 @@ import { isPublicPath, PUBLIC_PATHS } from "@/lib/public-paths";
 describe("public path allowlist", () => {
   it("allows only the website lead webhook under integrations", () => {
     expect(isPublicPath("/api/integrations/website/leads")).toBe(true);
+    expect(isPublicPath("/api/integrations/hubspot/webhooks")).toBe(true);
     expect(isPublicPath("/api/integrations")).toBe(false);
     expect(isPublicPath("/api/integrations/other")).toBe(false);
   });
