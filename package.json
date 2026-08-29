@@ -14,6 +14,7 @@
     "seed": "npx tsx scripts/seed.ts",
     "migrate:projects": "npx tsx scripts/migrate-projects.ts",
     "migrate:lead-email-index": "npx tsx scripts/migrate-lead-email-index.ts",
+    "repair:transient-bounce-suppressions": "npx tsx scripts/repair-transient-bounce-suppressions.ts",
     "verify:projects": "npx tsx scripts/verify-project-scope.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

@@ -10,6 +10,7 @@ import { upsertEmailSuppression } from "@/server/repositories/email-suppressions
 import { findLeadById } from "@/server/repositories/leads";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
+import { isPermanentResendBounce } from "@/server/utils/resend-bounce";
 import { Webhook } from "svix";
 
 type ResendWebhookTags =
@@ -22,7 +23,7 @@ type ResendWebhookPayload = {
   data?: {
     email_id?: string;
     created_at?: string;
-    bounce?: { message?: string; type?: string };
+    bounce?: { message?: string; type?: string; subType?: string };
     failed?: { reason?: string };
     tags?: ResendWebhookTags;
   };
@@ -175,7 +176,7 @@ export async function processResendWebhookPayload(
       providerError,
     );
 
-    if (eventType === "bounced" || eventType === "complained") {
+    if (eventType === "complained") {
       let recipientEmail =
         typeof tags.to === "string"
           ? tags.to
@@ -192,7 +193,32 @@ export async function processResendWebhookPayload(
         await upsertEmailSuppression(workspaceId, {
           email: recipientEmail,
           contactId: send.leadId,
-          reason: eventType === "bounced" ? "hard_bounce" : "complaint",
+          reason: "complaint",
+          source: "webhook",
+        });
+      }
+    }
+
+    // Soft/transient bounces (mailbox full, temporary DNS) must not permanently
+    // suppress — that blocked Grosvenor Vistas drip retries for recoverable addresses.
+    if (eventType === "bounced" && isPermanentResendBounce(payload.data?.bounce)) {
+      let recipientEmail =
+        typeof tags.to === "string"
+          ? tags.to
+          : typeof tags.email === "string"
+            ? tags.email
+            : null;
+
+      if (!recipientEmail && send.leadId) {
+        const lead = await findLeadById(workspaceId, send.leadId);
+        recipientEmail = lead?.email ?? null;
+      }
+
+      if (recipientEmail && send.leadId) {
+        await upsertEmailSuppression(workspaceId, {
+          email: recipientEmail,
+          contactId: send.leadId,
+          reason: "hard_bounce",
           source: "webhook",
         });
       }

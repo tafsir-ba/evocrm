@@ -198,7 +198,7 @@ describe("resend webhook processing", () => {
     expect(applyCampaignSendProviderEvent).not.toHaveBeenCalled();
   });
 
-  it("suppresses bounced recipients using lead email fallback", async () => {
+  it("suppresses only permanent bounced recipients", async () => {
     vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue({
       id: "send-1",
       workspaceId: "ws-1",
@@ -254,7 +254,7 @@ describe("resend webhook processing", () => {
         data: {
           email_id: "re_123",
           created_at: "2026-07-30T12:05:00.000Z",
-          bounce: { message: "mailbox full" },
+          bounce: { message: "user unknown", type: "Permanent" },
         },
       },
       "svix_bounce",
@@ -268,5 +268,69 @@ describe("resend webhook processing", () => {
         source: "webhook",
       }),
     );
+  });
+
+  it("does not suppress transient bounced recipients", async () => {
+    vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue({
+      id: "send-1",
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      campaignStepId: "step-1",
+      enrollmentId: "enroll-1",
+      leadId: "lead-1",
+      opportunityId: null,
+      status: "sent",
+      providerMessageId: "re_soft",
+      error: null,
+      scheduledFor: new Date(),
+      sentAt: new Date(),
+      deliveredAt: null,
+      firstOpenedAt: null,
+      firstClickedAt: null,
+      bouncedAt: null,
+      complainedAt: null,
+      deliveryDelayedAt: null,
+      providerFailedAt: null,
+      providerError: null,
+      lastProviderEventAt: null,
+      createdAt: new Date(),
+    });
+    vi.mocked(createEmailEventIdempotent).mockResolvedValue({
+      created: true,
+      event: {
+        id: "evt-soft",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        campaignStepId: "step-1",
+        contactId: "lead-1",
+        emailSendId: "send-1",
+        provider: "resend",
+        providerEventId: "svix_soft",
+        providerEmailId: "re_soft",
+        eventType: "bounced",
+        eventTimestamp: new Date("2026-07-30T12:05:00.000Z"),
+        rawPayload: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+    });
+
+    await processResendWebhookPayload(
+      {
+        type: "email.bounced",
+        data: {
+          email_id: "re_soft",
+          created_at: "2026-07-30T12:05:00.000Z",
+          bounce: {
+            message: "mailbox full",
+            type: "Transient",
+            subType: "MailboxFull",
+          },
+        },
+      },
+      "svix_soft",
+    );
+
+    expect(upsertEmailSuppression).not.toHaveBeenCalled();
   });
 });

@@ -727,8 +727,89 @@ describe("campaign sending service", () => {
 
     expect(summary.skipped).toBe(1);
     expect(sendCampaignEmail).not.toHaveBeenCalled();
-    expect(updateCampaignEnrollment).not.toHaveBeenCalled();
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({
+        status: "failed",
+        failureReason: "Campaign is draft and cannot send.",
+      }),
+    );
     expect(createCampaignSend).not.toHaveBeenCalled();
+  });
+
+  it("fails enrollment permanently when recipient is hard-bounce suppressed", async () => {
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "unknown",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findSuppressionByEmail).mockResolvedValue({
+      id: "supp-1",
+      workspaceId: "ws-1",
+      contactId: "lead-1",
+      email: "jane@example.com",
+      reason: "hard_bounce",
+      source: "webhook",
+      notes: null,
+      createdAt: new Date(),
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.skipped).toBe(1);
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(createCampaignSend).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        status: "skipped",
+        error: "Recipient is suppressed (hard_bounce).",
+      }),
+    );
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({
+        status: "failed",
+        failureReason: "Recipient is suppressed (hard_bounce).",
+      }),
+    );
+    // Must not defer — that caused infinite daily skip loops.
+    expect(updateCampaignEnrollment).not.toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({ nextSendAt: expect.any(Date) }),
+    );
   });
 
   it("skips delayed steps before their scheduled send time", async () => {
@@ -774,6 +855,11 @@ describe("campaign sending service", () => {
 
     expect(summary.skipped).toBe(1);
     expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(updateCampaignEnrollment).toHaveBeenCalledWith(
+      "ws-1",
+      "enroll-1",
+      expect.objectContaining({ status: "paused" }),
+    );
   });
 
   it("caps immediate activation sends and defers the rest for cron", async () => {

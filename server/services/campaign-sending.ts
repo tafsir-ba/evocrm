@@ -162,6 +162,24 @@ async function processEnrollment(
   const campaign = await findCampaignById(workspaceId, enrollment.campaignId);
 
   if (!campaign || campaign.status !== "active") {
+    // Heal drifted enrollments so inactive campaigns cannot clog the due queue
+    // and starve active campaigns (e.g. Grosvenor Vistas funnel).
+    if (campaign?.status === "paused") {
+      await updateCampaignEnrollment(workspaceId, enrollment.id, {
+        status: "paused",
+        sendClaimExpiresAt: null,
+      });
+    } else {
+      await updateCampaignEnrollment(workspaceId, enrollment.id, {
+        status: "failed",
+        failedAt: new Date(),
+        failureReason: !campaign
+          ? "Campaign not found."
+          : `Campaign is ${campaign.status} and cannot send.`,
+        sendClaimExpiresAt: null,
+      });
+    }
+
     return singleOutcomeResult("skipped");
   }
 
@@ -306,13 +324,30 @@ async function processEnrollment(
   if (lead.email) {
     const suppression = await findSuppressionByEmail(workspaceId, lead.email);
     if (suppression) {
+      // Permanent suppressions must end the enrollment. Daily defer retries
+      // produced hundreds of skip rows and blocked real due sends.
       await recordSkippedSend({
         workspaceId,
         enrollment,
         stepId: step.id,
         reason: `Recipient is suppressed (${suppression.reason}).`,
-        deferDays: SKIP_RETRY_DELAY_DAYS,
       });
+
+      if (suppression.reason === "unsubscribed") {
+        await updateCampaignEnrollment(workspaceId, enrollment.id, {
+          status: "unsubscribed",
+          unsubscribedAt: new Date(),
+          sendClaimExpiresAt: null,
+        });
+      } else {
+        await updateCampaignEnrollment(workspaceId, enrollment.id, {
+          status: "failed",
+          failedAt: new Date(),
+          failureReason: `Recipient is suppressed (${suppression.reason}).`,
+          sendClaimExpiresAt: null,
+        });
+      }
+      shouldReleaseSendClaim = false;
 
       return singleOutcomeResult("skipped");
     }

@@ -397,13 +397,37 @@ export async function findDueEnrollments(
   await connectDb();
 
   const now = new Date();
-  const documents = await CampaignEnrollmentModel.find({
-    status: "active",
-    nextSendAt: { $lte: now },
-  })
-    .sort({ nextSendAt: 1 })
-    .limit(limit)
-    .lean();
+
+  // Prefer enrollments whose campaign is still active and whose send claim is free.
+  // Skipping claimed / inactive-campaign rows in the query avoids starving healthy
+  // campaigns when a batch is full of stuck enrollments.
+  const documents = await CampaignEnrollmentModel.aggregate<CampaignEnrollmentDocument>([
+    {
+      $match: {
+        status: "active",
+        nextSendAt: { $lte: now },
+        $or: [{ sendClaimExpiresAt: null }, { sendClaimExpiresAt: { $lte: now } }],
+      },
+    },
+    { $sort: { nextSendAt: 1 } },
+    {
+      $lookup: {
+        from: "campaigns",
+        localField: "campaignId",
+        foreignField: "_id",
+        as: "campaign",
+      },
+    },
+    { $unwind: "$campaign" },
+    {
+      $match: {
+        "campaign.status": "active",
+        "campaign.archivedAt": null,
+      },
+    },
+    { $limit: limit },
+    { $project: { campaign: 0 } },
+  ]);
 
   return documents.map((doc) => toEnrollmentRecord(doc as CampaignEnrollmentDocument));
 }
