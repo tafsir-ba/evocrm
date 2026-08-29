@@ -38,7 +38,8 @@ export function verifyHubSpotSignatureV3(input: {
   const now = input.now ?? Date.now();
 
   if (Math.abs(now - timestamp) > MAX_TIMESTAMP_SKEW_MS) {
-    throw new AppError("FORBIDDEN", "HubSpot webhook timestamp is too old.", {
+    // Opaque message — do not distinguish skew from other signature failures.
+    throw new AppError("FORBIDDEN", "Invalid HubSpot webhook signature.", {
       expose: false,
     });
   }

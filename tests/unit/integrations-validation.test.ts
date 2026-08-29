@@ -31,6 +31,33 @@ describe("integrations validation", () => {
     expect(result.success).toBe(false);
   });
 
+  it("requires HubSpot credential fields on create", () => {
+    const missing = createIntegrationInputSchema.safeParse({
+      type: "hubspot",
+      name: "HubSpot CRM",
+    });
+    const valid = createIntegrationInputSchema.safeParse({
+      type: "hubspot",
+      name: "HubSpot CRM",
+      hubspotAccessToken: "pat-xxxxxxxxxxxx",
+      hubspotClientSecret: "client-secret",
+      hubspotPortalId: "12345",
+    });
+
+    expect(missing.success).toBe(false);
+    expect(valid.success).toBe(true);
+  });
+
+  it("rejects HubSpot credential fields on non-HubSpot creates", () => {
+    const result = createIntegrationInputSchema.safeParse({
+      type: "website",
+      name: "Website",
+      hubspotAccessToken: "pat-xxxxxxxxxxxx",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("allows safe integration updates", () => {
     const result = updateIntegrationInputSchema.safeParse({ status: "paused" });
     expect(result.success).toBe(true);

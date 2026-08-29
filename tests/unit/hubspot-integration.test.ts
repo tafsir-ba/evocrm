@@ -105,4 +105,27 @@ describe("hubspot webhook helpers", () => {
       }),
     ).toThrow(AppError);
   });
+
+  it("rejects timestamps outside the allowed skew with an opaque signature error", () => {
+    const now = Date.now();
+
+    try {
+      verifyHubSpotSignatureV3({
+        method: "POST",
+        uri: "https://example.com/hook",
+        rawBody: "[]",
+        timestampHeader: String(now - 10 * 60 * 1000),
+        signatureHeader: "unused",
+        clientSecret: "secret",
+        now,
+      });
+      throw new Error("expected verifyHubSpotSignatureV3 to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        code: "FORBIDDEN",
+        message: "Invalid HubSpot webhook signature.",
+      });
+    }
+  });
 });

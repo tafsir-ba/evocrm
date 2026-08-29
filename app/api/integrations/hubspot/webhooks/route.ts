@@ -1,6 +1,11 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
+import { assertHubSpotWebhookRateLimit } from "@/server/security/hubspot-webhook-rate-limit";
+import {
+  assertHubSpotWebhookContentLength,
+  assertHubSpotWebhookRawBodySize,
+} from "@/server/security/hubspot-webhook-request-guards";
 import { processHubSpotWebhookRequest } from "@/server/services/hubspot-lead-capture";
 
 function resolveRequestUri(request: Request): string {
@@ -19,11 +24,16 @@ function resolveRequestUri(request: Request): string {
 
 export async function POST(request: Request) {
   try {
+    assertHubSpotWebhookContentLength(request);
+    await assertHubSpotWebhookRateLimit(request);
+
     const rawBody = await request.text();
 
     if (!rawBody.trim()) {
       throw new AppError("VALIDATION_ERROR", "Empty HubSpot webhook body.");
     }
+
+    assertHubSpotWebhookRawBodySize(rawBody);
 
     const summary = await processHubSpotWebhookRequest({
       method: "POST",

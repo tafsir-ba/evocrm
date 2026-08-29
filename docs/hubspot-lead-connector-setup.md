@@ -48,3 +48,5 @@ In the same Private App → **Webhooks**:
 - Tokens are stored in `Integration.credentialsEncrypted` (AES-256-GCM)
 - Encryption key is derived from `NEXTAUTH_SECRET` (or `INTEGRATION_API_KEY_PEPPER`)
 - Webhook signature uses HubSpot **v3** (`X-HubSpot-Signature-v3` + timestamp)
+- Public webhook is IP rate-limited (60 req/min) and rejects bodies over 64 KB
+- Missing/paused portal lookups return an opaque auth failure (no portal oracle)

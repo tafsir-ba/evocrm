@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/server/repositories/integrations", () => ({
   findActiveHubSpotIntegrationByPortalId: vi.fn(),
-  findHubSpotIntegrationByPortalId: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/leads", () => ({
@@ -64,14 +63,19 @@ vi.mock("@/server/utils/hubspot-webhook", async () => {
 });
 
 import { createHmac } from "crypto";
+import { createAuditLog } from "@/server/audit/create-audit-log";
+import { AppError } from "@/server/errors";
 import { findActiveHubSpotIntegrationByPortalId } from "@/server/repositories/integrations";
-import { findLeadByIntegrationIdempotencyKey } from "@/server/repositories/leads";
+import {
+  findLeadByIntegrationIdempotencyKey,
+} from "@/server/repositories/leads";
 import { findProjectById } from "@/server/repositories/projects";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import {
   assertHubSpotAccessToken,
   fetchHubSpotContact,
 } from "@/server/services/hubspot-client";
+import { writeIntegrationLog } from "@/server/services/integration-logs";
 import { createLeadForWorkspace } from "@/server/services/leads";
 import { processHubSpotWebhookRequest } from "@/server/services/hubspot-lead-capture";
 import { verifyHubSpotSignatureV3 } from "@/server/utils/hubspot-webhook";
@@ -183,5 +187,88 @@ describe("hubspot lead capture webhook", () => {
       .update(`POST${uri}${body}${ts}`)
       .digest("base64");
     expect(signature.length).toBeGreaterThan(10);
+  });
+
+  it("returns opaque FORBIDDEN when portal integration is missing or inactive", async () => {
+    vi.mocked(findActiveHubSpotIntegrationByPortalId).mockResolvedValue(null);
+
+    await expect(
+      processHubSpotWebhookRequest({
+        method: "POST",
+        uri: "https://crm.evo-home.ch/api/integrations/hubspot/webhooks",
+        rawBody: JSON.stringify([
+          { objectId: 1, subscriptionType: "contact.creation", portalId: 999 },
+        ]),
+        timestampHeader: String(Date.now()),
+        signatureHeader: "ignored",
+      }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Invalid HubSpot webhook.",
+    });
+  });
+
+  it("treats idempotent retries as duplicates with logs", async () => {
+    vi.mocked(findLeadByIntegrationIdempotencyKey).mockResolvedValue({
+      id: "lead-existing",
+    } as never);
+
+    const summary = await processHubSpotWebhookRequest({
+      method: "POST",
+      uri: "https://crm.evo-home.ch/api/integrations/hubspot/webhooks",
+      rawBody: JSON.stringify([
+        { objectId: 99, subscriptionType: "contact.creation", portalId: 12345 },
+      ]),
+      timestampHeader: String(Date.now()),
+      signatureHeader: "ignored",
+    });
+
+    expect(createLeadForWorkspace).not.toHaveBeenCalled();
+    expect(writeIntegrationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "hubspot.contact.duplicate",
+        status: "success",
+      }),
+    );
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "integration.hubspot_lead_duplicate",
+        entityId: "lead-existing",
+      }),
+    );
+    expect(summary.duplicates).toBe(1);
+    expect(summary.created).toBe(0);
+  });
+
+  it("maps create CONFLICT races to duplicate success", async () => {
+    vi.mocked(createLeadForWorkspace).mockRejectedValueOnce(
+      new AppError("CONFLICT", "A lead with this email already exists in this project."),
+    );
+    vi.mocked(findLeadByIntegrationIdempotencyKey)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "lead-race" } as never);
+
+    const summary = await processHubSpotWebhookRequest({
+      method: "POST",
+      uri: "https://crm.evo-home.ch/api/integrations/hubspot/webhooks",
+      rawBody: JSON.stringify([
+        { objectId: 99, subscriptionType: "contact.creation", portalId: 12345 },
+      ]),
+      timestampHeader: String(Date.now()),
+      signatureHeader: "ignored",
+    });
+
+    expect(summary).toEqual({
+      received: 1,
+      created: 0,
+      duplicates: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(writeIntegrationLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "hubspot.contact.duplicate",
+      }),
+    );
   });
 });

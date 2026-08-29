@@ -5,7 +5,6 @@ import { AppError } from "@/server/errors";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import {
   findActiveHubSpotIntegrationByPortalId,
-  findHubSpotIntegrationByPortalId,
   type IntegrationRecord,
 } from "@/server/repositories/integrations";
 import {
@@ -95,6 +94,8 @@ async function resolveHubSpotLeadSourceId(workspaceId: string): Promise<string |
   return website?.isActive ? website.id : null;
 }
 
+const HUBSPOT_WEBHOOK_AUTH_ERROR = "Invalid HubSpot webhook.";
+
 export async function resolveHubSpotIntegrationFromPortalId(
   portalId: string,
 ): Promise<IntegrationRecord> {
@@ -104,13 +105,10 @@ export async function resolveHubSpotIntegrationFromPortalId(
     return active;
   }
 
-  const existing = await findHubSpotIntegrationByPortalId(portalId);
-
-  if (existing) {
-    throw new AppError("FORBIDDEN", "HubSpot integration is not active.");
-  }
-
-  throw new AppError("NOT_FOUND", "No HubSpot integration configured for this portal.");
+  // Lookup may exist (paused/archived) or not — never reveal which to the caller.
+  throw new AppError("FORBIDDEN", HUBSPOT_WEBHOOK_AUTH_ERROR, {
+    expose: false,
+  });
 }
 
 async function captureHubSpotContactAsLead(input: {
@@ -122,6 +120,18 @@ async function captureHubSpotContactAsLead(input: {
   const workspaceId = input.integration.workspaceId;
   const idempotencyKey = `hubspot:contact:${input.contactId}`;
 
+  await createAuditLog({
+    workspaceId,
+    actorId: input.integration.createdBy,
+    action: "integration.hubspot_lead_received",
+    entityType: "integration",
+    entityId: input.integration.id,
+    after: {
+      contactId: input.contactId,
+      ...(input.eventId ? { hubspotEventId: input.eventId } : {}),
+    },
+  });
+
   await ensureDefaultDictionaries(workspaceId);
 
   const existingByKey = await findLeadByIntegrationIdempotencyKey(
@@ -131,6 +141,28 @@ async function captureHubSpotContactAsLead(input: {
   );
 
   if (existingByKey) {
+    await writeIntegrationLog({
+      workspaceId,
+      integrationId: input.integration.id,
+      direction: "inbound",
+      status: "success",
+      eventType: "hubspot.contact.duplicate",
+      payloadSummary: buildWebsiteLeadPayloadSummary({
+        externalId: input.contactId,
+        source: "hubspot",
+        leadId: existingByKey.id,
+        idempotent: true,
+      }),
+    });
+
+    await createAuditLog({
+      workspaceId,
+      actorId: input.integration.createdBy,
+      action: "integration.hubspot_lead_duplicate",
+      entityType: "lead",
+      entityId: existingByKey.id,
+    });
+
     return { leadId: existingByKey.id, duplicate: true };
   }
 
@@ -178,8 +210,18 @@ async function captureHubSpotContactAsLead(input: {
           phone: contact.phone ?? undefined,
           source: "hubspot",
           leadId: existingByEmail.id,
+          duplicate: true,
         }),
       });
+
+      await createAuditLog({
+        workspaceId,
+        actorId: input.integration.createdBy,
+        action: "integration.hubspot_lead_duplicate",
+        entityType: "lead",
+        entityId: existingByEmail.id,
+      });
+
       return { leadId: existingByEmail.id, duplicate: true };
     }
   }
@@ -195,30 +237,136 @@ async function captureHubSpotContactAsLead(input: {
     contact.properties.message ? contact.properties.message : null,
   ].filter(Boolean);
 
-  const result = await createLeadForWorkspace(
-    workspaceId,
-    input.integration.createdBy,
-    {
-      projectId,
-      statusId,
-      sourceId: sourceId ?? undefined,
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      email: contact.email ?? undefined,
-      phone: contact.phone ?? undefined,
-      notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
-      emailConsentStatus: "unknown",
-      attributes: {
-        integration: {
-          integrationId: input.integration.id,
-          externalId: contact.id,
-          idempotencyKey,
-          inboundSource: "hubspot",
-          ...(input.eventId ? { hubspotEventId: String(input.eventId) } : {}),
-        },
+  const leadInput = {
+    projectId,
+    statusId,
+    sourceId: sourceId ?? undefined,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email ?? undefined,
+    phone: contact.phone ?? undefined,
+    notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
+    emailConsentStatus: "unknown" as const,
+    attributes: {
+      integration: {
+        integrationId: input.integration.id,
+        externalId: contact.id,
+        idempotencyKey,
+        inboundSource: "hubspot",
+        ...(input.eventId ? { hubspotEventId: String(input.eventId) } : {}),
       },
     },
-  );
+  };
+
+  let result;
+
+  try {
+    result = await createLeadForWorkspace(
+      workspaceId,
+      input.integration.createdBy,
+      leadInput,
+    );
+  } catch (error) {
+    if (error instanceof AppError && error.code === "CONFLICT") {
+      const duplicateByKey = await findLeadByIntegrationIdempotencyKey(
+        workspaceId,
+        input.integration.id,
+        idempotencyKey,
+      );
+
+      if (duplicateByKey) {
+        await writeIntegrationLog({
+          workspaceId,
+          integrationId: input.integration.id,
+          direction: "inbound",
+          status: "success",
+          eventType: "hubspot.contact.duplicate",
+          payloadSummary: buildWebsiteLeadPayloadSummary({
+            externalId: contact.id,
+            email: contact.email ?? undefined,
+            phone: contact.phone ?? undefined,
+            source: "hubspot",
+            leadId: duplicateByKey.id,
+            idempotent: true,
+          }),
+        });
+
+        await createAuditLog({
+          workspaceId,
+          actorId: input.integration.createdBy,
+          action: "integration.hubspot_lead_duplicate",
+          entityType: "lead",
+          entityId: duplicateByKey.id,
+        });
+
+        return { leadId: duplicateByKey.id, duplicate: true };
+      }
+
+      if (emailFields?.emailNormalized) {
+        const duplicateByEmail = await findActiveLeadByEmailNormalized(
+          workspaceId,
+          emailFields.emailNormalized,
+          undefined,
+          projectId,
+        );
+
+        if (duplicateByEmail) {
+          await writeIntegrationLog({
+            workspaceId,
+            integrationId: input.integration.id,
+            direction: "inbound",
+            status: "success",
+            eventType: "hubspot.contact.duplicate",
+            payloadSummary: buildWebsiteLeadPayloadSummary({
+              externalId: contact.id,
+              email: contact.email ?? undefined,
+              phone: contact.phone ?? undefined,
+              source: "hubspot",
+              leadId: duplicateByEmail.id,
+              duplicate: true,
+            }),
+          });
+
+          await createAuditLog({
+            workspaceId,
+            actorId: input.integration.createdBy,
+            action: "integration.hubspot_lead_duplicate",
+            entityType: "lead",
+            entityId: duplicateByEmail.id,
+          });
+
+          return { leadId: duplicateByEmail.id, duplicate: true };
+        }
+      }
+    }
+
+    await writeIntegrationLog({
+      workspaceId,
+      integrationId: input.integration.id,
+      direction: "inbound",
+      status: "failed",
+      eventType: "hubspot.contact.failed",
+      payloadSummary: {
+        contactId: contact.id,
+        reason: "create_failed",
+      },
+      error,
+    }).catch(() => undefined);
+
+    await createAuditLog({
+      workspaceId,
+      actorId: input.integration.createdBy,
+      action: "integration.hubspot_lead_failed",
+      entityType: "integration",
+      entityId: input.integration.id,
+      after: {
+        contactId: contact.id,
+        error: error instanceof Error ? error.message : "unknown",
+      },
+    }).catch(() => undefined);
+
+    throw error;
+  }
 
   await writeIntegrationLog({
     workspaceId,
