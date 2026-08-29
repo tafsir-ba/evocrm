@@ -74,6 +74,7 @@ const integration = {
   name: "Website",
   status: "active" as const,
   credentialsEncrypted: null,
+  externalAccountId: null,
   apiKeyHash: "hashed-key",
   defaultProjectId: null,
   allowProjectOverride: false,

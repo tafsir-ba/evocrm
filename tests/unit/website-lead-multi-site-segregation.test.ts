@@ -113,6 +113,7 @@ const websiteA = {
   name: "Website A",
   status: "active" as const,
   credentialsEncrypted: null,
+  externalAccountId: null,
   apiKeyHash: "hash:key-a",
   defaultProjectId: PROJECT_A,
   allowProjectOverride: false,
