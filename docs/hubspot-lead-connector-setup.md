@@ -8,33 +8,18 @@ Connect a HubSpot Private App so **new HubSpot contacts** become Evohome leads i
 - HubSpot sends `contact.creation` webhooks to Evohome
 - Evohome verifies the HubSpot signature, fetches the contact, and creates a lead (deduped by HubSpot contact id and email-per-project)
 
-## Setup
+## Historical migration (Phase 0–1)
 
-### 1. HubSpot Private App
+Historical import is **project-by-project** and not enabled until mapping review.
 
-1. HubSpot → **Settings → Integrations → Private Apps** (or Developer → Legacy/Private Apps)
-2. Create an app with scope: `crm.objects.contacts.read`
-3. Copy:
-   - **Access token**
-   - **Client secret** (for webhook signature v3)
-   - **Hub ID / portal ID** (Settings → Account Defaults, or from the HubSpot URL)
+1. Connect HubSpot with **access token + portal ID** (client secret optional for now)
+2. Open the HubSpot integration → **Run capability probe**
+3. **Refresh HubSpot projects**, then explicitly map each HubSpot project → Evohome project (or Skip)
+4. Do **not** import until Phase 2 dry-run / Phase 3 pilot are approved
 
-### 2. Evohome
+Companies are not a separate Evohome entity in V1; future pilot imports will store HubSpot company id/name on lead attributes/notes only.
 
-1. Settings → **Integrations** → **HubSpot CRM**
-2. Paste access token, client secret, portal ID
-3. Choose the destination **project**
-4. Click **Connect HubSpot**
-5. Copy the webhook URL shown:
-   `https://<your-host>/api/integrations/hubspot/webhooks`
-
-### 3. Subscribe HubSpot webhooks
-
-In the same Private App → **Webhooks**:
-
-1. Target URL = the Evohome webhook URL above
-2. Subscribe to **`contact.creation`**
-3. Save
+Live signed webhooks remain deferred until a client secret is saved and webhook setup is approved.
 
 ## Notes
 

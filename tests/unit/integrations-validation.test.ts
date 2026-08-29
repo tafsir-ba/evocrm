@@ -31,10 +31,16 @@ describe("integrations validation", () => {
     expect(result.success).toBe(false);
   });
 
-  it("requires HubSpot credential fields on create", () => {
+  it("requires HubSpot access token and portal on create; client secret optional", () => {
     const missing = createIntegrationInputSchema.safeParse({
       type: "hubspot",
       name: "HubSpot CRM",
+    });
+    const tokenOnly = createIntegrationInputSchema.safeParse({
+      type: "hubspot",
+      name: "HubSpot CRM",
+      hubspotAccessToken: "pat-xxxxxxxxxxxx",
+      hubspotPortalId: "12345",
     });
     const valid = createIntegrationInputSchema.safeParse({
       type: "hubspot",
@@ -45,6 +51,7 @@ describe("integrations validation", () => {
     });
 
     expect(missing.success).toBe(false);
+    expect(tokenOnly.success).toBe(true);
     expect(valid.success).toBe(true);
   });
 

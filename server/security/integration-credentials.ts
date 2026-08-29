@@ -58,16 +58,27 @@ export function decryptIntegrationCredentials(payload: string): string {
   ]).toString("utf8");
 }
 
+/**
+ * HubSpot Private App credentials.
+ * `clientSecret` is optional for historical/migration (token-only) connects.
+ * Live webhook signature verification requires a non-empty client secret.
+ */
 export type HubSpotIntegrationCredentials = {
   accessToken: string;
-  clientSecret: string;
+  clientSecret: string | null;
   portalId: string;
 };
 
 export function encodeHubSpotCredentials(
   credentials: HubSpotIntegrationCredentials,
 ): string {
-  return encryptIntegrationCredentials(JSON.stringify(credentials));
+  return encryptIntegrationCredentials(
+    JSON.stringify({
+      accessToken: credentials.accessToken,
+      clientSecret: credentials.clientSecret,
+      portalId: credentials.portalId,
+    }),
+  );
 }
 
 export function decodeHubSpotCredentials(
@@ -77,13 +88,15 @@ export function decodeHubSpotCredentials(
     throw new AppError("VALIDATION_ERROR", "HubSpot credentials are not configured.");
   }
 
-  const parsed = JSON.parse(decryptIntegrationCredentials(payload)) as Partial<HubSpotIntegrationCredentials>;
+  const parsed = JSON.parse(decryptIntegrationCredentials(payload)) as Partial<{
+    accessToken: unknown;
+    clientSecret: unknown;
+    portalId: unknown;
+  }>;
 
   if (
     typeof parsed.accessToken !== "string" ||
     !parsed.accessToken.trim() ||
-    typeof parsed.clientSecret !== "string" ||
-    !parsed.clientSecret.trim() ||
     typeof parsed.portalId !== "string" ||
     !parsed.portalId.trim()
   ) {
@@ -92,9 +105,28 @@ export function decodeHubSpotCredentials(
     });
   }
 
+  const clientSecret =
+    typeof parsed.clientSecret === "string" && parsed.clientSecret.trim()
+      ? parsed.clientSecret.trim()
+      : null;
+
   return {
     accessToken: parsed.accessToken.trim(),
-    clientSecret: parsed.clientSecret.trim(),
+    clientSecret,
     portalId: parsed.portalId.trim(),
   };
+}
+
+/** Require client secret for webhook signature verification. */
+export function requireHubSpotClientSecret(
+  credentials: HubSpotIntegrationCredentials,
+): string {
+  if (!credentials.clientSecret) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "HubSpot client secret is not configured. Live webhooks are disabled until a client secret is saved.",
+    );
+  }
+
+  return credentials.clientSecret;
 }

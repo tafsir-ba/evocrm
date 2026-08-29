@@ -25,7 +25,7 @@ import {
   createLeadForWorkspace,
   normalizeLeadEmail,
 } from "@/server/services/leads";
-import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
+import { decodeHubSpotCredentials, requireHubSpotClientSecret } from "@/server/security/integration-credentials";
 import {
   isHubSpotContactCreationEvent,
   parseHubSpotWebhookEvents,
@@ -428,6 +428,7 @@ export async function processHubSpotWebhookRequest(input: {
 
   const integration = await resolveHubSpotIntegrationFromPortalId(portalId);
   const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
+  const clientSecret = requireHubSpotClientSecret(credentials);
 
   verifyHubSpotSignatureV3({
     method: input.method,
@@ -435,7 +436,7 @@ export async function processHubSpotWebhookRequest(input: {
     rawBody: input.rawBody,
     timestampHeader: input.timestampHeader,
     signatureHeader: input.signatureHeader,
-    clientSecret: credentials.clientSecret,
+    clientSecret,
   });
 
   // Preflight token once per batch so bad tokens fail loudly.

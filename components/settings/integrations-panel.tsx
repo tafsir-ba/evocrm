@@ -23,11 +23,34 @@ type IntegrationRecord = {
   status: "active" | "paused" | "archived" | "error";
   hasApiKey: boolean;
   hasCredentials?: boolean;
+  hasClientSecret?: boolean;
   externalAccountId?: string | null;
   defaultProjectId: string | null;
   allowProjectOverride: boolean;
   createdAt: string;
   archivedAt: string | null;
+};
+
+type HubSpotProjectMappingRecord = {
+  id: string;
+  hubspotProjectId: string;
+  hubspotProjectName: string;
+  evoProjectId: string | null;
+  status: "unmapped" | "mapped" | "skipped";
+  reviewedAt: string | null;
+};
+
+type HubSpotProbeCheck = {
+  key: string;
+  ok: boolean;
+  statusCode: number | null;
+  detail: string;
+};
+
+type HubSpotProbeResult = {
+  ok: boolean;
+  checkedAt: string;
+  checks: HubSpotProbeCheck[];
 };
 
 type IntegrationLogRecord = {
@@ -107,6 +130,11 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
   const [hubspotClientSecret, setHubspotClientSecret] = useState("");
   const [hubspotPortalId, setHubspotPortalId] = useState("");
   const [hubspotCreating, setHubspotCreating] = useState(false);
+  const [hubspotProbe, setHubspotProbe] = useState<HubSpotProbeResult | null>(null);
+  const [hubspotProbeLoading, setHubspotProbeLoading] = useState(false);
+  const [hubspotMappings, setHubspotMappings] = useState<HubSpotProjectMappingRecord[]>([]);
+  const [hubspotMappingsLoading, setHubspotMappingsLoading] = useState(false);
+  const [hubspotMappingSavingId, setHubspotMappingSavingId] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const webhookUrl =
@@ -273,6 +301,33 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
     await loadIntegrations();
   }
 
+  useEffect(() => {
+    if (!selectedIntegration || selectedIntegration.type !== "hubspot") {
+      setHubspotMappings([]);
+      setHubspotProbe(null);
+      return;
+    }
+
+    void loadHubSpotMappings(selectedIntegration.id);
+  }, [selectedIntegration?.id, selectedIntegration?.type]);
+
+  async function loadHubSpotMappings(integrationId: string) {
+    setHubspotMappingsLoading(true);
+    try {
+      const response = await fetch(
+        `${apiBase}/integrations/${integrationId}/hubspot/project-mappings`,
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to load HubSpot project mappings.");
+        return;
+      }
+      setHubspotMappings(payload.data.mappings as HubSpotProjectMappingRecord[]);
+    } finally {
+      setHubspotMappingsLoading(false);
+    }
+  }
+
   async function createHubSpotIntegration() {
     setActionMessage(null);
     setError(null);
@@ -287,8 +342,8 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       return;
     }
 
-    if (!hubspotAccessToken.trim() || !hubspotClientSecret.trim() || !hubspotPortalId.trim()) {
-      setError("HubSpot access token, client secret, and portal ID are required.");
+    if (!hubspotAccessToken.trim() || !hubspotPortalId.trim()) {
+      setError("HubSpot access token and portal ID are required.");
       return;
     }
 
@@ -303,7 +358,9 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
           name: newHubSpotName.trim() || "HubSpot CRM",
           defaultProjectId: newHubSpotProjectId,
           hubspotAccessToken: hubspotAccessToken.trim(),
-          hubspotClientSecret: hubspotClientSecret.trim(),
+          ...(hubspotClientSecret.trim()
+            ? { hubspotClientSecret: hubspotClientSecret.trim() }
+            : {}),
           hubspotPortalId: hubspotPortalId.trim(),
         }),
       });
@@ -319,11 +376,94 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       setHubspotAccessToken("");
       setHubspotClientSecret("");
       setActionMessage(
-        "HubSpot connected. In HubSpot Private App → Webhooks, subscribe to contact.creation and paste the webhook URL below.",
+        "HubSpot connected for historical migration. Run the capability probe, then map HubSpot projects. Live webhooks stay deferred until a client secret is added.",
       );
       await loadIntegrations();
     } finally {
       setHubspotCreating(false);
+    }
+  }
+
+  async function runHubSpotProbe(integrationId: string) {
+    setHubspotProbeLoading(true);
+    setActionMessage(null);
+    setError(null);
+    try {
+      const response = await fetch(`${apiBase}/integrations/${integrationId}/hubspot/probe`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error?.message ?? "HubSpot capability probe failed.");
+        return;
+      }
+      setHubspotProbe(payload.data.probe as HubSpotProbeResult);
+      setActionMessage(
+        payload.data.probe.ok
+          ? "HubSpot capability probe passed."
+          : "HubSpot capability probe finished with failures — review checks below.",
+      );
+    } finally {
+      setHubspotProbeLoading(false);
+    }
+  }
+
+  async function refreshHubSpotProjects(integrationId: string) {
+    setHubspotMappingsLoading(true);
+    setActionMessage(null);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${apiBase}/integrations/${integrationId}/hubspot/project-mappings`,
+        { method: "POST" },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to refresh HubSpot projects.");
+        return;
+      }
+      setHubspotMappings(payload.data.mappings as HubSpotProjectMappingRecord[]);
+      setActionMessage(
+        `Loaded ${payload.data.hubspotProjectCount as number} HubSpot project(s). Map each to an Evohome project before any import.`,
+      );
+    } finally {
+      setHubspotMappingsLoading(false);
+    }
+  }
+
+  async function saveHubSpotMapping(
+    integrationId: string,
+    mapping: HubSpotProjectMappingRecord,
+    next: { status: HubSpotProjectMappingRecord["status"]; evoProjectId: string | null },
+  ) {
+    setHubspotMappingSavingId(mapping.hubspotProjectId);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${apiBase}/integrations/${integrationId}/hubspot/project-mappings/update`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hubspotProjectId: mapping.hubspotProjectId,
+            status: next.status,
+            evoProjectId: next.evoProjectId,
+          }),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error?.message ?? "Failed to save project mapping.");
+        return;
+      }
+      const saved = payload.data.mapping as HubSpotProjectMappingRecord;
+      setHubspotMappings((current) =>
+        current.map((item) =>
+          item.hubspotProjectId === saved.hubspotProjectId ? saved : item,
+        ),
+      );
+    } finally {
+      setHubspotMappingSavingId(null);
     }
   }
 
@@ -842,21 +982,22 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
         <Card>
           <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">Setup</h4>
           <ol className="mt-3 list-decimal pl-5 space-y-1.5 text-[12.5px] text-[var(--color-ink-muted)] leading-relaxed">
-            <li>In HubSpot: create a Private App with <code>crm.objects.contacts.read</code>.</li>
-            <li>Copy the access token, client secret, and Hub ID (portal ID).</li>
-            <li>Paste them below and choose the Evohome project for new leads.</li>
             <li>
-              In the Private App → Webhooks, subscribe to <code>contact.creation</code> and set the
-              target URL to the webhook below.
+              In HubSpot: create a Private App with contacts, companies, and projects read scopes.
+            </li>
+            <li>Copy the access token and Hub ID (portal ID). Client secret is optional for now.</li>
+            <li>Paste them below and choose a fallback Evohome project.</li>
+            <li>
+              After connect: run the capability probe, refresh HubSpot projects, and map each source
+              project explicitly. Historical import and live webhooks are not enabled in this step.
             </li>
           </ol>
           <div className="mt-4">
-            <Info label="HubSpot webhook URL" value={hubspotWebhookUrl} />
-            <div className="mt-2">
-              <Button size="sm" variant="secondary" onClick={() => void copyText("Webhook URL", hubspotWebhookUrl)}>
-                Copy webhook URL
-              </Button>
-            </div>
+            <Info label="HubSpot webhook URL (deferred)" value={hubspotWebhookUrl} />
+            <p className="text-[12px] text-[var(--color-ink-muted)] mt-1.5">
+              Live webhooks stay deferred until a client secret is saved and webhook setup is
+              approved later.
+            </p>
           </div>
         </Card>
 
@@ -873,7 +1014,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 />
               </div>
               <div>
-                <Label htmlFor="hubspot-project">Default project</Label>
+                <Label htmlFor="hubspot-project">Fallback default project</Label>
                 <ProjectSelector
                   id="hubspot-project"
                   projects={projects}
@@ -904,13 +1045,13 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                 />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="hubspot-secret">Client secret (webhook signature)</Label>
+                <Label htmlFor="hubspot-secret">Client secret (optional — live webhooks later)</Label>
                 <Input
                   id="hubspot-secret"
                   type="password"
                   value={hubspotClientSecret}
                   onChange={(event) => setHubspotClientSecret(event.target.value)}
-                  placeholder="HubSpot app client secret"
+                  placeholder="Leave blank for historical migration"
                   autoComplete="off"
                 />
               </div>
@@ -976,7 +1117,7 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
       {selectedIntegration?.type === "hubspot" && (
         <section className="space-y-3">
           <h2 className="text-[16px] font-semibold text-[var(--color-ink)] tracking-tight">
-            HubSpot integration details
+            HubSpot migration prep
           </h2>
           <Card>
             <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
@@ -986,22 +1127,16 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
               <Info label="Portal / Hub ID" value={selectedIntegration.externalAccountId ?? "—"} />
               <Info
                 label="Credentials"
-                value={selectedIntegration.hasCredentials ? "Configured" : "Missing"}
+                value={
+                  selectedIntegration.hasCredentials
+                    ? selectedIntegration.hasClientSecret
+                      ? "Token + client secret"
+                      : "Token only (historical)"
+                    : "Missing"
+                }
               />
               <div className="md:col-span-2">
-                <Info label="Webhook URL" value={hubspotWebhookUrl} />
-                <div className="mt-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void copyText("Webhook URL", hubspotWebhookUrl)}
-                  >
-                    Copy webhook URL
-                  </Button>
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="edit-hubspot-default-project">Default project</Label>
+                <Label htmlFor="edit-hubspot-default-project">Fallback default project</Label>
                 <ProjectSelector
                   id="edit-hubspot-default-project"
                   projects={projects}
@@ -1010,21 +1145,173 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                   disabled={!canUpdate || routingSaving}
                   placeholder="Select destination project"
                 />
-                <p className="text-[12px] text-[var(--color-ink-muted)] mt-1.5">
-                  New HubSpot contacts are created as leads in this project.
-                </p>
               </div>
             </div>
             {canUpdate && (
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   disabled={routingSaving}
                   onClick={() => void saveHubSpotRouting(selectedIntegration.id)}
                 >
-                  {routingSaving ? "Saving…" : "Save destination project"}
+                  {routingSaving ? "Saving…" : "Save fallback project"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={hubspotProbeLoading}
+                  onClick={() => void runHubSpotProbe(selectedIntegration.id)}
+                >
+                  {hubspotProbeLoading ? "Probing…" : "Run capability probe"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={hubspotMappingsLoading}
+                  onClick={() => void refreshHubSpotProjects(selectedIntegration.id)}
+                >
+                  {hubspotMappingsLoading ? "Refreshing…" : "Refresh HubSpot projects"}
                 </Button>
               </div>
+            )}
+          </Card>
+
+          {hubspotProbe && (
+            <Card>
+              <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
+                Capability probe {hubspotProbe.ok ? "passed" : "needs attention"}
+              </h4>
+              <p className="text-[12px] text-[var(--color-ink-muted)] mt-1">
+                Checked {new Date(hubspotProbe.checkedAt).toLocaleString()}
+              </p>
+              <ul className="mt-3 divide-y divide-[var(--color-line)]">
+                {hubspotProbe.checks.map((check) => (
+                  <li key={check.key} className="py-2 flex items-start gap-2">
+                    <Badge tone={check.ok ? "success" : "danger"} size="sm">
+                      {check.ok ? "ok" : "fail"}
+                    </Badge>
+                    <div>
+                      <p className="text-[13px] font-medium text-[var(--color-ink)]">{check.key}</p>
+                      <p className="text-[12.5px] text-[var(--color-ink-muted)]">{check.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <Card padded={false}>
+            <div className="px-5 py-4 border-b border-[var(--color-line)]">
+              <h4 className="text-[14px] font-semibold text-[var(--color-ink)]">
+                HubSpot project → Evohome project mapping
+              </h4>
+              <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-1">
+                Explicit mapping only. No auto-create. Import stays blocked until Phase 2–3.
+              </p>
+            </div>
+            {hubspotMappingsLoading && hubspotMappings.length === 0 ? (
+              <div className="px-5 py-4">
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : hubspotMappings.length === 0 ? (
+              <p className="px-5 py-4 text-[13px] text-[var(--color-ink-muted)]">
+                No HubSpot projects loaded yet. Click Refresh HubSpot projects.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-line)]">
+                {hubspotMappings.map((mapping) => (
+                  <li key={mapping.hubspotProjectId} className="px-5 py-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[13px] font-medium text-[var(--color-ink)]">
+                        {mapping.hubspotProjectName}
+                      </p>
+                      <Badge tone="muted" size="sm">
+                        {mapping.hubspotProjectId}
+                      </Badge>
+                      <Badge
+                        tone={
+                          mapping.status === "mapped"
+                            ? "success"
+                            : mapping.status === "skipped"
+                              ? "muted"
+                              : "danger"
+                        }
+                        size="sm"
+                      >
+                        {mapping.status}
+                      </Badge>
+                    </div>
+                    {canUpdate && (
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="min-w-[220px] flex-1">
+                          <Label htmlFor={`map-${mapping.hubspotProjectId}`}>Evohome project</Label>
+                          <ProjectSelector
+                            id={`map-${mapping.hubspotProjectId}`}
+                            projects={projects}
+                            selectedProjectId={mapping.evoProjectId}
+                            onChange={(projectId) => {
+                              setHubspotMappings((current) =>
+                                current.map((item) =>
+                                  item.hubspotProjectId === mapping.hubspotProjectId
+                                    ? {
+                                        ...item,
+                                        evoProjectId: projectId,
+                                        status: projectId ? "mapped" : "unmapped",
+                                      }
+                                    : item,
+                                ),
+                              );
+                            }}
+                            disabled={hubspotMappingSavingId === mapping.hubspotProjectId}
+                            placeholder="Select destination"
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={
+                            hubspotMappingSavingId === mapping.hubspotProjectId ||
+                            !mapping.evoProjectId
+                          }
+                          onClick={() =>
+                            void saveHubSpotMapping(selectedIntegration.id, mapping, {
+                              status: "mapped",
+                              evoProjectId: mapping.evoProjectId,
+                            })
+                          }
+                        >
+                          Save mapped
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={hubspotMappingSavingId === mapping.hubspotProjectId}
+                          onClick={() =>
+                            void saveHubSpotMapping(selectedIntegration.id, mapping, {
+                              status: "skipped",
+                              evoProjectId: null,
+                            })
+                          }
+                        >
+                          Skip
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={hubspotMappingSavingId === mapping.hubspotProjectId}
+                          onClick={() =>
+                            void saveHubSpotMapping(selectedIntegration.id, mapping, {
+                              status: "unmapped",
+                              evoProjectId: null,
+                            })
+                          }
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
         </section>

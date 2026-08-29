@@ -39,6 +39,7 @@ export type IntegrationPublicRecord = {
   status: IntegrationStatus;
   hasApiKey: boolean;
   hasCredentials: boolean;
+  hasClientSecret: boolean;
   externalAccountId: string | null;
   defaultProjectId: string | null;
   allowProjectOverride: boolean;
@@ -60,6 +61,18 @@ function defaultStatusForType(type: IntegrationType): IntegrationStatus {
 export function toIntegrationPublicRecord(
   integration: IntegrationRecord,
 ): IntegrationPublicRecord {
+  let hasClientSecret = false;
+
+  if (integration.type === "hubspot" && integration.credentialsEncrypted) {
+    try {
+      hasClientSecret = Boolean(
+        decodeHubSpotCredentials(integration.credentialsEncrypted).clientSecret,
+      );
+    } catch {
+      hasClientSecret = false;
+    }
+  }
+
   return {
     id: integration.id,
     type: integration.type,
@@ -68,6 +81,7 @@ export function toIntegrationPublicRecord(
     hasApiKey: integration.type === "website" && Boolean(integration.apiKeyHash),
     hasCredentials:
       integration.type === "hubspot" && Boolean(integration.credentialsEncrypted),
+    hasClientSecret,
     externalAccountId: integration.externalAccountId,
     defaultProjectId: integration.defaultProjectId,
     allowProjectOverride: integration.allowProjectOverride,
@@ -210,7 +224,7 @@ export async function createIntegrationForWorkspace(
     await assertHubSpotDefaultProjectConfigured(workspaceId, defaultProjectId);
 
     const accessToken = input.hubspotAccessToken!.trim();
-    const clientSecret = input.hubspotClientSecret!.trim();
+    const clientSecret = input.hubspotClientSecret?.trim() || null;
     const portalId = input.hubspotPortalId!.trim();
 
     await assertHubSpotAccessToken(accessToken);
@@ -325,14 +339,17 @@ export async function updateIntegrationForWorkspace(
 
       const accessToken =
         input.hubspotAccessToken?.trim() || current?.accessToken;
-      const clientSecret =
-        input.hubspotClientSecret?.trim() || current?.clientSecret;
       const portalId = input.hubspotPortalId?.trim() || current?.portalId;
+      // Empty string clears; undefined keeps existing; provided value replaces.
+      const clientSecret =
+        input.hubspotClientSecret !== undefined
+          ? input.hubspotClientSecret.trim() || null
+          : (current?.clientSecret ?? null);
 
-      if (!accessToken || !clientSecret || !portalId) {
+      if (!accessToken || !portalId) {
         throw new AppError(
           "VALIDATION_ERROR",
-          "HubSpot access token, client secret, and portal ID are required.",
+          "HubSpot access token and portal ID are required.",
         );
       }
 

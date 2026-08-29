@@ -50,6 +50,12 @@ vi.mock("@/server/security/integration-credentials", () => ({
     clientSecret: "client-secret",
     portalId: "12345",
   })),
+  requireHubSpotClientSecret: vi.fn((credentials: { clientSecret: string | null }) => {
+    if (!credentials.clientSecret) {
+      throw new Error("missing secret");
+    }
+    return credentials.clientSecret;
+  }),
 }));
 
 vi.mock("@/server/utils/hubspot-webhook", async () => {
@@ -123,6 +129,7 @@ describe("hubspot lead capture webhook", () => {
       lastName: "Lovelace",
       email: "ada@example.com",
       phone: null,
+      createdAt: "2024-01-01T00:00:00.000Z",
       properties: { company: "Analytical Engines" },
     });
     vi.mocked(createLeadForWorkspace).mockResolvedValue({

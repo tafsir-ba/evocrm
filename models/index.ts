@@ -20,6 +20,11 @@ export {
 export { CampaignSendModel, type CampaignSendDocument } from "./campaign-send";
 export { IntegrationModel, type IntegrationDocument } from "./integration";
 export { IntegrationLogModel, type IntegrationLogDocument } from "./integration-log";
+export {
+  HubSpotProjectMappingModel,
+  type HubSpotProjectMappingDocument,
+  HUBSPOT_PROJECT_MAPPING_STATUSES,
+} from "./hubspot-project-mapping";
 export { AuditLogModel, type AuditLogDocument } from "./audit-log";
 export { ImportJobModel, type ImportJobDocument } from "./import-job";
 export { ImportRowResultModel, type ImportRowResultDocument } from "./import-row-result";

@@ -335,7 +335,42 @@ describe("integrations service", () => {
       }),
     );
     expect(result.integration.hasCredentials).toBe(true);
+    expect(result.integration.hasClientSecret).toBe(true);
     expect(result.integration.externalAccountId).toBe("12345");
     expect(result.apiKey).toBeUndefined();
+  });
+
+  it("creates a HubSpot integration with token-only credentials", async () => {
+    const hubspotIntegration = {
+      ...baseIntegration,
+      id: "int-hs-token",
+      type: "hubspot" as const,
+      name: "HubSpot CRM",
+      apiKeyHash: null,
+      credentialsEncrypted: "encrypted-hubspot",
+      externalAccountId: "12345",
+      defaultProjectId: "project-1",
+    };
+    vi.mocked(createIntegration).mockResolvedValue(hubspotIntegration);
+    const { encodeHubSpotCredentials } = await import(
+      "@/server/security/integration-credentials"
+    );
+    vi.mocked(encodeHubSpotCredentials).mockReturnValue("encrypted-hubspot");
+
+    const result = await createIntegrationForWorkspace("ws-1", "user-1", {
+      type: "hubspot",
+      name: "HubSpot CRM",
+      defaultProjectId: "project-1",
+      hubspotAccessToken: "pat-xxxxxxxx",
+      hubspotPortalId: "12345",
+    });
+
+    expect(createIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "hubspot",
+        credentialsEncrypted: "encrypted-hubspot",
+      }),
+    );
+    expect(result.integration.hasCredentials).toBe(true);
   });
 });

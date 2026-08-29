@@ -40,6 +40,19 @@ describe("integration credentials encryption", () => {
       portalId: "12345",
     });
   });
+
+  it("allows token-only HubSpot credentials without client secret", () => {
+    const encoded = encodeHubSpotCredentials({
+      accessToken: "pat-abc",
+      clientSecret: null,
+      portalId: "12345",
+    });
+    expect(decodeHubSpotCredentials(encoded)).toEqual({
+      accessToken: "pat-abc",
+      clientSecret: null,
+      portalId: "12345",
+    });
+  });
 });
 
 describe("hubspot webhook helpers", () => {

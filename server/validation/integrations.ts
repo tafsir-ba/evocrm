@@ -31,7 +31,14 @@ export const createIntegrationInputSchema = z
     defaultProjectId: objectIdSchema.nullable().optional(),
     allowProjectOverride: z.boolean().optional(),
     hubspotAccessToken: z.string().trim().min(10).max(500).optional(),
-    hubspotClientSecret: z.string().trim().min(10).max(500).optional(),
+    hubspotClientSecret: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .refine((value) => value === undefined || value.length === 0 || value.length >= 10, {
+        message: "HubSpot client secret must be at least 10 characters when provided.",
+      }),
     hubspotPortalId: z.string().trim().min(1).max(64).optional(),
   })
   .strict()
@@ -55,13 +62,8 @@ export const createIntegrationInputSchema = z
           path: ["hubspotAccessToken"],
         });
       }
-      if (!value.hubspotClientSecret) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "HubSpot client secret is required for webhook verification.",
-          path: ["hubspotClientSecret"],
-        });
-      }
+      // clientSecret is optional for historical/migration connects (token-only).
+      // Live webhooks require it later via Settings.
       if (!value.hubspotPortalId) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -89,7 +91,14 @@ export const updateIntegrationInputSchema = z
     defaultProjectId: objectIdSchema.nullable().optional(),
     allowProjectOverride: z.boolean().optional(),
     hubspotAccessToken: z.string().trim().min(10).max(500).optional(),
-    hubspotClientSecret: z.string().trim().min(10).max(500).optional(),
+    hubspotClientSecret: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .refine((value) => value === undefined || value.length === 0 || value.length >= 10, {
+        message: "HubSpot client secret must be at least 10 characters when provided.",
+      }),
     hubspotPortalId: z.string().trim().min(1).max(64).optional(),
   })
   .strict()
