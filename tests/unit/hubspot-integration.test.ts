@@ -6,6 +6,7 @@ import {
   decryptIntegrationCredentials,
   encodeHubSpotCredentials,
   decodeHubSpotCredentials,
+  requireHubSpotClientSecret,
 } from "@/server/security/integration-credentials";
 import {
   isHubSpotContactCreationEvent,
@@ -52,6 +53,24 @@ describe("integration credentials encryption", () => {
       clientSecret: null,
       portalId: "12345",
     });
+  });
+
+  it("requires a client secret before webhook signature verification", () => {
+    expect(() =>
+      requireHubSpotClientSecret({
+        accessToken: "pat-abc",
+        clientSecret: null,
+        portalId: "12345",
+      }),
+    ).toThrow(AppError);
+
+    expect(
+      requireHubSpotClientSecret({
+        accessToken: "pat-abc",
+        clientSecret: "secret-xyz",
+        portalId: "12345",
+      }),
+    ).toBe("secret-xyz");
   });
 });
 

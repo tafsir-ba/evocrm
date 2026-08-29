@@ -162,4 +162,50 @@ describe("hubspot project mapping service", () => {
     expect(result.status).toBe("mapped");
     expect(result.evoProjectId).toBe("project-1");
   });
+
+  it("clears destination when marking a mapping as skipped", async () => {
+    vi.mocked(updateHubSpotProjectMapping).mockResolvedValue({
+      id: "map-1",
+      workspaceId: "ws-1",
+      integrationId: "int-hs",
+      hubspotProjectId: "hs-1",
+      hubspotProjectName: "Grosvenor",
+      evoProjectId: null,
+      status: "skipped",
+      reviewedBy: "user-1",
+      reviewedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await saveHubSpotProjectMappingForWorkspace({
+      workspaceId: "ws-1",
+      integrationId: "int-hs",
+      actorId: "user-1",
+      hubspotProjectId: "hs-1",
+      status: "skipped",
+      evoProjectId: "project-1",
+    });
+
+    expect(updateHubSpotProjectMapping).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "skipped",
+        evoProjectId: null,
+      }),
+    );
+  });
+
+  it("rejects unmapped status when a destination project is still provided", async () => {
+    await expect(
+      saveHubSpotProjectMappingForWorkspace({
+        workspaceId: "ws-1",
+        integrationId: "int-hs",
+        actorId: "user-1",
+        hubspotProjectId: "hs-1",
+        status: "unmapped",
+        evoProjectId: "project-1",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(updateHubSpotProjectMapping).not.toHaveBeenCalled();
+  });
 });

@@ -55,14 +55,15 @@ describe("integrations validation", () => {
     expect(valid.success).toBe(true);
   });
 
-  it("rejects HubSpot credential fields on non-HubSpot creates", () => {
+  it("accepts empty HubSpot client secret on create (token-only)", () => {
     const result = createIntegrationInputSchema.safeParse({
-      type: "website",
-      name: "Website",
+      type: "hubspot",
+      name: "HubSpot CRM",
       hubspotAccessToken: "pat-xxxxxxxxxxxx",
+      hubspotClientSecret: "",
+      hubspotPortalId: "12345",
     });
-
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("allows safe integration updates", () => {

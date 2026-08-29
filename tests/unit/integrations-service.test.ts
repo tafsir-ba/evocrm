@@ -347,15 +347,29 @@ describe("integrations service", () => {
       type: "hubspot" as const,
       name: "HubSpot CRM",
       apiKeyHash: null,
-      credentialsEncrypted: "encrypted-hubspot",
+      credentialsEncrypted: "encrypted-hubspot-token-only",
       externalAccountId: "12345",
       defaultProjectId: "project-1",
     };
     vi.mocked(createIntegration).mockResolvedValue(hubspotIntegration);
-    const { encodeHubSpotCredentials } = await import(
+    const { encodeHubSpotCredentials, decodeHubSpotCredentials } = await import(
       "@/server/security/integration-credentials"
     );
-    vi.mocked(encodeHubSpotCredentials).mockReturnValue("encrypted-hubspot");
+    vi.mocked(encodeHubSpotCredentials).mockReturnValue("encrypted-hubspot-token-only");
+    vi.mocked(decodeHubSpotCredentials).mockImplementation((payload) => {
+      if (payload === "encrypted-hubspot-token-only") {
+        return {
+          accessToken: "pat-xxxxxxxx",
+          clientSecret: null,
+          portalId: "12345",
+        };
+      }
+      return {
+        accessToken: "pat-test",
+        clientSecret: "secret-test",
+        portalId: "12345",
+      };
+    });
 
     const result = await createIntegrationForWorkspace("ws-1", "user-1", {
       type: "hubspot",
@@ -365,12 +379,18 @@ describe("integrations service", () => {
       hubspotPortalId: "12345",
     });
 
+    expect(encodeHubSpotCredentials).toHaveBeenCalledWith({
+      accessToken: "pat-xxxxxxxx",
+      clientSecret: null,
+      portalId: "12345",
+    });
     expect(createIntegration).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "hubspot",
-        credentialsEncrypted: "encrypted-hubspot",
+        credentialsEncrypted: "encrypted-hubspot-token-only",
       }),
     );
     expect(result.integration.hasCredentials).toBe(true);
+    expect(result.integration.hasClientSecret).toBe(false);
   });
 });

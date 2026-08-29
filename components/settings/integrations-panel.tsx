@@ -1250,13 +1250,13 @@ export function IntegrationsPanel({ workspaceSlug, canUpdate }: IntegrationsPane
                             projects={projects}
                             selectedProjectId={mapping.evoProjectId}
                             onChange={(projectId) => {
+                              // Draft destination only — status stays until Save/Skip/Clear persists.
                               setHubspotMappings((current) =>
                                 current.map((item) =>
                                   item.hubspotProjectId === mapping.hubspotProjectId
                                     ? {
                                         ...item,
                                         evoProjectId: projectId,
-                                        status: projectId ? "mapped" : "unmapped",
                                       }
                                     : item,
                                 ),
