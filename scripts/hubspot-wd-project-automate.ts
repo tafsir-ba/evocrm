@@ -148,6 +148,19 @@ async function disconnectMongo(): Promise<void> {
   if (mongoose.default.connection.readyState !== 0) {
     await mongoose.default.disconnect().catch(() => undefined);
   }
+  const globalCache = globalThis as typeof globalThis & {
+    __evocrmMongooseCache?: { conn: unknown; promise: unknown };
+  };
+  if (globalCache.__evocrmMongooseCache) {
+    globalCache.__evocrmMongooseCache.conn = null;
+    globalCache.__evocrmMongooseCache.promise = null;
+  }
+}
+
+async function reconnectMongo(): Promise<void> {
+  await disconnectMongo();
+  const { connectDb } = await import("../server/db/mongoose");
+  await connectDb();
 }
 
 type ProgressFile = {
@@ -232,6 +245,7 @@ async function main(): Promise<void> {
     }
   }
   mappedSlugs.add(WD_MIGRATION_FORBIDDEN_SLUG);
+  await disconnectMongo();
 
   const logDir = path.join("/tmp", "wd-automate-logs");
   await mkdir(logDir, { recursive: true });
@@ -259,6 +273,7 @@ async function main(): Promise<void> {
     }
     const name = row.display_name;
     const reference = stableProjectReference(slug);
+    await reconnectMongo();
     const projects = await findProjects(WD_MIGRATION_WORKSPACE_ID, { includeArchived: true });
     const alias = findUnresolvedAlias({ slug, name, reference, projects });
     if (alias) {
@@ -467,6 +482,7 @@ async function main(): Promise<void> {
     let integration = null as Awaited<ReturnType<typeof findIntegrationById>> | null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
+        await reconnectMongo();
         integration = await findIntegrationById(
           WD_MIGRATION_WORKSPACE_ID,
           WD_MIGRATION_INTEGRATION_ID,

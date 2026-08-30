@@ -16,8 +16,7 @@
         "multi_project": 172
       },
       "searchTotal": 2110,
-      "dryRunOnly": false,
-      "note": "Completed via residual resume after process interruption; destination integrity verified"
+      "dryRunOnly": false
     },
     {
       "slug": "arbora",
@@ -34,8 +33,25 @@
         "missing_name": 3
       },
       "searchTotal": 2075,
-      "dryRunOnly": false,
-      "note": "Completed via residual retry after Mongo session/pool interruption; destination integrity verified"
+      "dryRunOnly": false
+    },
+    {
+      "slug": "v77",
+      "name": "V77",
+      "reference": "V77",
+      "destinationProjectId": "6a942c102086413e5fdccc47",
+      "manifestSize": 1172,
+      "created": 1172,
+      "destinationLeadCount": 1172,
+      "exceptionCount": 574,
+      "exceptionCounts": {
+        "notes_conflict": 51,
+        "multi_project": 352,
+        "missing_name": 170,
+        "cmp_product": 1
+      },
+      "searchTotal": 1746,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
