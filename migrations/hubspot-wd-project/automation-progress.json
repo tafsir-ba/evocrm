@@ -670,6 +670,22 @@
       },
       "searchTotal": 171,
       "dryRunOnly": false
+    },
+    {
+      "slug": "loree_des_champs",
+      "name": "L'Orée des Champs",
+      "reference": "LOREE_DES_CHAMPS",
+      "destinationProjectId": "6a94717c635893abf0840d53",
+      "manifestSize": 13,
+      "created": 13,
+      "destinationLeadCount": 13,
+      "exceptionCount": 156,
+      "exceptionCounts": {
+        "multi_project": 51,
+        "missing_name": 105
+      },
+      "searchTotal": 169,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
