@@ -38,6 +38,11 @@ export const WD_MIGRATION_GENERAL_REFERENCE = "EVO-GENERAL";
 export const WD_MIGRATION_FORBIDDEN_SLUG = GV_PILOT_SLUG;
 export const WD_MIGRATION_INBOUND_SOURCE = "hubspot-wd-project";
 export const WD_MIGRATION_MANIFEST_DIR = "migrations/hubspot-wd-project";
+export const WD_MIGRATION_EXCEPTION_DIR = "migrations/hubspot-wd-project/exceptions";
+export const WD_MIGRATION_ROADMAP_FILE =
+  "migrations/hubspot-wd-project/master-project-roadmap.json";
+export const WD_MIGRATION_PROGRESS_FILE =
+  "migrations/hubspot-wd-project/automation-progress.json";
 export const WD_MIGRATION_MAX_BATCH = 4000;
 export const WD_MIGRATION_ABORT_THRESHOLD = 1;
 
@@ -75,6 +80,7 @@ export const WD_MIGRATION_EXCLUSION_REASONS = [
   "not_target_project",
   "destination_forbidden",
   "cmp_product",
+  "no_project_signal",
 ] as const;
 
 export type WdMigrationExclusionReason = (typeof WD_MIGRATION_EXCLUSION_REASONS)[number];
@@ -386,6 +392,187 @@ export function selectSortedContactIds(ids: string[]): string[] {
     return a.localeCompare(b);
   });
   return unique;
+}
+
+export const EXCEPTION_REASON_PRIORITY = [
+  "identity_conflict",
+  "hubspot_id_match",
+  "email_match",
+  "multi_project",
+  "missing_name",
+  "broker_only",
+  "notes_only",
+  "no_project_signal",
+  "notes_conflict",
+  "cmp_product",
+  "missing_email_and_phone",
+  "not_target_project",
+] as const;
+
+export function compactAliasKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function stableProjectReference(slug: string): string {
+  const cleaned = slug.trim().replace(/[^a-zA-Z0-9._-]/g, "_");
+  if (!cleaned) {
+    throw new Error("reference_invalid");
+  }
+  return cleaned.toUpperCase();
+}
+
+export function primaryExceptionReason(exclusions: string[]): string | null {
+  const normalized = exclusions.map((reason) =>
+    reason === "not_target_project" ? "no_project_signal" : reason,
+  );
+  for (const reason of EXCEPTION_REASON_PRIORITY) {
+    if (normalized.includes(reason)) {
+      return reason;
+    }
+  }
+  return normalized[0] ?? null;
+}
+
+export type WdExceptionRecord = {
+  hubspotContactId: string;
+  reason: string;
+};
+
+export type WdExceptionBucketFile = {
+  version: 1;
+  slug: string;
+  destinationProjectId: string | null;
+  destinationReference: string | null;
+  counts: Record<string, number>;
+  records: WdExceptionRecord[];
+};
+
+export function buildExceptionBuckets(
+  snapshots: Array<{
+    hubspotContactId: string;
+    projectValues: string[];
+    notesValues: string[];
+    brokerPrefixes: string[];
+    firstName: string;
+    lastName: string;
+    emailNormalized: string | null;
+    hasPhone: boolean;
+    nameKey: string;
+    productValues: string[];
+  }>,
+  existing: GvPilotExistingLead[],
+  slug: string,
+): WdExceptionBucketFile {
+  const counts: Record<string, number> = {};
+  const records: WdExceptionRecord[] = [];
+  for (const snapshot of snapshots) {
+    const eligibility = evaluateWdProjectEligibility(snapshot, existing, slug);
+    if (eligibility.writeEligible) {
+      continue;
+    }
+    const reason = primaryExceptionReason(eligibility.exclusions) ?? "excluded";
+    counts[reason] = (counts[reason] ?? 0) + 1;
+    records.push({ hubspotContactId: snapshot.hubspotContactId, reason });
+  }
+  records.sort((a, b) => {
+    if (a.reason !== b.reason) {
+      return a.reason.localeCompare(b.reason);
+    }
+    return a.hubspotContactId.localeCompare(b.hubspotContactId, undefined, { numeric: true });
+  });
+  return {
+    version: 1,
+    slug,
+    destinationProjectId: null,
+    destinationReference: null,
+    counts,
+    records,
+  };
+}
+
+export type RoadmapProjectRow = {
+  slug: string;
+  display_name: string;
+  classification: string;
+  status: string;
+  wd_project: number;
+};
+
+export type MasterProjectRoadmap = {
+  create_then_map: string[];
+  map_existing: string[];
+  no_contacts_skip: string[];
+  fallback_general: string[];
+  rows: RoadmapProjectRow[];
+};
+
+export function remainingRoadmapSlugs(
+  roadmap: MasterProjectRoadmap,
+  mappedSlugs: Set<string>,
+): string[] {
+  return roadmap.create_then_map.filter((slug) => {
+    if (mappedSlugs.has(slug)) {
+      return false;
+    }
+    if (slug === WD_MIGRATION_FORBIDDEN_SLUG) {
+      return false;
+    }
+    if (roadmap.fallback_general.includes(slug)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export type ExistingProjectAlias = {
+  id: string;
+  name: string;
+  reference: string | null;
+};
+
+export function findUnresolvedAlias(input: {
+  slug: string;
+  name: string;
+  reference: string;
+  projects: ExistingProjectAlias[];
+}): ExistingProjectAlias | null {
+  const wanted = new Set(
+    [compactAliasKey(input.slug), compactAliasKey(input.name), compactAliasKey(input.reference)].filter(
+      Boolean,
+    ),
+  );
+  for (const project of input.projects) {
+    if (project.reference === input.reference) {
+      continue;
+    }
+    const keys = [compactAliasKey(project.name)];
+    if (project.reference) {
+      keys.push(compactAliasKey(project.reference));
+    }
+    if (keys.some((key) => wanted.has(key))) {
+      return project;
+    }
+  }
+  return null;
+}
+
+export function isSystemicAutomationFailure(reason: string | null | undefined): boolean {
+  if (!reason) {
+    return false;
+  }
+  return [
+    "wrong_destination",
+    "grosvenor_fallback_not_allowed",
+    "evo_general_not_allowed",
+    "idempotency_breach",
+    "duplicate_key_breach",
+    "enrollment_breach",
+    "automation_breach",
+    "runner_gate_failure",
+    "execute_aborted",
+    "unexpected_results",
+    "integration_defaults_changed",
+  ].some((code) => reason.includes(code));
 }
 
 export { parseExecuteArgs, resolveManifestFileName };

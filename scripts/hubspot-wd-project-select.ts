@@ -69,6 +69,7 @@ function sleep(ms: number): Promise<void> {
 
 async function hubspotSearchPage(input: {
   accessToken: string;
+  propertyName: string;
   slug: string;
   properties: string[];
   after?: string;
@@ -91,7 +92,7 @@ async function hubspotSearchPage(input: {
           {
             filters: [
               {
-                propertyName: "wd_project",
+                propertyName: input.propertyName,
                 operator: "CONTAINS_TOKEN",
                 value: input.slug,
               },
@@ -146,15 +147,18 @@ async function main(): Promise<void> {
   }
 
   const {
+    WD_MIGRATION_EXCEPTION_DIR,
     WD_MIGRATION_FORBIDDEN_SLUG,
     WD_MIGRATION_HUBSPOT_PROPERTIES,
     WD_MIGRATION_MANIFEST_DIR,
     WD_MIGRATION_PORTAL_ID,
     WD_MIGRATION_WORKSPACE_ID,
     assertExplicitMappedDestination,
+    buildExceptionBuckets,
     evaluateWdProjectEligibility,
     selectSortedContactIds,
   } = await import("../lib/hubspot-wd-project-migration");
+  const { assertManifestHasNoPii } = await import("../lib/hubspot-gv-pilot");
   const { checksumContactIds, snapshotFromHubSpotProperties, existingLeadFromRecord } =
     await import("../lib/hubspot-gv-pilot");
   const { listHubSpotProjectMappings } = await import(
@@ -195,25 +199,31 @@ async function main(): Promise<void> {
       : null,
   });
 
-  const snapshots: ReturnType<typeof snapshotFromHubSpotProperties>[] = [];
-  let after: string | undefined;
+  const snapshotsById = new Map<string, ReturnType<typeof snapshotFromHubSpotProperties>>();
   let searchTotal = 0;
-  do {
-    const page = await hubspotSearchPage({
-      accessToken: token,
-      slug,
-      properties: [...WD_MIGRATION_HUBSPOT_PROPERTIES],
-      after,
-    });
-    searchTotal = page.total;
-    for (const result of page.results) {
-      if (result.id) {
-        snapshots.push(snapshotFromHubSpotProperties(result.id, result.properties));
+  for (const propertyName of ["wd_project", "hs_content_membership_notes", "wd_broker_assigned"]) {
+    let after: string | undefined;
+    do {
+      const page = await hubspotSearchPage({
+        accessToken: token,
+        propertyName,
+        slug,
+        properties: [...WD_MIGRATION_HUBSPOT_PROPERTIES],
+        after,
+      });
+      if (propertyName === "wd_project") {
+        searchTotal = page.total;
       }
-    }
-    after = page.after;
-    await sleep(250);
-  } while (after);
+      for (const result of page.results) {
+        if (result.id && !snapshotsById.has(result.id)) {
+          snapshotsById.set(result.id, snapshotFromHubSpotProperties(result.id, result.properties));
+        }
+      }
+      after = page.after;
+      await sleep(250);
+    } while (after);
+  }
+  const snapshots = [...snapshotsById.values()];
 
   const existing = await findLeadsForHubSpotGvPilotDedupe({
     workspaceId: WD_MIGRATION_WORKSPACE_ID,
@@ -264,40 +274,55 @@ async function main(): Promise<void> {
   }
 
   const selected = selectSortedContactIds(newIds);
-  const manifest = {
-    name: manifestName,
-    version: 1 as const,
-    portalId: WD_MIGRATION_PORTAL_ID,
-    workspaceId: WD_MIGRATION_WORKSPACE_ID,
-    destinationProjectId,
-    destinationReference,
-    slug,
-    sourceHubSpotProjectId: slug,
-    size: selected.length,
-    selection: {
-      pool: "new_write_eligible" as const,
-      sort: "hubspot_contact_id_asc" as const,
-      exclude: [
-        "email_match",
-        "hubspot_id_match",
-        "identity_conflict",
-        "multi_project",
-        "broker_only",
-        "missing_name",
-        "notes_conflict",
-        "notes_only",
-        "cmp_product",
-        "missing_email_and_phone",
-      ],
-    },
-    hubspotContactIds: selected,
-    idChecksum: checksumContactIds(selected),
-  };
+  const exceptions = buildExceptionBuckets(snapshots, existingLeads, slug);
+  exceptions.destinationProjectId = destinationProjectId;
+  exceptions.destinationReference = destinationReference;
+  assertManifestHasNoPii(exceptions);
 
   const dir = path.join(process.cwd(), WD_MIGRATION_MANIFEST_DIR);
   await mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `${manifestName}.json`);
-  await writeFile(filePath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await mkdir(path.join(process.cwd(), WD_MIGRATION_EXCEPTION_DIR), { recursive: true });
+  await writeFile(
+    path.join(process.cwd(), WD_MIGRATION_EXCEPTION_DIR, `${slug}.json`),
+    `${JSON.stringify(exceptions, null, 2)}\n`,
+  );
+
+  let idChecksum: string | null = null;
+  if (selected.length > 0) {
+    const manifest = {
+      name: manifestName,
+      version: 1 as const,
+      portalId: WD_MIGRATION_PORTAL_ID,
+      workspaceId: WD_MIGRATION_WORKSPACE_ID,
+      destinationProjectId,
+      destinationReference,
+      slug,
+      sourceHubSpotProjectId: slug,
+      size: selected.length,
+      selection: {
+        pool: "new_write_eligible" as const,
+        sort: "hubspot_contact_id_asc" as const,
+        exclude: [
+          "email_match",
+          "hubspot_id_match",
+          "identity_conflict",
+          "multi_project",
+          "broker_only",
+          "missing_name",
+          "notes_conflict",
+          "notes_only",
+          "no_project_signal",
+          "cmp_product",
+          "missing_email_and_phone",
+        ],
+      },
+      hubspotContactIds: selected,
+      idChecksum: checksumContactIds(selected),
+    };
+    assertManifestHasNoPii(manifest);
+    await writeFile(path.join(dir, `${manifestName}.json`), `${JSON.stringify(manifest, null, 2)}\n`);
+    idChecksum = manifest.idChecksum;
+  }
 
   console.log(
     JSON.stringify(
@@ -309,9 +334,11 @@ async function main(): Promise<void> {
         searchTotal,
         scanned: snapshots.length,
         cohortCounts,
-        manifestName,
+        exceptionCounts: exceptions.counts,
+        exceptionCount: exceptions.records.length,
+        manifestName: selected.length > 0 ? manifestName : null,
         manifestSize: selected.length,
-        idChecksum: manifest.idChecksum,
+        idChecksum,
       },
       null,
       2,
