@@ -796,6 +796,23 @@
       },
       "searchTotal": 0,
       "dryRunOnly": false
+    },
+    {
+      "slug": "seymaz44-vpi",
+      "name": "Seymaz 44 (VPI)",
+      "reference": "SEYMAZ44-VPI",
+      "destinationProjectId": "6a9473283e8b00dfbd79747d",
+      "manifestSize": 16,
+      "created": 16,
+      "destinationLeadCount": 16,
+      "exceptionCount": 87,
+      "exceptionCounts": {
+        "multi_project": 38,
+        "missing_name": 46,
+        "notes_only": 3
+      },
+      "searchTotal": 99,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
