@@ -282,6 +282,23 @@
       },
       "searchTotal": 565,
       "dryRunOnly": false
+    },
+    {
+      "slug": "avantscene",
+      "name": "Avant-Scène",
+      "reference": "AVANTSCENE",
+      "destinationProjectId": "6a9461729b3a69351115418b",
+      "manifestSize": 500,
+      "created": 500,
+      "destinationLeadCount": 500,
+      "exceptionCount": 61,
+      "exceptionCounts": {
+        "multi_project": 59,
+        "notes_conflict": 1,
+        "cmp_product": 1
+      },
+      "searchTotal": 561,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

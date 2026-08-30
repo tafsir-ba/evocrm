@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "slug": "avantscene",
+  "destinationProjectId": "6a9461729b3a69351115418b",
+  "destinationReference": "AVANTSCENE",
+  "counts": {
+    "multi_project": 59,
+    "notes_conflict": 1,
+    "cmp_product": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "623701",
+      "reason": "cmp_product"
+    },
+    {
+      "hubspotContactId": "11651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "42156",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "58051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "60651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "112351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "120501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "126251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "137051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "161301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "167501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "171601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "200501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "206201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "213301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "234751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "240701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "247501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "278501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "280101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "280901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "281551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "281701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "282451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "282501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "289351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "296601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "308651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "316551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "323551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "328451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "333651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "336101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "337001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "338151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "345601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "346551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "352001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "356501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "364251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "372351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "377651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "377951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "382851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "383701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "384451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "391451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "394101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "400651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "460001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "484151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "538251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "556151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "576051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "580301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "590501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "600251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "826001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "905451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1553451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "328651",
+      "reason": "notes_conflict"
+    }
+  ]
+}
