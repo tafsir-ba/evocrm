@@ -1176,6 +1176,21 @@
       },
       "searchTotal": 2,
       "dryRunOnly": false
+    },
+    {
+      "slug": "delejette",
+      "name": "Delejette",
+      "reference": "DELEJETTE",
+      "destinationProjectId": "6a947cd7bb299e25f68b5542",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 1,
+      "exceptionCounts": {
+        "notes_only": 1
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
