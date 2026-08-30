@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "slug": "symbiose_assei",
+  "destinationProjectId": "6a947c6910d02eaead68290b",
+  "destinationReference": "SYMBIOSE_ASSEI",
+  "counts": {
+    "multi_project": 6
+  },
+  "records": [
+    {
+      "hubspotContactId": "826001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "827401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "905451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1574101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "16170830377",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "35689256268",
+      "reason": "multi_project"
+    }
+  ]
+}

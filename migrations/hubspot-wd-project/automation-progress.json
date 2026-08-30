@@ -1081,6 +1081,21 @@
       },
       "searchTotal": 9,
       "dryRunOnly": false
+    },
+    {
+      "slug": "symbiose_assei",
+      "name": "Symbiose ASSEI",
+      "reference": "SYMBIOSE_ASSEI",
+      "destinationProjectId": "6a947c6910d02eaead68290b",
+      "manifestSize": 3,
+      "created": 3,
+      "destinationLeadCount": 3,
+      "exceptionCount": 6,
+      "exceptionCounts": {
+        "multi_project": 6
+      },
+      "searchTotal": 9,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
