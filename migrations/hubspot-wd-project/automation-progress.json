@@ -1036,6 +1036,21 @@
       },
       "searchTotal": 24,
       "dryRunOnly": false
+    },
+    {
+      "slug": "ecureuils",
+      "name": "Écureuils",
+      "reference": "ECUREUILS",
+      "destinationProjectId": "6a947c090a040e69ce06d20e",
+      "manifestSize": 9,
+      "created": 9,
+      "destinationLeadCount": 9,
+      "exceptionCount": 6,
+      "exceptionCounts": {
+        "multi_project": 6
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

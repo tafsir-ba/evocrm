@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "slug": "ecureuils",
+  "destinationProjectId": "6a947c090a040e69ce06d20e",
+  "destinationReference": "ECUREUILS",
+  "counts": {
+    "multi_project": 6
+  },
+  "records": [
+    {
+      "hubspotContactId": "391251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "534801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "710201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1317201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "41247421014",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "94203217479",
+      "reason": "multi_project"
+    }
+  ]
+}
