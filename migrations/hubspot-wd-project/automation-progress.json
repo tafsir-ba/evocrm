@@ -1112,6 +1112,21 @@
       },
       "searchTotal": 5,
       "dryRunOnly": false
+    },
+    {
+      "slug": "emerald",
+      "name": "Emerald",
+      "reference": "EMERALD",
+      "destinationProjectId": "6a947c9275ba7203b5f9d2cd",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "multi_project": 2
+      },
+      "searchTotal": 3,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
