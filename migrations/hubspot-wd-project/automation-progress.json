@@ -544,6 +544,22 @@
       },
       "searchTotal": 237,
       "dryRunOnly": false
+    },
+    {
+      "slug": "collex_bossy",
+      "name": "Collex-Bossy",
+      "reference": "COLLEX_BOSSY",
+      "destinationProjectId": "6a946d83e84a462f1ee3e21f",
+      "manifestSize": 33,
+      "created": 33,
+      "destinationLeadCount": 33,
+      "exceptionCount": 201,
+      "exceptionCounts": {
+        "multi_project": 67,
+        "missing_name": 134
+      },
+      "searchTotal": 234,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
