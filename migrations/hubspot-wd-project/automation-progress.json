@@ -880,6 +880,21 @@
       },
       "searchTotal": 76,
       "dryRunOnly": false
+    },
+    {
+      "slug": "buissonniere_bernard",
+      "name": "Buissonnière Bernard",
+      "reference": "BUISSONNIERE_BERNARD",
+      "destinationProjectId": "6a947a939d6b25833df6d78e",
+      "manifestSize": 59,
+      "created": 59,
+      "destinationLeadCount": 59,
+      "exceptionCount": 16,
+      "exceptionCounts": {
+        "multi_project": 16
+      },
+      "searchTotal": 75,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
