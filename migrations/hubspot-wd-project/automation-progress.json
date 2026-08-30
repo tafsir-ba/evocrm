@@ -382,6 +382,23 @@
       },
       "searchTotal": 366,
       "dryRunOnly": false
+    },
+    {
+      "slug": "vistabrent",
+      "name": "Vista Brent / Taquà",
+      "reference": "VISTABRENT",
+      "destinationProjectId": "6a946925cd5edb8f7a06c2af",
+      "manifestSize": 18,
+      "created": 18,
+      "destinationLeadCount": 18,
+      "exceptionCount": 341,
+      "exceptionCounts": {
+        "multi_project": 117,
+        "missing_name": 223,
+        "notes_only": 1
+      },
+      "searchTotal": 358,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
