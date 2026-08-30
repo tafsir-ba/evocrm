@@ -1,15 +1,21 @@
 {
-  "generatedAt": "2026-08-30T18:21:58.715Z",
+  "generatedAt": "2026-08-30T18:27:04.793Z",
   "mode": "execute",
   "catalog": {
-    "total": 17,
-    "highConfidence": 16,
+    "total": 23,
+    "highConfidence": 22,
     "unresolved": 1,
     "keys": [
       "grosvenor-vistas",
       "le-parc-des-crets",
       "v77",
       "residence-les-pins",
+      "arbora",
+      "defne",
+      "smarthill",
+      "villa-sorella",
+      "jardins-pala",
+      "rubix",
       "buissonniere-4",
       "residence-symbiose",
       "eleven-41",
@@ -27,18 +33,11 @@
   },
   "workspaces": 4,
   "projects": 59,
-  "applied": 26,
-  "skipped": 26,
-  "unresolved": 33,
+  "applied": 32,
+  "skipped": 20,
+  "unresolved": 27,
   "review": 7,
   "unresolvedCompact": [
-    {
-      "name": "Villa Sorella",
-      "reference": "VILLA_SORELLA",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
     {
       "name": "Terra Vista",
       "reference": "TERRA_VISTA",
@@ -77,13 +76,6 @@
     {
       "name": "Résidence Serena",
       "reference": "RESIDENCE_SERENA",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
-      "name": "Defne",
-      "reference": "DEFNE",
       "category": "no_place_signal",
       "placeSignal": null,
       "note": "No official project match and no unique verified municipality in the name/reference."
@@ -145,13 +137,6 @@
       "note": "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). Municipality left open."
     },
     {
-      "name": "Rubix",
-      "reference": "RUBIX",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
       "name": "Seymaz 44",
       "reference": "SEYMAZ44",
       "category": "ambiguous_place",
@@ -201,13 +186,6 @@
       "note": "Jardin des Nations is a Geneva-area neighbourhood spanning more than one commune (Pregny-Chambésy / Grand-Saconnex). Not a unique municipality."
     },
     {
-      "name": "Jardins Pala",
-      "reference": "JARDINSPALA",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
       "name": "Osmose",
       "reference": "OSMOSE",
       "category": "no_place_signal",
@@ -217,20 +195,6 @@
     {
       "name": "Alcove",
       "reference": "ALCOVE",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
-      "name": "Smarthill",
-      "reference": "SMARTHILL",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
-      "name": "Arbora",
-      "reference": "ARBORA",
       "category": "no_place_signal",
       "placeSignal": null,
       "note": "No official project match and no unique verified municipality in the name/reference."
@@ -275,11 +239,11 @@
       "projectId": "6a94736cd29a3272eaae6b4f",
       "name": "Villa Sorella",
       "reference": "VILLA_SORELLA",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "villa-sorella",
+      "countryCode": "CH",
+      "municipality": "Corsier",
       "overwrittenManual": false
     },
     {
@@ -371,11 +335,11 @@
       "projectId": "6a9471af5747d97c3a788d09",
       "name": "Defne",
       "reference": "DEFNE",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "defne",
+      "countryCode": "CH",
+      "municipality": "Rolle",
       "overwrittenManual": false
     },
     {
@@ -635,11 +599,11 @@
       "projectId": "6a9466cfde8b87074899d25c",
       "name": "Rubix",
       "reference": "RUBIX",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "rubix",
+      "countryCode": "CH",
+      "municipality": "Satigny",
       "overwrittenManual": false
     },
     {
@@ -803,11 +767,11 @@
       "projectId": "6a9446c0db72974d3666f72d",
       "name": "Jardins Pala",
       "reference": "JARDINSPALA",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "jardins-pala",
+      "countryCode": "CH",
+      "municipality": "Bulle",
       "overwrittenManual": false
     },
     {
@@ -851,11 +815,11 @@
       "projectId": "6a943bef1195ddcd26f08673",
       "name": "Smarthill",
       "reference": "SMARTHILL",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "smarthill",
+      "countryCode": "CH",
+      "municipality": "Crissier",
       "overwrittenManual": false
     },
     {
@@ -875,11 +839,11 @@
       "projectId": "6a9422aaea1b5f415435d42d",
       "name": "Arbora",
       "reference": "ARBORA",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "user_confirmed",
+      "catalogKey": "arbora",
+      "countryCode": "CH",
+      "municipality": "Crissier",
       "overwrittenManual": false
     },
     {

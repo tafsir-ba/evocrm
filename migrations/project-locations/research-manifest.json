@@ -275,8 +275,10 @@
   ],
   "intentionallyUnresolvedExamples": [
     "Cressy is an intercommunal Geneva quartier (Confignon / Bernex / Onex) and is not Cressier.",
-    "BC Kingston has a Kingston signal but no official project country.",
+    "BC Kingston has a Kingston signal but “[BC Kingston] development” still has no unique official project or country.",
     "Jardin des Nations and Seymaz 44 are neighbourhood / sector names, not unique communes.",
+    "Résidence Serena: “[Résidence Serena] promotion” finds Grandvaux listings and other homonyms abroad; no unique first-party official site.",
+    "Portes du Lac: “[Portes du Lac] promotion” finds Estavayer-le-Lac and other lake-door uses; name is not unique enough to apply.",
     "Branded names without a place signal or unique official site stay on the compact unresolved list after the promotion/development query convention."
   ]
 }
