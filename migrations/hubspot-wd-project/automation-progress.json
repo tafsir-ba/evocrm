@@ -218,6 +218,23 @@
       },
       "searchTotal": 664,
       "dryRunOnly": false
+    },
+    {
+      "slug": "gland_evo",
+      "name": "Gland (Evo)",
+      "reference": "GLAND_EVO",
+      "destinationProjectId": "6a945add8154645eabb07305",
+      "manifestSize": 113,
+      "created": 113,
+      "destinationLeadCount": 113,
+      "exceptionCount": 537,
+      "exceptionCounts": {
+        "multi_project": 239,
+        "missing_name": 297,
+        "notes_only": 1
+      },
+      "searchTotal": 648,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
