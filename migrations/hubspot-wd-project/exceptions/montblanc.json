@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "slug": "montblanc",
+  "destinationProjectId": "6a947c29f9c2de8fb6fa4ea8",
+  "destinationReference": "MONTBLANC",
+  "counts": {
+    "multi_project": 3
+  },
+  "records": [
+    {
+      "hubspotContactId": "234001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "234751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "935301",
+      "reason": "multi_project"
+    }
+  ]
+}

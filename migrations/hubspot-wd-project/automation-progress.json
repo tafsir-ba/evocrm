@@ -1051,6 +1051,21 @@
       },
       "searchTotal": 15,
       "dryRunOnly": false
+    },
+    {
+      "slug": "montblanc",
+      "name": "Mont-Blanc",
+      "reference": "MONTBLANC",
+      "destinationProjectId": "6a947c29f9c2de8fb6fa4ea8",
+      "manifestSize": 12,
+      "created": 12,
+      "destinationLeadCount": 12,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 3
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

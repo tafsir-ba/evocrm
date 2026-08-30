@@ -1,0 +1,43 @@
+{
+  "name": "montblanc-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947c29f9c2de8fb6fa4ea8",
+  "destinationReference": "MONTBLANC",
+  "slug": "montblanc",
+  "sourceHubSpotProjectId": "montblanc",
+  "size": 12,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "243501",
+    "249901",
+    "255101",
+    "256651",
+    "302601",
+    "319051",
+    "328001",
+    "353801",
+    "371051",
+    "371851",
+    "544251",
+    "75137948345"
+  ],
+  "idChecksum": "7b01ad0352e59f5294cf479dc9ea6ba526e733e4310d8c15d3759d13e7c1d2b6"
+}
