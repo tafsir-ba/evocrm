@@ -464,6 +464,22 @@
       },
       "searchTotal": 315,
       "dryRunOnly": false
+    },
+    {
+      "slug": "gland_cardis",
+      "name": "Gland (Cardis)",
+      "reference": "GLAND_CARDIS",
+      "destinationProjectId": "6a946b919b112e202440a029",
+      "manifestSize": 32,
+      "created": 32,
+      "destinationLeadCount": 32,
+      "exceptionCount": 283,
+      "exceptionCounts": {
+        "multi_project": 110,
+        "missing_name": 173
+      },
+      "searchTotal": 315,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
