@@ -21,6 +21,7 @@ import {
   buildWebsiteLeadPayloadSummary,
   writeIntegrationLog,
 } from "@/server/services/integration-logs";
+import { buildMigratedCampaignGuardAttributes } from "@/lib/campaign-enrollment-guard";
 import {
   createLeadForWorkspace,
   normalizeLeadEmail,
@@ -255,6 +256,7 @@ async function captureHubSpotContactAsLead(input: {
         inboundSource: "hubspot",
         ...(input.eventId ? { hubspotEventId: String(input.eventId) } : {}),
       },
+      ...buildMigratedCampaignGuardAttributes(),
     },
   };
 
@@ -265,6 +267,7 @@ async function captureHubSpotContactAsLead(input: {
       workspaceId,
       input.integration.createdBy,
       leadInput,
+      { triggerAutomation: false },
     );
   } catch (error) {
     if (error instanceof AppError && error.code === "CONFLICT") {

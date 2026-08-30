@@ -248,6 +248,22 @@ export async function findNonTerminalEnrollmentTargetIds(
   };
 }
 
+export async function countCampaignEnrollmentsForLeadIds(
+  workspaceId: string,
+  leadIds: string[],
+): Promise<number> {
+  if (leadIds.length === 0) {
+    return 0;
+  }
+
+  await connectDb();
+  return CampaignEnrollmentModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      leadId: { $in: leadIds },
+    }),
+  );
+}
+
 export async function countCampaignEnrollments(
   workspaceId: string,
   campaignId: string,

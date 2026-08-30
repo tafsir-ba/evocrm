@@ -91,6 +91,89 @@ async function hubspotGetJson(input: {
   return { ok: response.ok, status: response.status, body };
 }
 
+async function hubspotPostJson(input: {
+  accessToken: string;
+  path: string;
+  body: unknown;
+}): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const response = await fetch(`https://api.hubapi.com${input.path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input.body),
+  });
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  return { ok: response.ok, status: response.status, body };
+}
+
+export type HubSpotContactRaw = {
+  id: string;
+  properties: Record<string, string | null>;
+};
+
+export async function fetchHubSpotContactsByIds(input: {
+  accessToken: string;
+  contactIds: string[];
+  properties: string[];
+}): Promise<HubSpotContactRaw[]> {
+  if (input.contactIds.length === 0) {
+    return [];
+  }
+
+  const results: HubSpotContactRaw[] = [];
+  const chunkSize = 100;
+  for (let offset = 0; offset < input.contactIds.length; offset += chunkSize) {
+    const chunk = input.contactIds.slice(offset, offset + chunkSize);
+    const { ok, status, body } = await hubspotPostJson({
+      accessToken: input.accessToken,
+      path: "/crm/v3/objects/contacts/batch/read",
+      body: {
+        properties: input.properties,
+        inputs: chunk.map((id) => ({ id })),
+      },
+    });
+
+    if (!ok) {
+      throw new AppError(
+        "INTERNAL_ERROR",
+        `HubSpot contact batch read failed (${status}).`,
+        { expose: false },
+      );
+    }
+
+    const payload = body as {
+      results?: Array<{
+        id?: string;
+        properties?: Record<string, string | null | undefined>;
+      }>;
+    };
+
+    for (const result of payload.results ?? []) {
+      results.push({
+        id: String(result.id ?? ""),
+        properties: Object.fromEntries(
+          Object.entries(result.properties ?? {}).map(([key, value]) => [
+            key,
+            typeof value === "string" ? value : null,
+          ]),
+        ),
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function fetchHubSpotContact(input: {
   accessToken: string;
   contactId: string;

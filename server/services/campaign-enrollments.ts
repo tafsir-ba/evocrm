@@ -1,5 +1,6 @@
 import "server-only";
 
+import { canEnrollLeadInCampaigns } from "@/lib/campaign-enrollment-guard";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
@@ -263,6 +264,7 @@ export async function listEnrollmentCandidatesForWorkspace(
     const { leads, total } = await findLeads(workspaceId, {
       search: filter.search,
       excludeIds: leadIds,
+      excludeCampaignGuarded: true,
       page,
       pageSize,
     });
@@ -422,6 +424,13 @@ export async function createCampaignEnrollmentForWorkspace(
       throw new AppError("NOT_FOUND", "Lead not found.");
     }
 
+    if (!canEnrollLeadInCampaigns(lead.attributes)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Migrated HubSpot contacts are excluded from campaigns unless a project marketing manager opts them in.",
+      );
+    }
+
     const existing = await findActiveEnrollmentByLead(
       workspaceId,
       campaignId,
@@ -467,6 +476,13 @@ export async function createCampaignEnrollmentForWorkspace(
 
     if (!lead || lead.archivedAt) {
       throw new AppError("NOT_FOUND", "Associated lead not found.");
+    }
+
+    if (!canEnrollLeadInCampaigns(lead.attributes)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Migrated HubSpot contacts are excluded from campaigns unless a project marketing manager opts them in.",
+      );
     }
 
     opportunityId = opportunity.id;
@@ -545,6 +561,10 @@ export async function enrollLeadInCampaignWithContext(input: {
   const lead = await findLeadById(input.workspaceId, input.leadId);
 
   if (!lead || lead.archivedAt) {
+    return null;
+  }
+
+  if (!canEnrollLeadInCampaigns(lead.attributes)) {
     return null;
   }
 
