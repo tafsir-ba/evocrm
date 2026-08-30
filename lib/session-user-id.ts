@@ -11,7 +11,7 @@ export const LOGIN_PATH = "/login";
 
 /**
  * NextAuth GET `/api/auth/signout` renders a confirmation page
- * ("Do you want to sign out?"). Never send sign-in visitors there.
+ * ("Are you sure you want to sign out?"). Never send sign-in visitors there.
  * Stale/invalid JWTs are cleared by this route handler (no confirmation UI).
  */
 export const CLEAR_INVALID_SESSION_PATH = "/api/auth/clear-session";

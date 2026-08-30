@@ -22,18 +22,20 @@ import { auth, signOut } from "@/auth";
 import { LOGIN_PATH } from "@/lib/session-user-id";
 import { findUserById } from "@/server/repositories/users";
 
+const authMock = vi.mocked(auth as unknown as () => Promise<unknown>);
+
 describe("GET /api/auth/clear-session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("preserves a valid authenticated session and does not sign out", async () => {
-    vi.mocked(auth).mockResolvedValue({
+    authMock.mockResolvedValue({
       user: {
         id: "507f1f77bcf86cd799439011",
         email: "owner@example.com",
       },
-    } as Awaited<ReturnType<typeof auth>>);
+    });
     vi.mocked(findUserById).mockResolvedValue({
       id: "507f1f77bcf86cd799439011",
       email: "owner@example.com",
@@ -47,7 +49,7 @@ describe("GET /api/auth/clear-session", () => {
   });
 
   it("silently signs out when there is no session", async () => {
-    vi.mocked(auth).mockResolvedValue(null);
+    authMock.mockResolvedValue(null);
 
     await GET();
 
@@ -56,12 +58,12 @@ describe("GET /api/auth/clear-session", () => {
   });
 
   it("silently signs out a non-canonical JWT subject", async () => {
-    vi.mocked(auth).mockResolvedValue({
+    authMock.mockResolvedValue({
       user: {
         id: "550e8400-e29b-41d4-a716-446655440000",
         email: "stale@example.com",
       },
-    } as Awaited<ReturnType<typeof auth>>);
+    });
 
     await GET();
 
@@ -70,12 +72,12 @@ describe("GET /api/auth/clear-session", () => {
   });
 
   it("silently signs out when the session user no longer exists", async () => {
-    vi.mocked(auth).mockResolvedValue({
+    authMock.mockResolvedValue({
       user: {
         id: "507f1f77bcf86cd799439011",
         email: "gone@example.com",
       },
-    } as Awaited<ReturnType<typeof auth>>);
+    });
     vi.mocked(findUserById).mockResolvedValue(null);
 
     await GET();
