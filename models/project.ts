@@ -7,6 +7,34 @@ const PROJECT_TYPES = [
   "other",
 ] as const;
 
+const projectLocationSchema = new Schema(
+  {
+    countryCode: { type: String, trim: true, uppercase: true, default: null },
+    countryName: { type: String, trim: true, default: null },
+    cantonCode: { type: String, trim: true, uppercase: true, default: null },
+    cantonName: { type: String, trim: true, default: null },
+    municipality: { type: String, trim: true, default: null },
+    postalCode: { type: String, trim: true, default: null },
+    normalizedAddress: { type: String, trim: true, default: null },
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    precision: {
+      type: String,
+      enum: ["exact_project", "address", "locality", "unknown"],
+      default: "unknown",
+    },
+    sourceUrl: { type: String, trim: true, default: null },
+    confidence: { type: String, enum: ["high", "medium", "low"], default: null },
+    reviewStatus: {
+      type: String,
+      enum: ["verified", "review_needed", "unresolved"],
+      default: "unresolved",
+    },
+    provenance: { type: Schema.Types.Mixed, default: null },
+  },
+  { _id: false },
+);
+
 const projectSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
@@ -26,6 +54,7 @@ const projectSchema = new Schema(
     address: { type: String, trim: true, default: null },
     city: { type: String, trim: true, default: null },
     country: { type: String, trim: true, default: null },
+    location: { type: projectLocationSchema, default: () => ({}) },
     description: { type: String, trim: true, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
@@ -39,6 +68,9 @@ projectSchema.index({ workspaceId: 1 });
 projectSchema.index({ workspaceId: 1, archivedAt: 1 });
 projectSchema.index({ workspaceId: 1, createdAt: -1 });
 projectSchema.index({ workspaceId: 1, assignedTo: 1 });
+projectSchema.index({ workspaceId: 1, "location.countryCode": 1 });
+projectSchema.index({ workspaceId: 1, "location.cantonCode": 1 });
+projectSchema.index({ workspaceId: 1, "location.municipality": 1 });
 projectSchema.index(
   { workspaceId: 1, reference: 1 },
   {

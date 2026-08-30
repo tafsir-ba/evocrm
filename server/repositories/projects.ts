@@ -12,6 +12,11 @@ import {
   type ProjectBrowserSortDir,
   type ProjectBrowserView,
 } from "@/lib/project-browser";
+import {
+  emptyProjectLocation,
+  normalizeProjectLocation,
+  type ProjectLocation,
+} from "@/lib/project-location";
 import { ActivityModel } from "@/models/activity";
 import { CampaignModel } from "@/models/campaign";
 import { LeadModel } from "@/models/lead";
@@ -33,6 +38,7 @@ export type ProjectRecord = {
   address: string | null;
   city: string | null;
   country: string | null;
+  location?: ProjectLocation | null;
   description: string | null;
   createdBy: string;
   ownerId: string | null;
@@ -68,6 +74,9 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
     address: document.address ?? null,
     city: document.city ?? null,
     country: document.country ?? null,
+    location: normalizeProjectLocation(
+      (document as ProjectDocument & { location?: ProjectLocation | null }).location,
+    ),
     description: document.description ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
@@ -82,6 +91,9 @@ export type ProjectListFilter = {
   includeArchived?: boolean;
   search?: string;
   assignedTo?: string;
+  countryCode?: string;
+  cantonCode?: string;
+  municipality?: string;
   withCounts?: boolean;
   view?: ProjectBrowserView;
   sort?: ProjectBrowserSort;
@@ -103,10 +115,29 @@ function buildListQuery(filter: ProjectListFilter): Record<string, unknown> {
     query.assignedTo = filter.assignedTo;
   }
 
+  if (filter.countryCode) {
+    query["location.countryCode"] = filter.countryCode;
+  }
+  if (filter.cantonCode) {
+    query["location.cantonCode"] = filter.cantonCode;
+  }
+  if (filter.municipality) {
+    query["location.municipality"] = filter.municipality;
+  }
+
   if (filter.search) {
     const escaped = filter.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(escaped, "i");
-    query.$or = [{ name: regex }, { reference: regex }, { city: regex }, { country: regex }];
+    query.$or = [
+      { name: regex },
+      { reference: regex },
+      { city: regex },
+      { country: regex },
+      { "location.municipality": regex },
+      { "location.countryName": regex },
+      { "location.cantonName": regex },
+      { "location.postalCode": regex },
+    ];
   }
 
   return query;
@@ -408,6 +439,7 @@ export async function createProject(input: {
   address?: string | null;
   city?: string | null;
   country?: string | null;
+  location?: ProjectLocation | null;
   description?: string | null;
   createdBy: string;
   ownerId?: string | null;
@@ -424,6 +456,7 @@ export async function createProject(input: {
     address: input.address?.trim() || null,
     city: input.city?.trim() || null,
     country: input.country?.trim() || null,
+    location: normalizeProjectLocation(input.location ?? emptyProjectLocation()),
     description: input.description?.trim() || null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
@@ -445,15 +478,22 @@ export async function updateProject(
     address: string | null;
     city: string | null;
     country: string | null;
+    location: ProjectLocation | null;
     description: string | null;
     ownerId: string | null;
     assignedTo: string | null;
   }>,
 ): Promise<ProjectRecord | null> {
   await connectDb();
+  const updatePayload = { ...input };
+  if (input.location !== undefined) {
+    updatePayload.location = input.location
+      ? normalizeProjectLocation(input.location)
+      : emptyProjectLocation();
+  }
   const document = await ProjectModel.findOneAndUpdate(
     withWorkspaceScope(workspaceId, { _id: projectId, archivedAt: null }),
-    { $set: input },
+    { $set: updatePayload },
     { new: true },
   ).lean<ProjectDocument>();
   return document ? toProjectRecord(document) : null;

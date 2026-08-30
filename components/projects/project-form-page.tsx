@@ -8,6 +8,11 @@ import {
   FocusedFormLayout,
 } from "@/components/layout/focused-form-layout";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import {
+  formatProjectLocationDetail,
+  hasStructuredLocation,
+  type ProjectLocation,
+} from "@/lib/project-location";
 import { workspacePath } from "@/lib/workspace-paths";
 
 const PROJECT_TYPES = [
@@ -47,6 +52,7 @@ type ProjectFormPageProps = {
 export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<ProjectFormState>(emptyForm);
+  const [location, setLocation] = useState<ProjectLocation | null>(null);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +79,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
         address: string | null;
         city: string | null;
         country: string | null;
+        location?: ProjectLocation | null;
         description: string | null;
       };
       setForm({
@@ -84,6 +91,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
         country: project.country ?? "",
         description: project.description ?? "",
       });
+      setLocation(project.location ?? null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
@@ -212,6 +220,44 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
               onChange={(event) => setForm((c) => ({ ...c, country: event.target.value }))}
             />
           </div>
+          {hasStructuredLocation(location) ? (
+            <div className="md:col-span-2 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2.5">
+              <p className="text-[12px] font-medium text-[var(--color-ink-muted)]">
+                Normalized location
+              </p>
+              <p className="mt-1 text-[13px] text-[var(--color-ink)]">
+                {formatProjectLocationDetail(location, {
+                  address: form.address,
+                  city: form.city,
+                  country: form.country,
+                })}
+              </p>
+              <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                {[
+                  location?.countryCode,
+                  location?.cantonCode,
+                  location?.municipality,
+                  location?.postalCode,
+                  location?.precision,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {location?.sourceUrl ? (
+                  <>
+                    {" · "}
+                    <a
+                      href={location.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--color-brand-600)] hover:underline"
+                    >
+                      Source
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
             <Label htmlFor="description">Description</Label>
             <Textarea

@@ -4,7 +4,11 @@ import {
   type InboundReceivedBasis,
   type ProjectDemandStatus,
 } from "@/lib/inbound-received-at";
-import { formatLocation, hasPositiveCount } from "@/lib/list-view";
+import { hasPositiveCount } from "@/lib/list-view";
+import {
+  formatProjectLocationLabel,
+  type ProjectLocation,
+} from "@/lib/project-location";
 
 export type ProjectInventoryCounts = {
   leads?: number;
@@ -27,8 +31,9 @@ export type ProjectListStatus = ProjectDemandStatus;
 export function formatProjectLocation(
   city: string | null | undefined,
   country: string | null | undefined,
+  location?: ProjectLocation | null,
 ): string {
-  return formatLocation(city, country);
+  return formatProjectLocationLabel(location, { city, country });
 }
 
 export function formatProjectInventory(

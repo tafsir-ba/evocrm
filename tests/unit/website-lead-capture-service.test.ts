@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { emptyProjectLocation } from "@/lib/project-location";
 import { leadRecordExtras, TEST_PROJECT_ID } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/integrations", () => ({
@@ -95,6 +96,7 @@ const activeProject = {
   address: null,
   city: null,
   country: null,
+  location: emptyProjectLocation(),
   description: null,
   createdBy: "user-1",
   ownerId: null,

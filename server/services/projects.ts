@@ -16,6 +16,11 @@ import {
 } from "@/server/repositories/projects";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreateProjectInput, UpdateProjectInput } from "@/server/validation/projects";
+import {
+  emptyProjectLocation,
+  normalizeProjectLocation,
+  type ProjectLocation,
+} from "@/lib/project-location";
 
 function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
   return {
@@ -27,10 +32,28 @@ function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
     address: project.address,
     city: project.city,
     country: project.country,
+    location: project.location,
     description: project.description,
     ownerId: project.ownerId,
     assignedTo: project.assignedTo,
   };
+}
+
+function locationFromManualInput(
+  input: NonNullable<CreateProjectInput["location"]>,
+  existing?: ProjectLocation | null,
+): ProjectLocation {
+  return normalizeProjectLocation({
+    ...existing,
+    ...input,
+    provenance: {
+      method: "manual",
+      catalogKey: existing?.provenance?.catalogKey ?? null,
+      appliedAt: new Date().toISOString(),
+      previousManual: existing?.provenance?.previousManual ?? null,
+      notes: "Manual location update.",
+    },
+  });
 }
 
 export async function listProjectsForWorkspace(
@@ -87,6 +110,9 @@ export async function createProjectForWorkspace(
     address: input.address ?? null,
     city: input.city ?? null,
     country: input.country ?? null,
+    location: input.location
+      ? locationFromManualInput(input.location)
+      : emptyProjectLocation(),
     description: input.description ?? null,
     ownerId: input.ownerId ?? null,
     assignedTo: input.assignedTo ?? null,
@@ -160,6 +186,11 @@ export async function updateProjectForWorkspace(
   }
   if (input.country !== undefined) {
     updatePayload.country = input.country?.trim() || null;
+  }
+  if (input.location !== undefined) {
+    updatePayload.location = input.location
+      ? locationFromManualInput(input.location, existing.location)
+      : emptyProjectLocation();
   }
   if (input.description !== undefined) {
     updatePayload.description = input.description?.trim() || null;

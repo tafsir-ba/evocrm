@@ -8,6 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  formatProjectLocationDetail,
+  formatProjectLocationLabel,
+  hasStructuredLocation,
+  type ProjectLocation,
+} from "@/lib/project-location";
 import { withProjectIdQuery } from "@/lib/project-scope";
 import { workspaceNavPath, workspacePath } from "@/lib/workspace-paths";
 
@@ -19,6 +25,7 @@ type ProjectDetail = {
   address: string | null;
   city: string | null;
   country: string | null;
+  location?: ProjectLocation | null;
   description: string | null;
   archivedAt: string | null;
 };
@@ -168,9 +175,32 @@ export function ProjectDetailPanel({
           <div>
             <dt className="text-[var(--color-ink-muted)]">Location</dt>
             <dd className="text-[var(--color-ink)]">
-              {[project.address, project.city, project.country].filter(Boolean).join(", ") ||
-                "—"}
+              {formatProjectLocationDetail(project.location, {
+                address: project.address,
+                city: project.city,
+                country: project.country,
+              })}
             </dd>
+            {hasStructuredLocation(project.location) ? (
+              <dd className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                {formatProjectLocationLabel(project.location, {
+                  city: project.city,
+                  country: project.country,
+                })}
+                {project.location?.countryCode
+                  ? ` · ${project.location.countryCode}`
+                  : ""}
+                {project.location?.cantonCode
+                  ? ` · ${project.location.cantonCode}`
+                  : ""}
+                {project.location?.postalCode
+                  ? ` · ${project.location.postalCode}`
+                  : ""}
+                {project.location?.reviewStatus === "review_needed"
+                  ? " · Review needed"
+                  : ""}
+              </dd>
+            ) : null}
           </div>
           <div className="md:col-span-2">
             <dt className="text-[var(--color-ink-muted)]">Description</dt>

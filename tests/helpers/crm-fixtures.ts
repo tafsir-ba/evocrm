@@ -3,16 +3,18 @@ import type { CampaignRecord } from "@/server/repositories/campaigns";
 import type { CampaignEnrollmentRecord } from "@/server/repositories/campaign-enrollments";
 import type { CampaignSendRecord } from "@/server/repositories/campaign-sends";
 import type { LeadRecord } from "@/server/repositories/leads";
+import { emptyProjectLocation } from "@/lib/project-location";
 import type { ProjectRecord } from "@/server/repositories/projects";
 
 export const TEST_PROJECT_ID = "507f1f77bcf86cd799439011";
 
 export const projectRecordExtras: Pick<
   ProjectRecord,
-  "projectType" | "defaultDripCampaignId"
+  "projectType" | "defaultDripCampaignId" | "location"
 > = {
   projectType: null,
   defaultDripCampaignId: null,
+  location: emptyProjectLocation(),
 };
 
 export const campaignRecordExtras: Pick<

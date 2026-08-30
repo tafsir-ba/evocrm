@@ -13,10 +13,28 @@ import {
 const now = new Date(2026, 7, 30, 12, 0, 0);
 
 describe("projects table presentation", () => {
-  it("joins location parts and keeps Unicode city names", () => {
+  it("joins location parts and prefers structured geography when present", () => {
     expect(formatProjectLocation("Genève", "Suisse")).toBe("Genève, Suisse");
     expect(formatProjectLocation(null, "Suisse")).toBe("Suisse");
     expect(formatProjectLocation(null, null)).toBe("—");
+    expect(
+      formatProjectLocation("Geneva", "Switzerland", {
+        countryCode: "JM",
+        countryName: "Jamaica",
+        cantonCode: null,
+        cantonName: null,
+        municipality: "Kingston",
+        postalCode: "Kingston 8",
+        normalizedAddress: null,
+        latitude: null,
+        longitude: null,
+        precision: "address",
+        sourceUrl: "https://grosvenorvistas.com/",
+        confidence: "high",
+        reviewStatus: "verified",
+        provenance: null,
+      }),
+    ).toBe("Kingston 8, Jamaica");
   });
 
   it("omits zero inventory counts so empty columns can stay hidden", () => {

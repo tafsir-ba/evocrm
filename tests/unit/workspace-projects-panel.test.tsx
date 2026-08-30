@@ -162,6 +162,49 @@ describe("workspace ProjectsPanel list", () => {
     expect(screen.getByRole("columnheader", { name: "Inventory" })).toBeInTheDocument();
   });
 
+  it("renders structured Jamaica location for Grosvenor Vistas", async () => {
+    global.fetch = vi.fn(async () =>
+      jsonResponse(
+        [
+          {
+            ...sampleProject,
+            name: "Grosvenor Vistas",
+            reference: "GV",
+            city: "Geneva",
+            country: "Switzerland",
+            location: {
+              countryCode: "JM",
+              countryName: "Jamaica",
+              cantonCode: null,
+              cantonName: null,
+              municipality: "Kingston",
+              postalCode: "Kingston 8",
+              normalizedAddress: "3A Grosvenor Heights, Manor Park, Kingston 8, Jamaica",
+              latitude: null,
+              longitude: null,
+              precision: "address",
+              sourceUrl: "https://grosvenorvistas.com/",
+              confidence: "high",
+              reviewStatus: "verified",
+              provenance: null,
+            },
+          },
+        ],
+        { total: 1 },
+      ),
+    ) as typeof fetch;
+
+    render(
+      <ProjectsPanel workspaceSlug="demo" canCreate={false} canUpdate={false} canArchive={false} />,
+    );
+
+    expect(await screen.findAllByText("Grosvenor Vistas")).not.toHaveLength(0);
+    expect(screen.getAllByText("Kingston 8, Jamaica").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Geneva, Switzerland")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by country")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter by Swiss canton")).toBeInTheDocument();
+  });
+
   it("exposes demand views, search, pagination, and sortable inbound columns", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async () => jsonResponse([sampleProject], { total: 26 })) as typeof fetch;

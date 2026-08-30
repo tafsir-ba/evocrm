@@ -63,4 +63,31 @@ describe("project validation schemas", () => {
       expect(result.data.address).toBeNull();
     }
   });
+
+  it("accepts structured location filters and rejects stuffing geography into country", () => {
+    const list = projectListQuerySchema.safeParse({
+      countryCode: "jm",
+      cantonCode: "GE",
+      municipality: "Kingston",
+    });
+    expect(list.success).toBe(true);
+    if (list.success) {
+      expect(list.data.countryCode).toBe("JM");
+      expect(list.data.cantonCode).toBe("GE");
+    }
+
+    const create = createProjectInputSchema.safeParse({
+      name: "Grosvenor Vistas",
+      location: {
+        countryCode: "jm",
+        municipality: "Kingston",
+        postalCode: "Kingston 8",
+        precision: "address",
+      },
+    });
+    expect(create.success).toBe(true);
+    if (create.success) {
+      expect(create.data.location?.countryCode).toBe("JM");
+    }
+  });
 });

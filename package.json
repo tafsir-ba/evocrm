@@ -20,6 +20,7 @@
     "select:hubspot-wd-project": "npx tsx scripts/hubspot-wd-project-select.ts",
     "repair:transient-bounce-suppressions": "npx tsx scripts/repair-transient-bounce-suppressions.ts",
     "verify:projects": "npx tsx scripts/verify-project-scope.ts",
+    "enrich:project-locations": "npx tsx scripts/enrich-project-locations.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

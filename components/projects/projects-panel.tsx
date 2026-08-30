@@ -9,7 +9,7 @@ import { ProjectsTable } from "@/components/projects/projects-table";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
@@ -26,6 +26,7 @@ import {
   type ProjectBrowserSortDir,
   type ProjectBrowserView,
 } from "@/lib/project-browser";
+import { SWISS_CANTONS, type ProjectLocation } from "@/lib/project-location";
 import { PROJECT_FILTER_PARAM } from "@/lib/project-scope";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -45,6 +46,7 @@ type ProjectRecord = {
   reference: string | null;
   city: string | null;
   country: string | null;
+  location?: ProjectLocation | null;
   projectType: string | null;
   archivedAt: string | null;
   createdAt: string;
@@ -93,6 +95,8 @@ export function ProjectsPanel({
   const [forbidden, setForbidden] = useState(false);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const [search, setSearch] = useState(() => (searchParams.get("search") ?? "").trim());
+  const [countryCode, setCountryCode] = useState(() => searchParams.get("countryCode") ?? "");
+  const [cantonCode, setCantonCode] = useState(() => searchParams.get("cantonCode") ?? "");
   const [view, setView] = useState<ProjectBrowserView>(() =>
     readProjectBrowserView(searchParams.get("view")),
   );
@@ -139,11 +143,19 @@ export function ProjectsPanel({
     next.delete("dir");
     next.delete("sortDir");
     next.delete("page");
+    next.delete("countryCode");
+    next.delete("cantonCode");
     if (projectId) {
       next.set(PROJECT_FILTER_PARAM, projectId);
     }
     if (search) {
       next.set("search", search);
+    }
+    if (countryCode) {
+      next.set("countryCode", countryCode);
+    }
+    if (cantonCode) {
+      next.set("cantonCode", cantonCode);
     }
     if (view !== "all") {
       next.set("view", view);
@@ -167,11 +179,13 @@ export function ProjectsPanel({
       (current.get("sort") ?? "") === (next.get("sort") ?? "") &&
       (current.get("dir") ?? "") === (next.get("dir") ?? "") &&
       (current.get("page") ?? "") === (next.get("page") ?? "") &&
+      (current.get("countryCode") ?? "") === (next.get("countryCode") ?? "") &&
+      (current.get("cantonCode") ?? "") === (next.get("cantonCode") ?? "") &&
       (current.get(PROJECT_FILTER_PARAM) ?? "") === (next.get(PROJECT_FILTER_PARAM) ?? "");
     if (!sameState) {
       router.replace(href, { scroll: false });
     }
-  }, [page, pathname, router, search, searchParams, sort, sortDir, view]);
+  }, [cantonCode, countryCode, page, pathname, router, search, searchParams, sort, sortDir, view]);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -189,6 +203,12 @@ export function ProjectsPanel({
       });
       if (search) {
         params.set("search", search);
+      }
+      if (countryCode) {
+        params.set("countryCode", countryCode);
+      }
+      if (cantonCode) {
+        params.set("cantonCode", cantonCode);
       }
 
       const response = await fetch(`${apiBase}/projects?${params.toString()}`);
@@ -210,7 +230,7 @@ export function ProjectsPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, page, pageSize, search, sort, sortDir, view]);
+  }, [apiBase, cantonCode, countryCode, page, pageSize, search, sort, sortDir, view]);
 
   useEffect(() => {
     void loadProjects();
@@ -337,6 +357,39 @@ export function ProjectsPanel({
               <option value="name:desc">Name Z–A</option>
             </select>
           </label>
+          <Select
+            aria-label="Filter by country"
+            fieldSize="sm"
+            className="w-[10.5rem]"
+            value={countryCode}
+            onChange={(event) => {
+              setCountryCode(event.target.value);
+              if (event.target.value !== "CH") setCantonCode("");
+              setPage(1);
+            }}
+          >
+            <option value="">All countries</option>
+            <option value="CH">Switzerland</option>
+            <option value="JM">Jamaica</option>
+          </Select>
+          <Select
+            aria-label="Filter by Swiss canton"
+            fieldSize="sm"
+            className="w-[11rem]"
+            value={cantonCode}
+            disabled={countryCode !== "" && countryCode !== "CH"}
+            onChange={(event) => {
+              setCantonCode(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All cantons</option>
+            {Object.entries(SWISS_CANTONS).map(([code, name]) => (
+              <option key={code} value={code}>
+                {code} · {name}
+              </option>
+            ))}
+          </Select>
         </div>
       </div>
 

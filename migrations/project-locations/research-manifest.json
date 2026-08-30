@@ -1,0 +1,175 @@
+{
+  "title": "EvoHome CRM project location research manifest",
+  "generatedFor": "evidence-backed enrichment; no invented geography",
+  "policy": {
+    "sourceOrder": [
+      "official developer/project websites and brochures",
+      "authoritative municipal/cantonal or mapping sources",
+      "agency portfolio pages",
+      "authoritative press only to corroborate locality, not to invent streets"
+    ],
+    "doNotGuessFromProjectName": true,
+    "backfill": "high-confidence verified catalog matches only",
+    "coordinates": {
+      "exact_project": 5,
+      "address": 5,
+      "locality": 3,
+      "unknown": null
+    },
+    "preserveManual": true,
+    "reviewNeededWhen": [
+      "no catalog match",
+      "conflicting specific manual city",
+      "catch-all scopes such as EvoHome General"
+    ]
+  },
+  "entries": [
+    {
+      "key": "grosvenor-vistas",
+      "countryCode": "JM",
+      "municipality": "Kingston",
+      "postalCode": "Kingston 8",
+      "precision": "address",
+      "confidence": "high",
+      "sourceUrl": "https://grosvenorvistas.com/"
+    },
+    {
+      "key": "le-parc-des-crets",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Troinex",
+      "postalCode": "1256",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://leparcdescrets.ch/"
+    },
+    {
+      "key": "v77",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Vandœuvres",
+      "postalCode": "1253",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://v77.ch/en/"
+    },
+    {
+      "key": "residence-les-pins",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Confignon",
+      "postalCode": "1232",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.evo-home.ch/fr/projects/residence-les-pins"
+    },
+    {
+      "key": "buissonniere-4",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Prilly",
+      "postalCode": "1008",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://swissroc.ch/fr/projets/buissonniere-4/"
+    },
+    {
+      "key": "residence-symbiose",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Le Mont-sur-Lausanne",
+      "postalCode": "1052",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://residence-symbiose.ch/concepts/"
+    },
+    {
+      "key": "eleven-41",
+      "countryCode": "JM",
+      "municipality": "Montego Bay",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://1141bc.com/"
+    },
+    {
+      "key": "k2-apartments",
+      "countryCode": "JM",
+      "municipality": "Kingston",
+      "postalCode": "Kingston 2",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://evo-home.ch/en/"
+    },
+    {
+      "key": "evohome-general",
+      "reviewStatus": "unresolved",
+      "confidence": null,
+      "note": "Catch-all CRM scope. No geography invented."
+    },
+    {
+      "key": "crets-de-commugny",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Commugny",
+      "postalCode": "1291",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://cretsdecommugny.ch/"
+    },
+    {
+      "key": "tannay-horizon",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Tannay",
+      "postalCode": "1295",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://tannayhorizon.ch/"
+    },
+    {
+      "key": "namaya",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Rolle",
+      "postalCode": "1180",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://residence-namaya.ch/"
+    },
+    {
+      "key": "eveil-epalinges",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Epalinges",
+      "postalCode": "1066",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://eveil-epalinges.ch/"
+    },
+    {
+      "key": "vista-brent",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Brent",
+      "postalCode": "1817",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://swissroc.ch/fr/projets/vista/"
+    },
+    {
+      "key": "domaine-du-lac-nyon",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Nyon",
+      "postalCode": "1260",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.halter.ch/en/projects/domaine-du-lac"
+    }
+  ],
+  "intentionallyUnresolvedExamples": [
+    "Commune-only CRM names (Veyrier, Versoix, Collex-Bossy, Cressy) are not guessed.",
+    "Rubix / rubix-gva.ch spans Meyrin and Satigny — municipality conflict, left unresolved.",
+    "Arbora, Portes du Lac, BC Kingston, and other names without a unique official site stay unresolved."
+  ]
+}

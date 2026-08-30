@@ -263,9 +263,10 @@ Optional real estate development or property grouping.
 | `name` | |
 | `reference` | Optional external reference |
 | `statusId` | Optional dictionary item |
-| `address` | |
-| `city` | |
-| `country` | |
+| `address` | Manual/legacy street or area text. Preserved unless an evidence-backed correction is clearly safer. |
+| `city` | Manual/legacy locality display. |
+| `country` | Manual/legacy country display. |
+| `location` | Structured geography: ISO country, Swiss canton, municipality, postal code, normalized address/area, lat/lng at documented precision, evidence URL, confidence, review status, provenance. |
 | `description` | |
 | `createdBy` | |
 | `ownerId` | |

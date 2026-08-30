@@ -50,6 +50,9 @@ export async function GET(request: Request, context: RouteContext) {
         includeArchived: query.includeArchived,
         search: query.search,
         assignedTo: query.assignedTo,
+        countryCode: query.countryCode,
+        cantonCode: query.cantonCode,
+        municipality: query.municipality,
         withCounts: query.withCounts,
         view: query.view,
         sort: query.sort,
@@ -68,6 +71,9 @@ export async function GET(request: Request, context: RouteContext) {
       includeArchived: query.includeArchived,
       search: query.search,
       assignedTo: query.assignedTo,
+      countryCode: query.countryCode,
+      cantonCode: query.cantonCode,
+      municipality: query.municipality,
       withCounts: query.withCounts,
     });
 

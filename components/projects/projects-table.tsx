@@ -25,6 +25,7 @@ import {
   projectListStatus,
 } from "@/lib/projects-table";
 import { workspacePath } from "@/lib/workspace-paths";
+import type { ProjectLocation } from "@/lib/project-location";
 
 export type ProjectsTableItem = {
   id: string;
@@ -32,6 +33,7 @@ export type ProjectsTableItem = {
   reference: string | null;
   city: string | null;
   country: string | null;
+  location?: ProjectLocation | null;
   archivedAt: string | null;
   createdAt: string;
   counts?: {
@@ -165,7 +167,11 @@ export function ProjectsTable({
           </TableHead>
           <TableBody>
             {projects.map((project) => {
-              const location = formatProjectLocation(project.city, project.country);
+              const location = formatProjectLocation(
+                project.city,
+                project.country,
+                project.location,
+              );
               const inventoryLine = formatProjectInventoryLine(project.counts);
               const status = projectListStatus({
                 archivedAt: project.archivedAt,
@@ -253,7 +259,11 @@ export function ProjectsTable({
 
       <ul className="divide-y divide-[var(--color-line)] md:hidden">
         {projects.map((project) => {
-          const location = formatProjectLocation(project.city, project.country);
+          const location = formatProjectLocation(
+            project.city,
+            project.country,
+            project.location,
+          );
           const inventoryLine = formatProjectInventoryLine(project.counts);
           const status = projectListStatus({
             archivedAt: project.archivedAt,

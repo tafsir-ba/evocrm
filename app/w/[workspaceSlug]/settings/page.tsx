@@ -17,6 +17,7 @@ import {
   IconUser,
 } from "@/lib/icons";
 import { formatTimezoneLabel } from "@/lib/locale-options";
+import { formatProjectLocationLabel } from "@/lib/project-location";
 import { hasPermission } from "@/server/permissions/permissions";
 import { listDictionariesForWorkspace } from "@/server/services/dictionaries";
 import { listProjectsForWorkspace } from "@/server/services/projects";
@@ -253,7 +254,10 @@ export default async function SettingsPage({ params }: { params: Params }) {
                   <div>
                     <p className="text-[13.5px] font-medium text-[var(--color-ink)]">{p.name}</p>
                     <p className="text-[12px] text-[var(--color-ink-muted)]">
-                      {[p.city, p.country].filter(Boolean).join(" · ") || "No location"}
+                      {formatProjectLocationLabel(p.location, {
+                        city: p.city,
+                        country: p.country,
+                      })}
                     </p>
                   </div>
                 </div>

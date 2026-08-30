@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { formatProjectLocationLabel } from "@/lib/project-location";
+import type { ProjectLocation } from "@/lib/project-location";
 
 type ProjectRecord = {
   id: string;
@@ -18,6 +20,7 @@ type ProjectRecord = {
   address: string | null;
   city: string | null;
   country: string | null;
+  location?: ProjectLocation | null;
   description: string | null;
   assignedTo: string | null;
   archivedAt: string | null;
@@ -339,8 +342,7 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
                 <tr>
                   <th className="text-left font-semibold px-5 py-3">Name</th>
                   <th className="text-left font-semibold px-2 py-3">Reference</th>
-                  <th className="text-left font-semibold px-2 py-3">City</th>
-                  <th className="text-left font-semibold px-2 py-3">Country</th>
+                  <th className="text-left font-semibold px-2 py-3">Location</th>
                   <th className="text-left font-semibold px-2 py-3">Assigned To</th>
                   <th className="text-left font-semibold px-2 py-3">Created</th>
                   <th className="text-left font-semibold px-2 py-3">Status</th>
@@ -359,10 +361,10 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
                       {project.reference ?? "—"}
                     </td>
                     <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {project.city ?? "—"}
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {project.country ?? "—"}
+                      {formatProjectLocationLabel(project.location, {
+                        city: project.city,
+                        country: project.country,
+                      })}
                     </td>
                     <td className="px-2 py-3 text-[var(--color-ink-soft)] tabular">
                       {project.assignedTo ?? "—"}

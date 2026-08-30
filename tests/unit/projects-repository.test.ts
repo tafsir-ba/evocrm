@@ -61,6 +61,32 @@ describe("projects repository", () => {
     });
   });
 
+  it("filters and searches against normalized location fields", async () => {
+    const lean = vi.fn().mockResolvedValue([]);
+    const sort = vi.fn().mockReturnValue({ lean });
+    vi.mocked(ProjectModel.find).mockReturnValue({ sort } as never);
+
+    await findProjects("ws-1", {
+      countryCode: "JM",
+      cantonCode: "GE",
+      municipality: "Kingston",
+      search: "Kingston 8",
+    });
+
+    expect(ProjectModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws-1",
+        "location.countryCode": "JM",
+        "location.cantonCode": "GE",
+        "location.municipality": "Kingston",
+        $or: expect.arrayContaining([
+          { "location.municipality": expect.any(RegExp) },
+          { "location.postalCode": expect.any(RegExp) },
+        ]),
+      }),
+    );
+  });
+
   it("returns null for invalid project ids without querying", async () => {
     const result = await findProjectById("ws-1", "project-1");
 

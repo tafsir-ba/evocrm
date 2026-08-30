@@ -2,6 +2,12 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  PROJECT_LOCATION_CONFIDENCE,
+  PROJECT_LOCATION_PRECISIONS,
+  PROJECT_LOCATION_REVIEW_STATUSES,
+} from "@/lib/project-location";
+
 const objectIdSchema = z
   .string()
   .trim()
@@ -24,6 +30,36 @@ const projectTypeSchema = z.enum([
   "other",
 ]);
 
+const projectLocationInputSchema = z
+  .object({
+    countryCode: z
+      .string()
+      .trim()
+      .length(2)
+      .transform((value) => value.toUpperCase())
+      .nullable()
+      .optional(),
+    countryName: z.string().trim().max(120).nullable().optional(),
+    cantonCode: z
+      .string()
+      .trim()
+      .length(2)
+      .transform((value) => value.toUpperCase())
+      .nullable()
+      .optional(),
+    cantonName: z.string().trim().max(120).nullable().optional(),
+    municipality: z.string().trim().max(120).nullable().optional(),
+    postalCode: z.string().trim().max(32).nullable().optional(),
+    normalizedAddress: z.string().trim().max(240).nullable().optional(),
+    latitude: z.number().gte(-90).lte(90).nullable().optional(),
+    longitude: z.number().gte(-180).lte(180).nullable().optional(),
+    precision: z.enum(PROJECT_LOCATION_PRECISIONS).optional(),
+    sourceUrl: z.string().trim().url().max(500).nullable().optional(),
+    confidence: z.enum(PROJECT_LOCATION_CONFIDENCE).nullable().optional(),
+    reviewStatus: z.enum(PROJECT_LOCATION_REVIEW_STATUSES).optional(),
+  })
+  .strict();
+
 export const projectListQuerySchema = z.object({
   includeArchived: z
     .union([z.literal("true"), z.literal("false")])
@@ -31,6 +67,19 @@ export const projectListQuerySchema = z.object({
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
   assignedTo: objectIdSchema.optional(),
+  countryCode: z
+    .string()
+    .trim()
+    .length(2)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  cantonCode: z
+    .string()
+    .trim()
+    .length(2)
+    .transform((value) => value.toUpperCase())
+    .optional(),
+  municipality: z.string().trim().max(120).optional(),
   withCounts: z
     .union([z.literal("true"), z.literal("false")])
     .optional()
@@ -52,6 +101,7 @@ export const createProjectInputSchema = z
     address: z.string().trim().max(200).optional(),
     city: z.string().trim().max(120).optional(),
     country: z.string().trim().max(120).optional(),
+    location: projectLocationInputSchema.optional(),
     description: z.string().trim().max(2000).optional(),
     ownerId: objectIdSchema.optional(),
     assignedTo: objectIdSchema.optional(),
@@ -68,6 +118,7 @@ export const updateProjectInputSchema = z
     address: z.string().trim().max(200).nullable().optional(),
     city: z.string().trim().max(120).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),
+    location: projectLocationInputSchema.nullable().optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     ownerId: objectIdSchema.nullable().optional(),
     assignedTo: objectIdSchema.nullable().optional(),

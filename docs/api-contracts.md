@@ -540,7 +540,11 @@ DELETE /api/workspaces/[workspaceSlug]/projects/[projectId]  # archive (soft)
 
 **Project list defaults:** active projects only (`archivedAt: null`). Pass `includeArchived=true` to include archived projects in Settings management UI.
 
-**Project search:** optional `search` query matches name, reference, or city (case-insensitive).
+**Project search:** optional `search` query matches name, reference, city, country, or structured `location` municipality / country / canton / postal code (case-insensitive).
+
+**Project location filters:** optional `countryCode` (ISO 3166-1 alpha-2), `cantonCode` (Swiss official 2-letter code), and `municipality`.
+
+**Project location object:** API create/update may include a structured `location` object (`countryCode`, `countryName`, `cantonCode`, `cantonName`, `municipality`, `postalCode`, `normalizedAddress`, `latitude`, `longitude`, `precision`, `sourceUrl`, `confidence`, `reviewStatus`). Geography is not stuffed into a single display string. Manual `address` / `city` / `country` are preserved. Evidence-backed enrichment writes `location` and only corrects display fields when the correction is clearly safer, keeping previous values in `location.provenance`.
 
 **Project reference uniqueness:** `reference` is unique per workspace across all projects (including archived). Partial unique index applies only when `reference` is set.
 
