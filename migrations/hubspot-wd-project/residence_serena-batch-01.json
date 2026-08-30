@@ -1,0 +1,37 @@
+{
+  "name": "residence_serena-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9471cd9be7f2838819e778",
+  "destinationReference": "RESIDENCE_SERENA",
+  "slug": "residence_serena",
+  "sourceHubSpotProjectId": "residence_serena",
+  "size": 6,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "822851",
+    "23632518702",
+    "30132361039",
+    "49412661783",
+    "55765392442",
+    "66658750478"
+  ],
+  "idChecksum": "908df902f523b6941d3102ed55da15b0764d8a9013e773f62dbe4a6473aaa1ef"
+}

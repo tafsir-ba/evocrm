@@ -718,6 +718,22 @@
       },
       "searchTotal": 161,
       "dryRunOnly": false
+    },
+    {
+      "slug": "residence_serena",
+      "name": "Résidence Serena",
+      "reference": "RESIDENCE_SERENA",
+      "destinationProjectId": "6a9471cd9be7f2838819e778",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 152,
+      "exceptionCounts": {
+        "multi_project": 41,
+        "missing_name": 111
+      },
+      "searchTotal": 158,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
