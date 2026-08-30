@@ -734,6 +734,21 @@
       },
       "searchTotal": 158,
       "dryRunOnly": false
+    },
+    {
+      "slug": "the_view",
+      "name": "The View",
+      "reference": "THE_VIEW",
+      "destinationProjectId": "6a9471eb3edd667f3890f92b",
+      "manifestSize": 149,
+      "created": 149,
+      "destinationLeadCount": 149,
+      "exceptionCount": 4,
+      "exceptionCounts": {
+        "multi_project": 4
+      },
+      "searchTotal": 153,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
