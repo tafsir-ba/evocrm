@@ -957,6 +957,22 @@
       },
       "searchTotal": 50,
       "dryRunOnly": false
+    },
+    {
+      "slug": "senaleche",
+      "name": "Senalèche",
+      "reference": "SENALECHE",
+      "destinationProjectId": "6a947b8ef2674345cfc69f0c",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 45,
+      "exceptionCounts": {
+        "multi_project": 15,
+        "missing_name": 30
+      },
+      "searchTotal": 45,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
