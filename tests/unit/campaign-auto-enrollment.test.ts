@@ -305,6 +305,60 @@ describe("evaluateEnrollmentConditions", () => {
     expect(enrollLeadInCampaignWithContext).not.toHaveBeenCalled();
   });
 
+  it("skips HubSpot/legacy-migrated leads even when campaigns match", async () => {
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildLead({
+        attributes: {
+          integration: { inboundSource: "hubspot-gv-pilot", idempotencyKey: "hubspot:contact:1" },
+          campaignEnrollmentPolicy: { defaultExcluded: true, source: "hubspot_legacy_migration" },
+        },
+      }),
+    );
+    vi.mocked(findActiveAutoEnrollmentCampaigns).mockResolvedValue([
+      {
+        id: "campaign-1",
+        workspaceId: "ws-1",
+        name: "Welcome drip",
+        status: "active",
+        audienceType: "leads",
+        projectIds: [],
+        autoEnrollmentEnabled: true,
+        enrollmentTrigger: "new_lead",
+        enrollmentRules: { logic: "AND", conditions: [] },
+        frequency: null,
+        defaultFromName: null,
+        senderName: null,
+        senderEmail: null,
+        sendingDomainId: null,
+        createdBy: "user-1",
+        ownerId: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const { evaluateCampaignAutoEnrollmentForLead } = await import(
+      "@/server/services/campaign-auto-enrollment"
+    );
+
+    await evaluateCampaignAutoEnrollmentForLead({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      trigger: "new_lead",
+      actorId: "user-1",
+    });
+
+    expect(enrollLeadInCampaignWithContext).not.toHaveBeenCalled();
+    expect(findActiveAutoEnrollmentCampaigns).not.toHaveBeenCalled();
+    expect(createAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "campaign.auto_enrollment_skipped",
+        after: expect.objectContaining({ reason: "campaign_guard_migrated_lead" }),
+      }),
+    );
+  });
+
   it("enrolls matching leads for active auto-enrollment campaigns", async () => {
     vi.mocked(findLeadById).mockResolvedValue(buildLead());
     vi.mocked(findActiveAutoEnrollmentCampaigns).mockResolvedValue([

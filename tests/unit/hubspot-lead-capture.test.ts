@@ -173,8 +173,13 @@ describe("hubspot lead capture webhook", () => {
             inboundSource: "hubspot",
             idempotencyKey: "hubspot:contact:99",
           }),
+          campaignEnrollmentPolicy: {
+            defaultExcluded: true,
+            source: "hubspot_legacy_migration",
+          },
         }),
       }),
+      { triggerAutomation: false },
     );
     expect(summary).toEqual({
       received: 1,

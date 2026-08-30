@@ -271,6 +271,96 @@ export async function findLeadsByIds(
   return documents.map((document) => toLeadRecord(document as LeadDocument));
 }
 
+export type PilotDedupeLead = {
+  id: string;
+  projectId: string | null;
+  emailNormalized: string | null;
+  firstName: string;
+  lastName: string;
+  attributes: Record<string, unknown>;
+};
+
+export async function findLeadsForHubSpotGvPilotDedupe(input: {
+  workspaceId: string;
+  projectId: string;
+  emailNormalizedValues: string[];
+  hubspotContactIds: string[];
+}): Promise<PilotDedupeLead[]> {
+  await connectDb();
+
+  const emails = [...new Set(input.emailNormalizedValues.filter(Boolean))];
+  const contactIds = [...new Set(input.hubspotContactIds.filter(Boolean))];
+  const idempotencyKeys = contactIds.map((id) => `hubspot:contact:${id}`);
+
+  const orClauses: Record<string, unknown>[] = [];
+  if (emails.length > 0) {
+    orClauses.push({
+      projectId: input.projectId,
+      emailNormalized: { $in: emails },
+    });
+  }
+  if (idempotencyKeys.length > 0) {
+    orClauses.push({
+      "attributes.integration.idempotencyKey": { $in: idempotencyKeys },
+    });
+  }
+  if (contactIds.length > 0) {
+    orClauses.push({
+      "attributes.integration.externalId": { $in: contactIds },
+    });
+  }
+
+  if (orClauses.length === 0) {
+    return [];
+  }
+
+  const documents = await LeadModel.find(
+    withWorkspaceScope(input.workspaceId, {
+      archivedAt: null,
+      $or: orClauses,
+    }),
+  )
+    .select({
+      projectId: 1,
+      emailNormalized: 1,
+      firstName: 1,
+      lastName: 1,
+      attributes: 1,
+    })
+    .lean<
+      Array<{
+        _id: mongoose.Types.ObjectId;
+        projectId?: unknown;
+        emailNormalized?: string | null;
+        firstName?: string;
+        lastName?: string;
+        attributes?: Record<string, unknown>;
+      }>
+    >();
+
+  return documents.map((document) => ({
+    id: document._id.toString(),
+    projectId: document.projectId ? String(document.projectId) : null,
+    emailNormalized: document.emailNormalized ?? null,
+    firstName: document.firstName ?? "",
+    lastName: document.lastName ?? "",
+    attributes: document.attributes ?? {},
+  }));
+}
+
+export async function countActiveLeadsForProject(
+  workspaceId: string,
+  projectId: string,
+): Promise<number> {
+  await connectDb();
+  return LeadModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      projectId,
+      archivedAt: null,
+    }),
+  );
+}
+
 export async function findActiveLeadsByEmailNormalized(
   workspaceId: string,
   emailNormalizedValues: string[],

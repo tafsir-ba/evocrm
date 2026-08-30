@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  CAMPAIGN_GUARD_BLOCK_REASON,
+  isBlockedFromAutomaticCampaignEnrollment,
+} from "@/lib/campaign-enrollment-guard";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { captureError } from "@/server/observability/capture-error";
 import type { LeadRecord } from "@/server/repositories/leads";
@@ -244,6 +248,21 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
   }
 
   if (!lead.projectId) {
+    return;
+  }
+
+  if (isBlockedFromAutomaticCampaignEnrollment(lead.attributes)) {
+    await createAuditLog({
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      action: "campaign.auto_enrollment_skipped",
+      entityType: "lead",
+      entityId: lead.id,
+      after: {
+        trigger: input.trigger,
+        reason: CAMPAIGN_GUARD_BLOCK_REASON,
+      },
+    });
     return;
   }
 

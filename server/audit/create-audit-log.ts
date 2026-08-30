@@ -27,6 +27,7 @@ export type AuditEntityType =
   | "billing"
   | "feedback"
   | "import_job"
+  | "hubspot_migration_run"
   | "project_grant"
   | "project_invitation";
 

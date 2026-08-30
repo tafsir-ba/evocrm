@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  CAMPAIGN_GUARD_BLOCK_REASON,
+  isAutomaticEnrollmentSource,
+  isBlockedFromAutomaticCampaignEnrollment,
+} from "@/lib/campaign-enrollment-guard";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
@@ -545,6 +550,25 @@ export async function enrollLeadInCampaignWithContext(input: {
   const lead = await findLeadById(input.workspaceId, input.leadId);
 
   if (!lead || lead.archivedAt) {
+    return null;
+  }
+
+  if (
+    isAutomaticEnrollmentSource(input.enrollmentSource) &&
+    isBlockedFromAutomaticCampaignEnrollment(lead.attributes)
+  ) {
+    await createAuditLog({
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      action: "campaign.auto_enrollment_skipped",
+      entityType: "lead",
+      entityId: lead.id,
+      after: {
+        campaignId: input.campaignId,
+        enrollmentSource: input.enrollmentSource,
+        reason: CAMPAIGN_GUARD_BLOCK_REASON,
+      },
+    });
     return null;
   }
 

@@ -25,6 +25,11 @@ export {
   type HubSpotProjectMappingDocument,
   HUBSPOT_PROJECT_MAPPING_STATUSES,
 } from "./hubspot-project-mapping";
+export {
+  HubSpotMigrationRunModel,
+  type HubSpotMigrationRunDocument,
+  HUBSPOT_MIGRATION_RUN_STATUSES,
+} from "./hubspot-migration-run";
 export { AuditLogModel, type AuditLogDocument } from "./audit-log";
 export { ImportJobModel, type ImportJobDocument } from "./import-job";
 export { ImportRowResultModel, type ImportRowResultDocument } from "./import-row-result";
