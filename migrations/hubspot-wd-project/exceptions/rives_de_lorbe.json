@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "slug": "rives_de_lorbe",
+  "destinationProjectId": "6a947b741059fc9716d30dd0",
+  "destinationReference": "RIVES_DE_LORBE",
+  "counts": {
+    "multi_project": 8,
+    "missing_name": 41
+  },
+  "records": [
+    {
+      "hubspotContactId": "69468305746",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "69685311576",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "69703710737",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "69893877925",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "72232127758",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "72742570760",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "73078563098",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "73533143087",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74306938534",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74744844438",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74873888693",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74883557543",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74953713446",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "74985102608",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "75244930985",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "75915354713",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76033188259",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76142195890",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76363952212",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76383386450",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76750762016",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "76768037662",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "77062591492",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "77229767485",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "77784888958",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "77817612970",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "79015227995",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "79487472710",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "80322661379",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "80592887173",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "80904750726",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "80982761276",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "81104951857",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "81988456295",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "83614364271",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "83721861641",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "83770028309",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "95988929641",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "103113580313",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "113027132196",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "113436462937",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "584401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1340751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1514001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1570401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "8585467564",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "56989688682",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "69689941015",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "101812903580",
+      "reason": "multi_project"
+    }
+  ]
+}

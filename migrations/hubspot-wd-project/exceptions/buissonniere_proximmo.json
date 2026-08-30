@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "slug": "buissonniere_proximmo",
+  "destinationProjectId": "6a947cb9ac0fe419b3095870",
+  "destinationReference": "BUISSONNIERE_PROXIMMO",
+  "counts": {
+    "notes_conflict": 1,
+    "multi_project": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "227720791668",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "155441907313",
+      "reason": "notes_conflict"
+    }
+  ]
+}

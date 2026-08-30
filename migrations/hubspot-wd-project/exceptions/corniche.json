@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "slug": "corniche",
+  "destinationProjectId": "6a947b3926660fd5a8517d98",
+  "destinationReference": "CORNICHE",
+  "counts": {
+    "multi_project": 11
+  },
+  "records": [
+    {
+      "hubspotContactId": "196351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "343201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "856301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1203401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1542301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1567401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "101812903580",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "134536140150",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "154533022305",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "156924971324",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "157508210346",
+      "reason": "multi_project"
+    }
+  ]
+}

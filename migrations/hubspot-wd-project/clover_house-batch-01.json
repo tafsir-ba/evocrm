@@ -1,0 +1,46 @@
+{
+  "name": "clover_house-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947bbad561028b35f54747",
+  "destinationReference": "CLOVER_HOUSE",
+  "slug": "clover_house",
+  "sourceHubSpotProjectId": "clover_house",
+  "size": 15,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "76369752409",
+    "80590649730",
+    "84248666445",
+    "88005964406",
+    "88886592285",
+    "89259431176",
+    "89707369320",
+    "89985892440",
+    "89991805787",
+    "90710164647",
+    "91258596149",
+    "94622946192",
+    "96001011985",
+    "97453212302",
+    "100568864601"
+  ],
+  "idChecksum": "c278ed1c935a502d9eb908b638674a99b0b83d9152ee99b42a787f4dfbb7eca8"
+}

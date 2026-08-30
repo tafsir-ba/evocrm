@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "slug": "campanules",
+  "destinationProjectId": "6a94634b8625db128dceed95",
+  "destinationReference": "CAMPANULES",
+  "counts": {
+    "multi_project": 30
+  },
+  "records": [
+    {
+      "hubspotContactId": "198501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "244851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "265051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "330801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "385851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "390851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "418401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "420101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "440251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "450151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "501601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "505851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "512101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "559451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "637701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "643451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "653851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "666301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "673051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "677201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "696451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "698901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "703001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "709051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "710201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "731701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "741601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "741751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "746151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1298401",
+      "reason": "multi_project"
+    }
+  ]
+}

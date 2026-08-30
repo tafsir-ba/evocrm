@@ -1,0 +1,52 @@
+{
+  "name": "cressy_adv-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947bdf1e467e00065e10df",
+  "destinationReference": "CRESSY_ADV",
+  "slug": "cressy_adv",
+  "sourceHubSpotProjectId": "cressy_adv",
+  "size": 21,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "111670973311",
+    "119987122310",
+    "120117390758",
+    "120117942354",
+    "120195307864",
+    "122991118998",
+    "123099863092",
+    "123104066187",
+    "123261941661",
+    "123322080338",
+    "123324086321",
+    "123558802534",
+    "123669519903",
+    "155895445816",
+    "156068956984",
+    "156084341921",
+    "156168197982",
+    "156341091921",
+    "164079863661",
+    "165174824026",
+    "165536920750"
+  ],
+  "idChecksum": "97f5ad7e212d5c57fe0ed06f96d5febba23147178564f1c4da7271aa67f3bfcc"
+}

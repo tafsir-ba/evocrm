@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "slug": "delejette",
+  "destinationProjectId": "6a947cd7bb299e25f68b5542",
+  "destinationReference": "DELEJETTE",
+  "counts": {
+    "notes_only": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "155441907313",
+      "reason": "notes_only"
+    }
+  ]
+}

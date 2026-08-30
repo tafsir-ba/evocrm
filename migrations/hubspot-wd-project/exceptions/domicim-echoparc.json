@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "slug": "domicim-echoparc",
+  "destinationProjectId": "6a947bab53853e7fe07b192e",
+  "destinationReference": "DOMICIM-ECHOPARC",
+  "counts": {
+    "missing_name": 24
+  },
+  "records": [
+    {
+      "hubspotContactId": "15401",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "18901",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "20101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "21251",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "23301",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "24501",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "26101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "26901",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "28851",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "30501",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "34551",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "44801",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "48551",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "48601",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "50001",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "50751",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "50801",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "51751",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "52401",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "53551",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "65351",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "70101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "72751",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "72851",
+      "reason": "missing_name"
+    }
+  ]
+}

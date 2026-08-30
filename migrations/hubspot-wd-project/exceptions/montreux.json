@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "slug": "montreux",
+  "destinationProjectId": "6a947caad73b7ccc815ca410",
+  "destinationReference": "MONTREUX",
+  "counts": {
+    "multi_project": 2
+  },
+  "records": [
+    {
+      "hubspotContactId": "234001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "848351",
+      "reason": "multi_project"
+    }
+  ]
+}

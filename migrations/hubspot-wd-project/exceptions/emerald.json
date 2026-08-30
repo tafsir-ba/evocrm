@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "slug": "emerald",
+  "destinationProjectId": "6a947c9275ba7203b5f9d2cd",
+  "destinationReference": "EMERALD",
+  "counts": {
+    "multi_project": 2
+  },
+  "records": [
+    {
+      "hubspotContactId": "1540451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "61016425823",
+      "reason": "multi_project"
+    }
+  ]
+}

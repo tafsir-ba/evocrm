@@ -1,0 +1,37 @@
+{
+  "name": "connor-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947c4c33c143a44330853f",
+  "destinationReference": "CONNOR",
+  "slug": "connor",
+  "sourceHubSpotProjectId": "connor",
+  "size": 6,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "161056009138",
+    "221410042228",
+    "221514858345",
+    "221723997245",
+    "221789426195",
+    "221969908362"
+  ],
+  "idChecksum": "839a965c4d828d4cf16e1395a427e369a7acc55531d0c1481ca9cce3fd19cd5d"
+}

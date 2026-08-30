@@ -1,0 +1,49 @@
+{
+  "name": "vistabrent-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a946925cd5edb8f7a06c2af",
+  "destinationReference": "VISTABRENT",
+  "slug": "vistabrent",
+  "sourceHubSpotProjectId": "vistabrent",
+  "size": 18,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "492551",
+    "498801",
+    "503701",
+    "512151",
+    "547451",
+    "552201",
+    "555951",
+    "558851",
+    "608301",
+    "653701",
+    "706851",
+    "768151",
+    "791351",
+    "792801",
+    "803701",
+    "813601",
+    "813901",
+    "832051"
+  ],
+  "idChecksum": "030fe8928740651a42a05b4230d54a2555e7a008beabf6ea5dca86d38b21b75d"
+}

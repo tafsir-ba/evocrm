@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "slug": "buissonniere_bernard",
+  "destinationProjectId": "6a947a939d6b25833df6d78e",
+  "destinationReference": "BUISSONNIERE_BERNARD",
+  "counts": {
+    "multi_project": 16
+  },
+  "records": [
+    {
+      "hubspotContactId": "16351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "79951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "92751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "183051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "220451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "273551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "331551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "696101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "764651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "109505495886",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "123985823255",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "164140541317",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "165625151263",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "175621194924",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "177104293998",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "184919658009",
+      "reason": "multi_project"
+    }
+  ]
+}

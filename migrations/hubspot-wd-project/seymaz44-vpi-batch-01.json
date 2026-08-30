@@ -1,0 +1,47 @@
+{
+  "name": "seymaz44-vpi-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9473283e8b00dfbd79747d",
+  "destinationReference": "SEYMAZ44-VPI",
+  "slug": "seymaz44-vpi",
+  "sourceHubSpotProjectId": "seymaz44-vpi",
+  "size": 16,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "839701",
+    "846551",
+    "875751",
+    "911001",
+    "936701",
+    "936901",
+    "950451",
+    "951151",
+    "951201",
+    "1291801",
+    "1307051",
+    "1317351",
+    "1323551",
+    "1334951",
+    "1342901",
+    "1348701"
+  ],
+  "idChecksum": "38cf12c24f7890c6ba5108d078aa1c14718fb6986e90233b8519b750de27fce0"
+}

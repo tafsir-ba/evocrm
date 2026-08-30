@@ -1,0 +1,44 @@
+{
+  "name": "loree_des_champs-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a94717c635893abf0840d53",
+  "destinationReference": "LOREE_DES_CHAMPS",
+  "slug": "loree_des_champs",
+  "sourceHubSpotProjectId": "loree_des_champs",
+  "size": 13,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "1521901",
+    "1541251",
+    "1545601",
+    "1568151",
+    "1569751",
+    "1571651",
+    "1572851",
+    "7346761368",
+    "7912171148",
+    "9972454326",
+    "12884318591",
+    "15864993565",
+    "24941176664"
+  ],
+  "idChecksum": "644faa91f83cb1b9128d78a66229694c6ebc2cdc3ddb189c4ab3fb9a09af5c93"
+}

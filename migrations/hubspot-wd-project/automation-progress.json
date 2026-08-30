@@ -1,0 +1,1197 @@
+{
+  "version": 1,
+  "stopped": false,
+  "stopReason": null,
+  "completed": [
+    {
+      "slug": "portesdulac",
+      "name": "Portes du Lac",
+      "reference": "PORTESDULAC",
+      "destinationProjectId": "6a94179542f672203757af66",
+      "manifestSize": 1938,
+      "created": 1938,
+      "destinationLeadCount": 1938,
+      "exceptionCount": 172,
+      "exceptionCounts": {
+        "multi_project": 172
+      },
+      "searchTotal": 2110,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "arbora",
+      "name": "Arbora",
+      "reference": "ARBORA",
+      "destinationProjectId": "6a9422aaea1b5f415435d42d",
+      "manifestSize": 1642,
+      "created": 1642,
+      "destinationLeadCount": 1642,
+      "exceptionCount": 433,
+      "exceptionCounts": {
+        "multi_project": 409,
+        "notes_conflict": 21,
+        "missing_name": 3
+      },
+      "searchTotal": 2075,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "v77",
+      "name": "V77",
+      "reference": "V77",
+      "destinationProjectId": "6a942c102086413e5fdccc47",
+      "manifestSize": 1172,
+      "created": 1172,
+      "destinationLeadCount": 1172,
+      "exceptionCount": 574,
+      "exceptionCounts": {
+        "notes_conflict": 51,
+        "multi_project": 352,
+        "missing_name": 170,
+        "cmp_product": 1
+      },
+      "searchTotal": 1746,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "smarthill",
+      "name": "Smarthill",
+      "reference": "SMARTHILL",
+      "destinationProjectId": "6a943bef1195ddcd26f08673",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 1298,
+      "exceptionCounts": {
+        "multi_project": 14,
+        "missing_name": 1132,
+        "notes_only": 152
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "alcove",
+      "name": "Alcove",
+      "reference": "ALCOVE",
+      "destinationProjectId": "6a943c0c7571a4be20d8ca10",
+      "manifestSize": 49,
+      "created": 49,
+      "destinationLeadCount": 49,
+      "exceptionCount": 1321,
+      "exceptionCounts": {
+        "multi_project": 371,
+        "missing_name": 944,
+        "notes_only": 6
+      },
+      "searchTotal": 1355,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "eveil",
+      "name": "Éveil",
+      "reference": "EVEIL",
+      "destinationProjectId": "6a943c5ac1e31b2481c99b0d",
+      "manifestSize": 857,
+      "created": 12,
+      "destinationLeadCount": 857,
+      "exceptionCount": 163,
+      "exceptionCounts": {
+        "multi_project": 162,
+        "cmp_product": 1
+      },
+      "searchTotal": 1020,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "osmose",
+      "name": "Osmose",
+      "reference": "OSMOSE",
+      "destinationProjectId": "6a9444afa822ceedf6f7b57a",
+      "manifestSize": 574,
+      "created": 574,
+      "destinationLeadCount": 574,
+      "exceptionCount": 266,
+      "exceptionCounts": {
+        "multi_project": 248,
+        "missing_name": 2,
+        "cmp_product": 1,
+        "notes_conflict": 15
+      },
+      "searchTotal": 840,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "jardinspala",
+      "name": "Jardins Pala",
+      "reference": "JARDINSPALA",
+      "destinationProjectId": "6a9446c0db72974d3666f72d",
+      "manifestSize": 529,
+      "created": 528,
+      "destinationLeadCount": 529,
+      "exceptionCount": 233,
+      "exceptionCounts": {
+        "multi_project": 19,
+        "missing_name": 91,
+        "notes_conflict": 7,
+        "notes_only": 116
+      },
+      "searchTotal": 601,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "jardindesnations",
+      "name": "Jardin des Nations",
+      "reference": "JARDINDESNATIONS",
+      "destinationProjectId": "6a9453a2ece4a64e90a4e094",
+      "manifestSize": 195,
+      "created": 195,
+      "destinationLeadCount": 195,
+      "exceptionCount": 493,
+      "exceptionCounts": {
+        "multi_project": 21,
+        "missing_name": 472
+      },
+      "searchTotal": 688,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "k2",
+      "name": "K2",
+      "reference": "K2",
+      "destinationProjectId": "6a945468992d9fd9c3bed831",
+      "manifestSize": 492,
+      "created": 492,
+      "destinationLeadCount": 492,
+      "exceptionCount": 191,
+      "exceptionCounts": {
+        "multi_project": 44,
+        "missing_name": 147
+      },
+      "searchTotal": 683,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "residence_symbiose",
+      "name": "Résidence Symbiose",
+      "reference": "RESIDENCE_SYMBIOSE",
+      "destinationProjectId": "6a94562dd466072be25e952b",
+      "manifestSize": 497,
+      "created": 497,
+      "destinationLeadCount": 497,
+      "exceptionCount": 182,
+      "exceptionCounts": {
+        "multi_project": 181,
+        "notes_conflict": 1
+      },
+      "searchTotal": 679,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "bc_kingston",
+      "name": "BC Kingston",
+      "reference": "BC_KINGSTON",
+      "destinationProjectId": "6a9458029b2a898bd2832509",
+      "manifestSize": 602,
+      "created": 602,
+      "destinationLeadCount": 602,
+      "exceptionCount": 68,
+      "exceptionCounts": {
+        "multi_project": 68
+      },
+      "searchTotal": 670,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "corsier_sur_vevey",
+      "name": "Corsier-sur-Vevey",
+      "reference": "CORSIER_SUR_VEVEY",
+      "destinationProjectId": "6a945a2ed2ebb646e413cddf",
+      "manifestSize": 167,
+      "created": 167,
+      "destinationLeadCount": 167,
+      "exceptionCount": 499,
+      "exceptionCounts": {
+        "missing_name": 307,
+        "multi_project": 191,
+        "notes_only": 1
+      },
+      "searchTotal": 664,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "gland_evo",
+      "name": "Gland (Evo)",
+      "reference": "GLAND_EVO",
+      "destinationProjectId": "6a945add8154645eabb07305",
+      "manifestSize": 113,
+      "created": 113,
+      "destinationLeadCount": 113,
+      "exceptionCount": 537,
+      "exceptionCounts": {
+        "multi_project": 239,
+        "missing_name": 297,
+        "notes_only": 1
+      },
+      "searchTotal": 648,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "ltb",
+      "name": "LTB",
+      "reference": "LTB",
+      "destinationProjectId": "6a945b5d4abe68cd32bb9b39",
+      "manifestSize": 571,
+      "created": 571,
+      "destinationLeadCount": 571,
+      "exceptionCount": 74,
+      "exceptionCounts": {
+        "multi_project": 73,
+        "notes_only": 1
+      },
+      "searchTotal": 644,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "visp_litterna",
+      "name": "Visp Litterna",
+      "reference": "VISP_LITTERNA",
+      "destinationProjectId": "6a945d6e01e9e500a7744c1f",
+      "manifestSize": 581,
+      "created": 581,
+      "destinationLeadCount": 581,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "multi_project": 2
+      },
+      "searchTotal": 583,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "westend",
+      "name": "Westend",
+      "reference": "WESTEND",
+      "destinationProjectId": "6a945f9490d996b7b542a50d",
+      "manifestSize": 557,
+      "created": 557,
+      "destinationLeadCount": 557,
+      "exceptionCount": 8,
+      "exceptionCounts": {
+        "multi_project": 1,
+        "missing_name": 7
+      },
+      "searchTotal": 565,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "avantscene",
+      "name": "Avant-Scène",
+      "reference": "AVANTSCENE",
+      "destinationProjectId": "6a9461729b3a69351115418b",
+      "manifestSize": 500,
+      "created": 500,
+      "destinationLeadCount": 500,
+      "exceptionCount": 61,
+      "exceptionCounts": {
+        "multi_project": 59,
+        "notes_conflict": 1,
+        "cmp_product": 1
+      },
+      "searchTotal": 561,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "campanules",
+      "name": "Campanules",
+      "reference": "CAMPANULES",
+      "destinationProjectId": "6a94634b8625db128dceed95",
+      "manifestSize": 516,
+      "created": 516,
+      "destinationLeadCount": 516,
+      "exceptionCount": 30,
+      "exceptionCounts": {
+        "multi_project": 30
+      },
+      "searchTotal": 546,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "seymaz44",
+      "name": "Seymaz 44",
+      "reference": "SEYMAZ44",
+      "destinationProjectId": "6a9465309fec2eea59a62a36",
+      "manifestSize": 57,
+      "created": 57,
+      "destinationLeadCount": 57,
+      "exceptionCount": 500,
+      "exceptionCounts": {
+        "missing_name": 302,
+        "multi_project": 153,
+        "cmp_product": 1,
+        "notes_only": 15,
+        "no_project_signal": 29
+      },
+      "searchTotal": 438,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "domainedulac",
+      "name": "Domaine du Lac",
+      "reference": "DOMAINEDULAC",
+      "destinationProjectId": "6a94657dfc9fe9154441985d",
+      "manifestSize": 351,
+      "created": 351,
+      "destinationLeadCount": 351,
+      "exceptionCount": 96,
+      "exceptionCounts": {
+        "multi_project": 95,
+        "notes_only": 1
+      },
+      "searchTotal": 446,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "rubix",
+      "name": "Rubix",
+      "reference": "RUBIX",
+      "destinationProjectId": "6a9466cfde8b87074899d25c",
+      "manifestSize": 358,
+      "created": 358,
+      "destinationLeadCount": 358,
+      "exceptionCount": 12,
+      "exceptionCounts": {
+        "multi_project": 12
+      },
+      "searchTotal": 370,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "cressy",
+      "name": "Cressy",
+      "reference": "CRESSY",
+      "destinationProjectId": "6a946827842d838b91b62441",
+      "manifestSize": 265,
+      "created": 265,
+      "destinationLeadCount": 265,
+      "exceptionCount": 124,
+      "exceptionCounts": {
+        "multi_project": 100,
+        "cmp_product": 1,
+        "no_project_signal": 22,
+        "notes_only": 1
+      },
+      "searchTotal": 366,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "vistabrent",
+      "name": "Vista Brent / Taquà",
+      "reference": "VISTABRENT",
+      "destinationProjectId": "6a946925cd5edb8f7a06c2af",
+      "manifestSize": 18,
+      "created": 18,
+      "destinationLeadCount": 18,
+      "exceptionCount": 341,
+      "exceptionCounts": {
+        "multi_project": 117,
+        "missing_name": 223,
+        "notes_only": 1
+      },
+      "searchTotal": 358,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "bude_the_residence",
+      "name": "Budé The Residence",
+      "reference": "BUDE_THE_RESIDENCE",
+      "destinationProjectId": "6a94694f6562983489e1a4e5",
+      "manifestSize": 28,
+      "created": 28,
+      "destinationLeadCount": 28,
+      "exceptionCount": 324,
+      "exceptionCounts": {
+        "multi_project": 84,
+        "missing_name": 236,
+        "notes_only": 3,
+        "no_project_signal": 1
+      },
+      "searchTotal": 336,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "namaya",
+      "name": "Namaya",
+      "reference": "NAMAYA",
+      "destinationProjectId": "6a9469824aaecee2d7f3da4b",
+      "manifestSize": 247,
+      "created": 247,
+      "destinationLeadCount": 247,
+      "exceptionCount": 98,
+      "exceptionCounts": {
+        "multi_project": 76,
+        "missing_name": 22
+      },
+      "searchTotal": 345,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "carawina",
+      "name": "Carawina",
+      "reference": "CARAWINA",
+      "destinationProjectId": "6a946a73d89549c3528d9c0b",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 327,
+      "exceptionCounts": {
+        "multi_project": 14,
+        "missing_name": 313
+      },
+      "searchTotal": 327,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "cardinal",
+      "name": "Cardinal",
+      "reference": "CARDINAL",
+      "destinationProjectId": "6a946a83f543c29c0f9e55b4",
+      "manifestSize": 272,
+      "created": 272,
+      "destinationLeadCount": 272,
+      "exceptionCount": 43,
+      "exceptionCounts": {
+        "multi_project": 43
+      },
+      "searchTotal": 315,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "gland_cardis",
+      "name": "Gland (Cardis)",
+      "reference": "GLAND_CARDIS",
+      "destinationProjectId": "6a946b919b112e202440a029",
+      "manifestSize": 32,
+      "created": 32,
+      "destinationLeadCount": 32,
+      "exceptionCount": 283,
+      "exceptionCounts": {
+        "multi_project": 110,
+        "missing_name": 173
+      },
+      "searchTotal": 315,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "aquarellechardonne",
+      "name": "Aquarelle Chardonne",
+      "reference": "AQUARELLECHARDONNE",
+      "destinationProjectId": "6a946bc770605e4c59b9af5a",
+      "manifestSize": 22,
+      "created": 22,
+      "destinationLeadCount": 22,
+      "exceptionCount": 281,
+      "exceptionCounts": {
+        "multi_project": 82,
+        "missing_name": 199
+      },
+      "searchTotal": 302,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "princes",
+      "name": "Princes",
+      "reference": "PRINCES",
+      "destinationProjectId": "6a946bf4072755357a8c516d",
+      "manifestSize": 177,
+      "created": 177,
+      "destinationLeadCount": 177,
+      "exceptionCount": 91,
+      "exceptionCounts": {
+        "multi_project": 89,
+        "notes_only": 2
+      },
+      "searchTotal": 266,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "tannayhorizon",
+      "name": "Tannay Horizon",
+      "reference": "TANNAYHORIZON",
+      "destinationProjectId": "6a946cb00767f82fd854d9f7",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 238,
+      "exceptionCounts": {
+        "multi_project": 1,
+        "missing_name": 194,
+        "notes_only": 43
+      },
+      "searchTotal": 1,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "buissonniere_rockwell",
+      "name": "Buissonnière Rockwell",
+      "reference": "BUISSONNIERE_ROCKWELL",
+      "destinationProjectId": "6a946cc2952b3fadf1f368ce",
+      "manifestSize": 188,
+      "created": 188,
+      "destinationLeadCount": 188,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 49
+      },
+      "searchTotal": 237,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "collex_bossy",
+      "name": "Collex-Bossy",
+      "reference": "COLLEX_BOSSY",
+      "destinationProjectId": "6a946d83e84a462f1ee3e21f",
+      "manifestSize": 33,
+      "created": 33,
+      "destinationLeadCount": 33,
+      "exceptionCount": 201,
+      "exceptionCounts": {
+        "multi_project": 67,
+        "missing_name": 134
+      },
+      "searchTotal": 234,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "bochet",
+      "name": "Bochet",
+      "reference": "BOCHET",
+      "destinationProjectId": "6a946db9298a6f2202271942",
+      "manifestSize": 143,
+      "created": 143,
+      "destinationLeadCount": 143,
+      "exceptionCount": 89,
+      "exceptionCounts": {
+        "multi_project": 89
+      },
+      "searchTotal": 232,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "versoix",
+      "name": "Versoix",
+      "reference": "VERSOIX",
+      "destinationProjectId": "6a946e4f4ab39b7b02abe60d",
+      "manifestSize": 129,
+      "created": 129,
+      "destinationLeadCount": 129,
+      "exceptionCount": 98,
+      "exceptionCounts": {
+        "multi_project": 96,
+        "notes_only": 2
+      },
+      "searchTotal": 225,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "tdl_pully",
+      "name": "TDL Pully",
+      "reference": "TDL_PULLY",
+      "destinationProjectId": "6a946edae5888deab8f95cfe",
+      "manifestSize": 160,
+      "created": 160,
+      "destinationLeadCount": 160,
+      "exceptionCount": 68,
+      "exceptionCounts": {
+        "multi_project": 67,
+        "notes_only": 1
+      },
+      "searchTotal": 227,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "crets_de_commugny",
+      "name": "Crêts de Commugny",
+      "reference": "CRETS_DE_COMMUGNY",
+      "destinationProjectId": "6a946f8a3e7aedd43f119b24",
+      "manifestSize": 168,
+      "created": 168,
+      "destinationLeadCount": 168,
+      "exceptionCount": 52,
+      "exceptionCounts": {
+        "multi_project": 47,
+        "missing_name": 5
+      },
+      "searchTotal": 220,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "veyrier",
+      "name": "Veyrier",
+      "reference": "VEYRIER",
+      "destinationProjectId": "6a94703cdf13a83dd1f19113",
+      "manifestSize": 118,
+      "created": 118,
+      "destinationLeadCount": 118,
+      "exceptionCount": 88,
+      "exceptionCounts": {
+        "multi_project": 86,
+        "notes_only": 2
+      },
+      "searchTotal": 204,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "floreal",
+      "name": "Floréal",
+      "reference": "FLOREAL",
+      "destinationProjectId": "6a9470bfac4a59fdc6dfaa4a",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 175,
+      "exceptionCounts": {
+        "multi_project": 84,
+        "missing_name": 91
+      },
+      "searchTotal": 181,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "lacolline",
+      "name": "La Colline",
+      "reference": "LACOLLINE",
+      "destinationProjectId": "6a9470dd2dc8e2bc89757a91",
+      "manifestSize": 144,
+      "created": 144,
+      "destinationLeadCount": 144,
+      "exceptionCount": 27,
+      "exceptionCounts": {
+        "multi_project": 27
+      },
+      "searchTotal": 171,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "loree_des_champs",
+      "name": "L'Orée des Champs",
+      "reference": "LOREE_DES_CHAMPS",
+      "destinationProjectId": "6a94717c635893abf0840d53",
+      "manifestSize": 13,
+      "created": 13,
+      "destinationLeadCount": 13,
+      "exceptionCount": 156,
+      "exceptionCounts": {
+        "multi_project": 51,
+        "missing_name": 105
+      },
+      "searchTotal": 169,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "eleven_41",
+      "name": "Eleven 41",
+      "reference": "ELEVEN_41",
+      "destinationProjectId": "6a9471a1a948b94e014e1db4",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 166,
+      "exceptionCounts": {
+        "multi_project": 7,
+        "missing_name": 159
+      },
+      "searchTotal": 166,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "defne",
+      "name": "Defne",
+      "reference": "DEFNE",
+      "destinationProjectId": "6a9471af5747d97c3a788d09",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 155,
+      "exceptionCounts": {
+        "multi_project": 57,
+        "missing_name": 98
+      },
+      "searchTotal": 161,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "residence_serena",
+      "name": "Résidence Serena",
+      "reference": "RESIDENCE_SERENA",
+      "destinationProjectId": "6a9471cd9be7f2838819e778",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 152,
+      "exceptionCounts": {
+        "multi_project": 41,
+        "missing_name": 111
+      },
+      "searchTotal": 158,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "the_view",
+      "name": "The View",
+      "reference": "THE_VIEW",
+      "destinationProjectId": "6a9471eb3edd667f3890f92b",
+      "manifestSize": 149,
+      "created": 149,
+      "destinationLeadCount": 149,
+      "exceptionCount": 4,
+      "exceptionCounts": {
+        "multi_project": 4
+      },
+      "searchTotal": 153,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "lesjars",
+      "name": "Les Jars",
+      "reference": "LESJARS",
+      "destinationProjectId": "6a9472881beae69acd3d5047",
+      "manifestSize": 100,
+      "created": 100,
+      "destinationLeadCount": 100,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 49
+      },
+      "searchTotal": 149,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "hedonia",
+      "name": "Hedonia",
+      "reference": "HEDONIA",
+      "destinationProjectId": "6a9472fb597d08873e518eff",
+      "manifestSize": 7,
+      "created": 7,
+      "destinationLeadCount": 7,
+      "exceptionCount": 132,
+      "exceptionCounts": {
+        "missing_name": 101,
+        "multi_project": 31
+      },
+      "searchTotal": 139,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "mathod",
+      "name": "Mathod",
+      "reference": "MATHOD",
+      "destinationProjectId": "6a947319a702e2d6f378c2ef",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 137,
+      "exceptionCounts": {
+        "missing_name": 131,
+        "notes_only": 6
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "seymaz44-vpi",
+      "name": "Seymaz 44 (VPI)",
+      "reference": "SEYMAZ44-VPI",
+      "destinationProjectId": "6a9473283e8b00dfbd79747d",
+      "manifestSize": 16,
+      "created": 16,
+      "destinationLeadCount": 16,
+      "exceptionCount": 87,
+      "exceptionCounts": {
+        "multi_project": 38,
+        "missing_name": 46,
+        "notes_only": 3
+      },
+      "searchTotal": 99,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "terra_vista",
+      "name": "Terra Vista",
+      "reference": "TERRA_VISTA",
+      "destinationProjectId": "6a94734e9ec3b3f964a63b1a",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 83,
+      "exceptionCounts": {
+        "multi_project": 28,
+        "missing_name": 55
+      },
+      "searchTotal": 89,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "villa_sorella",
+      "name": "Villa Sorella",
+      "reference": "VILLA_SORELLA",
+      "destinationProjectId": "6a94736cd29a3272eaae6b4f",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 78,
+      "exceptionCounts": {
+        "multi_project": 17,
+        "missing_name": 61
+      },
+      "searchTotal": 78,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "leparcdescrets",
+      "name": "Le Parc des Crêts",
+      "reference": "LEPARCDESCRETS",
+      "destinationProjectId": "6a940beeec2f44703ff6cd00",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 3223,
+      "exceptionCounts": {
+        "multi_project": 459,
+        "hubspot_id_match": 2724,
+        "missing_name": 27,
+        "notes_conflict": 1,
+        "notes_only": 12
+      },
+      "searchTotal": 3211,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "ormet",
+      "name": "Ormet",
+      "reference": "ORMET",
+      "destinationProjectId": "6a94737a3a31c669cd059d07",
+      "manifestSize": 23,
+      "created": 23,
+      "destinationLeadCount": 53,
+      "exceptionCount": 53,
+      "exceptionCounts": {
+        "multi_project": 23,
+        "hubspot_id_match": 30
+      },
+      "searchTotal": 76,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "buissonniere_bernard",
+      "name": "Buissonnière Bernard",
+      "reference": "BUISSONNIERE_BERNARD",
+      "destinationProjectId": "6a947a939d6b25833df6d78e",
+      "manifestSize": 59,
+      "created": 59,
+      "destinationLeadCount": 59,
+      "exceptionCount": 16,
+      "exceptionCounts": {
+        "multi_project": 16
+      },
+      "searchTotal": 75,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "hyla",
+      "name": "Hyla",
+      "reference": "HYLA",
+      "destinationProjectId": "6a947ae571c11e72b8356c11",
+      "manifestSize": 52,
+      "created": 52,
+      "destinationLeadCount": 52,
+      "exceptionCount": 12,
+      "exceptionCounts": {
+        "multi_project": 12
+      },
+      "searchTotal": 64,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "cardis-echoparc",
+      "name": "Cardis Échoparc",
+      "reference": "CARDIS-ECHOPARC",
+      "destinationProjectId": "6a947b2b5637cd3e9b67aba9",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 57,
+      "exceptionCounts": {
+        "missing_name": 55,
+        "notes_only": 2
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "corniche",
+      "name": "Corniche",
+      "reference": "CORNICHE",
+      "destinationProjectId": "6a947b3926660fd5a8517d98",
+      "manifestSize": 41,
+      "created": 41,
+      "destinationLeadCount": 41,
+      "exceptionCount": 11,
+      "exceptionCounts": {
+        "multi_project": 11
+      },
+      "searchTotal": 52,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "rives_de_lorbe",
+      "name": "Rives de l'Orbe",
+      "reference": "RIVES_DE_LORBE",
+      "destinationProjectId": "6a947b741059fc9716d30dd0",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 8,
+        "missing_name": 41
+      },
+      "searchTotal": 50,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "senaleche",
+      "name": "Senalèche",
+      "reference": "SENALECHE",
+      "destinationProjectId": "6a947b8ef2674345cfc69f0c",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 45,
+      "exceptionCounts": {
+        "multi_project": 15,
+        "missing_name": 30
+      },
+      "searchTotal": 45,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "stlouis",
+      "name": "St-Louis",
+      "reference": "STLOUIS",
+      "destinationProjectId": "6a947b9d71a13d2788a06ea6",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 34,
+      "exceptionCounts": {
+        "multi_project": 9,
+        "missing_name": 24,
+        "notes_only": 1
+      },
+      "searchTotal": 33,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "domicim-echoparc",
+      "name": "Domicim Échoparc",
+      "reference": "DOMICIM-ECHOPARC",
+      "destinationProjectId": "6a947bab53853e7fe07b192e",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 24,
+      "exceptionCounts": {
+        "missing_name": 24
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "clover_house",
+      "name": "Clover House",
+      "reference": "CLOVER_HOUSE",
+      "destinationProjectId": "6a947bbad561028b35f54747",
+      "manifestSize": 15,
+      "created": 15,
+      "destinationLeadCount": 15,
+      "exceptionCount": 9,
+      "exceptionCounts": {
+        "multi_project": 9
+      },
+      "searchTotal": 24,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "cressy_adv",
+      "name": "Cressy (Adv)",
+      "reference": "CRESSY_ADV",
+      "destinationProjectId": "6a947bdf1e467e00065e10df",
+      "manifestSize": 21,
+      "created": 21,
+      "destinationLeadCount": 21,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 2,
+        "notes_conflict": 1
+      },
+      "searchTotal": 24,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "ecureuils",
+      "name": "Écureuils",
+      "reference": "ECUREUILS",
+      "destinationProjectId": "6a947c090a040e69ce06d20e",
+      "manifestSize": 9,
+      "created": 9,
+      "destinationLeadCount": 9,
+      "exceptionCount": 6,
+      "exceptionCounts": {
+        "multi_project": 6
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "montblanc",
+      "name": "Mont-Blanc",
+      "reference": "MONTBLANC",
+      "destinationProjectId": "6a947c29f9c2de8fb6fa4ea8",
+      "manifestSize": 12,
+      "created": 12,
+      "destinationLeadCount": 12,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 3
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "connor",
+      "name": "Connor",
+      "reference": "CONNOR",
+      "destinationProjectId": "6a947c4c33c143a44330853f",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 3
+      },
+      "searchTotal": 9,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "symbiose_assei",
+      "name": "Symbiose ASSEI",
+      "reference": "SYMBIOSE_ASSEI",
+      "destinationProjectId": "6a947c6910d02eaead68290b",
+      "manifestSize": 3,
+      "created": 3,
+      "destinationLeadCount": 3,
+      "exceptionCount": 6,
+      "exceptionCounts": {
+        "multi_project": 6
+      },
+      "searchTotal": 9,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "bude_the_residence_frederic",
+      "name": "Budé The Residence (Frédéric)",
+      "reference": "BUDE_THE_RESIDENCE_FREDERIC",
+      "destinationProjectId": "6a947c8479ec7c0a71a6fcfe",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 5,
+      "exceptionCounts": {
+        "missing_name": 4,
+        "cmp_product": 1
+      },
+      "searchTotal": 5,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "emerald",
+      "name": "Emerald",
+      "reference": "EMERALD",
+      "destinationProjectId": "6a947c9275ba7203b5f9d2cd",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "multi_project": 2
+      },
+      "searchTotal": 3,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "montreux",
+      "name": "Montreux",
+      "reference": "MONTREUX",
+      "destinationProjectId": "6a947caad73b7ccc815ca410",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "multi_project": 2
+      },
+      "searchTotal": 2,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "buissonniere_proximmo",
+      "name": "Buissonnière Proximmo",
+      "reference": "BUISSONNIERE_PROXIMMO",
+      "destinationProjectId": "6a947cb9ac0fe419b3095870",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "notes_conflict": 1,
+        "multi_project": 1
+      },
+      "searchTotal": 2,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "corsier",
+      "name": "Corsier",
+      "reference": "CORSIER",
+      "destinationProjectId": "6a947cc7d544938c6c8cd05a",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 556,
+      "exceptionCounts": {
+        "multi_project": 2,
+        "hubspot_id_match": 167,
+        "missing_name": 325,
+        "no_project_signal": 62
+      },
+      "searchTotal": 2,
+      "dryRunOnly": false
+    },
+    {
+      "slug": "delejette",
+      "name": "Delejette",
+      "reference": "DELEJETTE",
+      "destinationProjectId": "6a947cd7bb299e25f68b5542",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 1,
+      "exceptionCounts": {
+        "notes_only": 1
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
+    }
+  ],
+  "skipped": []
+}

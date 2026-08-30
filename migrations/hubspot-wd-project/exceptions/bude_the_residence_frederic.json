@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "slug": "bude_the_residence_frederic",
+  "destinationProjectId": "6a947c8479ec7c0a71a6fcfe",
+  "destinationReference": "BUDE_THE_RESIDENCE_FREDERIC",
+  "counts": {
+    "missing_name": 4,
+    "cmp_product": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "1375553",
+      "reason": "cmp_product"
+    },
+    {
+      "hubspotContactId": "861151",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "47560555931",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "64905152345",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "72705250936",
+      "reason": "missing_name"
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "slug": "lacolline",
+  "destinationProjectId": "6a9470dd2dc8e2bc89757a91",
+  "destinationReference": "LACOLLINE",
+  "counts": {
+    "multi_project": 27
+  },
+  "records": [
+    {
+      "hubspotContactId": "131201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "131551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "182901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "209401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "210451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "242051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "248101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "452051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "452451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "452701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "453001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "475401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "526601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "537351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "560251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "609701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "636151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "649151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "687201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "701751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "831151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "883601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "935301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1330701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1380051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1402551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "16104036117",
+      "reason": "multi_project"
+    }
+  ]
+}

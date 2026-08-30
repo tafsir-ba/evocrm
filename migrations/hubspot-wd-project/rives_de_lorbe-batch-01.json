@@ -1,0 +1,32 @@
+{
+  "name": "rives_de_lorbe-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947b741059fc9716d30dd0",
+  "destinationReference": "RIVES_DE_LORBE",
+  "slug": "rives_de_lorbe",
+  "sourceHubSpotProjectId": "rives_de_lorbe",
+  "size": 1,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "816801"
+  ],
+  "idChecksum": "b7955a60669f36fa6b6ac85e2c9b42b969b6a05c9509903eba69968b5785c967"
+}

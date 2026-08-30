@@ -1,0 +1,43 @@
+{
+  "name": "eveil-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a943c5ac1e31b2481c99b0d",
+  "destinationReference": "EVEIL",
+  "slug": "eveil",
+  "sourceHubSpotProjectId": "eveil",
+  "size": 12,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "241453572916",
+    "242034671953",
+    "242058198686",
+    "242153743737",
+    "242175972745",
+    "242227239470",
+    "242488701725",
+    "242571305261",
+    "242778588851",
+    "243160759969",
+    "243667861813",
+    "243677502624"
+  ],
+  "idChecksum": "e7ab4fcf62d3ae566d2dc218fec1d92ea13303c29977d662b2e67e4cfcac02c2"
+}

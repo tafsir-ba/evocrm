@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "slug": "connor",
+  "destinationProjectId": "6a947c4c33c143a44330853f",
+  "destinationReference": "CONNOR",
+  "counts": {
+    "multi_project": 3
+  },
+  "records": [
+    {
+      "hubspotContactId": "1317951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1379951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "152405776461",
+      "reason": "multi_project"
+    }
+  ]
+}

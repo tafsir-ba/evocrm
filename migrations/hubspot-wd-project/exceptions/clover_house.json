@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "slug": "clover_house",
+  "destinationProjectId": "6a947bbad561028b35f54747",
+  "destinationReference": "CLOVER_HOUSE",
+  "counts": {
+    "multi_project": 9
+  },
+  "records": [
+    {
+      "hubspotContactId": "138051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "614651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "761501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "866301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1023901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1272251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "87682351225",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "94203217479",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "94349458745",
+      "reason": "multi_project"
+    }
+  ]
+}

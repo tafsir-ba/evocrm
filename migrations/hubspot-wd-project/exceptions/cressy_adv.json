@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "slug": "cressy_adv",
+  "destinationProjectId": "6a947bdf1e467e00065e10df",
+  "destinationReference": "CRESSY_ADV",
+  "counts": {
+    "multi_project": 2,
+    "notes_conflict": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "314801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "119993874864",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "156209253222",
+      "reason": "notes_conflict"
+    }
+  ]
+}

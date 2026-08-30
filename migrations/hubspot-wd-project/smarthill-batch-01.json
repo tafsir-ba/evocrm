@@ -1,0 +1,32 @@
+{
+  "name": "smarthill-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a943bef1195ddcd26f08673",
+  "destinationReference": "SMARTHILL",
+  "slug": "smarthill",
+  "sourceHubSpotProjectId": "smarthill",
+  "size": 1,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "2401"
+  ],
+  "idChecksum": "66ba11c8b57047bc31dcba9dde802fb5f9d55940b0d98e692d4b47f6eead97ad"
+}

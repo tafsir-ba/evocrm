@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "slug": "the_view",
+  "destinationProjectId": "6a9471eb3edd667f3890f92b",
+  "destinationReference": "THE_VIEW",
+  "counts": {
+    "multi_project": 4
+  },
+  "records": [
+    {
+      "hubspotContactId": "696201",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1464901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1542851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "108469096337",
+      "reason": "multi_project"
+    }
+  ]
+}
