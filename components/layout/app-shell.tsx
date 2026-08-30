@@ -14,18 +14,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { permissionDenied } = useWorkspaceShell();
 
   return (
-    <div className="min-h-screen flex bg-[var(--color-canvas)] overflow-x-hidden">
-      <div className="hidden lg:block shrink-0">
-        <div className="sticky top-0 h-screen">
-          <Sidebar />
-        </div>
+    <div className="flex h-dvh overflow-hidden bg-[var(--color-canvas)]">
+      <div className="hidden h-full shrink-0 lg:block">
+        <Sidebar />
       </div>
 
       <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
-        <main className="flex-1 min-w-0 overflow-x-hidden">
+        <main
+          data-testid="workspace-main"
+          className="min-h-0 min-w-0 flex-1 overflow-auto"
+        >
           {permissionDenied ? (
             <PermissionDenied
               title="Permission denied"
@@ -35,9 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             children
           )}
         </main>
+        <FeedbackWidget />
       </div>
-
-      <FeedbackWidget />
     </div>
   );
 }

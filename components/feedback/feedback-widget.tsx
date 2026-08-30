@@ -172,24 +172,33 @@ export function FeedbackWidget() {
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="feedback-trigger"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-md)] hover:border-[var(--color-brand-600)] focus-ring"
+      <footer
+        data-testid="feedback-dock"
+        aria-label="Feedback"
+        className="relative z-10 flex shrink-0 flex-col items-end gap-2 border-t border-[var(--color-line)] bg-white px-3 py-2 sm:px-4"
+        style={{
+          minHeight: "var(--feedback-dock-height)",
+          paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+        }}
       >
-        <IconInbox size={16} />
-        <span className="hidden sm:inline">Feedback</span>
-      </button>
-
-      {toastMessage && (
-        <div
-          role="status"
-          className="fixed bottom-20 right-5 z-50 rounded-lg border border-[var(--color-line)] bg-white px-4 py-3 text-[13px] text-[var(--color-ink)] shadow-[var(--shadow-md)]"
+        {toastMessage ? (
+          <div
+            role="status"
+            className="max-w-full rounded-lg border border-[var(--color-line)] bg-white px-4 py-2 text-[13px] text-[var(--color-ink)] shadow-[var(--shadow-sm)]"
+          >
+            {toastMessage}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          data-testid="feedback-trigger"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] focus-ring"
         >
-          {toastMessage}
-        </div>
-      )}
+          <IconInbox size={16} />
+          <span className="hidden sm:inline">Feedback</span>
+        </button>
+      </footer>
 
       <Modal
         open={open}

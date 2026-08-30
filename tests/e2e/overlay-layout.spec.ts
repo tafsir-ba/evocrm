@@ -5,6 +5,7 @@ import {
   assertActionOutsideScrollRegion,
   assertBodyScrollLocked,
   assertDialogWithinViewport,
+  assertLocatorsDoNotOverlap,
   assertNoDocumentHorizontalOverflow,
 } from "./helpers/overlay-assertions";
 
@@ -88,6 +89,40 @@ test.describe("Phase 15 overlay layout", () => {
         await assertActionOutsideScrollRegion(page, "Send feedback");
         await assertActionOutsideScrollRegion(page, "Cancel");
         await assertBodyScrollLocked(page);
+        await assertNoDocumentHorizontalOverflow(page);
+      });
+
+      test("feedback dock does not cover projects table, pagination, or actions", async ({
+        page,
+      }) => {
+        await page.goto(`/w/${workspaceSlug!}/projects`);
+
+        const dock = page.getByTestId("feedback-dock");
+        const trigger = page.getByTestId("feedback-trigger");
+        const main = page.getByTestId("workspace-main");
+        await expect(dock).toBeVisible();
+        await expect(trigger).toBeVisible();
+        await expect(main).toBeVisible();
+
+        await assertLocatorsDoNotOverlap(dock, main);
+        await assertLocatorsDoNotOverlap(trigger, page.getByRole("heading", { name: "Projects" }));
+
+        const newProject = page.getByRole("link", { name: /new project/i });
+        if (await newProject.count()) {
+          await assertLocatorsDoNotOverlap(trigger, newProject.first());
+        }
+
+        const nextPage = page.getByRole("button", { name: "Next page" });
+        if (await nextPage.count()) {
+          await nextPage.scrollIntoViewIfNeeded();
+          await assertLocatorsDoNotOverlap(dock, nextPage);
+        }
+
+        await main.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+          element.scrollLeft = element.scrollWidth;
+        });
+        await assertLocatorsDoNotOverlap(dock, main);
         await assertNoDocumentHorizontalOverflow(page);
       });
     });

@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export async function assertDialogWithinViewport(
   page: Page,
@@ -53,4 +53,27 @@ export async function assertNoDocumentHorizontalOverflow(page: Page): Promise<vo
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(hasHorizontalOverflow).toBe(false);
+}
+
+export async function assertLocatorsDoNotOverlap(
+  first: Locator,
+  second: Locator,
+): Promise<void> {
+  await expect(first).toBeVisible();
+  await expect(second).toBeVisible();
+
+  const firstBox = await first.boundingBox();
+  const secondBox = await second.boundingBox();
+  expect(firstBox).not.toBeNull();
+  expect(secondBox).not.toBeNull();
+  if (!firstBox || !secondBox) {
+    return;
+  }
+
+  const overlaps =
+    firstBox.x < secondBox.x + secondBox.width - 0.5 &&
+    firstBox.x + firstBox.width > secondBox.x + 0.5 &&
+    firstBox.y < secondBox.y + secondBox.height - 0.5 &&
+    firstBox.y + firstBox.height > secondBox.y + 0.5;
+  expect(overlaps).toBe(false);
 }
