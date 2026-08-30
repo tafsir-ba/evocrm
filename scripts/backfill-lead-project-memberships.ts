@@ -4,9 +4,9 @@
  * Does not enroll campaigns or drips.
  *
  * Usage:
- *   npm run migrate:lead-project-memberships
  *   npm run migrate:lead-project-memberships -- --dry-run
- *   npm run migrate:lead-project-memberships -- --workspace-id=<id> --actor-id=<userId>
+ *   npm run migrate:lead-project-memberships -- --actor-id=<userObjectId>
+ *   npm run migrate:lead-project-memberships -- --workspace-id=<id> --actor-id=<userObjectId>
  *
  * Requires MONGODB_URI.
  */
@@ -23,10 +23,15 @@ function readArg(name: string): string | undefined {
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   const workspaceId = readArg("workspace-id");
-  const actorId = readArg("actor-id") ?? "000000000000000000000001";
+  const actorId = readArg("actor-id");
+  if (!dryRun && !actorId) {
+    throw new Error(
+      "Provide --actor-id=<userObjectId> when applying lead project membership backfill.",
+    );
+  }
   const result = await backfillLeadProjectMemberships({
     workspaceId,
-    actorId,
+    actorId: actorId ?? "000000000000000000000001",
     dryRun,
   });
   console.log("[migrate:lead-project-memberships] complete", result);

@@ -112,6 +112,7 @@ export type LeadListFilter = {
   projectId?: string;
   companyId?: string;
   includeAssociated?: boolean;
+  associatedLeadIds?: string[];
   search?: string;
   statusId?: string;
   sourceId?: string;
@@ -138,8 +139,9 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
     query.archivedAt = null;
   }
 
-  if (filter.projectId) {
-    query.projectId = filter.projectId;
+  const projectScope = buildProjectScope(filter);
+  if (projectScope.projectId) {
+    query.projectId = projectScope.projectId;
   }
   if (filter.companyId) {
     query.companyId = filter.companyId;
@@ -201,19 +203,52 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
     query._id = { $nin: toObjectIdArray(filter.excludeIds) };
   }
 
-  if (filter.search) {
-    const escaped = filter.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(escaped, "i");
-    query.$or = [
-      { firstName: regex },
-      { lastName: regex },
-      { fullName: regex },
-      { email: regex },
-      { phone: regex },
-    ];
+  const searchOr = buildSearchOr(filter.search);
+  const associatedOr = projectScope.$or;
+  if (associatedOr && searchOr) {
+    query.$and = [{ $or: associatedOr }, { $or: searchOr }];
+  } else if (associatedOr) {
+    query.$or = associatedOr;
+  } else if (searchOr) {
+    query.$or = searchOr;
   }
 
   return query;
+}
+
+function buildProjectScope(filter: LeadListFilter): {
+  projectId?: string;
+  $or?: Array<Record<string, unknown>>;
+} {
+  if (!filter.projectId) {
+    return {};
+  }
+
+  if (!filter.includeAssociated) {
+    return { projectId: filter.projectId };
+  }
+
+  const associatedIds = toObjectIdArray(filter.associatedLeadIds ?? []);
+  const clauses: Array<Record<string, unknown>> = [{ projectId: filter.projectId }];
+  if (associatedIds.length > 0) {
+    clauses.push({ _id: { $in: associatedIds } });
+  }
+  return { $or: clauses };
+}
+
+function buildSearchOr(search: string | undefined): Array<Record<string, unknown>> | null {
+  if (!search) {
+    return null;
+  }
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(escaped, "i");
+  return [
+    { firstName: regex },
+    { lastName: regex },
+    { fullName: regex },
+    { email: regex },
+    { phone: regex },
+  ];
 }
 
 export async function findLeads(

@@ -15,6 +15,21 @@ import { connectDb } from "@/server/db/mongoose";
 import { toObjectIdString } from "@/server/utils/mongo-id";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 
+let membershipIndexesReady: Promise<void> | null = null;
+
+export async function ensureLeadProjectMembershipIndexes(): Promise<void> {
+  if (!membershipIndexesReady) {
+    membershipIndexesReady = (async () => {
+      await connectDb();
+      await LeadProjectMembershipModel.syncIndexes();
+    })().catch((error: unknown) => {
+      membershipIndexesReady = null;
+      throw error;
+    });
+  }
+  await membershipIndexesReady;
+}
+
 function isDuplicateKeyError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -165,6 +180,7 @@ export async function createMembership(input: {
   createdBy?: string | null;
 }): Promise<LeadProjectMembershipRecord> {
   await connectDb();
+  await ensureLeadProjectMembershipIndexes();
   try {
     const document = await LeadProjectMembershipModel.create({
       workspaceId: input.workspaceId,

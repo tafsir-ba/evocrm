@@ -227,8 +227,32 @@ describe("lead service", () => {
     expect(findLeads).toHaveBeenCalledWith(
       "ws-1",
       expect.objectContaining({
-        leadIds: ["lead-1"],
-        projectId: undefined,
+        projectId: "project-2",
+        includeAssociated: true,
+        associatedLeadIds: ["lead-1"],
+      }),
+    );
+  });
+
+  it("keeps primary-project leads when includeAssociated has no membership rows", async () => {
+    vi.mocked(findLeadIdsForProjectMembership).mockResolvedValue([]);
+    vi.mocked(findLeads).mockResolvedValue({
+      leads: [baseLead],
+      total: 1,
+    });
+
+    const result = await listLeadsForWorkspace("ws-1", {
+      projectId: "project-1",
+      includeAssociated: true,
+    });
+
+    expect(result.total).toBe(1);
+    expect(findLeads).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        projectId: "project-1",
+        includeAssociated: true,
+        associatedLeadIds: [],
       }),
     );
   });

@@ -156,6 +156,48 @@ describe("lead project membership service", () => {
     expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
+  it("heals the current project as primary before adding a secondary when no memberships exist", async () => {
+    const healedPrimary = { ...primaryMembership, source: "backfill" as const };
+    vi.mocked(findMembershipsForLead)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([healedPrimary])
+      .mockResolvedValueOnce([healedPrimary, secondaryMembership]);
+    vi.mocked(findMembershipByLeadAndProject)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    vi.mocked(createMembership)
+      .mockResolvedValueOnce(healedPrimary)
+      .mockResolvedValueOnce(secondaryMembership);
+
+    await addLeadProjectMembership({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      projectId: "project-2",
+      isPrimary: false,
+    });
+
+    expect(createMembership).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        projectId: "project-1",
+        isPrimary: true,
+        source: "backfill",
+      }),
+    );
+    expect(createMembership).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        projectId: "project-2",
+        isPrimary: false,
+        source: "manual",
+      }),
+    );
+    expect(updateLead).not.toHaveBeenCalled();
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
+  });
+
   it("adds a secondary membership without campaign enrollment", async () => {
     vi.mocked(findMembershipsForLead)
       .mockResolvedValueOnce([primaryMembership])
@@ -227,6 +269,31 @@ describe("lead project membership service", () => {
     expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-2", { isPrimary: true });
     expect(updateLead).toHaveBeenCalledWith("ws-1", "lead-1", { projectId: "project-2" });
     expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
+  });
+
+  it("restores the previous primary if promoting the new primary fails", async () => {
+    vi.mocked(findMembershipById).mockResolvedValue(secondaryMembership);
+    vi.mocked(findMembershipsForLead).mockResolvedValue([
+      primaryMembership,
+      secondaryMembership,
+    ]);
+    vi.mocked(updateMembership)
+      .mockResolvedValueOnce({ ...primaryMembership, isPrimary: false })
+      .mockRejectedValueOnce(new Error("write failed"));
+
+    await expect(
+      setLeadProjectMembershipPrimary({
+        workspaceId: "ws-1",
+        leadId: "lead-1",
+        membershipId: "mem-2",
+        actorId: "user-1",
+      }),
+    ).rejects.toThrow("write failed");
+
+    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-1", { isPrimary: false });
+    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-2", { isPrimary: true });
+    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-1", { isPrimary: true });
+    expect(updateLead).not.toHaveBeenCalled();
   });
 
   it("prevents removing the last or current primary membership", async () => {

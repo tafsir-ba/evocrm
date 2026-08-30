@@ -398,8 +398,7 @@ async function resolveListFilter(
 
   return {
     ...filter,
-    projectId: undefined,
-    leadIds: requested,
+    associatedLeadIds: requested,
   };
 }
 
@@ -408,19 +407,6 @@ export async function listLeadsForWorkspace(
   filter: LeadListFilter = {},
 ): Promise<{ leads: LeadListItem[]; total: number }> {
   await assertValidProjectFilter(workspaceId, filter.projectId);
-  if (filter.projectId && filter.includeAssociated) {
-    const associatedLeadIds = await findLeadIdsForProjectMembership(
-      workspaceId,
-      filter.projectId,
-    );
-    const requested = filter.leadIds?.length
-      ? associatedLeadIds.filter((id) => filter.leadIds!.includes(id))
-      : associatedLeadIds;
-    if (requested.length === 0) {
-      return { leads: [], total: 0 };
-    }
-  }
-
   const listFilter = await resolveListFilter(workspaceId, filter);
   const { leads, total } = await findLeads(workspaceId, listFilter);
   const membershipsByLead = await loadMembershipsByLeadIds(

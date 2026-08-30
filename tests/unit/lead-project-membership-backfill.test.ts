@@ -12,6 +12,7 @@ vi.mock("@/models/lead", () => ({
 
 vi.mock("@/server/repositories/lead-project-memberships", () => ({
   createMembership: vi.fn(),
+  ensureLeadProjectMembershipIndexes: vi.fn(),
   findLeadIdsMissingMembership: vi.fn(),
   findMembershipByLeadAndProject: vi.fn(),
 }));
@@ -24,6 +25,7 @@ import { LeadModel } from "@/models/lead";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import {
   createMembership,
+  ensureLeadProjectMembershipIndexes,
   findLeadIdsMissingMembership,
   findMembershipByLeadAndProject,
 } from "@/server/repositories/lead-project-memberships";
@@ -73,8 +75,12 @@ describe("lead project membership backfill", () => {
         source: "backfill",
       }),
     );
+    expect(ensureLeadProjectMembershipIndexes).toHaveBeenCalled();
     expect(createAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
+        workspaceId: "ws-1",
+        actorId: "507f1f77bcf86cd799439099",
+        entityId: "ws-1",
         action: "lead.project_memberships_backfilled",
         after: expect.objectContaining({ triggerAutomation: false }),
       }),
@@ -117,6 +123,19 @@ describe("lead project membership backfill", () => {
     });
 
     expect(result.created).toBe(1);
+    expect(createMembership).not.toHaveBeenCalled();
+    expect(createAuditLog).not.toHaveBeenCalled();
+    expect(ensureLeadProjectMembershipIndexes).not.toHaveBeenCalled();
+  });
+
+  it("rejects apply without a real actor id", async () => {
+    await expect(
+      backfillLeadProjectMemberships({
+        workspaceId: "ws-1",
+        actorId: "000000000000000000000001",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
     expect(createMembership).not.toHaveBeenCalled();
     expect(createAuditLog).not.toHaveBeenCalled();
   });

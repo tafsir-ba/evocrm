@@ -7,13 +7,19 @@ import {
 } from "@/lib/lead-project-membership";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { connectDb } from "@/server/db/mongoose";
+import { AppError } from "@/server/errors";
 import {
   createMembership,
+  ensureLeadProjectMembershipIndexes,
   findLeadIdsMissingMembership,
   findMembershipByLeadAndProject,
 } from "@/server/repositories/lead-project-memberships";
 import { planBackfillMembershipsForLead } from "@/server/services/lead-project-memberships";
 import { toObjectIdString } from "@/server/utils/mongo-id";
+
+const OBJECT_ID_PATTERN = /^[a-fA-F0-9]{24}$/;
+const PLACEHOLDER_ACTOR_ID = "000000000000000000000001";
+const PLACEHOLDER_WORKSPACE_ID = "000000000000000000000000";
 
 export type LeadProjectMembershipBackfillResult = {
   dryRun: boolean;
@@ -32,7 +38,19 @@ export async function backfillLeadProjectMemberships(options: {
   dryRun?: boolean;
 }): Promise<LeadProjectMembershipBackfillResult> {
   const dryRun = options.dryRun ?? false;
+  if (
+    !dryRun &&
+    (!OBJECT_ID_PATTERN.test(options.actorId) || options.actorId === PLACEHOLDER_ACTOR_ID)
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Backfill requires a real --actor-id (24-character hex user ObjectId).",
+    );
+  }
   await connectDb();
+  if (!dryRun) {
+    await ensureLeadProjectMembershipIndexes();
+  }
 
   const query: Record<string, unknown> = {
     projectId: { $ne: null },
@@ -58,6 +76,7 @@ export async function backfillLeadProjectMemberships(options: {
     createdAt?: Date;
   };
 
+  const scannedWorkspaceIds = new Set<string>();
   let afterId: string | null = null;
 
   while (true) {
@@ -74,10 +93,10 @@ export async function backfillLeadProjectMemberships(options: {
       break;
     }
 
-    const leadIds = documents.map((document) => document._id.toString());
     const missingByWorkspace = new Map<string, string[]>();
     for (const document of documents) {
       const workspaceId = document.workspaceId.toString();
+      scannedWorkspaceIds.add(workspaceId);
       const current = missingByWorkspace.get(workspaceId) ?? [];
       current.push(document._id.toString());
       missingByWorkspace.set(workspaceId, current);
@@ -150,21 +169,26 @@ export async function backfillLeadProjectMemberships(options: {
   }
 
   if (!dryRun) {
-    await createAuditLog({
-      workspaceId: options.workspaceId ?? "000000000000000000000000",
-      actorId: options.actorId,
-      action: "lead.project_memberships_backfilled",
-      entityType: "lead_project_membership",
-      entityId: options.workspaceId ?? "all",
-      after: {
-        scanned: result.scanned,
-        created: result.created,
-        skipped: result.skipped,
-        missingProject: result.missingProject,
-        idempotentHits: result.idempotentHits,
-        triggerAutomation: false,
-      },
-    });
+    const auditedWorkspaceIds = options.workspaceId
+      ? [options.workspaceId]
+      : [...scannedWorkspaceIds].filter((id) => id !== PLACEHOLDER_WORKSPACE_ID);
+    for (const workspaceId of auditedWorkspaceIds) {
+      await createAuditLog({
+        workspaceId,
+        actorId: options.actorId,
+        action: "lead.project_memberships_backfilled",
+        entityType: "lead_project_membership",
+        entityId: workspaceId,
+        after: {
+          scanned: result.scanned,
+          created: result.created,
+          skipped: result.skipped,
+          missingProject: result.missingProject,
+          idempotentHits: result.idempotentHits,
+          triggerAutomation: false,
+        },
+      });
+    }
   }
 
   return result;

@@ -208,6 +208,25 @@ export async function addLeadProjectMembership(input: {
 
   await validateActiveProjectId(input.workspaceId, input.projectId);
 
+  let memberships = await findMembershipsForLead(input.workspaceId, input.leadId);
+  if (memberships.length === 0 && lead.projectId) {
+    await ensurePrimaryMembershipForLead({
+      workspaceId: input.workspaceId,
+      leadId: input.leadId,
+      projectId: lead.projectId,
+      actorId: input.actorId,
+      source: "backfill",
+      joinedAt: lead.createdAt,
+      sourceOrder: 0,
+      provenance: buildMembershipProvenance({
+        method: "backfill",
+        source: "lead.projectId",
+        notes: "Healed current primary project before adding another membership.",
+      }),
+    });
+    memberships = await findMembershipsForLead(input.workspaceId, input.leadId);
+  }
+
   const duplicate = await findMembershipByLeadAndProject(
     input.workspaceId,
     input.leadId,
@@ -216,8 +235,6 @@ export async function addLeadProjectMembership(input: {
   if (duplicate) {
     throw new AppError("CONFLICT", "This contact is already a member of that project.");
   }
-
-  const memberships = await findMembershipsForLead(input.workspaceId, input.leadId);
   const makePrimary = input.isPrimary === true || memberships.length === 0;
 
   if (makePrimary) {
@@ -228,28 +245,48 @@ export async function addLeadProjectMembership(input: {
     }
   }
 
-  const created = await createMembership({
-    workspaceId: input.workspaceId,
-    leadId: input.leadId,
-    projectId: input.projectId,
-    isPrimary: makePrimary,
-    joinedAt: input.joinedAt ?? new Date(),
-    sourceOrder: await nextSourceOrder(memberships),
-    source: input.source ?? "manual",
-    provenance:
-      input.provenance ??
-      buildMembershipProvenance({
-        method: "manual",
-        source: "lead_project_membership_api",
-        notes: makePrimary
-          ? "Primary membership set deliberately."
-          : "Secondary project association. Does not enroll campaigns.",
-      }),
-    createdBy: input.actorId,
-  });
+  let created: LeadProjectMembershipRecord;
+  try {
+    created = await createMembership({
+      workspaceId: input.workspaceId,
+      leadId: input.leadId,
+      projectId: input.projectId,
+      isPrimary: makePrimary,
+      joinedAt: input.joinedAt ?? new Date(),
+      sourceOrder: await nextSourceOrder(memberships),
+      source: input.source ?? "manual",
+      provenance:
+        input.provenance ??
+        buildMembershipProvenance({
+          method: "manual",
+          source: "lead_project_membership_api",
+          notes: makePrimary
+            ? "Primary membership set deliberately."
+            : "Secondary project association. Does not enroll campaigns.",
+        }),
+      createdBy: input.actorId,
+    });
+  } catch (error) {
+    if (makePrimary) {
+      const currentPrimary = memberships.find((item) => item.isPrimary);
+      if (currentPrimary) {
+        await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: true });
+      }
+    }
+    throw error;
+  }
 
   if (makePrimary) {
-    await syncLeadPrimaryProject(input.workspaceId, lead, input.projectId);
+    try {
+      await syncLeadPrimaryProject(input.workspaceId, lead, input.projectId);
+    } catch (error) {
+      await updateMembership(input.workspaceId, created.id, { isPrimary: false });
+      const currentPrimary = memberships.find((item) => item.isPrimary);
+      if (currentPrimary) {
+        await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: true });
+      }
+      throw error;
+    }
   }
 
   await createAuditLog({
@@ -294,8 +331,16 @@ export async function setLeadProjectMembershipPrimary(input: {
   if (currentPrimary) {
     await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: false });
   }
-  await updateMembership(input.workspaceId, target.id, { isPrimary: true });
-  await syncLeadPrimaryProject(input.workspaceId, lead, target.projectId);
+  try {
+    await updateMembership(input.workspaceId, target.id, { isPrimary: true });
+    await syncLeadPrimaryProject(input.workspaceId, lead, target.projectId);
+  } catch (error) {
+    if (currentPrimary) {
+      await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: true });
+    }
+    await updateMembership(input.workspaceId, target.id, { isPrimary: false });
+    throw error;
+  }
 
   await createAuditLog({
     workspaceId: input.workspaceId,
