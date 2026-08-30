@@ -560,6 +560,21 @@
       },
       "searchTotal": 234,
       "dryRunOnly": false
+    },
+    {
+      "slug": "bochet",
+      "name": "Bochet",
+      "reference": "BOCHET",
+      "destinationProjectId": "6a946db9298a6f2202271942",
+      "manifestSize": 143,
+      "created": 143,
+      "destinationLeadCount": 143,
+      "exceptionCount": 89,
+      "exceptionCounts": {
+        "multi_project": 89
+      },
+      "searchTotal": 232,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
