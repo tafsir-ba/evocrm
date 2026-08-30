@@ -299,6 +299,21 @@
       },
       "searchTotal": 561,
       "dryRunOnly": false
+    },
+    {
+      "slug": "campanules",
+      "name": "Campanules",
+      "reference": "CAMPANULES",
+      "destinationProjectId": "6a94634b8625db128dceed95",
+      "manifestSize": 516,
+      "created": 516,
+      "destinationLeadCount": 516,
+      "exceptionCount": 30,
+      "exceptionCounts": {
+        "multi_project": 30
+      },
+      "searchTotal": 546,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
