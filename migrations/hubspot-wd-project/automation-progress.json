@@ -69,6 +69,23 @@
       },
       "searchTotal": 15,
       "dryRunOnly": false
+    },
+    {
+      "slug": "alcove",
+      "name": "Alcove",
+      "reference": "ALCOVE",
+      "destinationProjectId": "6a943c0c7571a4be20d8ca10",
+      "manifestSize": 49,
+      "created": 49,
+      "destinationLeadCount": 49,
+      "exceptionCount": 1321,
+      "exceptionCounts": {
+        "multi_project": 371,
+        "missing_name": 944,
+        "notes_only": 6
+      },
+      "searchTotal": 1355,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
