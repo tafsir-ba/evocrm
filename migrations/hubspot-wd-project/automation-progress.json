@@ -201,6 +201,23 @@
       },
       "searchTotal": 670,
       "dryRunOnly": false
+    },
+    {
+      "slug": "corsier_sur_vevey",
+      "name": "Corsier-sur-Vevey",
+      "reference": "CORSIER_SUR_VEVEY",
+      "destinationProjectId": "6a945a2ed2ebb646e413cddf",
+      "manifestSize": 167,
+      "created": 167,
+      "destinationLeadCount": 167,
+      "exceptionCount": 499,
+      "exceptionCounts": {
+        "missing_name": 307,
+        "multi_project": 191,
+        "notes_only": 1
+      },
+      "searchTotal": 664,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
