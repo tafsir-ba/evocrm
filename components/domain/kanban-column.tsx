@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { IconMore, IconPlus } from "@/lib/icons";
 
 export type KanbanCardData = {
   id: string;
@@ -29,52 +28,35 @@ export function KanbanColumn({
   emptyLabel?: string;
 }) {
   return (
-    <div className="flex flex-col bg-[var(--color-canvas)] border border-[var(--color-line)] rounded-xl">
-      <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          {accentColor && (
+    <div className="flex flex-col rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)]">
+      <div className="flex items-center justify-between gap-2 px-2.5 pt-2 pb-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {accentColor ? (
             <span
-              className="w-2 h-2 rounded-full shrink-0"
+              className="h-2 w-2 shrink-0 rounded-full"
               style={{ background: accentColor }}
             />
-          )}
-          <span className="text-[13px] font-semibold text-[var(--color-ink)]">
+          ) : null}
+          <span className="truncate text-[12.5px] font-semibold text-[var(--color-ink)]">
             {title}
           </span>
-          <span className="text-[11.5px] text-[var(--color-ink-muted)] tabular bg-white border border-[var(--color-line)] rounded-md px-1.5 py-[1px]">
+          <span className="rounded border border-[var(--color-line)] bg-white px-1 py-px text-[11px] tabular text-[var(--color-ink-muted)]">
             {count}
           </span>
         </div>
-        <button
-          type="button"
-          aria-label="Column actions"
-          className="w-6 h-6 inline-flex items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-white"
-        >
-          <IconMore size={14} />
-        </button>
       </div>
-      {summary && (
-        <div className="px-3 pb-2 text-[11.5px] text-[var(--color-ink-muted)] tabular">
+      {summary ? (
+        <div className="px-2.5 pb-1.5 text-[11px] tabular text-[var(--color-ink-muted)]">
           {summary}
         </div>
-      )}
-      <div className="flex-1 px-2 pb-2 space-y-2 min-h-[200px]">
+      ) : null}
+      <div className="space-y-1.5 px-1.5 pb-2">
         {cards.length === 0 ? (
-          <div className="border border-dashed border-[var(--color-line-strong)] rounded-lg p-4 text-center">
-            <p className="text-[12px] text-[var(--color-ink-muted)]">{emptyLabel}</p>
-          </div>
+          <p className="px-1 py-2 text-[12px] text-[var(--color-ink-muted)]">{emptyLabel}</p>
         ) : (
-          cards.map((card) => (
-            <div key={card.id}>{renderCard(card)}</div>
-          ))
+          cards.map((card) => <div key={card.id}>{renderCard(card)}</div>)
         )}
       </div>
-      <button
-        type="button"
-        className="m-2 mt-1 h-8 inline-flex items-center justify-center gap-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)] border border-dashed border-[var(--color-line)] rounded-lg hover:text-[var(--color-brand-700)] hover:border-[var(--color-brand-300)] hover:bg-white transition-colors"
-      >
-        <IconPlus size={13} /> Add card
-      </button>
     </div>
   );
 }

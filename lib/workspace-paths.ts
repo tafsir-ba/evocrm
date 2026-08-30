@@ -19,3 +19,22 @@ export function workspaceNavPath(
 ): string {
   return workspacePath(workspaceSlug, segment);
 }
+
+export function workspaceHref(
+  workspaceSlug: string,
+  segments: string | string[],
+  query?: Record<string, string | number | null | undefined>,
+): string {
+  const path = workspacePath(
+    workspaceSlug,
+    ...(Array.isArray(segments) ? segments : [segments]),
+  );
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== null && value !== undefined && String(value).length > 0) {
+      params.set(key, String(value));
+    }
+  }
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+}

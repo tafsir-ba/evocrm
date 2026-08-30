@@ -265,11 +265,11 @@ export function PipelinePanel({
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-full max-w-xl" />
-        <div className="grid grid-flow-col auto-cols-[280px] gap-3">
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-full max-w-xl" />
+        <div className="grid grid-flow-col auto-cols-[240px] gap-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-[320px] w-[280px]" />
+            <Skeleton key={index} className="h-[220px] w-[240px]" />
           ))}
         </div>
       </div>
@@ -305,11 +305,11 @@ export function PipelinePanel({
   return (
     <>
       <PageHeader
+        density="compact"
         title="Pipeline"
-        description="Opportunities grouped by workspace opportunity status dictionaries. Active pipeline value includes open stages only."
         meta={
-          <span className="text-[13px] text-[var(--color-ink-muted)] tabular">
-            {pipeline.totals.count} active · {activeValueLabel} pipeline value
+          <span className="text-[12.5px] text-[var(--color-ink-muted)] tabular">
+            {pipeline.totals.count} open · {activeValueLabel}
           </span>
         }
         actions={
@@ -324,10 +324,11 @@ export function PipelinePanel({
         }
       />
 
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
-        <div className="flex-1 min-w-[200px] max-w-md">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <div className="min-w-[200px] max-w-md flex-1">
           <SearchInput
             placeholder="Search opportunities…"
+            aria-label="Search opportunities"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -365,8 +366,8 @@ export function PipelinePanel({
           }
         />
       ) : (
-        <div className="-mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 overflow-x-auto pb-6 min-w-0 max-w-full">
-          <div className="grid grid-flow-col auto-cols-[minmax(240px,280px)] gap-3 w-max">
+        <div className="-mx-4 md:-mx-6 lg:-mx-8 min-w-0 max-w-full overflow-x-auto px-4 pb-4 md:px-6 lg:px-8">
+          <div className="grid w-max grid-flow-col auto-cols-[minmax(220px,250px)] gap-2">
             {columns.map((column) => (
               <KanbanColumn
                 key={column.status.id}
@@ -387,7 +388,10 @@ export function PipelinePanel({
                 cards={(column.opportunities ?? []).map((opportunity) => ({
                   id: opportunity.id,
                   title: opportunity.lead?.fullName ?? "Lead",
-                  subtitle: opportunity.property?.title ?? "Property",
+                  subtitle:
+                    opportunity.property?.reference ??
+                    opportunity.property?.title ??
+                    "Property",
                   metaLeft: formatPrice(opportunity.value, opportunity.currency),
                   metaRight:
                     opportunity.probability !== null
@@ -400,54 +404,58 @@ export function PipelinePanel({
                     (item) => item.id === card.id,
                   );
                   return (
-                    <div className="space-y-2">
-                      <KanbanCard
-                        title={card.title}
-                        subtitle={card.subtitle}
-                        metaLeft={card.metaLeft}
-                        metaRight={card.metaRight}
-                        href={card.href}
-                        avatar={
-                          opportunity?.assignedUser ? (
-                            <Avatar
-                              user={{
-                                id: opportunity.assignedUser.id,
-                                name:
-                                  opportunity.assignedUser.name ??
-                                  opportunity.assignedUser.email ??
-                                  "User",
-                                initials: memberInitials({
-                                  userId: opportunity.assignedUser.id,
-                                  name: opportunity.assignedUser.name,
-                                  email: opportunity.assignedUser.email,
-                                }),
-                              }}
-                              size={20}
-                            />
-                          ) : undefined
-                        }
-                      />
-                      {canUpdate && opportunity && (
-                        <Select
-                          value={opportunity.statusId}
-                          onChange={(event) =>
-                            handleStageSelect(
-                              opportunity.id,
-                              opportunity.statusId,
-                              event.target.value,
-                            )
-                          }
-                          disabled={stageMovePending === opportunity.id}
-                          className="text-[12px]"
-                        >
-                          {allStages.map((stage) => (
-                            <option key={stage.id} value={stage.id}>
-                              Move to {stage.label}
-                            </option>
-                          ))}
-                        </Select>
-                      )}
-                    </div>
+                    <KanbanCard
+                      title={card.title}
+                      subtitle={card.subtitle}
+                      metaLeft={card.metaLeft}
+                      metaRight={card.metaRight}
+                      href={card.href}
+                      avatar={
+                        opportunity?.assignedUser ? (
+                          <Avatar
+                            user={{
+                              id: opportunity.assignedUser.id,
+                              name:
+                                opportunity.assignedUser.name ??
+                                opportunity.assignedUser.email ??
+                                "User",
+                              initials: memberInitials({
+                                userId: opportunity.assignedUser.id,
+                                name: opportunity.assignedUser.name,
+                                email: opportunity.assignedUser.email,
+                              }),
+                            }}
+                            size={18}
+                          />
+                        ) : undefined
+                      }
+                      footer={
+                        canUpdate && opportunity ? (
+                          <Select
+                            fieldSize="sm"
+                            aria-label={`Move ${card.title}`}
+                            value={opportunity.statusId}
+                            onChange={(event) =>
+                              handleStageSelect(
+                                opportunity.id,
+                                opportunity.statusId,
+                                event.target.value,
+                              )
+                            }
+                            disabled={stageMovePending === opportunity.id}
+                            className="h-7 text-[12px]"
+                          >
+                            {allStages.map((stage) => (
+                              <option key={stage.id} value={stage.id}>
+                                {stage.id === opportunity.statusId
+                                  ? stage.label
+                                  : `Move to ${stage.label}`}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : undefined
+                      }
+                    />
                   );
                 }}
               />

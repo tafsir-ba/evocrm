@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
@@ -75,6 +75,11 @@ export function LeadsPanel({
   canUpdate,
 }: LeadsPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sourceIdParam = searchParams.get("sourceId") ?? "";
+  const assignedToParam = searchParams.get("assignedTo") ?? "";
+  const createdFromParam = searchParams.get("createdFrom");
+  const createdToParam = searchParams.get("createdTo");
   const projectId = useWorkspaceProjectFilter();
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -85,7 +90,9 @@ export function LeadsPanel({
   const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState(() => searchParams.get("sourceId") ?? "");
+  const [assignedFilter, setAssignedFilter] = useState(() => searchParams.get("assignedTo") ?? "");
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [tagFilter, setTagFilter] = useState("");
   const [integrationFilter, setIntegrationFilter] = useState("");
   const [utmCampaignFilter, setUtmCampaignFilter] = useState("");
@@ -119,7 +126,7 @@ export function LeadsPanel({
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
         fetch(`${apiBase}/integrations?type=website`),
-        canUpdate ? fetch(`${apiBase}/members`) : Promise.resolve(null),
+        fetch(`${apiBase}/members`),
       ]);
 
       const [statusPayload, sourcePayload, tagsPayload, integrationsPayload, membersPayload] =
@@ -128,7 +135,7 @@ export function LeadsPanel({
           sourceRes.json(),
           tagsRes.json(),
           integrationsRes.json(),
-          membersRes ? membersRes.json() : Promise.resolve(null),
+          membersRes.json(),
         ]);
 
       if (statusRes.ok) {
@@ -157,7 +164,7 @@ export function LeadsPanel({
           integrationsPayload.error?.message ?? "Could not load website integrations for filtering.",
         );
       }
-      if (membersRes?.ok) {
+      if (membersRes.ok) {
         setMembers((membersPayload?.data?.members as LeadTableMember[] | undefined) ?? []);
       } else {
         setMembers([]);
@@ -165,7 +172,7 @@ export function LeadsPanel({
     } catch {
       setWebsiteOptionsWarning("Could not load some lead filter options.");
     }
-  }, [apiBase, canUpdate]);
+  }, [apiBase]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -204,6 +211,7 @@ export function LeadsPanel({
     propertyTypeInterestFilter,
     search,
     sourceFilter,
+    assignedFilter,
     statusFilter,
     tagFilter,
     integrationFilter,
@@ -212,7 +220,14 @@ export function LeadsPanel({
     usagePurposeFilter,
     projectId,
     showArchived,
+    createdFromParam,
+    createdToParam,
   ]);
+
+  useEffect(() => {
+    setSourceFilter(sourceIdParam);
+    setAssignedFilter(assignedToParam);
+  }, [assignedToParam, sourceIdParam]);
 
   useEffect(() => {
     void loadOptions();
@@ -232,6 +247,7 @@ export function LeadsPanel({
     propertyTypeInterestFilter,
     search,
     sourceFilter,
+    assignedFilter,
     statusFilter,
     tagFilter,
     integrationFilter,
@@ -239,6 +255,8 @@ export function LeadsPanel({
     transactionIntentFilter,
     usagePurposeFilter,
     showArchived,
+    createdFromParam,
+    createdToParam,
   ]);
 
   const selectedCount = useMemo(() => {
@@ -279,6 +297,15 @@ export function LeadsPanel({
     }
     if (sourceFilter) {
       filters.sourceId = sourceFilter;
+    }
+    if (assignedFilter) {
+      filters.assignedTo = assignedFilter;
+    }
+    if (createdFromParam) {
+      filters.createdFrom = createdFromParam;
+    }
+    if (createdToParam) {
+      filters.createdTo = createdToParam;
     }
     if (tagFilter) {
       filters.tagId = tagFilter;
@@ -503,8 +530,8 @@ export function LeadsPanel({
   return (
     <>
       <PageHeader
+        density="compact"
         title="Leads"
-        description="Every contact entering your workspace. Convert qualified leads into opportunities."
         meta={
           !loading ? (
             <Badge tone="muted" size="sm">
@@ -594,6 +621,63 @@ export function LeadsPanel({
             </option>
           ))}
         </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[140px]"
+          aria-label="Filter by assignee"
+          value={assignedFilter}
+          onChange={(event) => {
+            setPage(1);
+            setAssignedFilter(event.target.value);
+          }}
+        >
+          <option value="">All assigned</option>
+          {members.map((member) => (
+            <option key={member.userId} value={member.userId}>
+              {member.name ?? member.email}
+            </option>
+          ))}
+        </Select>
+        {createdFromParam || createdToParam ? (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)]">
+            Created in linked period
+            <button
+              type="button"
+              className="font-medium text-[var(--color-brand-700)] hover:underline"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams.toString());
+                next.delete("createdFrom");
+                next.delete("createdTo");
+                const qs = next.toString();
+                router.replace(
+                  `${workspacePath(workspaceSlug, "leads")}${qs ? `?${qs}` : ""}`,
+                );
+              }}
+            >
+              Clear
+            </button>
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-8 items-center rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
+          aria-expanded={showMoreFilters}
+          onClick={() => setShowMoreFilters((current) => !current)}
+        >
+          More filters
+          {tagFilter ||
+          integrationFilter ||
+          utmCampaignFilter ||
+          propertyTypeInterestFilter ||
+          transactionIntentFilter ||
+          usagePurposeFilter
+            ? " · on"
+            : ""}
+        </button>
+      </div>
+
+      {showMoreFilters ? (
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
@@ -691,6 +775,7 @@ export function LeadsPanel({
           ))}
         </Select>
       </div>
+      ) : null}
 
       {loading ? (
         <div className="space-y-1.5">

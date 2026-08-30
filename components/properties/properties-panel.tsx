@@ -209,8 +209,8 @@ export function PropertiesPanel({
   return (
     <>
       <PageHeader
+        density="compact"
         title="Properties"
-        description="Inventory of available, reserved and sold listings, grouped by project."
         meta={
           !loading ? (
             <Badge tone="muted" size="sm">
@@ -238,7 +238,7 @@ export function PropertiesPanel({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <div className="flex-1 min-w-[200px] max-w-md">
           <Input
             placeholder="Search properties by title, reference, city…"
@@ -319,9 +319,9 @@ export function PropertiesPanel({
 
       {loading ? (
         <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
         </div>
       ) : error ? (
         <ErrorState

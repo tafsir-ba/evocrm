@@ -116,8 +116,8 @@ export function ProjectsPanel({
   return (
     <>
       <PageHeader
+        density="compact"
         title="Projects"
-        description="Real estate developments and CRM scopes for this workspace."
         actions={
           canCreate ? (
             <Link
@@ -152,7 +152,11 @@ export function ProjectsPanel({
       </div>
 
       {loading ? (
-        <Skeleton className="h-48 w-full" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
       ) : error ? (
         <ErrorState
           title="Could not load projects"

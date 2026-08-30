@@ -24,6 +24,7 @@ describe("domain display components", () => {
 
     expect(screen.getByText("Qualified")).toBeInTheDocument();
     expect(screen.getByText("Anna Keller")).toBeInTheDocument();
+    expect(screen.queryByText("Add card")).not.toBeInTheDocument();
   });
 
   it("renders timeline items from props", () => {

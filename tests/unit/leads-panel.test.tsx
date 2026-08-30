@@ -188,6 +188,9 @@ describe("LeadsPanel table", () => {
     expect(screen.getByLabelText("Show archived")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All statuses")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All sources")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("All assigned")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("All tags")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "More filters" }));
     expect(screen.getByDisplayValue("All tags")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All websites")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("UTM campaign")).toBeInTheDocument();

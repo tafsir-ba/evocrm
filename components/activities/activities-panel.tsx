@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -64,6 +64,10 @@ type ActivitiesPanelProps = {
 
 type ViewKey = "all" | "mine" | "upcoming" | "overdue";
 
+function readViewParam(value: string | null): ViewKey {
+  return value === "mine" || value === "upcoming" || value === "overdue" ? value : "all";
+}
+
 export function ActivitiesPanel({
   workspaceSlug,
   workspaceTimezone,
@@ -73,12 +77,15 @@ export function ActivitiesPanel({
   allowGlobalCreate = false,
 }: ActivitiesPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const viewParam = readViewParam(searchParams.get("view"));
   const projectId = useWorkspaceProjectFilter();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
-  const [view, setView] = useState<ViewKey>("all");
+  const [view, setView] = useState<ViewKey>(viewParam);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -181,6 +188,10 @@ export function ActivitiesPanel({
   ]);
 
   useEffect(() => {
+    setView(viewParam);
+  }, [viewParam]);
+
+  useEffect(() => {
     void loadOptions();
   }, [loadOptions]);
 
@@ -244,22 +255,22 @@ export function ActivitiesPanel({
   function renderList(list: ActivityListItem[]) {
     if (loading) {
       return (
-        <div className="space-y-3">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       );
     }
 
     if (list.length === 0) {
       return (
-        <div className="bg-white border border-dashed border-[var(--color-line-strong)] rounded-xl py-12 text-center dot-grid">
-          <span className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-600)] mb-3">
-            <IconActivities size={20} />
+        <div className="rounded-lg border border-dashed border-[var(--color-line-strong)] bg-white px-3 py-6 text-center">
+          <span className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-600)]">
+            <IconActivities size={16} />
           </span>
-          <p className="text-[14.5px] font-semibold text-[var(--color-ink)]">All caught up</p>
-          <p className="text-[13px] text-[var(--color-ink-muted)] mt-1">
+          <p className="text-[13.5px] font-semibold text-[var(--color-ink)]">All caught up</p>
+          <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">
             No activities match this view.
           </p>
         </div>
@@ -267,106 +278,97 @@ export function ActivitiesPanel({
     }
 
     return (
-      <div className="bg-white border border-[var(--color-line)] rounded-xl divide-y divide-[var(--color-line)] overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white divide-y divide-[var(--color-line)]">
         {list.map((activity) => (
           <div
             key={activity.id}
-            className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--color-canvas)] transition-colors"
+            className={`flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--color-canvas)] ${
+              activity.isOverdue ? "bg-[color-mix(in_srgb,var(--color-danger-fg)_4%,white)]" : ""
+            }`}
           >
             <span
-              className="inline-flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
               style={{
                 background: `color-mix(in srgb, ${activity.type?.color ?? "var(--color-brand-600)"} 10%, white)`,
                 color: activity.type?.color ?? "var(--color-brand-600)",
               }}
               title={activity.type?.label}
             >
-              {activityTypeIcon(activity.type?.key)}
+              {activityTypeIcon(activity.type?.key, 14)}
             </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-[13.5px] font-semibold text-[var(--color-ink)] truncate">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <p className="truncate text-[12.5px] font-semibold text-[var(--color-ink)]">
                   {activity.title}
                 </p>
-                {activity.type && (
-                  <Badge tone="muted" size="sm">
-                    {activity.type.label}
-                  </Badge>
-                )}
-                {activity.isOverdue && (
-                  <span className="text-[11px] font-medium text-[var(--color-danger-fg)]">
+                {activity.isOverdue ? (
+                  <span className="shrink-0 text-[11px] font-medium text-[var(--color-danger-fg)]">
                     Overdue
                   </span>
-                )}
+                ) : null}
               </div>
-              <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5 truncate">
-                {formatRelatedSummary(activity)} ·{" "}
+              <p className="truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                {formatRelatedSummary(activity)}
                 {activity.dueDate
-                  ? formatActivityDateTime(activity.dueDate, workspaceTimezone)
-                  : "No due date"}
+                  ? ` · ${formatActivityDateTime(activity.dueDate, workspaceTimezone)}`
+                  : " · No due date"}
+                {activity.assignedUser
+                  ? ` · ${activity.assignedUser.name ?? activity.assignedUser.email}`
+                  : ""}
+                {activity.outcome ? ` · ${activity.outcome}` : ""}
               </p>
-              {activity.outcome && (
-                <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5 truncate">
-                  Outcome: {activity.outcome}
-                </p>
-              )}
             </div>
-            <div className="hidden md:block text-[12px] text-[var(--color-ink-muted)] shrink-0">
-              {activity.assignedUser?.name ?? activity.assignedUser?.email ?? "—"}
-            </div>
-            {activity.status && (
+            {activity.status ? (
               <StatusBadge
                 label={activity.status.label}
                 color={activity.status.color}
                 behavior={activity.status.behavior}
                 size="sm"
               />
-            )}
-            <div className="flex items-center gap-1 shrink-0">
-              {canUpdate && activity.status?.behavior === "pending" && (
+            ) : null}
+            <div className="flex shrink-0 items-center gap-0.5">
+              {canUpdate && activity.status?.behavior === "pending" ? (
                 <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    leadingIcon={<IconCheck size={12} />}
+                  <button
+                    type="button"
+                    className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
                     disabled={actionPending === activity.id}
                     onClick={() => void handleComplete(activity.id)}
                   >
-                    Complete
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
+                    <IconCheck size={12} />
+                    <span className="ml-1">Complete</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
                     disabled={actionPending === activity.id}
                     onClick={() => void handleCancel(activity.id)}
                   >
                     Cancel
-                  </Button>
+                  </button>
                 </>
-              )}
-              {canUpdate && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                    onClick={() =>
-                      router.push(
-                        workspacePath(workspaceSlug, "activities", activity.id, "edit"),
-                      )
-                    }
+              ) : null}
+              {canUpdate ? (
+                <button
+                  type="button"
+                  className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                  onClick={() =>
+                    router.push(workspacePath(workspaceSlug, "activities", activity.id, "edit"))
+                  }
                 >
                   Edit
-                </Button>
-              )}
-              {canArchive && (
-                <Button
-                  size="sm"
-                  variant="ghost"
+                </button>
+              ) : null}
+              {canArchive ? (
+                <button
+                  type="button"
+                  className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-danger-fg)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                   disabled={actionPending === activity.id}
                   onClick={() => void handleArchive(activity.id, activity.title)}
                 >
                   Archive
-                </Button>
-              )}
+                </button>
+              ) : null}
             </div>
           </div>
         ))}
@@ -396,8 +398,8 @@ export function ActivitiesPanel({
   return (
     <>
       <PageHeader
+        density="compact"
         title="Activities"
-        description="Calls, emails, meetings, visits, tasks and notes — your daily follow-up board."
         meta={
           <Badge tone="muted" size="sm">
             {total} total
@@ -415,120 +417,142 @@ export function ActivitiesPanel({
         }
       />
 
-      {canCreate && !allowGlobalCreate && (
-        <div className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
-          Create activities from a Lead, Property, or Opportunity detail page. Dates are
-          shown in workspace timezone ({workspaceTimezone}).
-        </div>
-      )}
+      {canCreate && !allowGlobalCreate ? (
+        <p className="mb-2 text-[12px] text-[var(--color-ink-muted)]">
+          Create from a lead, property, or opportunity. Times in {workspaceTimezone}.
+        </p>
+      ) : null}
 
-      <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
-        <Input
-          placeholder="Search activities…"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={typeFilter}
-          onChange={(event) => {
-            setTypeFilter(event.target.value);
-            setPage(1);
-          }}
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <div
+          className="inline-flex overflow-x-auto rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] p-0.5"
+          role="tablist"
+          aria-label="Activity views"
         >
-          <option value="">All types</option>
-          {types.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={statusFilter}
-          onChange={(event) => {
-            setStatusFilter(event.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All statuses</option>
-          {statuses.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </Select>
-        <MemberSelector
-          members={members}
-          selectedUserId={assignedFilter || null}
-          onChange={(userId) => {
-            setAssignedFilter(userId ?? "");
-            setPage(1);
-          }}
-          placeholder="All assignees"
-        />
-      </div>
-
-      <div className="flex items-center gap-1 border-b border-[var(--color-line)] overflow-x-auto mb-5">
-        {(
-          [
-            { key: "all", label: "All" },
-            { key: "mine", label: "Mine" },
-            { key: "upcoming", label: "Upcoming" },
-            { key: "overdue", label: "Overdue" },
-          ] as const
-        ).map((tab) => {
-          const isActive = view === tab.key;
-          return (
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "mine", label: "Mine" },
+              { key: "upcoming", label: "Upcoming" },
+              { key: "overdue", label: "Overdue" },
+            ] as const
+          ).map((tab) => (
             <button
               key={tab.key}
               type="button"
+              role="tab"
+              aria-selected={view === tab.key}
               onClick={() => {
                 setView(tab.key);
                 setPage(1);
               }}
-              className={`relative h-10 px-3 inline-flex items-center text-[13.5px] font-medium whitespace-nowrap transition-colors ${
-                isActive
-                  ? "text-[var(--color-ink)]"
+              className={`h-7 whitespace-nowrap rounded px-2.5 text-[12.5px] font-medium ${
+                view === tab.key
+                  ? "bg-white text-[var(--color-ink)] shadow-[var(--shadow-xs)]"
                   : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
               }`}
             >
               {tab.label}
-              {isActive && (
-                <span className="absolute left-2 right-2 -bottom-px h-[2px] bg-[var(--color-brand-600)] rounded-full" />
-              )}
             </button>
-          );
-        })}
+          ))}
+        </div>
+        <div className="min-w-[180px] max-w-sm flex-1">
+          <Input
+            placeholder="Search activities…"
+            aria-label="Search activities"
+            fieldSize="sm"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
+          aria-expanded={showMoreFilters}
+          onClick={() => setShowMoreFilters((current) => !current)}
+        >
+          More filters
+          {typeFilter || statusFilter || assignedFilter ? " · on" : ""}
+        </button>
       </div>
+
+      {showMoreFilters ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[140px]"
+            aria-label="Filter by type"
+            value={typeFilter}
+            onChange={(event) => {
+              setTypeFilter(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All types</option>
+            {types.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[140px]"
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All statuses</option>
+            {statuses.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </Select>
+          <MemberSelector
+            members={members}
+            selectedUserId={assignedFilter || null}
+            onChange={(userId) => {
+              setAssignedFilter(userId ?? "");
+              setPage(1);
+            }}
+            placeholder="All assignees"
+          />
+        </div>
+      ) : null}
 
       {renderList(activities)}
 
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between">
           <p className="text-[12px] text-[var(--color-ink-muted)]">
             Page {page} of {totalPages}
           </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              leadingIcon={<IconChevronLeft size={14} />}
+          <div className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
               disabled={page <= 1}
+              aria-label="Previous page"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              trailingIcon={<IconChevronRight size={14} />}
+              <IconChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
               disabled={page >= totalPages}
+              aria-label="Next page"
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >
-              Next
-            </Button>
+              <IconChevronRight size={14} />
+            </button>
           </div>
         </div>
       )}

@@ -24,17 +24,31 @@ export function CardHeader({
   title,
   subtitle,
   action,
+  density = "comfortable",
   className,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
+  density?: "comfortable" | "compact";
   className?: string;
 }) {
+  const compact = density === "compact";
   return (
-    <div className={cn("flex items-start justify-between gap-3 mb-4", className)}>
+    <div
+      className={cn(
+        "flex items-start justify-between gap-3",
+        compact ? "mb-2" : "mb-4",
+        className,
+      )}
+    >
       <div className="min-w-0">
-        <h3 className="text-[15px] font-semibold text-[var(--color-ink)] tracking-tight">
+        <h3
+          className={cn(
+            "font-semibold text-[var(--color-ink)] tracking-tight",
+            compact ? "text-[13px]" : "text-[15px]",
+          )}
+        >
           {title}
         </h3>
         {subtitle && (

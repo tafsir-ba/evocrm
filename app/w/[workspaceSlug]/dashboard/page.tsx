@@ -27,14 +27,13 @@ export default async function DashboardPage({ params }: { params: Params }) {
     <PageContainer className="min-w-0 overflow-x-hidden">
       <Suspense
         fallback={
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-64" />
-            <div className="grid grid-cols-2 gap-3">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} className="h-24 rounded-xl" />
-              ))}
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-16 w-full rounded-lg" />
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <Skeleton className="h-48 rounded-lg" />
+              <Skeleton className="h-48 rounded-lg" />
             </div>
-            <Skeleton className="h-64 rounded-xl" />
           </div>
         }
       >

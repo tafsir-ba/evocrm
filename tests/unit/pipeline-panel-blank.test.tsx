@@ -65,6 +65,8 @@ describe("PipelinePanel blank regressions", () => {
       expect(screen.getByText("Qualified")).toBeInTheDocument();
       expect(screen.getByText("No opportunities")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: "Column actions" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Add card")).not.toBeInTheDocument();
   });
 
   it("survives members payload without members array", async () => {
