@@ -764,6 +764,22 @@
       },
       "searchTotal": 149,
       "dryRunOnly": false
+    },
+    {
+      "slug": "hedonia",
+      "name": "Hedonia",
+      "reference": "HEDONIA",
+      "destinationProjectId": "6a9472fb597d08873e518eff",
+      "manifestSize": 7,
+      "created": 7,
+      "destinationLeadCount": 7,
+      "exceptionCount": 132,
+      "exceptionCounts": {
+        "missing_name": 101,
+        "multi_project": 31
+      },
+      "searchTotal": 139,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

@@ -1,0 +1,38 @@
+{
+  "name": "hedonia-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9472fb597d08873e518eff",
+  "destinationReference": "HEDONIA",
+  "slug": "hedonia",
+  "sourceHubSpotProjectId": "hedonia",
+  "size": 7,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "800051",
+    "41004321965",
+    "47733303097",
+    "51097470539",
+    "78868248350",
+    "78875124329",
+    "83336356517"
+  ],
+  "idChecksum": "e8538ed18204249e32221180988fdc5cb728fdf6c27b1e6dc11b79b696f7d620"
+}
