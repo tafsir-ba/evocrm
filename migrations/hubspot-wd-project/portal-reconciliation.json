@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-30T19:30:58.219Z",
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "hubspotSearchTotal": 38366,
+  "scannedUniqueIds": 38366,
+  "accounted": 38366,
+  "unexplained": 0,
+  "idChecksum": "01e23865c4b59ed4964f468555b78f6b117442666028b1be115a1cbb95828d50",
+  "contentHash": "09a0ca118994b65acb1f9b68424ba173f82242ed20aa4b5de47bffa767082936",
+  "bucketCounts": {
+    "migrated": 18316,
+    "preexisting_deduped": 295,
+    "still_to_migrate": 0,
+    "multi_or_identity_exception": 2380,
+    "no_project_signal": 11874,
+    "excluded": 5501
+  },
+  "reasonCounts": {
+    "no_project_signal:notes_only": 2284,
+    "hubspot_id_match": 18316,
+    "multi_project": 2224,
+    "missing_name": 4805,
+    "notes_conflict": 150,
+    "no_project_signal": 9584,
+    "cmp_product": 7,
+    "fallback_general:evohom": 1,
+    "no_project_signal:broker_only": 6,
+    "fallback_general:swissrocestimation": 159,
+    "fallback_general:evohome": 453,
+    "email_match": 295,
+    "fallback_general:educative_plateform": 28,
+    "fallback_general:CMP": 46,
+    "identity_conflict": 6,
+    "fallback_general:swissroc_properties": 2
+  },
+  "stillToMigrateBySlug": {},
+  "residualManifests": [],
+  "reviewQueue": {
+    "no_project_signal:no_project_signal:notes_only": {
+      "count": 2284,
+      "sampleIds": [
+        "401",
+        "701",
+        "851",
+        "951",
+        "1051"
+      ]
+    },
+    "multi_or_identity_exception:multi_project": {
+      "count": 2224,
+      "sampleIds": [
+        "3503",
+        "3602",
+        "3804",
+        "3902",
+        "4101"
+      ]
+    },
+    "excluded:missing_name": {
+      "count": 4805,
+      "sampleIds": [
+        "5751",
+        "6552",
+        "8751",
+        "9001",
+        "29901"
+      ]
+    },
+    "multi_or_identity_exception:notes_conflict": {
+      "count": 150,
+      "sampleIds": [
+        "7001",
+        "21151",
+        "42415",
+        "61451",
+        "63751"
+      ]
+    },
+    "no_project_signal:no_project_signal": {
+      "count": 9584,
+      "sampleIds": [
+        "51701",
+        "52651",
+        "88651",
+        "103351",
+        "103352"
+      ]
+    },
+    "excluded:cmp_product": {
+      "count": 7,
+      "sampleIds": [
+        "58151",
+        "623701",
+        "1327670",
+        "1328588",
+        "1375553"
+      ]
+    },
+    "excluded:fallback_general:evohom": {
+      "count": 1,
+      "sampleIds": [
+        "74651"
+      ]
+    },
+    "no_project_signal:no_project_signal:broker_only": {
+      "count": 6,
+      "sampleIds": [
+        "103461",
+        "107254",
+        "108204",
+        "108802",
+        "452851"
+      ]
+    },
+    "excluded:fallback_general:swissrocestimation": {
+      "count": 159,
+      "sampleIds": [
+        "599251",
+        "608451",
+        "609751",
+        "615151",
+        "632801"
+      ]
+    },
+    "excluded:fallback_general:evohome": {
+      "count": 453,
+      "sampleIds": [
+        "638751",
+        "644651",
+        "654601",
+        "655051",
+        "656351"
+      ]
+    },
+    "excluded:fallback_general:educative_plateform": {
+      "count": 28,
+      "sampleIds": [
+        "657801",
+        "782051",
+        "791551",
+        "795001",
+        "795051"
+      ]
+    },
+    "excluded:fallback_general:CMP": {
+      "count": 46,
+      "sampleIds": [
+        "891351",
+        "891401",
+        "894201",
+        "902001",
+        "903951"
+      ]
+    },
+    "multi_or_identity_exception:identity_conflict": {
+      "count": 6,
+      "sampleIds": [
+        "1394351",
+        "1540451",
+        "91309004555",
+        "92441879658",
+        "94609004611"
+      ]
+    },
+    "excluded:fallback_general:swissroc_properties": {
+      "count": 2,
+      "sampleIds": [
+        "218954782322",
+        "219164334936"
+      ]
+    }
+  },
+  "campaignGuard": {
+    "migratedLeadCount": 18316,
+    "unguardedDefaultExcluded": 0,
+    "enrollmentCount": 0
+  },
+  "gates": {
+    "exactAccounted": true,
+    "noDuplicateScanIds": true,
+    "campaignGuardIntact": true
+  },
+  "guardBackfill": {
+    "restoredPolicyOnLeads": 25,
+    "note": "Backfilled campaignEnrollmentPolicy on hubspot-gv-pilot leads missing defaultExcluded; enrollments unchanged at 0"
+  }
+}

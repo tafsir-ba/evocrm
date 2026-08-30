@@ -575,4 +575,124 @@ export function isSystemicAutomationFailure(reason: string | null | undefined): 
   ].some((code) => reason.includes(code));
 }
 
+/** Exclusive portal-wide reconciliation buckets (each HubSpot contact → exactly one). */
+export const PORTAL_RECON_BUCKETS = [
+  "migrated",
+  "preexisting_deduped",
+  "still_to_migrate",
+  "multi_or_identity_exception",
+  "no_project_signal",
+  "excluded",
+] as const;
+
+export type PortalReconBucket = (typeof PORTAL_RECON_BUCKETS)[number];
+
+export type PortalReconClassification = {
+  bucket: PortalReconBucket;
+  reason: string;
+  attributableSlug: string | null;
+};
+
+/**
+ * Classify one HubSpot contact into exactly one durable recon bucket.
+ * Never guesses a primary project for multi-project contacts.
+ * EvoHome General is not assigned here — no_project_signal stays in review
+ * unless a later explicit fallback pass routes it under the agreed rule.
+ */
+export function classifyPortalContact(input: {
+  snapshot: GvPilotContactSnapshot;
+  existing: GvPilotExistingLead[];
+  fallbackGeneralSlugs: ReadonlySet<string>;
+  migratableSlugs: ReadonlySet<string>;
+}): PortalReconClassification {
+  const { snapshot, existing, fallbackGeneralSlugs, migratableSlugs } = input;
+  const projects = [...new Set(snapshot.projectValues)];
+  const hubspotIdMatch = existing.some((lead) =>
+    lead.hubspotContactIds.includes(snapshot.hubspotContactId),
+  );
+  if (hubspotIdMatch) {
+    return { bucket: "migrated", reason: "hubspot_id_match", attributableSlug: null };
+  }
+
+  const emailMatches = snapshot.emailNormalized
+    ? existing.filter((lead) => lead.emailNormalized === snapshot.emailNormalized)
+    : [];
+  const identityConflict = emailMatches.some(
+    (lead) => lead.nameKey && snapshot.nameKey && lead.nameKey !== snapshot.nameKey,
+  );
+  if (identityConflict) {
+    return {
+      bucket: "multi_or_identity_exception",
+      reason: "identity_conflict",
+      attributableSlug: null,
+    };
+  }
+  if (emailMatches.length > 0) {
+    return {
+      bucket: "preexisting_deduped",
+      reason: "email_match",
+      attributableSlug: null,
+    };
+  }
+
+  if (projects.length > 1) {
+    return {
+      bucket: "multi_or_identity_exception",
+      reason: "multi_project",
+      attributableSlug: null,
+    };
+  }
+
+  if (projects.length === 0) {
+    return {
+      bucket: "no_project_signal",
+      reason: snapshot.notesValues.length > 0
+        ? "no_project_signal:notes_only"
+        : snapshot.brokerPrefixes.length > 0
+          ? "no_project_signal:broker_only"
+          : "no_project_signal",
+      attributableSlug: null,
+    };
+  }
+
+  const slug = projects[0]!;
+  const eligibility = evaluateWdProjectEligibility(snapshot, existing, slug);
+  if (eligibility.exclusions.includes("notes_conflict")) {
+    return {
+      bucket: "multi_or_identity_exception",
+      reason: "notes_conflict",
+      attributableSlug: null,
+    };
+  }
+  if (fallbackGeneralSlugs.has(slug)) {
+    return {
+      bucket: "excluded",
+      reason: `fallback_general:${slug}`,
+      attributableSlug: null,
+    };
+  }
+  if (!migratableSlugs.has(slug)) {
+    return {
+      bucket: "excluded",
+      reason: `unmapped_project:${slug}`,
+      attributableSlug: null,
+    };
+  }
+  if (eligibility.writeEligible) {
+    return {
+      bucket: "still_to_migrate",
+      reason: "new_write_eligible",
+      attributableSlug: slug,
+    };
+  }
+  const reason =
+    primaryExceptionReason(eligibility.exclusions.filter((item) => item !== "not_target_project")) ??
+    "excluded";
+  return {
+    bucket: "excluded",
+    reason,
+    attributableSlug: null,
+  };
+}
+
 export { parseExecuteArgs, resolveManifestFileName };
