@@ -417,6 +417,22 @@
       },
       "searchTotal": 336,
       "dryRunOnly": false
+    },
+    {
+      "slug": "namaya",
+      "name": "Namaya",
+      "reference": "NAMAYA",
+      "destinationProjectId": "6a9469824aaecee2d7f3da4b",
+      "manifestSize": 247,
+      "created": 247,
+      "destinationLeadCount": 247,
+      "exceptionCount": 98,
+      "exceptionCounts": {
+        "multi_project": 76,
+        "missing_name": 22
+      },
+      "searchTotal": 345,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
