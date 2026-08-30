@@ -8,6 +8,7 @@ import { CampaignSendModel } from "@/models/campaign-send";
 import { DocumentModel } from "@/models/document";
 import { ImportRowResultModel } from "@/models/import-row-result";
 import { LeadModel } from "@/models/lead";
+import { LeadProjectMembershipModel } from "@/models/lead-project-membership";
 import { OpportunityModel } from "@/models/opportunity";
 import { connectDb } from "@/server/db/mongoose";
 import { deleteObject } from "@/server/storage/spaces";
@@ -122,6 +123,10 @@ export async function purgeLeadsByIds(
     workspaceId: workspaceObjectId,
     entityId: { $in: leadIds },
   });
+
+  await LeadProjectMembershipModel.deleteMany(
+    withWorkspaceScope(workspaceId, { leadId: { $in: leadObjectIds } }),
+  );
 
   const result = await LeadModel.deleteMany(
     withWorkspaceScope(workspaceId, { _id: { $in: leadObjectIds } }),

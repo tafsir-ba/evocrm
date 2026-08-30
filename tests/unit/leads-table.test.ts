@@ -6,6 +6,7 @@ import {
   formatNextActionWhen,
   formatNextStepCell,
   formatOwnerName,
+  formatProjectMembershipCell,
   formatRelativeAge,
   formatSourceContext,
   leadUrgency,
@@ -48,6 +49,19 @@ describe("leads table presentation", () => {
     });
     expect(formatSourceContext(null, {})).toEqual({ source: "—", context: null });
     expect(formatCompactUtm(undefined)).toBeNull();
+  });
+
+  it("shows primary project and secondary overflow", () => {
+    expect(
+      formatProjectMembershipCell({
+        primaryName: "Les Terrasses",
+        secondaryCount: 2,
+      }),
+    ).toEqual({ text: "Les Terrasses +2", overflow: 2 });
+    expect(formatProjectMembershipCell({ primaryName: null, secondaryCount: 0 })).toEqual({
+      text: "—",
+      overflow: 0,
+    });
   });
 
   it("keeps two meaningful tags and reports overflow", () => {

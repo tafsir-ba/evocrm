@@ -35,6 +35,18 @@ export type LeadTableActivityEvent = {
   at: string | Date;
 };
 
+export function formatProjectMembershipCell(input: {
+  primaryName?: string | null;
+  secondaryCount?: number;
+}): { text: string; overflow: number } {
+  const primary = input.primaryName?.trim() || "—";
+  const overflow = input.secondaryCount && input.secondaryCount > 0 ? input.secondaryCount : 0;
+  return {
+    text: overflow > 0 ? `${primary} +${overflow}` : primary,
+    overflow,
+  };
+}
+
 export function formatOwnerName(user: LeadTableUser | null | undefined): string {
   const name = user?.name?.trim();
   if (name) {

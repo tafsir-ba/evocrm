@@ -48,6 +48,10 @@ export const leadListQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
   projectId: objectIdSchema.optional(),
   companyId: objectIdSchema.optional(),
+  includeAssociated: z
+    .union([z.literal("true"), z.literal("false")])
+    .optional()
+    .transform((value) => value === "true"),
   statusId: objectIdSchema.optional(),
   sourceId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),

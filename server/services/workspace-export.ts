@@ -14,6 +14,7 @@ import {
   IntegrationLogModel,
   IntegrationModel,
   LeadModel,
+  LeadProjectMembershipModel,
   MembershipModel,
   OpportunityModel,
   ProjectModel,
@@ -40,6 +41,7 @@ export type WorkspaceExportBundle = {
   tags: Record<string, unknown>[];
   projects: Record<string, unknown>[];
   leads: Record<string, unknown>[];
+  leadProjectMemberships: Record<string, unknown>[];
   properties: Record<string, unknown>[];
   opportunities: Record<string, unknown>[];
   activities: Record<string, unknown>[];
@@ -81,6 +83,7 @@ export async function exportWorkspaceData(input: {
     tags,
     projects,
     leads,
+    leadProjectMemberships,
     properties,
     opportunities,
     activities,
@@ -99,6 +102,7 @@ export async function exportWorkspaceData(input: {
     findWorkspaceScoped(TagModel, input.workspaceId),
     findWorkspaceScoped(ProjectModel, input.workspaceId),
     findWorkspaceScoped(LeadModel, input.workspaceId),
+    findWorkspaceScoped(LeadProjectMembershipModel, input.workspaceId),
     findWorkspaceScoped(PropertyModel, input.workspaceId),
     findWorkspaceScoped(OpportunityModel, input.workspaceId),
     findWorkspaceScoped(ActivityModel, input.workspaceId),
@@ -122,6 +126,7 @@ export async function exportWorkspaceData(input: {
     tags: sanitizeExportCollection(tags),
     projects: sanitizeExportCollection(projects),
     leads: sanitizeExportCollection(leads),
+    leadProjectMemberships: sanitizeExportCollection(leadProjectMemberships),
     properties: sanitizeExportCollection(properties),
     opportunities: sanitizeExportCollection(opportunities),
     activities: sanitizeExportCollection(activities),

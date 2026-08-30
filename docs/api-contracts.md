@@ -185,6 +185,11 @@ POST   /api/workspaces/[workspaceSlug]/leads
 GET    /api/workspaces/[workspaceSlug]/leads/[leadId]
 PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]
 DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
+GET    /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships
+PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/[membershipId]
+DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/[membershipId]
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/reorder
 ```
 
 | Method | Permission |
@@ -193,8 +198,12 @@ DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
 | POST create | `lead:create` |
 | PATCH update | `lead:update` |
 | DELETE archive | `lead:archive` |
+| GET project memberships | `lead:read` |
+| POST/PATCH/DELETE/reorder memberships | `lead:update` |
 
-**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `includeArchived`.
+**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `includeArchived`, `projectId`, `includeAssociated`. `projectId` matches the **primary** project by default. `includeAssociated=true` includes leads associated with that project through any membership. List/detail items include `project` (primary), `projectMemberships`, and `secondaryProjects`.
+
+**Project memberships:** Unique contact/project pair. Exactly one primary. Adding, removing, reordering, or changing primary does **not** enroll campaigns or drips. Removing the last membership or the current primary (without promoting another) returns `400 VALIDATION_ERROR`. Duplicate membership returns `409 CONFLICT`. Changing primary to a project that already has the same active email returns `409 CONFLICT`.
 
 **POST/PATCH** reject client-provided `workspaceId`, `createdBy`, `fullName`, `emailNormalized`, `phoneNormalized`, `archivedAt`. Duplicate active email **in the same project** returns `409 CONFLICT`. Duplicate phone returns `warnings: ["duplicate_phone"]` without blocking.
 

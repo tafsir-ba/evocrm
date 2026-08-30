@@ -35,6 +35,11 @@ import {
   IconPhone,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import {
+  LeadProjectMemberships,
+  type LeadProjectMembershipItem,
+  type LeadProjectOption,
+} from "@/components/leads/lead-project-memberships";
 
 type DictionaryItem = {
   id: string;
@@ -64,6 +69,8 @@ type LeadDetail = {
   status: DictionaryItem | null;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
+  projectMemberships?: LeadProjectMembershipItem[];
+  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   tags: string[];
   assignedUser: { id: string; name: string | null; email: string } | null;
@@ -115,6 +122,9 @@ export function LeadDetailPanel({
   const [notFound, setNotFound] = useState(false);
   const [integrationNames, setIntegrationNames] = useState<Record<string, string>>({});
   const [integrationNamesWarning, setIntegrationNamesWarning] = useState<string | null>(null);
+  const [projects, setProjects] = useState<LeadProjectOption[]>([]);
+  const [memberships, setMemberships] = useState<LeadProjectMembershipItem[]>([]);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -140,7 +150,9 @@ export function LeadDetailPanel({
         throw new Error(payload.error?.message ?? "Failed to load lead.");
       }
 
-      setLead(payload.data.lead as LeadDetail);
+      const nextLead = payload.data.lead as LeadDetail;
+      setLead(nextLead);
+      setMemberships(nextLead.projectMemberships ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
@@ -195,6 +207,46 @@ export function LeadDetailPanel({
       cancelled = true;
     };
   }, [apiBase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjects() {
+      try {
+        const response = await fetch(`${apiBase}/projects`);
+        const payload = await response.json();
+        if (cancelled || !response.ok) {
+          return;
+        }
+        setProjects((payload.data?.projects ?? []) as LeadProjectOption[]);
+      } catch {
+        if (!cancelled) {
+          setProjects([]);
+        }
+      }
+    }
+
+    void loadProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
+
+  async function mutateMemberships(
+    path: string,
+    init: RequestInit,
+  ): Promise<LeadProjectMembershipItem[]> {
+    const response = await fetch(path, init);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error?.message ?? "Failed to update project memberships.");
+    }
+    const next = (payload.data?.memberships ?? []) as LeadProjectMembershipItem[];
+    setMemberships(next);
+    setMembershipError(null);
+    await loadLead();
+    return next;
+  }
 
   async function handleArchive() {
     if (!lead || !canArchive || lead.archivedAt) {
@@ -452,16 +504,103 @@ export function LeadDetailPanel({
                         }
                       />
                       <Info label="Source" value={lead.source?.label ?? "—"} />
-                      <Info
-                        label="Project"
-                        value={
-                          lead.project
-                            ? lead.project.reference
-                              ? `${lead.project.name} (${lead.project.reference})`
-                              : lead.project.name
-                            : "—"
-                        }
-                      />
+                      <div className="md:col-span-2">
+                        <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
+                          Projects
+                        </p>
+                        {membershipError ? (
+                          <p className="mb-2 text-[12px] text-[var(--color-danger-fg)]">
+                            {membershipError}
+                          </p>
+                        ) : null}
+                        <LeadProjectMemberships
+                          memberships={
+                            memberships.length > 0
+                              ? memberships
+                              : lead.project
+                                ? [
+                                    {
+                                      id: lead.project.id,
+                                      projectId: lead.project.id,
+                                      isPrimary: true,
+                                      sourceOrder: 0,
+                                      project: lead.project,
+                                    },
+                                  ]
+                                : []
+                          }
+                          projects={projects}
+                          canUpdate={canUpdate && !lead.archivedAt}
+                          onAdd={async (projectId, isPrimary) => {
+                            try {
+                              await mutateMemberships(
+                                `${apiBase}/leads/${leadId}/project-memberships`,
+                                {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ projectId, isPrimary }),
+                                },
+                              );
+                            } catch (error) {
+                              setMembershipError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to add project.",
+                              );
+                            }
+                          }}
+                          onRemove={async (membershipId) => {
+                            try {
+                              await mutateMemberships(
+                                `${apiBase}/leads/${leadId}/project-memberships/${membershipId}`,
+                                { method: "DELETE" },
+                              );
+                            } catch (error) {
+                              setMembershipError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to remove project.",
+                              );
+                            }
+                          }}
+                          onSetPrimary={async (membershipId) => {
+                            try {
+                              await mutateMemberships(
+                                `${apiBase}/leads/${leadId}/project-memberships/${membershipId}`,
+                                {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ isPrimary: true }),
+                                },
+                              );
+                            } catch (error) {
+                              setMembershipError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to change primary project.",
+                              );
+                            }
+                          }}
+                          onReorder={async (membershipIds) => {
+                            try {
+                              await mutateMemberships(
+                                `${apiBase}/leads/${leadId}/project-memberships/reorder`,
+                                {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ membershipIds }),
+                                },
+                              );
+                            } catch (error) {
+                              setMembershipError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to reorder projects.",
+                              );
+                            }
+                          }}
+                        />
+                      </div>
                       <Info label="Status" value={lead.status?.label ?? "—"} />
                       <Info
                         label="Email consent"

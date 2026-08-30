@@ -46,6 +46,14 @@ type LeadListItem = {
   statusId?: string;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
+  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  projectMemberships?: Array<{
+    id: string;
+    projectId: string;
+    isPrimary: boolean;
+    sourceOrder: number;
+    project: { id: string; name: string; reference: string | null } | null;
+  }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
   lastActivity?: { id: string; title: string; at: string | Date } | null;
@@ -81,6 +89,7 @@ export function LeadsPanel({
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
   const projectId = useWorkspaceProjectFilter();
+  const [includeAssociated, setIncludeAssociated] = useState(false);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -219,6 +228,7 @@ export function LeadsPanel({
     transactionIntentFilter,
     usagePurposeFilter,
     projectId,
+    includeAssociated,
     showArchived,
     createdFromParam,
     createdToParam,
@@ -244,6 +254,7 @@ export function LeadsPanel({
   }, [
     page,
     projectId,
+    includeAssociated,
     propertyTypeInterestFilter,
     search,
     sourceFilter,
@@ -327,6 +338,9 @@ export function LeadsPanel({
     }
     if (projectId) {
       filters.projectId = projectId;
+    }
+    if (projectId && includeAssociated) {
+      filters.includeAssociated = "true";
     }
     if (showArchived) {
       filters.includeArchived = "true";
@@ -587,6 +601,19 @@ export function LeadsPanel({
           />
           Show archived
         </label>
+        {projectId ? (
+          <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+            <input
+              type="checkbox"
+              checked={includeAssociated}
+              onChange={(event) => {
+                setPage(1);
+                setIncludeAssociated(event.target.checked);
+              }}
+            />
+            Include associated projects
+          </label>
+        ) : null}
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"

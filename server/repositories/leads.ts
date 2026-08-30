@@ -111,6 +111,7 @@ export type LeadListFilter = {
   includeArchived?: boolean;
   projectId?: string;
   companyId?: string;
+  includeAssociated?: boolean;
   search?: string;
   statusId?: string;
   sourceId?: string;
@@ -186,7 +187,7 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
     query.createdAt = createdAt;
   }
 
-  if (filter.leadIds && filter.leadIds.length > 0) {
+  if (filter.leadIds) {
     const leadObjectIds = toObjectIdArray(filter.leadIds);
     if (filter.excludeIds && filter.excludeIds.length > 0) {
       const excluded = new Set(filter.excludeIds);
@@ -601,6 +602,7 @@ export async function updateLead(
     emailUnsubscribedAt: Date | null;
     emailUnsubscribeReason: string | null;
     companyId: string | null;
+    projectId: string;
   }>,
 ): Promise<LeadRecord | null> {
   await connectDb();
