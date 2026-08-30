@@ -154,6 +154,22 @@
       },
       "searchTotal": 688,
       "dryRunOnly": false
+    },
+    {
+      "slug": "k2",
+      "name": "K2",
+      "reference": "K2",
+      "destinationProjectId": "6a945468992d9fd9c3bed831",
+      "manifestSize": 492,
+      "created": 492,
+      "destinationLeadCount": 492,
+      "exceptionCount": 191,
+      "exceptionCounts": {
+        "multi_project": 44,
+        "missing_name": 147
+      },
+      "searchTotal": 683,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
