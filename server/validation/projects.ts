@@ -79,13 +79,23 @@ const projectLocationInputSchema = z.object({
   reviewStatus: z.enum(PROJECT_LOCATION_REVIEW_STATUSES).optional(),
 });
 
-const projectCompanySchema = z
+const projectCompanyProvenanceSchema = z
   .object({
-    companyId: objectIdSchema,
-    role: projectCompanyRoleSchema,
-    isPrimary: z.boolean().optional(),
+    method: z.enum(["workbook_import", "manual"]),
+    relationship: z.enum(["billed_linked", "unspecified"]),
+    source: z.string().trim().max(200),
+    appliedAt: z.string().trim().max(64),
+    notes: z.string().trim().max(500),
   })
-  .strict();
+  .nullable()
+  .optional();
+
+const projectCompanySchema = z.object({
+  companyId: objectIdSchema,
+  role: projectCompanyRoleSchema,
+  isPrimary: z.boolean().optional(),
+  provenance: projectCompanyProvenanceSchema,
+});
 
 export const projectListQuerySchema = z.object({
   includeArchived: z

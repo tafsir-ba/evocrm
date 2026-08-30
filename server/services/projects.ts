@@ -5,7 +5,10 @@ import {
   normalizeProjectLocation,
   type ProjectLocation,
 } from "@/lib/project-location";
-import { normalizeProjectCompanies } from "@/lib/project-operating-record";
+import {
+  normalizeProjectCompanies,
+  retainExistingCompanyProvenance,
+} from "@/lib/project-operating-record";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findCompaniesByIds } from "@/server/repositories/companies";
@@ -308,7 +311,10 @@ export async function updateProjectForWorkspace(
     }
   }
   if (input.companies !== undefined) {
-    const companies = normalizeProjectCompanies(input.companies);
+    const companies = retainExistingCompanyProvenance(
+      normalizeProjectCompanies(input.companies),
+      existing.companies,
+    );
     await validateProjectCompanies(workspaceId, companies);
     updatePayload.companies = companies;
   }

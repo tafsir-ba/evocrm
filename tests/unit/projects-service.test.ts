@@ -267,6 +267,81 @@ describe("project service", () => {
     });
   });
 
+  it("keeps billed/linked company provenance when an edit omits it", async () => {
+    const companyId = "507f1f77bcf86cd7994390aa";
+    const provenance = {
+      method: "workbook_import" as const,
+      relationship: "billed_linked" as const,
+      source: "workbook-derived mapping (operator-approved)",
+      appliedAt: "2026-08-30T18:00:00.000Z",
+      notes: "Establishes a billed/linked company relationship. Does not claim legal ownership.",
+    };
+
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Green View",
+      reference: null,
+      ...projectRecordExtras,
+      companies: [{ companyId, role: "developer", isPrimary: true, provenance }],
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findCompaniesByIds).mockResolvedValue([
+      {
+        id: companyId,
+        workspaceId: "ws-1",
+        name: "Promotor SA",
+        nameNormalized: "promotor sa",
+        website: null,
+        createdBy: "user-1",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(updateProject).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Green View",
+      reference: null,
+      ...projectRecordExtras,
+      companies: [{ companyId, role: "developer", isPrimary: true, provenance }],
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await updateProjectForWorkspace("ws-1", "project-1", "user-1", {
+      companies: [{ companyId, role: "developer", isPrimary: true }],
+    });
+
+    expect(updateProject).toHaveBeenCalledWith(
+      "ws-1",
+      "project-1",
+      expect.objectContaining({
+        companies: [{ companyId, role: "developer", isPrimary: true, provenance }],
+      }),
+    );
+  });
+
   it("archives projects with archivedAt and does not hard-delete", async () => {
     vi.mocked(findProjectById).mockResolvedValue({
       id: "project-1",

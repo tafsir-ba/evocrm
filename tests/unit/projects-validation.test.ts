@@ -168,6 +168,39 @@ describe("project validation schemas", () => {
     }
   });
 
+  it("accepts company links that round-trip stored provenance or extra display fields", () => {
+    const result = updateProjectInputSchema.safeParse({
+      companies: [
+        {
+          companyId: "507f1f77bcf86cd7994390aa",
+          role: "developer",
+          isPrimary: true,
+          company: { id: "507f1f77bcf86cd7994390aa", name: "Promotor SA" },
+          provenance: {
+            method: "workbook_import",
+            relationship: "billed_linked",
+            source: "workbook-derived mapping (operator-approved)",
+            appliedAt: "2026-08-30T18:00:00.000Z",
+            notes: "Billed/linked. Does not claim legal ownership.",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.companies?.[0]).toMatchObject({
+        companyId: "507f1f77bcf86cd7994390aa",
+        role: "developer",
+        isPrimary: true,
+        provenance: {
+          relationship: "billed_linked",
+        },
+      });
+      expect(result.data.companies?.[0] && "company" in result.data.companies[0]).toBe(false);
+    }
+  });
+
   it("accepts commercial stage and company associations", () => {
     const result = createProjectInputSchema.safeParse({
       name: "Les Terrasses",

@@ -120,3 +120,24 @@ export function primaryDeveloperCompanyId(
 ): string | null {
   return associations.find((item) => item.role === "developer" && item.isPrimary)?.companyId ?? null;
 }
+
+/**
+ * Keep stored company provenance when the client omits it (edit forms only send
+ * companyId/role/isPrimary). Incoming provenance wins when provided.
+ */
+export function retainExistingCompanyProvenance(
+  incoming: ProjectCompanyAssociation[],
+  existing: ProjectCompanyAssociation[],
+): ProjectCompanyAssociation[] {
+  const existingByKey = new Map(
+    existing.map((item) => [`${item.companyId}:${item.role}`, item] as const),
+  );
+
+  return incoming.map((item) => {
+    if (item.provenance) {
+      return item;
+    }
+    const prior = existingByKey.get(`${item.companyId}:${item.role}`);
+    return prior?.provenance ? { ...item, provenance: prior.provenance } : item;
+  });
+}
