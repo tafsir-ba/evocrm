@@ -623,6 +623,22 @@
       },
       "searchTotal": 220,
       "dryRunOnly": false
+    },
+    {
+      "slug": "veyrier",
+      "name": "Veyrier",
+      "reference": "VEYRIER",
+      "destinationProjectId": "6a94703cdf13a83dd1f19113",
+      "manifestSize": 118,
+      "created": 118,
+      "destinationLeadCount": 118,
+      "exceptionCount": 88,
+      "exceptionCounts": {
+        "multi_project": 86,
+        "notes_only": 2
+      },
+      "searchTotal": 204,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
