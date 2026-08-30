@@ -480,6 +480,22 @@
       },
       "searchTotal": 315,
       "dryRunOnly": false
+    },
+    {
+      "slug": "aquarellechardonne",
+      "name": "Aquarelle Chardonne",
+      "reference": "AQUARELLECHARDONNE",
+      "destinationProjectId": "6a946bc770605e4c59b9af5a",
+      "manifestSize": 22,
+      "created": 22,
+      "destinationLeadCount": 22,
+      "exceptionCount": 281,
+      "exceptionCounts": {
+        "multi_project": 82,
+        "missing_name": 199
+      },
+      "searchTotal": 302,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
