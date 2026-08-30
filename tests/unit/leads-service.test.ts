@@ -33,6 +33,10 @@ vi.mock("@/server/repositories/projects", () => ({
   findProjectById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/activities", () => ({
+  findLeadActivitySummaries: vi.fn(),
+}));
+
 vi.mock("@/server/services/campaign-auto-enrollment", () => ({
   evaluateCampaignAutoEnrollmentForLead: vi.fn(),
   logAutoEnrollmentFailure: vi.fn(),
@@ -55,6 +59,7 @@ import {
   restoreLead,
   updateLead,
 } from "@/server/repositories/leads";
+import { findLeadActivitySummaries } from "@/server/repositories/activities";
 import { findTagById } from "@/server/repositories/tags";
 import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
 import {
@@ -124,6 +129,7 @@ describe("lead service", () => {
     });
     vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
     vi.mocked(findLeadByPhoneNormalized).mockResolvedValue(null);
+    vi.mocked(findLeadActivitySummaries).mockResolvedValue(new Map());
     vi.mocked(findProjectById).mockResolvedValue({
       id: "project-1",
       workspaceId: "ws-1",
@@ -156,6 +162,34 @@ describe("lead service", () => {
     expect(result.leads).toHaveLength(1);
     expect(result.leads[0]?.projectId).toBeNull();
     expect(result.leads[0]?.project).toBeNull();
+    expect(result.leads[0]?.lastActivity).toBeNull();
+    expect(result.leads[0]?.nextAction).toBeNull();
+    expect(findLeadActivitySummaries).toHaveBeenCalledWith("ws-1", ["lead-1"]);
+  });
+
+  it("attaches last activity and next action from the workspace activity timeline", async () => {
+    const lastActivity = {
+      id: "act-last",
+      title: "Appel François",
+      at: new Date("2026-08-28T10:00:00.000Z"),
+    };
+    const nextAction = {
+      id: "act-next",
+      title: "Relance Genève",
+      at: new Date("2026-09-01T09:00:00.000Z"),
+    };
+    vi.mocked(findLeads).mockResolvedValue({
+      leads: [baseLead],
+      total: 1,
+    });
+    vi.mocked(findLeadActivitySummaries).mockResolvedValue(
+      new Map([["lead-1", { lastActivity, nextAction }]]),
+    );
+
+    const result = await listLeadsForWorkspace("ws-1");
+
+    expect(result.leads[0]?.lastActivity).toEqual(lastActivity);
+    expect(result.leads[0]?.nextAction).toEqual(nextAction);
   });
 
   it("derives fullName server-side on create", async () => {

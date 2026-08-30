@@ -1,7 +1,9 @@
 import "server-only";
 
+import type { LeadActivityEvent } from "@/lib/lead-activity-summary";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { findLeadActivitySummaries } from "@/server/repositories/activities";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import {
   archiveLead,
@@ -66,6 +68,8 @@ export type LeadListItem = LeadRecord & {
   source: LeadDictionarySummary | null;
   tagsResolved: LeadTagSummary[];
   assignedUser: LeadUserSummary | null;
+  lastActivity?: LeadActivityEvent | null;
+  nextAction?: LeadActivityEvent | null;
 };
 
 export type LeadDetail = LeadListItem & {
@@ -302,6 +306,8 @@ async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
     source,
     tagsResolved,
     assignedUser,
+    lastActivity: null,
+    nextAction: null,
   };
 }
 
@@ -336,9 +342,25 @@ export async function listLeadsForWorkspace(
   await assertValidProjectFilter(workspaceId, filter.projectId);
   const { leads, total } = await findLeads(workspaceId, filter);
 
-  const enriched = await Promise.all(leads.map((lead) => enrichLeadListItem(lead)));
+  const [enriched, activitySummaries] = await Promise.all([
+    Promise.all(leads.map((lead) => enrichLeadListItem(lead))),
+    findLeadActivitySummaries(
+      workspaceId,
+      leads.map((lead) => lead.id),
+    ),
+  ]);
 
-  return { leads: enriched, total };
+  return {
+    leads: enriched.map((lead) => {
+      const timeline = activitySummaries.get(lead.id);
+      return {
+        ...lead,
+        lastActivity: timeline?.lastActivity ?? null,
+        nextAction: timeline?.nextAction ?? null,
+      };
+    }),
+    total,
+  };
 }
 
 export async function getLeadForWorkspace(

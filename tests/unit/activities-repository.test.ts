@@ -15,7 +15,11 @@ vi.mock("@/models/activity", () => ({
 }));
 
 import { ActivityModel } from "@/models/activity";
-import { findActivities, findActivityById } from "@/server/repositories/activities";
+import {
+  findActivities,
+  findActivityById,
+  findLeadActivitySummaries,
+} from "@/server/repositories/activities";
 
 describe("activities repository", () => {
   beforeEach(() => {
@@ -100,6 +104,41 @@ describe("activities repository", () => {
     const result = await findActivities("ws-1", { emptyResult: true });
 
     expect(result).toEqual({ activities: [], total: 0 });
+    expect(ActivityModel.find).not.toHaveBeenCalled();
+  });
+
+  it("batches lead activity summaries for the current page", async () => {
+    const lean = vi.fn().mockResolvedValue([
+      {
+        _id: { toString: () => "act-1" },
+        leadId: "lead-1",
+        title: "Appel François",
+        dueDate: null,
+        nextActionDate: new Date("2026-09-01T09:00:00.000Z"),
+        completedAt: null,
+        cancelledAt: null,
+        updatedAt: new Date("2026-08-28T15:00:00.000Z"),
+        createdAt: new Date("2026-08-28T14:00:00.000Z"),
+      },
+    ]);
+    const select = vi.fn().mockReturnValue({ lean });
+    vi.mocked(ActivityModel.find).mockReturnValue({ select } as never);
+
+    const summaries = await findLeadActivitySummaries("ws-1", ["lead-1", "lead-2"]);
+
+    expect(ActivityModel.find).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      leadId: { $in: ["lead-1", "lead-2"] },
+      archivedAt: null,
+    });
+    expect(summaries.get("lead-1")?.lastActivity?.title).toBe("Appel François");
+    expect(summaries.get("lead-1")?.nextAction?.title).toBe("Appel François");
+  });
+
+  it("skips the activity query when the page has no leads", async () => {
+    const summaries = await findLeadActivitySummaries("ws-1", []);
+
+    expect(summaries.size).toBe(0);
     expect(ActivityModel.find).not.toHaveBeenCalled();
   });
 });

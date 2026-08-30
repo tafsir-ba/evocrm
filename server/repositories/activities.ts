@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  summarizeLeadActivities,
+  type LeadActivityTimeline,
+} from "@/lib/lead-activity-summary";
 import { connectDb } from "@/server/db/mongoose";
 import { ActivityModel, type ActivityDocument } from "@/models/activity";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
@@ -171,6 +175,61 @@ function buildListQuery(filter: ActivityListFilter): Record<string, unknown> {
   }
 
   return query;
+}
+
+export async function findLeadActivitySummaries(
+  workspaceId: string,
+  leadIds: string[],
+): Promise<Map<string, LeadActivityTimeline>> {
+  if (leadIds.length === 0) {
+    return new Map();
+  }
+
+  await connectDb();
+
+  const documents = await ActivityModel.find(
+    withWorkspaceScope(workspaceId, {
+      leadId: { $in: leadIds },
+      archivedAt: null,
+    }),
+  )
+    .select({
+      leadId: 1,
+      title: 1,
+      dueDate: 1,
+      nextActionDate: 1,
+      completedAt: 1,
+      cancelledAt: 1,
+      updatedAt: 1,
+      createdAt: 1,
+    })
+    .lean<
+      Array<{
+        _id: { toString(): string };
+        leadId?: unknown;
+        title?: string;
+        dueDate?: Date | null;
+        nextActionDate?: Date | null;
+        completedAt?: Date | null;
+        cancelledAt?: Date | null;
+        updatedAt?: Date;
+        createdAt?: Date;
+      }>
+    >();
+
+  return summarizeLeadActivities(
+    documents.map((document) => ({
+      id: document._id.toString(),
+      leadId: document.leadId ? String(document.leadId) : null,
+      title: document.title ?? "",
+      dueDate: document.dueDate ?? null,
+      nextActionDate: document.nextActionDate ?? null,
+      completedAt: document.completedAt ?? null,
+      cancelledAt: document.cancelledAt ?? null,
+      updatedAt: document.updatedAt ?? document.createdAt ?? new Date(0),
+      createdAt: document.createdAt ?? new Date(0),
+    })),
+  );
 }
 
 export async function findActivities(

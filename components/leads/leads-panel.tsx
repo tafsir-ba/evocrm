@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { StatusBadge } from "@/components/domain/status-badge";
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
+import { LeadsTable, type LeadTableMember } from "@/components/leads/leads-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -41,10 +40,16 @@ type LeadListItem = {
   phone: string | null;
   createdAt: string;
   archivedAt?: string | null;
+  attributes?: Record<string, unknown> | null;
+  lastContactedAt?: string | Date | null;
   status: DictionaryItem | null;
+  statusId?: string;
   source: DictionaryItem | null;
+  project: { id: string; name: string; reference: string | null } | null;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
+  lastActivity?: { id: string; title: string; at: string | Date } | null;
+  nextAction?: { id: string; title: string; at: string | Date } | null;
 };
 
 type WebsiteIntegrationOption = {
@@ -58,6 +63,7 @@ type LeadsPanelProps = {
   canCreateProject?: boolean;
   canArchive: boolean;
   canDelete: boolean;
+  canUpdate: boolean;
 };
 
 export function LeadsPanel({
@@ -66,6 +72,7 @@ export function LeadsPanel({
   canCreateProject = false,
   canArchive,
   canDelete,
+  canUpdate,
 }: LeadsPanelProps) {
   const router = useRouter();
   const projectId = useWorkspaceProjectFilter();
@@ -97,6 +104,8 @@ export function LeadsPanel({
   const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [members, setMembers] = useState<LeadTableMember[]>([]);
+  const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -105,19 +114,22 @@ export function LeadsPanel({
     setWebsiteOptionsWarning(null);
 
     try {
-      const [statusRes, sourceRes, tagsRes, integrationsRes] = await Promise.all([
+      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes] = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=lead_status`),
         fetch(`${apiBase}/dictionary-items?type=lead_source`),
         fetch(`${apiBase}/tags?entityType=lead`),
         fetch(`${apiBase}/integrations?type=website`),
+        canUpdate ? fetch(`${apiBase}/members`) : Promise.resolve(null),
       ]);
 
-      const [statusPayload, sourcePayload, tagsPayload, integrationsPayload] = await Promise.all([
-        statusRes.json(),
-        sourceRes.json(),
-        tagsRes.json(),
-        integrationsRes.json(),
-      ]);
+      const [statusPayload, sourcePayload, tagsPayload, integrationsPayload, membersPayload] =
+        await Promise.all([
+          statusRes.json(),
+          sourceRes.json(),
+          tagsRes.json(),
+          integrationsRes.json(),
+          membersRes ? membersRes.json() : Promise.resolve(null),
+        ]);
 
       if (statusRes.ok) {
         setStatuses(statusPayload.data.items as DictionaryItem[]);
@@ -145,10 +157,15 @@ export function LeadsPanel({
           integrationsPayload.error?.message ?? "Could not load website integrations for filtering.",
         );
       }
+      if (membersRes?.ok) {
+        setMembers((membersPayload?.data?.members as LeadTableMember[] | undefined) ?? []);
+      } else {
+        setMembers([]);
+      }
     } catch {
       setWebsiteOptionsWarning("Could not load some lead filter options.");
     }
-  }, [apiBase]);
+  }, [apiBase, canUpdate]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -438,12 +455,40 @@ export function LeadsPanel({
     await loadLeads();
   }
 
-  function formatDate(value: string) {
-    return new Date(value).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  async function patchLead(
+    leadId: string,
+    payload: { statusId?: string; assignedTo?: string | null },
+    failureMessage: string,
+  ) {
+    if (!canUpdate || pendingLeadId) {
+      return;
+    }
+
+    setPendingLeadId(leadId);
+    try {
+      const response = await fetch(`${apiBase}/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const body = await response.json();
+        window.alert(body.error?.message ?? failureMessage);
+        return;
+      }
+
+      await loadLeads();
+    } finally {
+      setPendingLeadId(null);
+    }
+  }
+
+  async function handleAssign(leadId: string, assignedTo: string | null) {
+    await patchLead(leadId, { assignedTo }, "Failed to assign lead.");
+  }
+
+  async function handleStatusChange(leadId: string, statusId: string) {
+    await patchLead(leadId, { statusId }, "Failed to update lead status.");
   }
 
   if (forbidden) {
@@ -491,10 +536,11 @@ export function LeadsPanel({
         <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <div className="flex-1 min-w-[200px] max-w-md">
           <Input
             placeholder="Search leads by name, email or phone…"
+            aria-label="Search leads by name, email or phone"
             value={search}
             onChange={(event) => {
               setPage(1);
@@ -517,6 +563,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
+          aria-label="Filter by status"
           value={statusFilter}
           onChange={(event) => {
             setPage(1);
@@ -533,6 +580,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
+          aria-label="Filter by source"
           value={sourceFilter}
           onChange={(event) => {
             setPage(1);
@@ -549,6 +597,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
+          aria-label="Filter by tag"
           value={tagFilter}
           onChange={(event) => {
             setPage(1);
@@ -565,6 +614,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[160px]"
+          aria-label="Filter by website"
           value={integrationFilter}
           onChange={(event) => {
             setPage(1);
@@ -582,6 +632,7 @@ export function LeadsPanel({
           fieldSize="sm"
           className="w-auto min-w-[150px] max-w-[180px]"
           placeholder="UTM campaign"
+          aria-label="Filter by UTM campaign"
           value={utmCampaignFilter}
           onChange={(event) => {
             setPage(1);
@@ -591,6 +642,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[160px]"
+          aria-label="Filter by property type"
           value={propertyTypeInterestFilter}
           onChange={(event) => {
             setPage(1);
@@ -607,6 +659,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
+          aria-label="Filter by intent"
           value={transactionIntentFilter}
           onChange={(event) => {
             setPage(1);
@@ -623,6 +676,7 @@ export function LeadsPanel({
         <Select
           fieldSize="sm"
           className="w-auto min-w-[150px]"
+          aria-label="Filter by usage purpose"
           value={usagePurposeFilter}
           onChange={(event) => {
             setPage(1);
@@ -639,10 +693,11 @@ export function LeadsPanel({
       </div>
 
       {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
         </div>
       ) : error ? (
         <ErrorState title="Could not load leads" description={error} primaryAction={{ label: "Retry", onClick: () => void loadLeads() }} />
@@ -662,7 +717,7 @@ export function LeadsPanel({
       ) : (
         <div className="bg-white border border-[var(--color-line)] rounded-xl overflow-hidden">
           {canDelete && selectedCount > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-canvas)] px-5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
               <p className="text-[12.5px] text-[var(--color-ink-soft)]">
                 <span className="font-medium text-[var(--color-ink)]">
                   {selectedCount.toLocaleString()}
@@ -686,7 +741,7 @@ export function LeadsPanel({
           )}
 
           {canDelete && allPageSelected && total > leads.length && !selectAllMatching && (
-            <div className="border-b border-[var(--color-line)] bg-[#eff6ff] px-5 py-2.5 text-[12.5px] text-[var(--color-ink-soft)]">
+            <div className="border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
               All {leads.length} leads on this page are selected.{" "}
               <button
                 type="button"
@@ -702,140 +757,29 @@ export function LeadsPanel({
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-[13px]">
-              <thead>
-                <tr className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] bg-[var(--color-canvas)] border-b border-[var(--color-line)]">
-                  {canDelete && (
-                    <th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-[var(--color-line)]"
-                        checked={allPageSelected}
-                        ref={(element) => {
-                          if (element) {
-                            element.indeterminate = somePageSelected && !allPageSelected;
-                          }
-                        }}
-                        onChange={togglePageSelection}
-                        aria-label="Select all leads on this page"
-                      />
-                    </th>
-                  )}
-                  <th className="text-left font-semibold px-5 py-3">Name</th>
-                  <th className="text-left font-semibold px-2 py-3">Source</th>
-                  <th className="text-left font-semibold px-2 py-3">Status</th>
-                  <th className="text-left font-semibold px-2 py-3">Assigned to</th>
-                  <th className="text-left font-semibold px-2 py-3">Created</th>
-                  <th className="text-left font-semibold px-2 py-3">Tags</th>
-                  <th className="text-right font-semibold px-5 py-3 w-24">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-line)]">
-                {leads.map((lead) => {
-                  const isSelected = selectAllMatching
-                    ? !excludedLeadIds.has(lead.id)
-                    : selectedLeadIds.has(lead.id);
+          <LeadsTable
+            workspaceSlug={workspaceSlug}
+            leads={leads}
+            statuses={statuses}
+            members={members}
+            canUpdate={canUpdate}
+            canArchive={canArchive}
+            canDelete={canDelete}
+            selectedLeadIds={selectedLeadIds}
+            selectAllMatching={selectAllMatching}
+            excludedLeadIds={excludedLeadIds}
+            allPageSelected={allPageSelected}
+            somePageSelected={somePageSelected}
+            pendingLeadId={pendingLeadId}
+            onToggleLead={toggleLeadSelection}
+            onTogglePage={togglePageSelection}
+            onAssign={(leadId, assignedTo) => void handleAssign(leadId, assignedTo)}
+            onStatusChange={(leadId, statusId) => void handleStatusChange(leadId, statusId)}
+            onArchive={(leadId, leadName) => void handleArchive(leadId, leadName)}
+            onRestore={(leadId, leadName) => void handleRestore(leadId, leadName)}
+          />
 
-                  return (
-                  <tr
-                    key={lead.id}
-                    className="hover:bg-[var(--color-canvas)] transition-colors"
-                  >
-                    {canDelete && (
-                      <td className="px-3 py-3.5">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-[var(--color-line)]"
-                          checked={isSelected}
-                          onChange={() => toggleLeadSelection(lead.id)}
-                          aria-label={`Select ${lead.fullName}`}
-                        />
-                      </td>
-                    )}
-                    <td className="px-5 py-3.5">
-                      <Link
-                        href={workspacePath(workspaceSlug, "leads", lead.id)}
-                        className="font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
-                      >
-                        {lead.fullName}
-                      </Link>
-                      {lead.email && (
-                        <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5">
-                          {lead.email}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-2 py-3.5 text-[var(--color-ink-soft)]">
-                      {lead.source?.label ?? "—"}
-                    </td>
-                    <td className="px-2 py-3.5">
-                      {lead.status ? (
-                        <StatusBadge
-                          label={lead.status.label}
-                          color={lead.status.color}
-                          size="sm"
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-2 py-3.5 text-[var(--color-ink-soft)]">
-                      {lead.assignedUser?.name ?? lead.assignedUser?.email ?? "—"}
-                    </td>
-                    <td className="px-2 py-3.5 text-[var(--color-ink-soft)] tabular">
-                      {formatDate(lead.createdAt)}
-                    </td>
-                    <td className="px-2 py-3.5">
-                      {lead.tagsResolved.length === 0 ? (
-                        <span className="text-[var(--color-ink-faint)]">—</span>
-                      ) : (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {lead.tagsResolved.map((tag) => (
-                            <Badge key={tag.id} tone="muted" size="sm">
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Link
-                          href={workspacePath(workspaceSlug, "leads", lead.id)}
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
-                          aria-label={`Open ${lead.fullName}`}
-                        >
-                          <IconChevronRight size={14} />
-                        </Link>
-                        {canArchive && lead.archivedAt ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleRestore(lead.id, lead.fullName)}
-                          >
-                            Restore
-                          </Button>
-                        ) : null}
-                        {canArchive && !lead.archivedAt ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleArchive(lead.id, lead.fullName)}
-                          >
-                            Archive
-                          </Button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)]">
+          <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-[var(--color-line)] bg-[var(--color-canvas)]">
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
               Showing{" "}
               <span className="text-[var(--color-ink)] font-medium">
@@ -849,17 +793,19 @@ export function LeadsPanel({
                 type="button"
                 className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page <= 1}
+                aria-label="Previous page"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
                 <IconChevronLeft size={14} />
               </button>
-              <span className="px-2 text-[12.5px] text-[var(--color-ink-soft)] tabular">
+              <span className="px-2 text-[12.5px] text-[var(--color-ink-soft)] tabular" aria-live="polite">
                 {page} / {totalPages}
               </span>
               <button
                 type="button"
                 className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page >= totalPages}
+                aria-label="Next page"
                 onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               >
                 <IconChevronRight size={14} />
