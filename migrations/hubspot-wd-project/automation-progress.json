@@ -314,6 +314,25 @@
       },
       "searchTotal": 546,
       "dryRunOnly": false
+    },
+    {
+      "slug": "seymaz44",
+      "name": "Seymaz 44",
+      "reference": "SEYMAZ44",
+      "destinationProjectId": "6a9465309fec2eea59a62a36",
+      "manifestSize": 57,
+      "created": 57,
+      "destinationLeadCount": 57,
+      "exceptionCount": 500,
+      "exceptionCounts": {
+        "missing_name": 302,
+        "multi_project": 153,
+        "cmp_product": 1,
+        "notes_only": 15,
+        "no_project_signal": 29
+      },
+      "searchTotal": 438,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
