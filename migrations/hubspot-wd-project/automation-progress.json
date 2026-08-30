@@ -895,6 +895,21 @@
       },
       "searchTotal": 75,
       "dryRunOnly": false
+    },
+    {
+      "slug": "hyla",
+      "name": "Hyla",
+      "reference": "HYLA",
+      "destinationProjectId": "6a947ae571c11e72b8356c11",
+      "manifestSize": 52,
+      "created": 52,
+      "destinationLeadCount": 52,
+      "exceptionCount": 12,
+      "exceptionCounts": {
+        "multi_project": 12
+      },
+      "searchTotal": 64,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

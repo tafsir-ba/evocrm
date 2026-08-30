@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "slug": "hyla",
+  "destinationProjectId": "6a947ae571c11e72b8356c11",
+  "destinationReference": "HYLA",
+  "counts": {
+    "multi_project": 12
+  },
+  "records": [
+    {
+      "hubspotContactId": "226601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "812851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "842151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "101437132868",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "121563944244",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "123096660231",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "128159454619",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "155166017909",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "163795209524",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "167916976134",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "177104293998",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "197767255047",
+      "reason": "multi_project"
+    }
+  ]
+}
