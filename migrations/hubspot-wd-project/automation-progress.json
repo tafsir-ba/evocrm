@@ -170,6 +170,22 @@
       },
       "searchTotal": 683,
       "dryRunOnly": false
+    },
+    {
+      "slug": "residence_symbiose",
+      "name": "Résidence Symbiose",
+      "reference": "RESIDENCE_SYMBIOSE",
+      "destinationProjectId": "6a94562dd466072be25e952b",
+      "manifestSize": 497,
+      "created": 497,
+      "destinationLeadCount": 497,
+      "exceptionCount": 182,
+      "exceptionCounts": {
+        "multi_project": 181,
+        "notes_conflict": 1
+      },
+      "searchTotal": 679,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
