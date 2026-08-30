@@ -529,6 +529,21 @@
       },
       "searchTotal": 1,
       "dryRunOnly": false
+    },
+    {
+      "slug": "buissonniere_rockwell",
+      "name": "Buissonnière Rockwell",
+      "reference": "BUISSONNIERE_ROCKWELL",
+      "destinationProjectId": "6a946cc2952b3fadf1f368ce",
+      "manifestSize": 188,
+      "created": 188,
+      "destinationLeadCount": 188,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 49
+      },
+      "searchTotal": 237,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
