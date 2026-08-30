@@ -829,6 +829,22 @@
       },
       "searchTotal": 89,
       "dryRunOnly": false
+    },
+    {
+      "slug": "villa_sorella",
+      "name": "Villa Sorella",
+      "reference": "VILLA_SORELLA",
+      "destinationProjectId": "6a94736cd29a3272eaae6b4f",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 78,
+      "exceptionCounts": {
+        "multi_project": 17,
+        "missing_name": 61
+      },
+      "searchTotal": 78,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
