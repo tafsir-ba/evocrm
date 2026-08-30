@@ -52,6 +52,23 @@
       },
       "searchTotal": 1746,
       "dryRunOnly": false
+    },
+    {
+      "slug": "smarthill",
+      "name": "Smarthill",
+      "reference": "SMARTHILL",
+      "destinationProjectId": "6a943bef1195ddcd26f08673",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 1298,
+      "exceptionCounts": {
+        "multi_project": 14,
+        "missing_name": 1132,
+        "notes_only": 152
+      },
+      "searchTotal": 15,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
