@@ -10,7 +10,6 @@ import type {
   TransactionIntent,
   UsagePurpose,
 } from "@/lib/lead-preferences";
-import { campaignGuardMongoExclusion } from "@/lib/campaign-enrollment-guard";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 import { toObjectIdString } from "@/server/utils/mongo-id";
 
@@ -122,7 +121,6 @@ export type LeadListFilter = {
   createdTo?: Date;
   excludeIds?: string[];
   leadIds?: string[];
-  excludeCampaignGuarded?: boolean;
   page?: number;
   pageSize?: number;
 };
@@ -204,10 +202,6 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
       { email: regex },
       { phone: regex },
     ];
-  }
-
-  if (filter.excludeCampaignGuarded) {
-    query.$nor = [campaignGuardMongoExclusion()];
   }
 
   return query;

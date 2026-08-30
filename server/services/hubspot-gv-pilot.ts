@@ -5,7 +5,10 @@ import path from "node:path";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
-import { canEnrollLeadInCampaigns, buildMigratedCampaignGuardAttributes } from "@/lib/campaign-enrollment-guard";
+import {
+  buildMigratedCampaignGuardAttributes,
+  isBlockedFromAutomaticCampaignEnrollment,
+} from "@/lib/campaign-enrollment-guard";
 import {
   GV_PILOT_ABORT_THRESHOLD,
   GV_PILOT_GENERAL_PROJECT_ID,
@@ -106,7 +109,7 @@ export type GvPilotReconciliation = {
   generalProjectTouched: boolean;
   campaignGuard: {
     createdLeadsGuarded: number;
-    enrollableWithoutOptIn: number;
+    automaticallyEnrollable: number;
     enrollmentCount: number;
   };
 };
@@ -204,11 +207,11 @@ async function reconcile(input: {
     findLeadsByIds(GV_PILOT_WORKSPACE_ID, input.createdLeadIds),
   ]);
 
-  const enrollableWithoutOptIn = createdLeads.filter((lead) =>
-    canEnrollLeadInCampaigns(lead.attributes),
+  const createdLeadsGuarded = createdLeads.filter((lead) =>
+    isBlockedFromAutomaticCampaignEnrollment(lead.attributes),
   ).length;
-  const createdLeadsGuarded = createdLeads.filter(
-    (lead) => !canEnrollLeadInCampaigns(lead.attributes),
+  const automaticallyEnrollable = createdLeads.filter(
+    (lead) => !isBlockedFromAutomaticCampaignEnrollment(lead.attributes),
   ).length;
 
   return {
@@ -225,7 +228,7 @@ async function reconcile(input: {
     generalProjectTouched: false,
     campaignGuard: {
       createdLeadsGuarded,
-      enrollableWithoutOptIn,
+      automaticallyEnrollable,
       enrollmentCount,
     },
   };
@@ -548,7 +551,7 @@ export async function runHubSpotGvPilot(input: {
       aborted = true;
       abortReason = abortReason ?? "automation_side_effect";
     }
-    if (reconciliation.campaignGuard.enrollableWithoutOptIn > 0) {
+    if (reconciliation.campaignGuard.automaticallyEnrollable > 0) {
       unexpected += 1;
       aborted = true;
       abortReason = abortReason ?? "campaign_guard_missing";

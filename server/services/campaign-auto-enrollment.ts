@@ -1,6 +1,9 @@
 import "server-only";
 
-import { CAMPAIGN_GUARD_BLOCK_REASON, canEnrollLeadInCampaigns } from "@/lib/campaign-enrollment-guard";
+import {
+  CAMPAIGN_GUARD_BLOCK_REASON,
+  isBlockedFromAutomaticCampaignEnrollment,
+} from "@/lib/campaign-enrollment-guard";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { captureError } from "@/server/observability/capture-error";
 import type { LeadRecord } from "@/server/repositories/leads";
@@ -248,7 +251,7 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
     return;
   }
 
-  if (!canEnrollLeadInCampaigns(lead.attributes)) {
+  if (isBlockedFromAutomaticCampaignEnrollment(lead.attributes)) {
     await createAuditLog({
       workspaceId: input.workspaceId,
       actorId: input.actorId,

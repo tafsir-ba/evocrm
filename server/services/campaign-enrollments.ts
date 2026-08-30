@@ -1,6 +1,10 @@
 import "server-only";
 
-import { canEnrollLeadInCampaigns } from "@/lib/campaign-enrollment-guard";
+import {
+  CAMPAIGN_GUARD_BLOCK_REASON,
+  isAutomaticEnrollmentSource,
+  isBlockedFromAutomaticCampaignEnrollment,
+} from "@/lib/campaign-enrollment-guard";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
@@ -264,7 +268,6 @@ export async function listEnrollmentCandidatesForWorkspace(
     const { leads, total } = await findLeads(workspaceId, {
       search: filter.search,
       excludeIds: leadIds,
-      excludeCampaignGuarded: true,
       page,
       pageSize,
     });
@@ -424,13 +427,6 @@ export async function createCampaignEnrollmentForWorkspace(
       throw new AppError("NOT_FOUND", "Lead not found.");
     }
 
-    if (!canEnrollLeadInCampaigns(lead.attributes)) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Migrated HubSpot contacts are excluded from campaigns unless a project marketing manager opts them in.",
-      );
-    }
-
     const existing = await findActiveEnrollmentByLead(
       workspaceId,
       campaignId,
@@ -476,13 +472,6 @@ export async function createCampaignEnrollmentForWorkspace(
 
     if (!lead || lead.archivedAt) {
       throw new AppError("NOT_FOUND", "Associated lead not found.");
-    }
-
-    if (!canEnrollLeadInCampaigns(lead.attributes)) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "Migrated HubSpot contacts are excluded from campaigns unless a project marketing manager opts them in.",
-      );
     }
 
     opportunityId = opportunity.id;
@@ -564,7 +553,22 @@ export async function enrollLeadInCampaignWithContext(input: {
     return null;
   }
 
-  if (!canEnrollLeadInCampaigns(lead.attributes)) {
+  if (
+    isAutomaticEnrollmentSource(input.enrollmentSource) &&
+    isBlockedFromAutomaticCampaignEnrollment(lead.attributes)
+  ) {
+    await createAuditLog({
+      workspaceId: input.workspaceId,
+      actorId: input.actorId,
+      action: "campaign.auto_enrollment_skipped",
+      entityType: "lead",
+      entityId: lead.id,
+      after: {
+        campaignId: input.campaignId,
+        enrollmentSource: input.enrollmentSource,
+        reason: CAMPAIGN_GUARD_BLOCK_REASON,
+      },
+    });
     return null;
   }
 

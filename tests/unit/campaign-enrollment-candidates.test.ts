@@ -103,7 +103,6 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
     expect(findLeads).toHaveBeenCalledWith("ws-1", {
       search: undefined,
       excludeIds: [],
-      excludeCampaignGuarded: true,
       page: 1,
       pageSize: 50,
     });

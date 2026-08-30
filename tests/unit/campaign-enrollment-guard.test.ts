@@ -1,43 +1,42 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildMarketingManagerOptInPolicy,
   buildMigratedCampaignGuardAttributes,
-  canEnrollLeadInCampaigns,
-  hasProjectMarketingManagerOptIn,
+  isAutomaticEnrollmentSource,
+  isBlockedFromAutomaticCampaignEnrollment,
   isHubSpotOrLegacyMigratedLead,
 } from "@/lib/campaign-enrollment-guard";
 
 describe("campaign enrollment guard", () => {
-  it("allows organic leads with no HubSpot or migration markers", () => {
-    expect(canEnrollLeadInCampaigns({})).toBe(true);
-    expect(canEnrollLeadInCampaigns({ integration: { inboundSource: "website" } })).toBe(true);
+  it("does not treat organic leads as automatically blocked", () => {
+    expect(isBlockedFromAutomaticCampaignEnrollment({})).toBe(false);
+    expect(
+      isBlockedFromAutomaticCampaignEnrollment({ integration: { inboundSource: "website" } }),
+    ).toBe(false);
     expect(isHubSpotOrLegacyMigratedLead({ integration: { inboundSource: "hero-form" } })).toBe(
       false,
     );
   });
 
-  it("blocks HubSpot idempotency keys, inbound sources, and stamped migration policy", () => {
+  it("blocks automatic enrollment for HubSpot keys, inbound sources, and stamped policy", () => {
     expect(
-      canEnrollLeadInCampaigns({
+      isBlockedFromAutomaticCampaignEnrollment({
         integration: { idempotencyKey: "hubspot:contact:99" },
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
-      canEnrollLeadInCampaigns({
+      isBlockedFromAutomaticCampaignEnrollment({
         integration: { inboundSource: "hubspot-gv-pilot" },
       }),
-    ).toBe(false);
-    expect(canEnrollLeadInCampaigns(buildMigratedCampaignGuardAttributes())).toBe(false);
+    ).toBe(true);
+    expect(isBlockedFromAutomaticCampaignEnrollment(buildMigratedCampaignGuardAttributes())).toBe(
+      true,
+    );
   });
 
-  it("allows enrollment only after explicit project marketing-manager opt-in", () => {
-    const optedIn = {
-      ...buildMigratedCampaignGuardAttributes(),
-      campaignEnrollmentPolicy: buildMarketingManagerOptInPolicy({ actorId: "mm-1" }),
-    };
-    expect(isHubSpotOrLegacyMigratedLead(optedIn)).toBe(true);
-    expect(hasProjectMarketingManagerOptIn(optedIn)).toBe(true);
-    expect(canEnrollLeadInCampaigns(optedIn)).toBe(true);
+  it("classifies only auto-enroll sources as automatic", () => {
+    expect(isAutomaticEnrollmentSource("manual")).toBe(false);
+    expect(isAutomaticEnrollmentSource("rule_based_auto_enrollment")).toBe(true);
+    expect(isAutomaticEnrollmentSource("project_auto_enroll")).toBe(true);
   });
 });

@@ -1,9 +1,10 @@
 /**
- * Permanent campaign / drip / workflow enrollment guard.
+ * Permanent automatic-enrollment guard for HubSpot / legacy-migrated contacts.
  *
- * HubSpot and legacy-migrated contacts are excluded by default.
- * Only organic leads, or an explicit project marketing-manager opt-in,
- * may be enrolled.
+ * Migrated records are blocked from every automatic drip, workflow, and
+ * campaign enrollment route. A user who already has campaign:update may
+ * still enroll one deliberately via the existing manual enrollment API;
+ * that path keeps its normal audit trail. No new role or permission.
  */
 
 export const HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX = "hubspot:contact:";
@@ -17,15 +18,16 @@ export const CAMPAIGN_ENROLLMENT_POLICY_KEY = "campaignEnrollmentPolicy";
 
 export const CAMPAIGN_GUARD_SOURCE = "hubspot_legacy_migration";
 
+export const AUTOMATIC_ENROLLMENT_SOURCES = [
+  "project_auto_enroll",
+  "rule_based_auto_enrollment",
+] as const;
+
+export type AutomaticEnrollmentSource = (typeof AUTOMATIC_ENROLLMENT_SOURCES)[number];
+
 export type CampaignEnrollmentPolicy = {
   defaultExcluded: true;
   source: typeof CAMPAIGN_GUARD_SOURCE;
-  marketingOptIn?: {
-    enabled: boolean;
-    actorId: string;
-    at: string;
-    role: "project_marketing_manager";
-  };
 };
 
 function readIntegrationRecord(
@@ -55,20 +57,9 @@ export function readCampaignEnrollmentPolicy(
   if (policy.defaultExcluded !== true || policy.source !== CAMPAIGN_GUARD_SOURCE) {
     return null;
   }
-  const optInRaw = policy.marketingOptIn;
-  const marketingOptIn =
-    optInRaw && typeof optInRaw === "object" && !Array.isArray(optInRaw)
-      ? {
-          enabled: (optInRaw as Record<string, unknown>).enabled === true,
-          actorId: String((optInRaw as Record<string, unknown>).actorId ?? ""),
-          at: String((optInRaw as Record<string, unknown>).at ?? ""),
-          role: "project_marketing_manager" as const,
-        }
-      : undefined;
   return {
     defaultExcluded: true,
     source: CAMPAIGN_GUARD_SOURCE,
-    ...(marketingOptIn ? { marketingOptIn } : {}),
   };
 }
 
@@ -92,19 +83,17 @@ export function isHubSpotOrLegacyMigratedLead(
   return (HUBSPOT_MIGRATED_INBOUND_SOURCES as readonly string[]).includes(inboundSource);
 }
 
-export function hasProjectMarketingManagerOptIn(
-  attributes: Record<string, unknown> | null | undefined,
-): boolean {
-  return readCampaignEnrollmentPolicy(attributes)?.marketingOptIn?.enabled === true;
+export function isAutomaticEnrollmentSource(
+  source: string | null | undefined,
+): source is AutomaticEnrollmentSource {
+  return (AUTOMATIC_ENROLLMENT_SOURCES as readonly string[]).includes(source ?? "");
 }
 
-export function canEnrollLeadInCampaigns(
+/** True when automatic/drip/workflow enrollment must skip this lead. */
+export function isBlockedFromAutomaticCampaignEnrollment(
   attributes: Record<string, unknown> | null | undefined,
 ): boolean {
-  if (!isHubSpotOrLegacyMigratedLead(attributes)) {
-    return true;
-  }
-  return hasProjectMarketingManagerOptIn(attributes);
+  return isHubSpotOrLegacyMigratedLead(attributes);
 }
 
 export function buildMigratedCampaignGuardAttributes(): {
@@ -118,43 +107,4 @@ export function buildMigratedCampaignGuardAttributes(): {
   };
 }
 
-export function buildMarketingManagerOptInPolicy(input: {
-  actorId: string;
-  at?: Date;
-}): CampaignEnrollmentPolicy {
-  return {
-    defaultExcluded: true,
-    source: CAMPAIGN_GUARD_SOURCE,
-    marketingOptIn: {
-      enabled: true,
-      actorId: input.actorId,
-      at: (input.at ?? new Date()).toISOString(),
-      role: "project_marketing_manager",
-    },
-  };
-}
-
 export const CAMPAIGN_GUARD_BLOCK_REASON = "campaign_guard_migrated_lead";
-
-export function campaignGuardMongoExclusion(): Record<string, unknown> {
-  return {
-    $and: [
-      {
-        $or: [
-          {
-            "attributes.integration.idempotencyKey": {
-              $regex: `^${HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX}`,
-            },
-          },
-          {
-            "attributes.integration.inboundSource": {
-              $in: [...HUBSPOT_MIGRATED_INBOUND_SOURCES],
-            },
-          },
-          { "attributes.campaignEnrollmentPolicy.defaultExcluded": true },
-        ],
-      },
-      { "attributes.campaignEnrollmentPolicy.marketingOptIn.enabled": { $ne: true } },
-    ],
-  };
-}
