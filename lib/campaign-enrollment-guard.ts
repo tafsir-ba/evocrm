@@ -12,6 +12,7 @@ export const HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX = "hubspot:contact:";
 export const HUBSPOT_MIGRATED_INBOUND_SOURCES = [
   "hubspot",
   "hubspot-gv-pilot",
+  "hubspot-wd-project",
 ] as const;
 
 export const CAMPAIGN_ENROLLMENT_POLICY_KEY = "campaignEnrollmentPolicy";

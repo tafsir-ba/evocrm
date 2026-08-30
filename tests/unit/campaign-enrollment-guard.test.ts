@@ -29,6 +29,11 @@ describe("campaign enrollment guard", () => {
         integration: { inboundSource: "hubspot-gv-pilot" },
       }),
     ).toBe(true);
+    expect(
+      isBlockedFromAutomaticCampaignEnrollment({
+        integration: { inboundSource: "hubspot-wd-project" },
+      }),
+    ).toBe(true);
     expect(isBlockedFromAutomaticCampaignEnrollment(buildMigratedCampaignGuardAttributes())).toBe(
       true,
     );
