@@ -65,7 +65,9 @@ const LOCALITY_ALIASES: Record<string, string[]> = {
   kingston: ["kingston", "kingston8", "kingston2", "manorpark"],
   troinex: ["troinex"],
   vandoeuvres: ["vandoeuvres", "vandœuvres"],
-  confignon: ["confignon"],
+  confignon: ["confignon", "cressy"],
+  neuchatel: ["neuchatel", "neuchâtel"],
+  gollion: ["gollion"],
   prilly: ["prilly"],
   lemontsurlausanne: ["lemontsurlausanne", "montsurlausanne"],
   montegobay: ["montegobay", "montego"],
@@ -504,6 +506,12 @@ function isBroaderRegionLabel(
   if (
     cityKey === "montreux" &&
     compactLocationKey(entry.municipality ?? "") === "brent"
+  ) {
+    return true;
+  }
+  if (
+    cityKey === "cressy" &&
+    compactLocationKey(entry.municipality ?? "") === "confignon"
   ) {
     return true;
   }

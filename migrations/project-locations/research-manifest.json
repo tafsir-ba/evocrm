@@ -28,7 +28,7 @@
       "no catalog match and no unique verified place signal",
       "conflicting specific manual city",
       "catch-all scopes such as EvoHome General",
-      "ambiguous place signals (Cressy, Kingston, Jardin des Nations, Seymaz)"
+      "ambiguous place signals (bare Kingston, Jardin des Nations, Seymaz, other Cressy-named rows)"
     ]
   },
   "entries": [
@@ -260,6 +260,54 @@
       "precision": "locality",
       "confidence": "high",
       "sourceUrl": "https://ormet68.ch/"
+    },
+    {
+      "key": "avant-scene",
+      "countryCode": "CH",
+      "cantonCode": "NE",
+      "municipality": "Neuchâtel",
+      "postalCode": "2000",
+      "precision": "locality",
+      "confidence": "high",
+      "confirmation": "user"
+    },
+    {
+      "key": "bc-kingston",
+      "countryCode": "JM",
+      "municipality": "Kingston",
+      "precision": "locality",
+      "confidence": "high",
+      "confirmation": "user"
+    },
+    {
+      "key": "cressy",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Confignon",
+      "postalCode": "1232",
+      "precision": "locality",
+      "confidence": "high",
+      "confirmation": "user"
+    },
+    {
+      "key": "floreal",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Ecublens",
+      "postalCode": "1024",
+      "precision": "locality",
+      "confidence": "high",
+      "confirmation": "user"
+    },
+    {
+      "key": "campanules",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Gollion",
+      "postalCode": "1124",
+      "precision": "locality",
+      "confidence": "high",
+      "confirmation": "user"
     }
   ],
   "verifiedPlaceSignals": [
@@ -274,8 +322,8 @@
     "Mathod"
   ],
   "intentionallyUnresolvedExamples": [
-    "Cressy is an intercommunal Geneva quartier (Confignon / Bernex / Onex) and is not Cressier.",
-    "BC Kingston has a Kingston signal but “[BC Kingston] development” still has no unique official project or country.",
+    "A bare Kingston signal is still not a unique country; BC Kingston is user-confirmed separately.",
+    "Other Cressy-named rows stay open: the quartier spans Confignon, Bernex and Onex. The CRM project Cressy is user-confirmed as Confignon.",
     "Jardin des Nations and Seymaz 44 are neighbourhood / sector names, not unique communes.",
     "Résidence Serena: “[Résidence Serena] promotion” finds Grandvaux listings and other homonyms abroad; no unique first-party official site.",
     "Portes du Lac: “[Portes du Lac] promotion” finds Estavayer-le-Lac and other lake-door uses; name is not unique enough to apply.",

@@ -46,6 +46,14 @@ describe("project location catalog", () => {
     expect(findCatalogEntryByKey("domaine-du-lac-nyon")?.municipality).toBe("Nyon");
     expect(findCatalogEntryByKey("bochet-thonex")?.municipality).toBe("Thônex");
     expect(findCatalogEntryByKey("ormet-ecublens")?.municipality).toBe("Ecublens");
+    expect(findCatalogEntryByKey("avant-scene")?.municipality).toBe("Neuchâtel");
+    expect(findCatalogEntryByKey("avant-scene")?.cantonCode).toBe("NE");
+    expect(findCatalogEntryByKey("cressy")?.municipality).toBe("Confignon");
+    expect(findCatalogEntryByKey("floreal")?.municipality).toBe("Ecublens");
+    expect(findCatalogEntryByKey("campanules")?.municipality).toBe("Gollion");
+    expect(findCatalogEntryByKey("bc-kingston")?.countryCode).toBe("JM");
+    expect(findCatalogEntryByKey("bc-kingston")?.municipality).toBe("Kingston");
+    expect(findCatalogEntryByKey("bc-kingston")?.cantonCode).toBeNull();
   });
 
   it("does not invent a street for Buissonnière 4 from the project name", () => {
@@ -54,17 +62,35 @@ describe("project location catalog", () => {
     expect(entry?.normalizedAddress).not.toMatch(/chemin/i);
   });
 
-  it("records user-confirmed provenance on Les Pins and Arbora", () => {
-    const lesPins = findCatalogEntryByKey("residence-les-pins");
-    const arbora = findCatalogEntryByKey("arbora");
-    expect(lesPins?.confirmation).toBe("user");
-    expect(arbora?.confirmation).toBe("user");
-    expect(lesPins?.sources.some((source) => source.kind === "user_confirmed")).toBe(
-      true,
-    );
-    expect(arbora?.sources.some((source) => source.kind === "user_confirmed")).toBe(
-      true,
-    );
+  it("records user-confirmed provenance on operator-provided rows", () => {
+    for (const key of [
+      "residence-les-pins",
+      "arbora",
+      "avant-scene",
+      "bc-kingston",
+      "cressy",
+      "floreal",
+      "campanules",
+    ]) {
+      const entry = findCatalogEntryByKey(key);
+      expect(entry?.confirmation).toBe("user");
+      expect(entry?.sources.some((source) => source.kind === "user_confirmed")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("keeps user-confirmed Cressy and BC Kingston on exact keys only", () => {
+    const cressy = findCatalogEntryByKey("cressy");
+    expect(cressy?.aliases).toEqual(["Cressy"]);
+    expect(cressy?.references).toEqual(["CRESSY"]);
+    expect(cressy?.municipality).toBe("Confignon");
+
+    const kingston = findCatalogEntryByKey("bc-kingston");
+    expect(kingston?.aliases).toEqual(["BC Kingston"]);
+    expect(kingston?.references).toEqual(["BC_KINGSTON"]);
+    expect(kingston?.countryCode).toBe("JM");
+    expect(kingston?.postalCode).toBeNull();
   });
 
   it("places Villa Sorella in Corsier GE, not Corsier-sur-Vevey", () => {
@@ -94,15 +120,24 @@ describe("project location catalog", () => {
     const high = PROJECT_LOCATION_CATALOG.filter((entry) => entry.confidence === "high");
     expect(high.length).toBeGreaterThan(0);
     for (const entry of high) {
-      expect(entry.sourceUrl).toMatch(/^https:\/\//);
       expect(entry.sources.length).toBeGreaterThan(0);
+      if (entry.confirmation === "user") {
+        expect(entry.sources.some((source) => source.kind === "user_confirmed")).toBe(
+          true,
+        );
+        if (entry.sourceUrl) {
+          expect(entry.sourceUrl).toMatch(/^https:\/\//);
+        }
+      } else {
+        expect(entry.sourceUrl).toMatch(/^https:\/\//);
+      }
     }
   });
 
   it("summarizes catalog coverage", () => {
     const summary = catalogCoverageSummary();
     expect(summary.total).toBe(PROJECT_LOCATION_CATALOG.length);
-    expect(summary.highConfidence).toBe(22);
+    expect(summary.highConfidence).toBe(27);
     expect(summary.unresolved).toBe(1);
   });
 });

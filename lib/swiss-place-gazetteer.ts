@@ -168,13 +168,13 @@ export const AMBIGUOUS_PLACE_SIGNALS: AmbiguousPlaceSignal[] = [
     key: "cressy",
     aliases: ["Cressy"],
     reason:
-      "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). Municipality left open.",
+      "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). The CRM project named Cressy is user-confirmed separately; other Cressy-named rows stay open.",
   },
   {
     key: "kingston",
-    aliases: ["Kingston", "BC Kingston"],
+    aliases: ["Kingston"],
     reason:
-      "Kingston is not a unique country or project. Grosvenor Vistas and K2 have their own catalog evidence; BC Kingston does not.",
+      "Kingston is not a unique country or project. Grosvenor Vistas, K2, and BC Kingston have their own catalog evidence; a bare Kingston signal does not.",
   },
   {
     key: "jardin-des-nations",

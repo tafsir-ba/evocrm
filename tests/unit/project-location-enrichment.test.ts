@@ -298,24 +298,106 @@ describe("project location enrichment", () => {
     ).toBe("Collex-Bossy");
   });
 
-  it("leaves Cressy as review-needed because the quartier spans several communes", () => {
+  it("applies user-confirmed Confignon only to the Cressy / CRESSY row", () => {
     const decision = decideProjectLocationEnrichment({
       name: "Cressy",
       reference: "CRESSY",
     });
-    expect(decision.action).toBe("review");
-    expect(decision.reason).toBe("ambiguous_place_signal");
-    expect(decision.location.municipality).toBeNull();
-    expect(decision.location.reviewStatus).toBe("review_needed");
+    expect(decision.action).toBe("apply");
+    expect(decision.reason).toBe("user_confirmed");
+    expect(decision.location.municipality).toBe("Confignon");
+    expect(decision.location.cantonCode).toBe("GE");
+    expect(decision.location.provenance?.method).toBe("user_confirmed");
+    expect(decision.location.provenance?.catalogKey).toBe("cressy");
   });
 
-  it("does not assume BC Kingston is Swiss or Jamaican without project evidence", () => {
+  it("does not apply Cressy confirmation to Cressier or other Cressy-named projects", () => {
+    const cressier = decideProjectLocationEnrichment({
+      name: "Cressier",
+      reference: "CRESSIER",
+    });
+    expect(cressier.location.provenance?.catalogKey).not.toBe("cressy");
+    expect(cressier.location.municipality).not.toBe("Confignon");
+
+    const longer = decideProjectLocationEnrichment({
+      name: "Cressy Residences",
+      reference: "CRESSY_RESIDENCES",
+    });
+    expect(longer.action).not.toBe("apply");
+    expect(longer.location.municipality).toBeNull();
+  });
+
+  it("applies user-confirmed Kingston, Jamaica only to BC Kingston", () => {
     const decision = decideProjectLocationEnrichment({
       name: "BC Kingston",
       reference: "BC_KINGSTON",
     });
-    expect(decision.action).toBe("review");
-    expect(decision.reason).toBe("ambiguous_place_signal");
-    expect(decision.location.countryCode).toBeNull();
+    expect(decision.action).toBe("apply");
+    expect(decision.reason).toBe("user_confirmed");
+    expect(decision.location.countryCode).toBe("JM");
+    expect(decision.location.municipality).toBe("Kingston");
+    expect(decision.location.cantonCode).toBeNull();
+    expect(decision.location.provenance?.method).toBe("user_confirmed");
+    expect(decision.location.provenance?.catalogKey).toBe("bc-kingston");
+  });
+
+  it("does not treat a bare Kingston name or other Kingston projects as BC Kingston", () => {
+    const bare = decideProjectLocationEnrichment({
+      name: "Kingston",
+      reference: "KINGSTON",
+    });
+    expect(bare.action).toBe("review");
+    expect(bare.reason).toBe("ambiguous_place_signal");
+    expect(bare.location.countryCode).toBeNull();
+
+    const grosvenor = decideProjectLocationEnrichment({
+      name: "Grosvenor Vistas",
+      reference: "GV",
+    });
+    expect(grosvenor.location.provenance?.catalogKey).toBe("grosvenor-vistas");
+    expect(grosvenor.location.postalCode).toBe("Kingston 8");
+
+    const k2 = decideProjectLocationEnrichment({ name: "K2", reference: "K2" });
+    expect(k2.location.provenance?.catalogKey).toBe("k2-apartments");
+  });
+
+  it("applies the remaining user-confirmed rows on exact name/reference only", () => {
+    const avant = decideProjectLocationEnrichment({
+      name: "Avant-Scène",
+      reference: "AVANTSCENE",
+    });
+    expect(avant.action).toBe("apply");
+    expect(avant.reason).toBe("user_confirmed");
+    expect(avant.location.municipality).toBe("Neuchâtel");
+    expect(avant.location.cantonCode).toBe("NE");
+    expect(avant.location.provenance?.method).toBe("user_confirmed");
+
+    const floreal = decideProjectLocationEnrichment({
+      name: "Floréal",
+      reference: "FLOREAL",
+    });
+    expect(floreal.location.municipality).toBe("Ecublens");
+    expect(floreal.location.cantonCode).toBe("VD");
+    expect(floreal.location.provenance?.catalogKey).toBe("floreal");
+
+    const ormet = decideProjectLocationEnrichment({
+      name: "Ormet",
+      reference: "ORMET",
+    });
+    expect(ormet.location.provenance?.catalogKey).toBe("ormet-ecublens");
+
+    const campanules = decideProjectLocationEnrichment({
+      name: "Campanules",
+      reference: "CAMPANULES",
+    });
+    expect(campanules.location.municipality).toBe("Gollion");
+    expect(campanules.location.cantonCode).toBe("VD");
+
+    const lesCampanules = decideProjectLocationEnrichment({
+      name: "Les Campanules",
+      reference: "LES_CAMPANULES",
+    });
+    expect(lesCampanules.location.provenance?.catalogKey).not.toBe("campanules");
+    expect(lesCampanules.action).not.toBe("apply");
   });
 });
