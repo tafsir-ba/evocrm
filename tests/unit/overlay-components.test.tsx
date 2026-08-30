@@ -33,6 +33,31 @@ describe("overlay and table primitives", () => {
     );
 
     expect(screen.getByText("Test lead")).toBeInTheDocument();
+    expect(screen.getByText("Test lead").closest("table")).toHaveClass("text-[13px]");
+  });
+
+  it("applies compact density only when requested", () => {
+    render(
+      <Table density="compact">
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Name</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          <TableRow>
+            <TableCell>Compact lead</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+
+    expect(screen.getByText("Compact lead").closest("table")).toHaveClass(
+      "text-[12.5px]",
+      "leading-none",
+    );
+    expect(screen.getByRole("columnheader", { name: "Name" })).toHaveClass("px-1.5", "py-1");
+    expect(screen.getByText("Compact lead")).toHaveClass("px-1.5", "py-1");
   });
 
   it("renders modal when open", () => {

@@ -1,17 +1,31 @@
+"use client";
+
+import { createContext, useContext, type HTMLAttributes, type TdHTMLAttributes, type ThHTMLAttributes } from "react";
+
 import { cn } from "@/lib/utils";
-import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
+
+export type TableDensity = "comfortable" | "compact";
+
+const TableDensityContext = createContext<TableDensity>("comfortable");
 
 export function Table({
   className,
+  density = "comfortable",
   ...rest
-}: HTMLAttributes<HTMLTableElement>) {
+}: HTMLAttributes<HTMLTableElement> & { density?: TableDensity }) {
   return (
-    <div className="overflow-x-auto">
-      <table
-        {...rest}
-        className={cn("min-w-full text-[13px]", className)}
-      />
-    </div>
+    <TableDensityContext.Provider value={density}>
+      <div className="overflow-x-auto">
+        <table
+          {...rest}
+          className={cn(
+            "min-w-full",
+            density === "compact" ? "text-[12.5px] leading-none" : "text-[13px]",
+            className,
+          )}
+        />
+      </div>
+    </TableDensityContext.Provider>
   );
 }
 
@@ -19,11 +33,13 @@ export function TableHead({
   className,
   ...rest
 }: HTMLAttributes<HTMLTableSectionElement>) {
+  const density = useContext(TableDensityContext);
   return (
     <thead
       {...rest}
       className={cn(
-        "text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] bg-[var(--color-canvas)] border-b border-[var(--color-line)]",
+        "border-b border-[var(--color-line)] bg-[var(--color-canvas)] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]",
+        density === "compact" ? "text-[10.5px]" : "text-[11.5px]",
         className,
       )}
     />
@@ -53,10 +69,15 @@ export function TableHeaderCell({
   className,
   ...rest
 }: ThHTMLAttributes<HTMLTableCellElement>) {
+  const density = useContext(TableDensityContext);
   return (
     <th
       {...rest}
-      className={cn("text-left font-semibold px-4 py-3", className)}
+      className={cn(
+        "text-left font-semibold",
+        density === "compact" ? "px-1.5 py-1" : "px-4 py-3",
+        className,
+      )}
     />
   );
 }
@@ -65,5 +86,15 @@ export function TableCell({
   className,
   ...rest
 }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td {...rest} className={cn("px-4 py-3 align-middle", className)} />;
+  const density = useContext(TableDensityContext);
+  return (
+    <td
+      {...rest}
+      className={cn(
+        "align-middle",
+        density === "compact" ? "px-1.5 py-1" : "px-4 py-3",
+        className,
+      )}
+    />
+  );
 }

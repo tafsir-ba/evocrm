@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
+import { ProjectsTable } from "@/components/projects/projects-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
@@ -131,13 +131,16 @@ export function ProjectsPanel({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <Input
-          placeholder="Search projects…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="max-w-xs"
-        />
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <div className="max-w-xs flex-1 min-w-[200px]">
+          <Input
+            placeholder="Search projects…"
+            aria-label="Search projects"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            fieldSize="sm"
+          />
+        </div>
         <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-soft)]">
           <input
             type="checkbox"
@@ -162,80 +165,14 @@ export function ProjectsPanel({
           description="Create a project to scope leads, properties, pipeline, and dripping."
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--color-line)] bg-white">
-          <table className="min-w-full text-[13px]">
-            <thead className="bg-[var(--color-canvas)] text-[var(--color-ink-muted)]">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">Name</th>
-                <th className="text-left px-3 py-2 font-medium">Reference</th>
-                <th className="text-left px-3 py-2 font-medium">Location</th>
-                <th className="text-right px-3 py-2 font-medium">Leads</th>
-                <th className="text-right px-3 py-2 font-medium">Properties</th>
-                <th className="text-right px-3 py-2 font-medium">Pipeline</th>
-                <th className="text-right px-3 py-2 font-medium">Dripping</th>
-                <th className="text-left px-3 py-2 font-medium">Status</th>
-                <th className="text-right px-3 py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleProjects.map((project) => (
-                <tr key={project.id} className="border-t border-[var(--color-line)]">
-                  <td className="px-3 py-2.5 font-medium text-[var(--color-ink)]">
-                    <Link
-                      href={workspacePath(workspaceSlug, "projects", project.id)}
-                      className="hover:text-[var(--color-brand-600)]"
-                    >
-                      {project.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2.5">{project.reference ?? "—"}</td>
-                  <td className="px-3 py-2.5">
-                    {[project.city, project.country].filter(Boolean).join(", ") || "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">{project.counts?.leads ?? 0}</td>
-                  <td className="px-3 py-2.5 text-right">{project.counts?.properties ?? 0}</td>
-                  <td className="px-3 py-2.5 text-right">
-                    {project.counts?.opportunities ?? 0}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {project.counts?.activeCampaigns ?? 0}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {project.archivedAt ? (
-                      <Badge tone="muted">Archived</Badge>
-                    ) : (
-                      <Badge tone="success">Active</Badge>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right space-x-2">
-                    <Link
-                      href={workspacePath(workspaceSlug, "projects", project.id)}
-                      className="text-[var(--color-brand-600)] hover:underline"
-                    >
-                      View
-                    </Link>
-                    {canUpdate && !project.archivedAt && (
-                      <Link
-                        href={workspacePath(workspaceSlug, "projects", project.id, "edit")}
-                        className="text-[var(--color-brand-600)] hover:underline"
-                      >
-                        Edit
-                      </Link>
-                    )}
-                    {canArchive && !project.archivedAt && (
-                      <button
-                        type="button"
-                        onClick={() => void archiveProject(project.id, project.name)}
-                        className="text-[var(--color-danger-fg)] hover:underline"
-                      >
-                        Archive
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white">
+          <ProjectsTable
+            workspaceSlug={workspaceSlug}
+            projects={visibleProjects}
+            canUpdate={canUpdate}
+            canArchive={canArchive}
+            onArchive={(projectId, projectName) => void archiveProject(projectId, projectName)}
+          />
         </div>
       )}
     </>

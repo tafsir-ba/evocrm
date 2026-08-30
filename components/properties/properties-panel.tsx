@@ -1,14 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { StatusBadge } from "@/components/domain/status-badge";
 import type { MemberSelectorMember } from "@/components/domain/member-selector";
 import type { TagSelectorTag } from "@/components/domain/tag-selector";
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
+import { PropertiesTable } from "@/components/properties/properties-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -16,7 +15,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IconChevronLeft, IconChevronRight, IconImage, IconPlus } from "@/lib/icons";
+import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
 import { appendProjectIdToSearchParams } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -53,25 +52,8 @@ type PropertiesPanelProps = {
   canArchive: boolean;
 };
 
-function formatPrice(price: number | null, currency: string): string {
-  if (price === null) {
-    return "—";
-  }
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(price);
-  } catch {
-    return `${currency} ${price.toLocaleString()}`;
-  }
-}
-
 export function PropertiesPanel({
   workspaceSlug,
-  defaultCurrency,
   canCreate,
   canCreateProject = false,
   canArchive,
@@ -260,6 +242,7 @@ export function PropertiesPanel({
         <div className="flex-1 min-w-[200px] max-w-md">
           <Input
             placeholder="Search properties by title, reference, city…"
+            aria-label="Search properties by title, reference or city"
             value={search}
             onChange={(event) => {
               setPage(1);
@@ -361,117 +344,14 @@ export function PropertiesPanel({
         />
       ) : (
         <div className="bg-white border border-[var(--color-line)] rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-[13px]">
-              <thead>
-                <tr className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] bg-[var(--color-canvas)] border-b border-[var(--color-line)]">
-                  <th className="text-left font-semibold px-5 py-3">Title</th>
-                  <th className="text-left font-semibold px-2 py-3">Project</th>
-                  <th className="text-left font-semibold px-2 py-3">Type</th>
-                  <th className="text-left font-semibold px-2 py-3">Status</th>
-                  <th className="text-left font-semibold px-2 py-3">Price</th>
-                  <th className="text-left font-semibold px-2 py-3">Rooms</th>
-                  <th className="text-left font-semibold px-2 py-3">City</th>
-                  <th className="text-left font-semibold px-2 py-3">Assigned</th>
-                  <th className="text-left font-semibold px-2 py-3">Tags</th>
-                  <th className="text-right font-semibold px-5 py-3 w-24">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-line)]">
-                {properties.map((property) => (
-                  <tr
-                    key={property.id}
-                    className="hover:bg-[var(--color-canvas)] transition-colors"
-                  >
-                    <td className="px-5 py-3">
-                      <Link
-                        href={workspacePath(workspaceSlug, "properties", property.id)}
-                        className="flex items-center gap-3 min-w-0"
-                      >
-                        <span className="w-10 h-10 rounded-md overflow-hidden bg-[var(--color-muted)] shrink-0 inline-flex items-center justify-center text-[var(--color-ink-faint)]">
-                          <IconImage size={16} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-[var(--color-ink)] truncate hover:text-[var(--color-brand-700)]">
-                            {property.title}
-                          </span>
-                          {property.reference && (
-                            <span className="block text-[12px] text-[var(--color-ink-muted)] truncate">
-                              {property.reference}
-                            </span>
-                          )}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {property.project?.name ?? "—"}
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {property.type?.label ?? "—"}
-                    </td>
-                    <td className="px-2 py-3">
-                      {property.status ? (
-                        <StatusBadge
-                          label={property.status.label}
-                          color={property.status.color}
-                          size="sm"
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-2 py-3 font-semibold text-[var(--color-ink)] tabular">
-                      {formatPrice(property.price, property.currency)}
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)] tabular">
-                      {property.rooms ?? "—"}
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {property.city ?? "—"}
-                    </td>
-                    <td className="px-2 py-3 text-[var(--color-ink-soft)]">
-                      {property.assignedUser?.name ?? property.assignedUser?.email ?? "—"}
-                    </td>
-                    <td className="px-2 py-3">
-                      {property.tagsResolved.length === 0 ? (
-                        <span className="text-[var(--color-ink-faint)]">—</span>
-                      ) : (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {property.tagsResolved.map((tag) => (
-                            <Badge key={tag.id} tone="muted" size="sm">
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Link
-                          href={workspacePath(workspaceSlug, "properties", property.id)}
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
-                          aria-label={`Open ${property.title}`}
-                        >
-                          <IconChevronRight size={14} />
-                        </Link>
-                        {canArchive && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleArchive(property.id, property.title)}
-                          >
-                            Archive
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PropertiesTable
+            workspaceSlug={workspaceSlug}
+            properties={properties}
+            canArchive={canArchive}
+            onArchive={(propertyId, propertyTitle) => void handleArchive(propertyId, propertyTitle)}
+          />
 
-          <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)]">
+          <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-[var(--color-line)] bg-[var(--color-canvas)]">
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
               Showing{" "}
               <span className="text-[var(--color-ink)] font-medium">
@@ -485,6 +365,7 @@ export function PropertiesPanel({
                 type="button"
                 className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page <= 1}
+                aria-label="Previous page"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
                 <IconChevronLeft size={14} />
@@ -496,6 +377,7 @@ export function PropertiesPanel({
                 type="button"
                 className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page >= totalPages}
+                aria-label="Next page"
                 onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               >
                 <IconChevronRight size={14} />

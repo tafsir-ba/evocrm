@@ -3,10 +3,19 @@ import {
   readLeadIntegrationAttributes,
   type LeadIntegrationUtm,
 } from "@/lib/lead-integration-attributes";
+import {
+  LIST_DAY_MS,
+  formatRelativeAge,
+  parseListDate,
+  startOfLocalDay,
+} from "@/lib/list-view";
 
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
+export {
+  formatRelativeAge,
+  parseListDate as parseLeadDate,
+  startOfLocalDay,
+  visibleOverflowItems as visibleLeadTags,
+} from "@/lib/list-view";
 
 export type LeadTableUser = {
   id: string;
@@ -25,61 +34,6 @@ export type LeadTableActivityEvent = {
   title: string;
   at: string | Date;
 };
-
-export function parseLeadDate(value: string | Date | null | undefined): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-export function formatRelativeAge(
-  value: string | Date | null | undefined,
-  now: Date = new Date(),
-): string {
-  const date = parseLeadDate(value);
-  if (!date) {
-    return "—";
-  }
-
-  const deltaMs = now.getTime() - date.getTime();
-  const future = deltaMs < 0;
-  const absMs = Math.abs(deltaMs);
-
-  if (absMs < MINUTE_MS) {
-    return future ? "in <1m" : "<1m";
-  }
-
-  const minutes = Math.round(absMs / MINUTE_MS);
-  if (absMs < HOUR_MS) {
-    return future ? `in ${minutes}m` : `${minutes}m`;
-  }
-
-  const hours = Math.round(absMs / HOUR_MS);
-  if (absMs < DAY_MS) {
-    return future ? `in ${hours}h` : `${hours}h`;
-  }
-
-  const days = Math.round(absMs / DAY_MS);
-  if (days < 14) {
-    return future ? `in ${days}d` : `${days}d`;
-  }
-
-  if (days < 60) {
-    const weeks = Math.round(days / 7);
-    return future ? `in ${weeks}w` : `${weeks}w`;
-  }
-
-  if (days < 540) {
-    const months = Math.round(days / 30);
-    return future ? `in ${months}mo` : `${months}mo`;
-  }
-
-  const years = Math.round(days / 365);
-  return future ? `in ${years}y` : `${years}y`;
-}
 
 export function formatOwnerName(user: LeadTableUser | null | undefined): string {
   const name = user?.name?.trim();
@@ -131,18 +85,6 @@ export function formatUtmTitle(
   return summary === "—" ? undefined : summary;
 }
 
-export function visibleLeadTags<T>(tags: T[], max = 2): { visible: T[]; overflow: number } {
-  const safeMax = Math.max(0, max);
-  if (tags.length <= safeMax) {
-    return { visible: tags, overflow: 0 };
-  }
-
-  return {
-    visible: tags.slice(0, safeMax),
-    overflow: tags.length - safeMax,
-  };
-}
-
 export function telHref(phone: string): string {
   const trimmed = phone.trim();
   const hasPlus = trimmed.startsWith("+");
@@ -150,21 +92,17 @@ export function telHref(phone: string): string {
   return hasPlus ? `tel:+${digits}` : `tel:${digits}`;
 }
 
-export function startOfLocalDay(value: Date): Date {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
 export function formatNextActionWhen(
   value: string | Date | null | undefined,
   now: Date = new Date(),
 ): string {
-  const date = parseLeadDate(value);
+  const date = parseListDate(value);
   if (!date) {
     return "—";
   }
 
   const dayDelta = Math.round(
-    (startOfLocalDay(date).getTime() - startOfLocalDay(now).getTime()) / DAY_MS,
+    (startOfLocalDay(date).getTime() - startOfLocalDay(now).getTime()) / LIST_DAY_MS,
   );
 
   if (dayDelta === 0) {
@@ -265,10 +203,10 @@ export function leadUrgency(input: {
   }
 
   const now = input.now ?? new Date();
-  const nextAt = parseLeadDate(input.nextAction?.at);
+  const nextAt = parseListDate(input.nextAction?.at);
   if (nextAt) {
     const dayDelta = Math.round(
-      (startOfLocalDay(nextAt).getTime() - startOfLocalDay(now).getTime()) / DAY_MS,
+      (startOfLocalDay(nextAt).getTime() - startOfLocalDay(now).getTime()) / LIST_DAY_MS,
     );
     if (dayDelta < 0) {
       return { level: "overdue", label: "Overdue", tone: "danger", sortRank: 0 };
@@ -281,11 +219,11 @@ export function leadUrgency(input: {
     }
   }
 
-  const lastTouch = parseLeadDate(
+  const lastTouch = parseListDate(
     input.lastActivity?.at ?? input.lastContactedAt ?? input.createdAt,
   );
   if (lastTouch) {
-    const ageDays = (now.getTime() - lastTouch.getTime()) / DAY_MS;
+    const ageDays = (now.getTime() - lastTouch.getTime()) / LIST_DAY_MS;
     if (ageDays >= STALE_DAY_THRESHOLD) {
       return { level: "stale", label: "Stale", tone: "warn", sortRank: 3 };
     }
