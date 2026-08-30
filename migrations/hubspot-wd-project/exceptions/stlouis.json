@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "slug": "stlouis",
+  "destinationProjectId": "6a947b9d71a13d2788a06ea6",
+  "destinationReference": "STLOUIS",
+  "counts": {
+    "multi_project": 9,
+    "missing_name": 24,
+    "notes_only": 1
+  },
+  "records": [
+    {
+      "hubspotContactId": "536451",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "537501",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "539901",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "542151",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "543201",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "544101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "545201",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "549001",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "550301",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "551601",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "552251",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "552701",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "552951",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "554201",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "554701",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "556001",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "558751",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "560051",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "560601",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "562601",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "563101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "566651",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "567101",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1419751",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "314251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "413001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "499301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "507151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "508851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "544601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "552751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "554001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1419801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "370651",
+      "reason": "notes_only"
+    }
+  ]
+}

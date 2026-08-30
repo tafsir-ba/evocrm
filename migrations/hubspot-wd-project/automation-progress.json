@@ -973,6 +973,23 @@
       },
       "searchTotal": 45,
       "dryRunOnly": false
+    },
+    {
+      "slug": "stlouis",
+      "name": "St-Louis",
+      "reference": "STLOUIS",
+      "destinationProjectId": "6a947b9d71a13d2788a06ea6",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 34,
+      "exceptionCounts": {
+        "multi_project": 9,
+        "missing_name": 24,
+        "notes_only": 1
+      },
+      "searchTotal": 33,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
