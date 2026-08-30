@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "slug": "westend",
+  "destinationProjectId": "6a945f9490d996b7b542a50d",
+  "destinationReference": "WESTEND",
+  "counts": {
+    "multi_project": 1,
+    "missing_name": 7
+  },
+  "records": [
+    {
+      "hubspotContactId": "1013554",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1013603",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1013703",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1014352",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1014854",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1015159",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "1015606",
+      "reason": "missing_name"
+    },
+    {
+      "hubspotContactId": "704301",
+      "reason": "multi_project"
+    }
+  ]
+}

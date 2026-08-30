@@ -266,6 +266,22 @@
       },
       "searchTotal": 583,
       "dryRunOnly": false
+    },
+    {
+      "slug": "westend",
+      "name": "Westend",
+      "reference": "WESTEND",
+      "destinationProjectId": "6a945f9490d996b7b542a50d",
+      "manifestSize": 557,
+      "created": 557,
+      "destinationLeadCount": 557,
+      "exceptionCount": 8,
+      "exceptionCounts": {
+        "multi_project": 1,
+        "missing_name": 7
+      },
+      "searchTotal": 565,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
