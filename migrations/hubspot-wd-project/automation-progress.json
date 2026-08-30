@@ -813,6 +813,22 @@
       },
       "searchTotal": 99,
       "dryRunOnly": false
+    },
+    {
+      "slug": "terra_vista",
+      "name": "Terra Vista",
+      "reference": "TERRA_VISTA",
+      "destinationProjectId": "6a94734e9ec3b3f964a63b1a",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 83,
+      "exceptionCounts": {
+        "multi_project": 28,
+        "missing_name": 55
+      },
+      "searchTotal": 89,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
