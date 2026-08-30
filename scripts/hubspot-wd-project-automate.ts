@@ -46,9 +46,7 @@ function bootstrapEnv(): void {
   if (!process.env.NEXT_PUBLIC_APP_URL) {
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
   }
-  if (!process.env.NODE_ENV || process.env.NODE_ENV === "production") {
-    process.env.NODE_ENV = "development";
-  }
+  // NODE_ENV is runtime-owned (read-only in production typing); never assign it.
 }
 
 function readArg(argv: string[], name: string): string {
