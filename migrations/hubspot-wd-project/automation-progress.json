@@ -1020,6 +1020,22 @@
       },
       "searchTotal": 24,
       "dryRunOnly": false
+    },
+    {
+      "slug": "cressy_adv",
+      "name": "Cressy (Adv)",
+      "reference": "CRESSY_ADV",
+      "destinationProjectId": "6a947bdf1e467e00065e10df",
+      "manifestSize": 21,
+      "created": 21,
+      "destinationLeadCount": 21,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 2,
+        "notes_conflict": 1
+      },
+      "searchTotal": 24,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
