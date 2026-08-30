@@ -941,6 +941,22 @@
       },
       "searchTotal": 52,
       "dryRunOnly": false
+    },
+    {
+      "slug": "rives_de_lorbe",
+      "name": "Rives de l'Orbe",
+      "reference": "RIVES_DE_LORBE",
+      "destinationProjectId": "6a947b741059fc9716d30dd0",
+      "manifestSize": 1,
+      "created": 1,
+      "destinationLeadCount": 1,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 8,
+        "missing_name": 41
+      },
+      "searchTotal": 50,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
