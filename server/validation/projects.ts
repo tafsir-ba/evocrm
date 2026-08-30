@@ -38,35 +38,46 @@ const projectCompanyRoleSchema = z.enum([
   "marketing_sales_partner",
 ]);
 
-const projectLocationInputSchema = z
-  .object({
-    countryCode: z
-      .string()
-      .trim()
-      .length(2)
-      .transform((value) => value.toUpperCase())
-      .nullable()
-      .optional(),
-    countryName: z.string().trim().max(120).nullable().optional(),
-    cantonCode: z
-      .string()
-      .trim()
-      .length(2)
-      .transform((value) => value.toUpperCase())
-      .nullable()
-      .optional(),
-    cantonName: z.string().trim().max(120).nullable().optional(),
-    municipality: z.string().trim().max(120).nullable().optional(),
-    postalCode: z.string().trim().max(32).nullable().optional(),
-    normalizedAddress: z.string().trim().max(240).nullable().optional(),
-    latitude: z.number().gte(-90).lte(90).nullable().optional(),
-    longitude: z.number().gte(-180).lte(180).nullable().optional(),
-    precision: z.enum(PROJECT_LOCATION_PRECISIONS).optional(),
-    sourceUrl: z.string().trim().url().max(500).nullable().optional(),
-    confidence: z.enum(PROJECT_LOCATION_CONFIDENCE).nullable().optional(),
-    reviewStatus: z.enum(PROJECT_LOCATION_REVIEW_STATUSES).optional(),
-  })
-  .strict();
+const emptyStringToNull = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? null : value;
+
+const optionalIsoCode = z.preprocess(
+  emptyStringToNull,
+  z
+    .string()
+    .trim()
+    .length(2)
+    .transform((value) => value.toUpperCase())
+    .nullable()
+    .optional(),
+);
+
+const optionalTrimmed = (max: number) =>
+  z.preprocess(
+    emptyStringToNull,
+    z.string().trim().max(max).nullable().optional(),
+  );
+
+const optionalSourceUrl = z.preprocess(
+  emptyStringToNull,
+  z.string().trim().url().max(500).nullable().optional(),
+);
+
+const projectLocationInputSchema = z.object({
+  countryCode: optionalIsoCode,
+  countryName: optionalTrimmed(120),
+  cantonCode: optionalIsoCode,
+  cantonName: optionalTrimmed(120),
+  municipality: optionalTrimmed(120),
+  postalCode: optionalTrimmed(32),
+  normalizedAddress: optionalTrimmed(240),
+  latitude: z.number().gte(-90).lte(90).nullable().optional(),
+  longitude: z.number().gte(-180).lte(180).nullable().optional(),
+  precision: z.enum(PROJECT_LOCATION_PRECISIONS).optional(),
+  sourceUrl: optionalSourceUrl,
+  confidence: z.enum(PROJECT_LOCATION_CONFIDENCE).nullable().optional(),
+  reviewStatus: z.enum(PROJECT_LOCATION_REVIEW_STATUSES).optional(),
+});
 
 const projectCompanySchema = z
   .object({

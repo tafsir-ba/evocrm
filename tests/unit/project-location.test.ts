@@ -7,6 +7,7 @@ import {
   formatStructuredProjectLocation,
   normalizeProjectLocation,
   roundCoordinate,
+  toProjectLocationWriteInput,
 } from "@/lib/project-location";
 
 describe("project location model", () => {
@@ -76,5 +77,34 @@ describe("project location model", () => {
     expect(location.cantonName).toBe("Vaud");
     expect(location.latitude).toBe(46.538);
     expect(location.longitude).toBe(6.605);
+  });
+
+  it("omits provenance from API write payloads", () => {
+    const location = emptyProjectLocation({
+      countryCode: "CH",
+      countryName: "Switzerland",
+      cantonCode: "GE",
+      cantonName: "Genève",
+      municipality: "Petit Saconnex",
+      postalCode: "1209",
+      reviewStatus: "verified",
+      provenance: {
+        method: "user_confirmed",
+        catalogKey: "petit-saconnex",
+        appliedAt: "2026-08-01T00:00:00.000Z",
+        previousManual: null,
+        notes: "Operator confirmed.",
+      },
+    });
+
+    const payload = toProjectLocationWriteInput(location);
+
+    expect(payload).toMatchObject({
+      countryCode: "CH",
+      cantonCode: "GE",
+      municipality: "Petit Saconnex",
+      postalCode: "1209",
+    });
+    expect(payload && "provenance" in payload).toBe(false);
   });
 });

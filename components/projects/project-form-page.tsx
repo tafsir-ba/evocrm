@@ -14,6 +14,7 @@ import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import {
   emptyProjectLocation,
   hasStructuredLocation,
+  toProjectLocationWriteInput,
   type ProjectLocation,
 } from "@/lib/project-location";
 import {
@@ -134,23 +135,6 @@ function formFromProject(project: LoadedProject): ProjectFormState {
     additionalCompanies,
     description: project.description ?? "",
     website: project.website ?? "",
-  };
-}
-
-function locationWritePayload(location: ProjectLocation): ProjectLocation | null {
-  if (!hasStructuredLocation(location) && !location.countryCode && !location.countryName) {
-    return null;
-  }
-
-  const sourceUrl = location.sourceUrl?.trim() || null;
-  const hasEvidence = Boolean(sourceUrl);
-  return {
-    ...location,
-    sourceUrl,
-    latitude: hasEvidence ? location.latitude : null,
-    longitude: hasEvidence ? location.longitude : null,
-    precision: hasEvidence && location.precision === "unknown" ? "address" : location.precision,
-    confidence: hasEvidence ? location.confidence : null,
   };
 }
 
@@ -299,7 +283,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
     setError(null);
 
     const companies = companiesPayload();
-    const location = locationWritePayload(form.location);
+    const location = toProjectLocationWriteInput(form.location);
     const createBody = {
       name: form.name.trim(),
       ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),

@@ -71,6 +71,76 @@ describe("project validation schemas", () => {
     }
   });
 
+  it("accepts an edit save that round-trips stored location provenance", () => {
+    const result = updateProjectInputSchema.safeParse({
+      name: "Petit Saconnex",
+      reference: null,
+      projectType: null,
+      commercialStage: null,
+      propertyTypeId: null,
+      website: null,
+      location: {
+        countryCode: "CH",
+        countryName: "Switzerland",
+        cantonCode: "GE",
+        cantonName: "Genève",
+        municipality: "Petit Saconnex",
+        postalCode: "1209",
+        normalizedAddress: null,
+        latitude: null,
+        longitude: null,
+        precision: "locality",
+        sourceUrl: null,
+        confidence: null,
+        reviewStatus: "verified",
+        provenance: {
+          method: "user_confirmed",
+          catalogKey: "petit-saconnex",
+          appliedAt: "2026-08-01T00:00:00.000Z",
+          previousManual: null,
+          notes: "Operator confirmed.",
+        },
+      },
+      address: null,
+      city: "Petit Saconnex",
+      country: "Switzerland",
+      companies: [],
+      description: null,
+      ownerId: null,
+      assignedTo: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.location).toMatchObject({
+        countryCode: "CH",
+        cantonCode: "GE",
+        municipality: "Petit Saconnex",
+        postalCode: "1209",
+      });
+      expect(result.data.location && "provenance" in result.data.location).toBe(false);
+    }
+  });
+
+  it("treats empty location strings as null instead of rejecting the save", () => {
+    const result = updateProjectInputSchema.safeParse({
+      location: {
+        countryCode: "",
+        cantonCode: "",
+        sourceUrl: "",
+        municipality: "Petit Saconnex",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.location?.countryCode).toBeNull();
+      expect(result.data.location?.cantonCode).toBeNull();
+      expect(result.data.location?.sourceUrl).toBeNull();
+      expect(result.data.location?.municipality).toBe("Petit Saconnex");
+    }
+  });
+
   it("accepts structured location filters and rejects stuffing geography into country", () => {
     const list = projectListQuerySchema.safeParse({
       countryCode: "jm",
