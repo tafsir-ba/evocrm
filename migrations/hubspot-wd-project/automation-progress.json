@@ -1066,6 +1066,21 @@
       },
       "searchTotal": 15,
       "dryRunOnly": false
+    },
+    {
+      "slug": "connor",
+      "name": "Connor",
+      "reference": "CONNOR",
+      "destinationProjectId": "6a947c4c33c143a44330853f",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 3,
+      "exceptionCounts": {
+        "multi_project": 3
+      },
+      "searchTotal": 9,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
