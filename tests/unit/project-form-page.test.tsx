@@ -217,8 +217,8 @@ describe("ProjectFormPage", () => {
         return jsonResponse({ project: { id: projectId } });
       }
       return jsonResponse({});
-    }) as typeof fetch;
-    global.fetch = fetchMock;
+    });
+    global.fetch = fetchMock as typeof fetch;
 
     render(<ProjectFormPage workspaceSlug="demo" mode="edit" projectId={projectId} />);
 
