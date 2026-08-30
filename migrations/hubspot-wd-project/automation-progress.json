@@ -1005,6 +1005,21 @@
       },
       "searchTotal": 0,
       "dryRunOnly": false
+    },
+    {
+      "slug": "clover_house",
+      "name": "Clover House",
+      "reference": "CLOVER_HOUSE",
+      "destinationProjectId": "6a947bbad561028b35f54747",
+      "manifestSize": 15,
+      "created": 15,
+      "destinationLeadCount": 15,
+      "exceptionCount": 9,
+      "exceptionCounts": {
+        "multi_project": 9
+      },
+      "searchTotal": 24,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
