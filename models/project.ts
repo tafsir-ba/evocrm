@@ -43,6 +43,7 @@ const projectCompanySchema = new Schema(
     companyId: { type: Schema.Types.ObjectId, ref: "Company", required: true },
     role: { type: String, enum: PROJECT_COMPANY_ROLES, required: true },
     isPrimary: { type: Boolean, default: false },
+    provenance: { type: Schema.Types.Mixed, default: null },
   },
   { _id: false },
 );

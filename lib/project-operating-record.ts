@@ -44,16 +44,26 @@ export const PROJECT_COMPANY_ROLE_LABELS: Record<ProjectCompanyRole, string> = {
   marketing_sales_partner: "Marketing / sales partner",
 };
 
+export type ProjectCompanyProvenance = {
+  method: "workbook_import" | "manual";
+  relationship: "billed_linked" | "unspecified";
+  source: string;
+  appliedAt: string;
+  notes: string;
+};
+
 export type ProjectCompanyAssociationInput = {
   companyId: string;
   role: ProjectCompanyRole;
   isPrimary?: boolean;
+  provenance?: ProjectCompanyProvenance | null;
 };
 
 export type ProjectCompanyAssociation = {
   companyId: string;
   role: ProjectCompanyRole;
   isPrimary: boolean;
+  provenance?: ProjectCompanyProvenance | null;
 };
 
 export function normalizeCompanyNameKey(name: string): string {
@@ -76,6 +86,7 @@ export function normalizeProjectCompanies(
       companyId: item.companyId,
       role: item.role,
       isPrimary: item.role === "developer" && item.isPrimary === true,
+      ...(item.provenance ? { provenance: item.provenance } : {}),
     });
   }
 

@@ -89,11 +89,15 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
     location: normalizeProjectLocation(
       (document as ProjectDocument & { location?: ProjectLocation | null }).location,
     ),
-    companies: (document.companies ?? []).map((link) => ({
-      companyId: link.companyId.toString(),
-      role: link.role as ProjectCompanyLink["role"],
-      isPrimary: Boolean(link.isPrimary),
-    })),
+    companies: (document.companies ?? []).map((link) => {
+      const provenance = (link as { provenance?: ProjectCompanyLink["provenance"] }).provenance;
+      return {
+        companyId: link.companyId.toString(),
+        role: link.role as ProjectCompanyLink["role"],
+        isPrimary: Boolean(link.isPrimary),
+        ...(provenance ? { provenance } : {}),
+      };
+    }),
     description: document.description ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,

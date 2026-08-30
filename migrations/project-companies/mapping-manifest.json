@@ -1,0 +1,71 @@
+{
+  "title": "Approved workbook-derived project company mapping",
+  "generatedFor": "exact project and exact/deduplicated company matching only",
+  "policy": {
+    "matching": "exact project name and exact/deduplicated company name only",
+    "relationship": "billed_linked",
+    "claimsLegalOwnership": false,
+    "primaryRole": "developer",
+    "createProjects": false,
+    "createCompanyFromIndividuals": false,
+    "overwriteExistingPrimary": false,
+    "notes": "These source records establish a billed/linked company relationship. They do not prove legal ownership. Existing manually-set primary companies are preserved and reported as conflicts."
+  },
+  "apply": [
+    { "projectName": "Arbora", "companyName": "Losinger Marazzi SA" },
+    { "projectName": "Avant-Scène", "companyName": "Cardis- Sotheby's International Realty" },
+    { "projectName": "Campanules", "companyName": "Fondation des Logements pour Personnes Âgées ou Isolées" },
+    { "projectName": "Carawina", "companyName": "LEAD" },
+    { "projectName": "Cardinal", "companyName": "Johnston Development Group" },
+    { "projectName": "Corsier-sur-Vevey", "companyName": "Swissroc Investment SA" },
+    { "projectName": "Eleven 41", "companyName": "Tailwind Corporation (Jamaica) Limited" },
+    { "projectName": "Floréal", "companyName": "ROC INVEST VD 1 SA" },
+    { "projectName": "Jardin des Nations", "companyName": "Steiner AG" },
+    { "projectName": "Le Parc des Crêts", "companyName": "Naef Immobilier Genève Arcade de vente" },
+    { "projectName": "Mathod", "companyName": "NewHome Services SA" },
+    { "projectName": "Namaya", "companyName": "Voisirel Immo SA" },
+    { "projectName": "Ormet", "companyName": "Swissroc Properties SA" },
+    { "projectName": "Osmose", "companyName": "Halter AG" },
+    { "projectName": "Portes du Lac", "companyName": "GEFISWISS SA" },
+    { "projectName": "Résidence Symbiose", "companyName": "NewHome Services SA" },
+    { "projectName": "Seymaz 44", "companyName": "Swissroc Construction SA" },
+    { "projectName": "Smarthill", "companyName": "Realitim II SCPC" },
+    { "projectName": "Tannay Horizon", "companyName": "Projectim SA" },
+    { "projectName": "V77", "companyName": "Swissroc Construction SA" }
+  ],
+  "personReview": [
+    {
+      "projectName": "Grosvenor Vistas",
+      "sourceValue": "Nigel Benjamin",
+      "note": "Individual, not a company. Do not create a Company. Hold for person/company review."
+    }
+  ],
+  "hold": [
+    {
+      "projectName": "Collex-Bossy",
+      "candidates": ["Swissroc Properties SA", "M3 Real Estate"]
+    },
+    {
+      "projectName": "Defne",
+      "candidates": ["Courvoisier SA", "Nestima SA"]
+    },
+    {
+      "projectName": "Jardins Pala",
+      "candidates": ["GEROFINANCE-DUNAND COURTAGE SA", "City West SA", "BARNES Suisse SA"]
+    },
+    {
+      "projectName": "Rubix",
+      "candidates": ["Halter AG", "HIG Asset Management AG"]
+    },
+    {
+      "projectName": "Versoix",
+      "candidates": ["Swissroc Properties SA", "Pilet Renaud", "Pilet Renaud Transactions SA"]
+    }
+  ],
+  "noProject": [
+    {
+      "projectName": "Payerne-Envergure",
+      "note": "No exact CRM project match. Do not create a project."
+    }
+  ]
+}

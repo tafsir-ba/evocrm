@@ -21,6 +21,7 @@
     "repair:transient-bounce-suppressions": "npx tsx scripts/repair-transient-bounce-suppressions.ts",
     "verify:projects": "npx tsx scripts/verify-project-scope.ts",
     "enrich:project-locations": "npx tsx scripts/enrich-project-locations.ts",
+    "import:project-companies": "npx tsx scripts/import-project-companies.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

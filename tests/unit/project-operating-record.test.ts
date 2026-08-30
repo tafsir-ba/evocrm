@@ -55,4 +55,20 @@ describe("project operating record", () => {
     expect(associations[0]?.isPrimary).toBe(false);
     expect(primaryDeveloperCompanyId(associations)).toBeNull();
   });
+
+  it("preserves billed/linked provenance on the primary company link", () => {
+    const provenance = {
+      method: "workbook_import" as const,
+      relationship: "billed_linked" as const,
+      source: "workbook-derived mapping (operator-approved)",
+      appliedAt: "2026-08-30T18:00:00.000Z",
+      notes: "Establishes a billed/linked company relationship. Does not claim legal ownership.",
+    };
+
+    const associations = normalizeProjectCompanies([
+      { companyId: "dev-1", role: "developer", isPrimary: true, provenance },
+    ]);
+
+    expect(associations[0]?.provenance).toEqual(provenance);
+  });
 });

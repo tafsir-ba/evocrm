@@ -1,0 +1,84 @@
+{
+  "generatedAt": "2026-08-30T18:58:00.000Z",
+  "mode": "catalog-audit",
+  "policy": {
+    "matching": "exact project name and exact/deduplicated company name only",
+    "relationship": "billed_linked",
+    "claimsLegalOwnership": false,
+    "createProjects": false,
+    "createCompanyFromIndividuals": false,
+    "overwriteExistingPrimary": false
+  },
+  "catalog": {
+    "total": 27,
+    "apply": 20,
+    "hold": 5,
+    "personReview": 1,
+    "noProject": 1
+  },
+  "plannedApplies": [
+    "Arbora → Losinger Marazzi SA",
+    "Avant-Scène → Cardis- Sotheby's International Realty",
+    "Campanules → Fondation des Logements pour Personnes Âgées ou Isolées",
+    "Carawina → LEAD",
+    "Cardinal → Johnston Development Group",
+    "Corsier-sur-Vevey → Swissroc Investment SA",
+    "Eleven 41 → Tailwind Corporation (Jamaica) Limited",
+    "Floréal → ROC INVEST VD 1 SA",
+    "Jardin des Nations → Steiner AG",
+    "Le Parc des Crêts → Naef Immobilier Genève Arcade de vente",
+    "Mathod → NewHome Services SA",
+    "Namaya → Voisirel Immo SA",
+    "Ormet → Swissroc Properties SA",
+    "Osmose → Halter AG",
+    "Portes du Lac → GEFISWISS SA",
+    "Résidence Symbiose → NewHome Services SA",
+    "Seymaz 44 → Swissroc Construction SA",
+    "Smarthill → Realitim II SCPC",
+    "Tannay Horizon → Projectim SA",
+    "V77 → Swissroc Construction SA"
+  ],
+  "holds": [
+    {
+      "projectName": "Grosvenor Vistas",
+      "action": "person_review",
+      "sourceValue": "Nigel Benjamin",
+      "note": "Individual, not a company. Do not create a Company."
+    },
+    {
+      "projectName": "Collex-Bossy",
+      "action": "hold",
+      "candidates": ["Swissroc Properties SA", "M3 Real Estate"]
+    },
+    {
+      "projectName": "Defne",
+      "action": "hold",
+      "candidates": ["Courvoisier SA", "Nestima SA"]
+    },
+    {
+      "projectName": "Jardins Pala",
+      "action": "hold",
+      "candidates": ["GEROFINANCE-DUNAND COURTAGE SA", "City West SA", "BARNES Suisse SA"]
+    },
+    {
+      "projectName": "Rubix",
+      "action": "hold",
+      "candidates": ["Halter AG", "HIG Asset Management AG"]
+    },
+    {
+      "projectName": "Versoix",
+      "action": "hold",
+      "candidates": ["Swissroc Properties SA", "Pilet Renaud", "Pilet Renaud Transactions SA"]
+    }
+  ],
+  "unresolved": [
+    {
+      "projectName": "Payerne-Envergure",
+      "action": "unresolved",
+      "reason": "no_exact_project_match",
+      "note": "Do not create a project."
+    }
+  ],
+  "liveWrite": false,
+  "note": "Catalog-audit of the operator-approved mapping. Live create/link requires `npm run import:project-companies -- --execute --confirm-write` against the target workspace. Existing primary companies are never overwritten; conflicts stay in the report."
+}
