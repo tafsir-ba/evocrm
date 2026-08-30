@@ -16,7 +16,7 @@ npm run migrate:lead-project-memberships -- --workspace-id=<workspaceObjectId> -
 
 Apply requires a real `--actor-id` (24-character hex user ObjectId). Do not use a placeholder actor. The apply run syncs membership indexes and writes one audit log per scanned workspace.
 
-Requires the same `MONGODB_URI` as the running app. Safe to re-run.
+Requires the same `MONGODB_URI` or `MONGO_URL` as the running app. If the URI has no database path, the runner defaults to `evocrm`. Safe to re-run.
 
 ## Held HubSpot multi-project contacts — do not run yet
 
