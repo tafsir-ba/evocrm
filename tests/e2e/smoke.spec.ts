@@ -9,6 +9,9 @@ test.describe("Public routes", () => {
   test("home redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/login/);
+    await expect(page).not.toHaveURL(/\/api\/auth\/signout/);
+    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+    await expect(page.getByText(/do you want to sign out/i)).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /continue with google/i }),
     ).toBeVisible();

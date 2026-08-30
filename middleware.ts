@@ -2,22 +2,13 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 
 import { getAuthConfig } from "@/auth.config";
-import { isPublicPath } from "@/lib/public-paths";
+import {
+  shouldRedirectAuthenticatedAwayFromAuthPages,
+  shouldRedirectUnauthenticatedToLogin,
+} from "@/lib/protected-app-paths";
 import { isCanonicalSessionUserId } from "@/lib/session-user-id";
 
 const { auth } = NextAuth(getAuthConfig());
-
-function isProtectedAppPath(pathname: string): boolean {
-  return (
-    pathname.startsWith("/w/") ||
-    pathname.startsWith("/workspaces") ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/api/me") ||
-    pathname.startsWith("/api/workspaces") ||
-    pathname.startsWith("/api/feedback") ||
-    pathname.startsWith("/api/admin")
-  );
-}
 
 export default auth((request) => {
   const { pathname } = request.nextUrl;
@@ -28,13 +19,13 @@ export default auth((request) => {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);
 
-  if (!isLoggedIn && isProtectedAppPath(pathname) && !isPublicPath(pathname)) {
+  if (shouldRedirectUnauthenticatedToLogin(pathname, isLoggedIn)) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isLoggedIn && (pathname === "/login" || pathname === "/signup")) {
+  if (shouldRedirectAuthenticatedAwayFromAuthPages(pathname, isLoggedIn)) {
     return NextResponse.redirect(new URL("/workspaces", request.url));
   }
 

@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  CLEAR_INVALID_SESSION_PATH,
   isCanonicalSessionUserId,
-  SIGN_OUT_TO_LOGIN_PATH,
+  pageRedirectForMissingOrInvalidSession,
 } from "@/lib/session-user-id";
 import {
   listActiveWorkspacesForUser,
@@ -16,13 +17,13 @@ export default async function HomePage() {
   const session = await auth();
 
   if (!session?.user?.id || !isCanonicalSessionUserId(session.user.id)) {
-    redirect(SIGN_OUT_TO_LOGIN_PATH);
+    redirect(pageRedirectForMissingOrInvalidSession(session?.user?.id));
   }
 
   const user = await findUserById(session.user.id);
 
   if (!user) {
-    redirect(SIGN_OUT_TO_LOGIN_PATH);
+    redirect(CLEAR_INVALID_SESSION_PATH);
   }
 
   const workspaces = await listActiveWorkspacesForUser(user.id);
