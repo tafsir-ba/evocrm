@@ -43,19 +43,53 @@ import {
   updateProjectForWorkspace,
 } from "@/server/services/projects";
 
+const PRIMARY_COMPANY_ID = "507f1f77bcf86cd7994390aa";
+
+function mockKnownCompany() {
+  vi.mocked(findCompaniesByIds).mockResolvedValue([
+    {
+      id: PRIMARY_COMPANY_ID,
+      workspaceId: "ws-1",
+      name: "Promotor SA",
+      nameNormalized: "promotor sa",
+      website: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ]);
+}
+
 describe("project service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
+  it("rejects a standard create without a primary company", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+
+    await expect(
+      createProjectForWorkspace("ws-1", "user-1", {
+        name: "Green View",
+        reference: "GV",
+        city: "Geneva",
+        country: "Switzerland",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
   it("sets workspaceId and createdBy server-side on create", async () => {
     vi.mocked(findProjectByReference).mockResolvedValue(null);
+    mockKnownCompany();
     vi.mocked(createProject).mockResolvedValue({
       id: "project-1",
       workspaceId: "ws-1",
       name: "Green View",
       reference: "GV",
       ...projectRecordExtras,
+      companies: [{ companyId: PRIMARY_COMPANY_ID, role: "developer", isPrimary: true }],
       statusId: null,
       address: null,
       city: "Geneva",
@@ -74,6 +108,7 @@ describe("project service", () => {
       reference: "GV",
       city: "Geneva",
       country: "Switzerland",
+      companies: [{ companyId: PRIMARY_COMPANY_ID, role: "developer", isPrimary: true }],
     });
 
     expect(createProject).toHaveBeenCalledWith(
@@ -81,6 +116,7 @@ describe("project service", () => {
         workspaceId: "ws-1",
         createdBy: "user-1",
         name: "Green View",
+        companies: [{ companyId: PRIMARY_COMPANY_ID, role: "developer", isPrimary: true }],
       }),
     );
     expect(project.createdBy).toBe("user-1");
@@ -88,6 +124,42 @@ describe("project service", () => {
       expect.objectContaining({
         city: "Geneva",
         country: "Switzerland",
+      }),
+    );
+  });
+
+  it("allows system callers to create catch-all projects without a company", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+    vi.mocked(createProject).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "EvoHome General",
+      reference: "EVO-GENERAL",
+      ...projectRecordExtras,
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await createProjectForWorkspace(
+      "ws-1",
+      "user-1",
+      { name: "EvoHome General", reference: "EVO-GENERAL" },
+      { allowWithoutPrimaryCompany: true },
+    );
+
+    expect(createProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "EvoHome General",
+        companies: [],
       }),
     );
   });
@@ -171,10 +243,12 @@ describe("project service", () => {
       updatedAt: new Date(),
     } as never);
 
+    mockKnownCompany();
     await expect(
       createProjectForWorkspace("ws-1", "user-1", {
         name: "Green View",
         propertyTypeId: "507f1f77bcf86cd7994390cc",
+        companies: [{ companyId: PRIMARY_COMPANY_ID, role: "developer", isPrimary: true }],
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     expect(createProject).not.toHaveBeenCalled();

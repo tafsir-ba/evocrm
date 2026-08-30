@@ -19,10 +19,12 @@ import { IconArrowDown, IconArrowUp } from "@/lib/icons";
 import type { ProjectBrowserSort, ProjectBrowserSortDir } from "@/lib/project-browser";
 import {
   anyProjectHasInventory,
+  formatPrimaryCompany,
   formatProjectActivity,
   formatProjectInventoryLine,
   formatProjectLocation,
   projectListStatus,
+  type ProjectCompanyListLink,
 } from "@/lib/projects-table";
 import { workspacePath } from "@/lib/workspace-paths";
 import type { ProjectLocation } from "@/lib/project-location";
@@ -34,6 +36,7 @@ export type ProjectsTableItem = {
   city: string | null;
   country: string | null;
   location?: ProjectLocation | null;
+  companies?: ProjectCompanyListLink[];
   archivedAt: string | null;
   createdAt: string;
   counts?: {
@@ -133,6 +136,7 @@ export function ProjectsTable({
                 sortDir={sortDir}
                 onSort={onSort}
               />
+              <TableHeaderCell className="w-[10rem]">Company</TableHeaderCell>
               <TableHeaderCell className="w-[10rem]">Location</TableHeaderCell>
               <SortableHeader
                 label="Leads"
@@ -167,6 +171,7 @@ export function ProjectsTable({
           </TableHead>
           <TableBody>
             {projects.map((project) => {
+              const company = formatPrimaryCompany(project.companies);
               const location = formatProjectLocation(
                 project.city,
                 project.country,
@@ -203,6 +208,11 @@ export function ProjectsTable({
                         </span>
                       ) : null}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <p className="truncate text-[var(--color-ink-soft)]" title={company}>
+                      {company}
+                    </p>
                   </TableCell>
                   <TableCell>
                     <p className="truncate text-[var(--color-ink-soft)]" title={location}>
@@ -259,6 +269,7 @@ export function ProjectsTable({
 
       <ul className="divide-y divide-[var(--color-line)] md:hidden">
         {projects.map((project) => {
+          const company = formatPrimaryCompany(project.companies);
           const location = formatProjectLocation(
             project.city,
             project.country,
@@ -289,9 +300,13 @@ export function ProjectsTable({
                     {project.name}
                   </Link>
                   <p className="mt-0.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                    {[project.reference, location !== "—" ? location : null]
+                    {[
+                      project.reference,
+                      company !== "—" ? company : null,
+                      location !== "—" ? location : null,
+                    ]
                       .filter(Boolean)
-                      .join(" · ") || "No reference or location"}
+                      .join(" · ") || "No company or location"}
                   </p>
                 </div>
                 <Badge tone={status.tone} size="sm">

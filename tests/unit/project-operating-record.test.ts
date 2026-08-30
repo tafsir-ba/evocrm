@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasPrimaryBusinessCompany,
   normalizeCompanyNameKey,
   normalizeProjectCompanies,
+  primaryCompanyLink,
   primaryDeveloperCompanyId,
 } from "@/lib/project-operating-record";
 
@@ -54,5 +56,17 @@ describe("project operating record", () => {
 
     expect(associations[0]?.isPrimary).toBe(false);
     expect(primaryDeveloperCompanyId(associations)).toBeNull();
+    expect(hasPrimaryBusinessCompany(associations)).toBe(false);
+  });
+
+  it("resolves the primary company link for list and detail display", () => {
+    const associations = normalizeProjectCompanies([
+      { companyId: "dev-1", role: "developer", isPrimary: true },
+      { companyId: "own-1", role: "owner" },
+    ]);
+
+    expect(hasPrimaryBusinessCompany(associations)).toBe(true);
+    expect(primaryCompanyLink(associations)?.companyId).toBe("dev-1");
+    expect(primaryCompanyLink([])).toBeNull();
   });
 });

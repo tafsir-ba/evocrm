@@ -17,6 +17,7 @@ import {
   type ProjectLocation,
 } from "@/lib/project-location";
 import {
+  PRIMARY_COMPANY_REQUIRED_MESSAGE,
   primaryDeveloperCompanyId,
   PROJECT_COMMERCIAL_STAGE_LABELS,
   PROJECT_COMMERCIAL_STAGES,
@@ -299,6 +300,12 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
     setError(null);
 
     const companies = companiesPayload();
+    if (!form.primaryDeveloperId) {
+      setError(PRIMARY_COMPANY_REQUIRED_MESSAGE);
+      setSaving(false);
+      return;
+    }
+
     const location = locationWritePayload(form.location);
     const createBody = {
       name: form.name.trim(),
@@ -308,7 +315,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       ...(form.propertyTypeId ? { propertyTypeId: form.propertyTypeId } : {}),
       ...(form.website.trim() ? { website: form.website.trim() } : {}),
       ...(location ? { location } : {}),
-      ...(companies.length > 0 ? { companies } : {}),
+      companies,
       ...(form.description.trim() ? { description: form.description.trim() } : {}),
       ...(form.ownerId ? { ownerId: form.ownerId } : {}),
       ...(form.assignedTo ? { assignedTo: form.assignedTo } : {}),
@@ -358,7 +365,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
   return (
     <FocusedFormLayout
       title={isEdit ? "Edit project" : "New project"}
-      description="Create an operating record for the development. Inbound demand (Active / Stale) is calculated later from leads, not from this form."
+      description="Create an operating record for a company and its people. Inbound demand (Active / Stale) is calculated later from leads, not from this form."
       back={{ href: cancelHref, label: "Projects" }}
     >
       {loading ? (
@@ -371,7 +378,8 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                 Essentials
               </h2>
               <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
-                Name, developer, commercial stage, and who owns the record.
+                Name, the primary company this project is for, commercial stage, and who owns the
+                record.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -401,9 +409,12 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                 />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="primaryDeveloper">Primary developer</Label>
+                <Label htmlFor="primaryDeveloper" required>
+                  Primary company
+                </Label>
                 <CompanySelector
                   id="primaryDeveloper"
+                  required
                   companies={companies}
                   selectedCompanyId={form.primaryDeveloperId || null}
                   onChange={(companyId) =>
@@ -411,12 +422,13 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                   }
                   onCreate={createCompany}
                   creating={creatingCompany}
-                  placeholder="Select developer / promoter…"
+                  placeholder="Select developer / client…"
                   createLabel="Create company"
                 />
                 <p className="mt-1.5 text-[12px] text-[var(--color-ink-faint)]">
-                  Reuses the CRM company record. Additional owners or sales partners can be added
-                  below.
+                  Required. Search or create the CRM company this development is for. That
+                  company&apos;s people stay on the company record — do not type names here.
+                  Additional owners or sales partners can be added below.
                 </p>
               </div>
               <div>
@@ -562,7 +574,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                       Additional companies
                     </p>
                     <p className="mt-1 text-[12px] text-[var(--color-ink-faint)]">
-                      Owner, marketing, or a second developer. The primary developer stays above.
+                      Owner, marketing, or a second developer. The primary company stays above.
                     </p>
                   </div>
                   {form.additionalCompanies.map((item) => (

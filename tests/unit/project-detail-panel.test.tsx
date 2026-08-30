@@ -52,6 +52,24 @@ describe("ProjectDetailPanel", () => {
           ],
           description: "Lakefront residences",
           archivedAt: null,
+          companyPeople: [
+            {
+              id: "507f1f77bcf86cd7994390ee",
+              companyId: "507f1f77bcf86cd7994390aa",
+              projectId: "507f1f77bcf86cd7994390dd",
+              fullName: "Marie Dupont",
+              email: "marie@promotor.example",
+            },
+          ],
+          associablePeople: [
+            {
+              id: "507f1f77bcf86cd7994390ff",
+              companyId: null,
+              projectId: "507f1f77bcf86cd7994390dd",
+              fullName: "Jean Client",
+              email: "jean@example.com",
+            },
+          ],
         },
       }),
     ) as typeof fetch;
@@ -70,7 +88,11 @@ describe("ProjectDetailPanel", () => {
     expect(await screen.findByText("Les Terrasses")).toBeInTheDocument();
     expect(screen.getByText("Pre-launch")).toBeInTheDocument();
     expect(screen.getByText("Development")).toBeInTheDocument();
+    expect(screen.getByText("Primary company")).toBeInTheDocument();
     expect(screen.getByText("Promotor SA")).toBeInTheDocument();
+    expect(screen.getByText("Developer / client")).toBeInTheDocument();
+    expect(screen.getByText("Marie Dupont")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Jean Client/ })).toBeInTheDocument();
     expect(screen.getByText(/Quai du Mont-Blanc/)).toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });

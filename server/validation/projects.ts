@@ -7,6 +7,7 @@ import {
   PROJECT_LOCATION_PRECISIONS,
   PROJECT_LOCATION_REVIEW_STATUSES,
 } from "@/lib/project-location";
+import { PRIMARY_COMPANY_REQUIRED_MESSAGE } from "@/lib/project-operating-record";
 
 const objectIdSchema = z
   .string()
@@ -126,7 +127,11 @@ export const createProjectInputSchema = z
     ownerId: objectIdSchema.optional(),
     assignedTo: objectIdSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => (value.companies ?? []).some((item) => item.role === "developer"), {
+    message: PRIMARY_COMPANY_REQUIRED_MESSAGE,
+    path: ["companies"],
+  });
 
 export const updateProjectInputSchema = z
   .object({
@@ -150,7 +155,15 @@ export const updateProjectInputSchema = z
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field must be provided.",
-  });
+  })
+  .refine(
+    (value) =>
+      value.companies === undefined || value.companies.some((item) => item.role === "developer"),
+    {
+      message: PRIMARY_COMPANY_REQUIRED_MESSAGE,
+      path: ["companies"],
+    },
+  );
 
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectInputSchema>;

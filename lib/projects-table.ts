@@ -9,6 +9,10 @@ import {
   formatProjectLocationLabel,
   type ProjectLocation,
 } from "@/lib/project-location";
+import {
+  primaryCompanyLink,
+  type ProjectCompanyRole,
+} from "@/lib/project-operating-record";
 
 export type ProjectInventoryCounts = {
   leads?: number;
@@ -27,6 +31,20 @@ export type ProjectInventoryPart = {
 };
 
 export type ProjectListStatus = ProjectDemandStatus;
+
+export type ProjectCompanyListLink = {
+  companyId: string;
+  role: ProjectCompanyRole | string;
+  isPrimary?: boolean;
+  company?: { id: string; name: string } | null;
+};
+
+export function formatPrimaryCompany(
+  companies: ProjectCompanyListLink[] | null | undefined,
+): string {
+  const link = primaryCompanyLink(companies ?? []);
+  return link?.company?.name?.trim() || "—";
+}
 
 export function formatProjectLocation(
   city: string | null | undefined,

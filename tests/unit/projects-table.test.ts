@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   anyProjectHasInbound,
   anyProjectHasInventory,
+  formatPrimaryCompany,
   formatProjectActivity,
   formatProjectInventory,
   formatProjectInventoryLine,
@@ -13,6 +14,26 @@ import {
 const now = new Date(2026, 7, 30, 12, 0, 0);
 
 describe("projects table presentation", () => {
+  it("shows the primary company name and not a free-text contact", () => {
+    expect(formatPrimaryCompany([])).toBe("—");
+    expect(
+      formatPrimaryCompany([
+        {
+          companyId: "c1",
+          role: "developer",
+          isPrimary: true,
+          company: { id: "c1", name: "Promotor SA" },
+        },
+        {
+          companyId: "c2",
+          role: "owner",
+          isPrimary: false,
+          company: { id: "c2", name: "Other Ltd" },
+        },
+      ]),
+    ).toBe("Promotor SA");
+  });
+
   it("joins location parts and prefers structured geography when present", () => {
     expect(formatProjectLocation("Genève", "Suisse")).toBe("Genève, Suisse");
     expect(formatProjectLocation(null, "Suisse")).toBe("Suisse");
