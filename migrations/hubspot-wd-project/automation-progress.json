@@ -433,6 +433,22 @@
       },
       "searchTotal": 345,
       "dryRunOnly": false
+    },
+    {
+      "slug": "carawina",
+      "name": "Carawina",
+      "reference": "CARAWINA",
+      "destinationProjectId": "6a946a73d89549c3528d9c0b",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 327,
+      "exceptionCounts": {
+        "multi_project": 14,
+        "missing_name": 313
+      },
+      "searchTotal": 327,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
