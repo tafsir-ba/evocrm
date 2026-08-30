@@ -35,6 +35,11 @@ export const projectListQuerySchema = z.object({
     .union([z.literal("true"), z.literal("false")])
     .optional()
     .transform((value) => value === "true"),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  view: z.enum(["all", "active", "stale", "needs_attention", "archived"]).optional(),
+  sort: z.enum(["inbound", "leads", "status", "name"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).optional(),
 });
 
 export const createProjectInputSchema = z

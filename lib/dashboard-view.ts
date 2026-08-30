@@ -1,3 +1,4 @@
+import type { InboundReceivedBasis } from "@/lib/inbound-received-at";
 import { projectListStatus, type ProjectListStatus } from "@/lib/projects-table";
 
 export type DashboardAttentionTab = "overdue" | "dueToday" | "upcoming";
@@ -10,9 +11,21 @@ export type DashboardProjectHealthItem = {
   createdAt: string;
   counts?: {
     leads: number;
-    lastActivityAt: string | null;
+    lastActivityAt?: string | null;
+    lastGenuineInboundAt?: string | null;
+    lastGenuineInboundBasis?: InboundReceivedBasis | null;
   };
 };
+
+function demandAttentionRank(label: ProjectListStatus["label"]): number {
+  if (label === "Stale") {
+    return 2;
+  }
+  if (label === "Unknown") {
+    return 1;
+  }
+  return 0;
+}
 
 export function defaultAttentionTab(input: {
   overdue: number;
@@ -54,15 +67,14 @@ export function rankProjectsForOperator(
       ...project,
       status: projectListStatus({
         archivedAt: project.archivedAt,
-        lastActivityAt: project.counts?.lastActivityAt,
-        createdAt: project.createdAt,
+        lastGenuineInboundAt: project.counts?.lastGenuineInboundAt,
         now,
       }),
     }))
     .sort((left, right) => {
-      const staleRank = Number(right.status.label === "Stale") - Number(left.status.label === "Stale");
-      if (staleRank !== 0) {
-        return staleRank;
+      const rank = demandAttentionRank(right.status.label) - demandAttentionRank(left.status.label);
+      if (rank !== 0) {
+        return rank;
       }
       return (right.counts?.leads ?? 0) - (left.counts?.leads ?? 0);
     })

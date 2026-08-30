@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  anyProjectHasActivity,
+  anyProjectHasInbound,
   anyProjectHasInventory,
   formatProjectActivity,
   formatProjectInventory,
@@ -33,7 +33,7 @@ describe("projects table presentation", () => {
         opportunities: 0,
         activeCampaigns: 1,
       }),
-    ).toBe("4 properties · 1 dripping");
+    ).toBe("4 properties · 1 workflow");
     expect(
       anyProjectHasInventory([
         { counts: { properties: 0, opportunities: 0, activeCampaigns: 0 } },
@@ -46,7 +46,7 @@ describe("projects table presentation", () => {
     ).toBe(true);
   });
 
-  it("marks archived, stale, and active projects from real activity dates", () => {
+  it("marks archived, stale, active, and unknown from genuine inbound dates only", () => {
     expect(
       projectListStatus({
         archivedAt: "2026-08-01T00:00:00.000Z",
@@ -57,27 +57,43 @@ describe("projects table presentation", () => {
 
     expect(
       projectListStatus({
-        createdAt: new Date(2026, 6, 1),
-        lastActivityAt: new Date(2026, 7, 1),
+        createdAt: now,
+        lastActivityAt: now,
+        lastGenuineInboundAt: new Date(2026, 6, 1),
         now,
       }).label,
     ).toBe("Stale");
 
     expect(
       projectListStatus({
-        createdAt: now,
-        lastActivityAt: now,
+        createdAt: new Date(2025, 0, 1),
+        lastActivityAt: new Date(2025, 0, 1),
+        lastGenuineInboundAt: now,
         now,
       }).label,
     ).toBe("Active");
+
+    expect(
+      projectListStatus({
+        createdAt: now,
+        lastActivityAt: now,
+        lastGenuineInboundAt: null,
+        now,
+      }).label,
+    ).toBe("Unknown");
   });
 
-  it("formats recent activity and hides the column when none exists", () => {
-    expect(formatProjectActivity(new Date(2026, 7, 29, 12, 0, 0), now)).toBe("1d");
-    expect(formatProjectActivity(null, now)).toBe("—");
-    expect(anyProjectHasActivity([{ counts: { lastActivityAt: null } }])).toBe(false);
+  it("formats last inbound with basis and ignores CRM activity timestamps", () => {
+    expect(formatProjectActivity(new Date(2026, 7, 29, 12, 0, 0), "received_at", now)).toBe(
+      "1d · received",
+    );
+    expect(formatProjectActivity(null, null, now)).toBe("Needs inbound date");
+    expect(anyProjectHasInbound([{ counts: { lastGenuineInboundAt: null } }])).toBe(false);
     expect(
-      anyProjectHasActivity([{ counts: { lastActivityAt: "2026-08-29T12:00:00.000Z" } }]),
+      anyProjectHasInbound([{ counts: { lastGenuineInboundAt: "2026-08-29T12:00:00.000Z" } }]),
     ).toBe(true);
+    expect(anyProjectHasInbound([{ counts: { lastActivityAt: now.toISOString() } }])).toBe(
+      false,
+    );
   });
 });

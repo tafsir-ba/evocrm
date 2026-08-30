@@ -254,6 +254,7 @@ async function captureHubSpotContactAsLead(input: {
         externalId: contact.id,
         idempotencyKey,
         inboundSource: "hubspot",
+        ...(contact.createdAt ? { sourceCreatedAt: contact.createdAt } : {}),
         ...(input.eventId ? { hubspotEventId: String(input.eventId) } : {}),
       },
       ...buildMigratedCampaignGuardAttributes(),

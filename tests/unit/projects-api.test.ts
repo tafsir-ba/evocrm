@@ -16,6 +16,7 @@ vi.mock("@/server/permissions/require-permission", () => ({
 
 vi.mock("@/server/services/projects", () => ({
   listProjectsForWorkspace: vi.fn(),
+  listProjectsPageForWorkspace: vi.fn(),
   createProjectForWorkspace: vi.fn(),
   archiveProjectForWorkspace: vi.fn(),
   getProjectForWorkspace: vi.fn(),
@@ -30,6 +31,7 @@ import {
   createProjectForWorkspace,
   getProjectForWorkspace,
   listProjectsForWorkspace,
+  listProjectsPageForWorkspace,
 } from "@/server/services/projects";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -103,6 +105,81 @@ describe("project API routes", () => {
     const body = await response.json();
     expect(body.data.projects).toHaveLength(1);
     expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "project:read");
+    expect(listProjectsPageForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("returns a paginated project browser page", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["project:read"],
+      },
+    });
+    vi.mocked(listProjectsPageForWorkspace).mockResolvedValue({
+      projects: [
+        {
+          id: "p1",
+          workspaceId: "ws-1",
+          name: "Green View",
+          reference: "GV",
+          ...projectRecordExtras,
+          statusId: null,
+          address: null,
+          city: "Geneva",
+          country: "Switzerland",
+          description: null,
+          createdBy: "user-1",
+          ownerId: null,
+          assignedTo: null,
+          archivedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+      total: 26,
+    });
+
+    const response = await getProjects(
+      new Request(
+        "http://localhost/api/workspaces/demo/projects?page=1&pageSize=25&view=all&sort=inbound&withCounts=true",
+      ),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.pagination).toEqual({
+      page: 1,
+      pageSize: 25,
+      total: 26,
+      totalPages: 2,
+    });
+    expect(listProjectsPageForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        page: 1,
+        pageSize: 25,
+        view: "all",
+        sort: "inbound",
+        withCounts: true,
+      }),
+    );
+    expect(listProjectsForWorkspace).not.toHaveBeenCalled();
   });
 
   it("returns PERMISSION_DENIED without project:read", async () => {

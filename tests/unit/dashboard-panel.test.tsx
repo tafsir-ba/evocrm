@@ -135,7 +135,12 @@ describe("DashboardPanel operator view", () => {
                 reference: "LT-01",
                 archivedAt: null,
                 createdAt: "2026-08-20T12:00:00.000Z",
-                counts: { leads: 12, lastActivityAt: "2026-08-29T09:00:00.000Z" },
+                counts: {
+                  leads: 12,
+                  lastActivityAt: "2026-08-29T09:00:00.000Z",
+                  lastGenuineInboundAt: "2026-08-29T09:00:00.000Z",
+                  lastGenuineInboundBasis: "received_at",
+                },
               },
             ],
           },
@@ -168,6 +173,11 @@ describe("DashboardPanel operator view", () => {
       expect.stringContaining("sourceId=src-web"),
     );
     expect(screen.getByText("Les Terrasses")).toBeInTheDocument();
+    expect(
+      screen.getByText("Active = genuine inbound lead in the last 30 days"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/12 leads · .+ · received/)).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("François Côté · AG-12")).toBeInTheDocument();
     expect(screen.queryByText("Live signal of leads")).not.toBeInTheDocument();
     expect(screen.queryByText("Properties by status")).not.toBeInTheDocument();

@@ -12,7 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  anyProjectHasActivity,
+  formatInboundDemandAudit,
+  type InboundReceivedBasis,
+} from "@/lib/inbound-received-at";
+import { IconArrowDown, IconArrowUp } from "@/lib/icons";
+import type { ProjectBrowserSort, ProjectBrowserSortDir } from "@/lib/project-browser";
+import {
   anyProjectHasInventory,
   formatProjectActivity,
   formatProjectInventoryLine,
@@ -35,6 +40,8 @@ export type ProjectsTableItem = {
     opportunities: number;
     activeCampaigns: number;
     lastActivityAt: string | null;
+    lastGenuineInboundAt?: string | null;
+    lastGenuineInboundBasis?: InboundReceivedBasis | null;
   };
 };
 
@@ -44,7 +51,60 @@ type ProjectsTableProps = {
   canUpdate: boolean;
   canArchive: boolean;
   onArchive: (projectId: string, projectName: string) => void;
+  sort?: ProjectBrowserSort;
+  sortDir?: ProjectBrowserSortDir;
+  onSort?: (sort: ProjectBrowserSort) => void;
 };
+
+function SortableHeader({
+  label,
+  column,
+  sort,
+  sortDir,
+  onSort,
+  className,
+  align = "left",
+}: {
+  label: string;
+  column: ProjectBrowserSort;
+  sort?: ProjectBrowserSort;
+  sortDir?: ProjectBrowserSortDir;
+  onSort?: (sort: ProjectBrowserSort) => void;
+  className?: string;
+  align?: "left" | "right";
+}) {
+  const active = sort === column;
+  const ariaSort = active ? (sortDir === "asc" ? "ascending" : "descending") : "none";
+
+  if (!onSort) {
+    return (
+      <TableHeaderCell className={className} aria-sort={ariaSort}>
+        {label}
+      </TableHeaderCell>
+    );
+  }
+
+  return (
+    <TableHeaderCell className={className} aria-sort={ariaSort}>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-0.5 font-semibold uppercase tracking-wide hover:text-[var(--color-ink)] ${
+          align === "right" ? "ml-auto" : ""
+        } ${active ? "text-[var(--color-ink)]" : ""}`}
+        onClick={() => onSort(column)}
+      >
+        {label}
+        {active ? (
+          sortDir === "asc" ? (
+            <IconArrowUp size={11} aria-hidden />
+          ) : (
+            <IconArrowDown size={11} aria-hidden />
+          )
+        ) : null}
+      </button>
+    </TableHeaderCell>
+  );
+}
 
 export function ProjectsTable({
   workspaceSlug,
@@ -52,9 +112,11 @@ export function ProjectsTable({
   canUpdate,
   canArchive,
   onArchive,
+  sort,
+  sortDir,
+  onSort,
 }: ProjectsTableProps) {
   const showInventory = anyProjectHasInventory(projects);
-  const showActivity = anyProjectHasActivity(projects);
 
   return (
     <>
@@ -62,16 +124,42 @@ export function ProjectsTable({
         <Table density="compact">
           <TableHead>
             <TableRow>
-              <TableHeaderCell>Project</TableHeaderCell>
+              <SortableHeader
+                label="Project"
+                column="name"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+              />
               <TableHeaderCell className="w-[10rem]">Location</TableHeaderCell>
-              <TableHeaderCell className="w-[4.5rem] text-right">Leads</TableHeaderCell>
+              <SortableHeader
+                label="Leads"
+                column="leads"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[4.5rem] text-right"
+                align="right"
+              />
               {showInventory ? (
                 <TableHeaderCell className="w-[12rem]">Inventory</TableHeaderCell>
               ) : null}
-              <TableHeaderCell className="w-[5.5rem]">Status</TableHeaderCell>
-              {showActivity ? (
-                <TableHeaderCell className="w-[5.5rem]">Activity</TableHeaderCell>
-              ) : null}
+              <SortableHeader
+                label="Status"
+                column="status"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[5.5rem]"
+              />
+              <SortableHeader
+                label="Last inbound"
+                column="inbound"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[9rem]"
+              />
               <TableHeaderCell className="w-[7rem] text-right">Actions</TableHeaderCell>
             </TableRow>
           </TableHead>
@@ -81,9 +169,16 @@ export function ProjectsTable({
               const inventoryLine = formatProjectInventoryLine(project.counts);
               const status = projectListStatus({
                 archivedAt: project.archivedAt,
-                lastActivityAt: project.counts?.lastActivityAt,
-                createdAt: project.createdAt,
+                lastGenuineInboundAt: project.counts?.lastGenuineInboundAt,
               });
+              const inboundLine = formatProjectActivity(
+                project.counts?.lastGenuineInboundAt,
+                project.counts?.lastGenuineInboundBasis,
+              );
+              const inboundTitle = formatInboundDemandAudit(
+                project.counts?.lastGenuineInboundAt,
+                project.counts?.lastGenuineInboundBasis,
+              );
               const identityTitle = [project.name, project.reference].filter(Boolean).join(" · ");
 
               return (
@@ -125,11 +220,9 @@ export function ProjectsTable({
                       {status.label}
                     </Badge>
                   </TableCell>
-                  {showActivity ? (
-                    <TableCell className="tabular text-[var(--color-ink-muted)]">
-                      {formatProjectActivity(project.counts?.lastActivityAt)}
-                    </TableCell>
-                  ) : null}
+                  <TableCell className="tabular text-[var(--color-ink-muted)]">
+                    <span title={inboundTitle}>{inboundLine}</span>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center justify-end gap-1">
                       {canUpdate && !project.archivedAt ? (
@@ -164,9 +257,16 @@ export function ProjectsTable({
           const inventoryLine = formatProjectInventoryLine(project.counts);
           const status = projectListStatus({
             archivedAt: project.archivedAt,
-            lastActivityAt: project.counts?.lastActivityAt,
-            createdAt: project.createdAt,
+            lastGenuineInboundAt: project.counts?.lastGenuineInboundAt,
           });
+          const inboundLine = formatProjectActivity(
+            project.counts?.lastGenuineInboundAt,
+            project.counts?.lastGenuineInboundBasis,
+          );
+          const inboundTitle = formatInboundDemandAudit(
+            project.counts?.lastGenuineInboundAt,
+            project.counts?.lastGenuineInboundBasis,
+          );
 
           return (
             <li key={project.id} className="px-3 py-2">
@@ -188,12 +288,13 @@ export function ProjectsTable({
                   {status.label}
                 </Badge>
               </div>
-              <p className="mt-1.5 truncate text-[12px] text-[var(--color-ink-soft)]">
+              <p
+                className="mt-1.5 truncate text-[12px] text-[var(--color-ink-soft)]"
+                title={inboundTitle}
+              >
                 {project.counts?.leads ?? 0} leads
                 {inventoryLine !== "—" ? ` · ${inventoryLine}` : ""}
-                {project.counts?.lastActivityAt
-                  ? ` · ${formatProjectActivity(project.counts.lastActivityAt)}`
-                  : ""}
+                {` · ${inboundLine}`}
               </p>
               <div className="mt-1.5 flex items-center gap-2">
                 {canUpdate && !project.archivedAt ? (

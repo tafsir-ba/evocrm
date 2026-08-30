@@ -2,10 +2,33 @@ import { describe, expect, it } from "vitest";
 
 import {
   createProjectInputSchema,
+  projectListQuerySchema,
   updateProjectInputSchema,
 } from "@/server/validation/projects";
 
 describe("project validation schemas", () => {
+  it("accepts browser pagination, demand views, and inbound sorts", () => {
+    const result = projectListQuerySchema.safeParse({
+      page: "2",
+      pageSize: "25",
+      view: "needs_attention",
+      sort: "inbound",
+      sortDir: "desc",
+      search: "grosvenor",
+      withCounts: "true",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.page).toBe(2);
+      expect(result.data.view).toBe("needs_attention");
+      expect(result.data.sort).toBe("inbound");
+    }
+
+    expect(projectListQuerySchema.safeParse({ view: "hot" }).success).toBe(false);
+    expect(projectListQuerySchema.safeParse({ pageSize: "250" }).success).toBe(false);
+  });
+
   it("rejects client-provided workspaceId and createdBy on create", () => {
     const withWorkspaceId = createProjectInputSchema.safeParse({
       name: "Green View",

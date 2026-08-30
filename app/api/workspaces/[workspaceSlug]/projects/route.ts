@@ -1,4 +1,9 @@
-import { handleRouteError, successResponse } from "@/server/api/responses";
+import {
+  buildPaginationMeta,
+  handleRouteError,
+  paginatedResponse,
+  successResponse,
+} from "@/server/api/responses";
 import {
   parseRequestOrThrow,
   validateSearchParams,
@@ -10,6 +15,7 @@ import {
 import {
   createProjectForWorkspace,
   listProjectsForWorkspace,
+  listProjectsPageForWorkspace,
 } from "@/server/services/projects";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
@@ -32,11 +38,37 @@ export async function GET(request: Request, context: RouteContext) {
       throw queryResult.error;
     }
 
+    const query = queryResult.data;
+    const browsing =
+      query.page !== undefined ||
+      query.pageSize !== undefined ||
+      query.view !== undefined ||
+      query.sort !== undefined;
+
+    if (browsing) {
+      const { projects, total } = await listProjectsPageForWorkspace(workspace.id, {
+        includeArchived: query.includeArchived,
+        search: query.search,
+        assignedTo: query.assignedTo,
+        withCounts: query.withCounts,
+        view: query.view,
+        sort: query.sort,
+        sortDir: query.sortDir,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 25,
+      });
+
+      return paginatedResponse(
+        projects,
+        buildPaginationMeta(query.page ?? 1, query.pageSize ?? 25, total),
+      );
+    }
+
     const projects = await listProjectsForWorkspace(workspace.id, {
-      includeArchived: queryResult.data.includeArchived,
-      search: queryResult.data.search,
-      assignedTo: queryResult.data.assignedTo,
-      withCounts: queryResult.data.withCounts,
+      includeArchived: query.includeArchived,
+      search: query.search,
+      assignedTo: query.assignedTo,
+      withCounts: query.withCounts,
     });
 
     return successResponse({ projects });

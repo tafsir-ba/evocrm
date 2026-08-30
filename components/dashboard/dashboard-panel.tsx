@@ -20,6 +20,7 @@ import {
   type DashboardAttentionTab,
   type DashboardProjectHealthItem,
 } from "@/lib/dashboard-view";
+import { formatInboundDemandLine } from "@/lib/inbound-received-at";
 import { formatPrice } from "@/lib/format-price";
 import { formatRelativeAge } from "@/lib/list-view";
 import { appendProjectIdToSearchParams, withProjectIdQuery } from "@/lib/project-scope";
@@ -505,7 +506,7 @@ export function DashboardPanel({
               <CardHeader
                 density="compact"
                 title={projectId ? "This project" : "Project health"}
-                subtitle="Active vs stale from last recorded activity"
+                subtitle="Active = genuine inbound lead in the last 30 days"
                 action={
                   <Link
                     href={scopedHref("projects")}
@@ -534,9 +535,11 @@ export function DashboardPanel({
                           </p>
                           <p className="truncate text-[11.5px] text-[var(--color-ink-muted)]">
                             {project.counts?.leads ?? 0} leads
-                            {project.counts?.lastActivityAt
-                              ? ` · ${formatRelativeAge(project.counts.lastActivityAt)}`
-                              : ""}
+                            {" · "}
+                            {formatInboundDemandLine(
+                              project.counts?.lastGenuineInboundAt,
+                              project.counts?.lastGenuineInboundBasis,
+                            )}
                           </p>
                         </div>
                         <Badge tone={project.status.tone} size="sm">

@@ -51,6 +51,34 @@ describe("ProjectSelector", () => {
     fetchSpy.mockRestore();
   });
 
+  it("filters a long project list by name, reference, or location", async () => {
+    const user = userEvent.setup();
+    const many = [
+      ...projects,
+      { id: "p3", name: "Alpine", reference: "AL", city: "Zermatt", country: "Switzerland" },
+      { id: "p4", name: "Harbour", reference: "HB", city: "Nice", country: "France" },
+      { id: "p5", name: "Garden", reference: "GD", city: "Lyon", country: "France" },
+      { id: "p6", name: "Court", reference: "CT", city: "Bern", country: "Switzerland" },
+      { id: "p7", name: "Park", reference: "PK", city: "Basel", country: "Switzerland" },
+      { id: "p8", name: "Tower", reference: "TW", city: "Zurich", country: "Switzerland" },
+    ];
+
+    render(
+      <ProjectSelector
+        projects={many}
+        selectedProjectId={null}
+        onChange={vi.fn()}
+        placeholder="Select a project"
+      />,
+    );
+
+    const search = screen.getByLabelText("Search projects");
+    await user.type(search, "geneva");
+
+    expect(screen.getByRole("option", { name: /Green View/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Harbour/ })).not.toBeInTheDocument();
+  });
+
   it("calls onChange when a project is selected", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

@@ -15,6 +15,8 @@ export type LeadIntegrationAttributes = {
   idempotencyKey?: string;
   inboundSource?: string;
   propertyReference?: string;
+  receivedAt?: string;
+  sourceCreatedAt?: string;
   utm?: LeadIntegrationUtm;
 };
 
@@ -60,6 +62,12 @@ export function readLeadIntegrationAttributes(
     ...(typeof integration.propertyReference === "string"
       ? { propertyReference: integration.propertyReference }
       : {}),
+    ...(typeof integration.receivedAt === "string" ? { receivedAt: integration.receivedAt } : {}),
+    ...(typeof integration.sourceCreatedAt === "string"
+      ? { sourceCreatedAt: integration.sourceCreatedAt }
+      : typeof integration.createdate === "string"
+        ? { sourceCreatedAt: integration.createdate }
+        : {}),
     ...(utm && Object.keys(utm).length > 0 ? { utm } : {}),
   };
 

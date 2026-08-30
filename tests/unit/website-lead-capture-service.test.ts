@@ -233,6 +233,7 @@ describe("website lead capture service", () => {
           integration: expect.objectContaining({
             integrationId: "int-1",
             idempotencyKey: "form-1",
+            receivedAt: expect.any(String),
             utm: { source: "google", medium: "cpc", campaign: "spring-buyers" },
           }),
         },

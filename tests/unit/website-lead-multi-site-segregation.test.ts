@@ -571,6 +571,7 @@ describe("multi-website lead segregation (investigation)", () => {
             idempotencyKey: "idem-99",
             inboundSource: "landing-hero",
             propertyReference: "PA-200",
+            receivedAt: expect.any(String),
             utm: {
               source: "google",
               medium: "cpc",

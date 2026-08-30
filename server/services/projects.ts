@@ -8,6 +8,7 @@ import {
   findProjectById,
   findProjectByReference,
   findProjects,
+  findProjectsPage,
   updateProject,
   type ProjectListFilter,
   type ProjectListItem,
@@ -37,6 +38,13 @@ export async function listProjectsForWorkspace(
   filter: ProjectListFilter = {},
 ): Promise<ProjectListItem[]> {
   return findProjects(workspaceId, filter);
+}
+
+export async function listProjectsPageForWorkspace(
+  workspaceId: string,
+  filter: ProjectListFilter = {},
+): Promise<{ projects: ProjectListItem[]; total: number }> {
+  return findProjectsPage(workspaceId, filter);
 }
 
 export async function getProjectForWorkspace(

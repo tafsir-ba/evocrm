@@ -25,7 +25,7 @@ describe("dashboard view helpers", () => {
     });
   });
 
-  it("surfaces stale projects before quieter active ones", () => {
+  it("surfaces stale inbound demand before unknown and quieter active projects", () => {
     const ranked = rankProjectsForOperator(
       [
         {
@@ -34,7 +34,12 @@ describe("dashboard view helpers", () => {
           reference: "LT-01",
           archivedAt: null,
           createdAt: now.toISOString(),
-          counts: { leads: 2, lastActivityAt: now.toISOString() },
+          counts: {
+            leads: 2,
+            lastActivityAt: now.toISOString(),
+            lastGenuineInboundAt: now.toISOString(),
+            lastGenuineInboundBasis: "received_at",
+          },
         },
         {
           id: "stale",
@@ -42,7 +47,25 @@ describe("dashboard view helpers", () => {
           reference: "PC-02",
           archivedAt: null,
           createdAt: new Date(2026, 5, 1).toISOString(),
-          counts: { leads: 1, lastActivityAt: new Date(2026, 6, 1).toISOString() },
+          counts: {
+            leads: 1,
+            lastActivityAt: now.toISOString(),
+            lastGenuineInboundAt: new Date(2026, 6, 1).toISOString(),
+            lastGenuineInboundBasis: "source_created",
+          },
+        },
+        {
+          id: "imported",
+          name: "Bulk import",
+          reference: "IMP",
+          archivedAt: null,
+          createdAt: now.toISOString(),
+          counts: {
+            leads: 8,
+            lastActivityAt: now.toISOString(),
+            lastGenuineInboundAt: null,
+            lastGenuineInboundBasis: null,
+          },
         },
         {
           id: "archived",
@@ -56,7 +79,9 @@ describe("dashboard view helpers", () => {
       now,
     );
 
-    expect(ranked.map((project) => project.id)).toEqual(["stale", "active"]);
+    expect(ranked.map((project) => project.id)).toEqual(["stale", "imported", "active"]);
     expect(ranked[0]?.status.label).toBe("Stale");
+    expect(ranked[1]?.status.label).toBe("Unknown");
+    expect(ranked[2]?.status.label).toBe("Active");
   });
 });

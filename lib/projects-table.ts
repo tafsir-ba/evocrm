@@ -1,4 +1,10 @@
-import { daysSince, formatLocation, formatRelativeAge, hasPositiveCount } from "@/lib/list-view";
+import {
+  formatInboundDemandLine,
+  projectDemandStatus,
+  type InboundReceivedBasis,
+  type ProjectDemandStatus,
+} from "@/lib/inbound-received-at";
+import { formatLocation, hasPositiveCount } from "@/lib/list-view";
 
 export type ProjectInventoryCounts = {
   leads?: number;
@@ -6,20 +12,17 @@ export type ProjectInventoryCounts = {
   opportunities?: number;
   activeCampaigns?: number;
   lastActivityAt?: string | Date | null;
+  lastGenuineInboundAt?: string | Date | null;
+  lastGenuineInboundBasis?: InboundReceivedBasis | null;
 };
 
 export type ProjectInventoryPart = {
-  key: "properties" | "pipeline" | "dripping";
+  key: "properties" | "pipeline" | "workflows";
   label: string;
   value: number;
 };
 
-export type ProjectListStatus = {
-  label: "Archived" | "Stale" | "Active";
-  tone: "muted" | "warn" | "success";
-};
-
-const PROJECT_STALE_DAYS = 14;
+export type ProjectListStatus = ProjectDemandStatus;
 
 export function formatProjectLocation(
   city: string | null | undefined,
@@ -39,7 +42,12 @@ export function formatProjectInventory(
     parts.push({ key: "pipeline", label: "Pipeline", value: counts?.opportunities ?? 0 });
   }
   if (hasPositiveCount(counts?.activeCampaigns)) {
-    parts.push({ key: "dripping", label: "Dripping", value: counts?.activeCampaigns ?? 0 });
+    const value = counts?.activeCampaigns ?? 0;
+    parts.push({
+      key: "workflows",
+      label: value === 1 ? "Workflow" : "Workflows",
+      value,
+    });
   }
   return parts;
 }
@@ -59,39 +67,37 @@ export function anyProjectHasInventory(
   return projects.some((project) => formatProjectInventory(project.counts).length > 0);
 }
 
+export function anyProjectHasInbound(
+  projects: Array<{ counts?: ProjectInventoryCounts | null }>,
+): boolean {
+  return projects.some((project) => Boolean(project.counts?.lastGenuineInboundAt));
+}
+
+/** @deprecated Use anyProjectHasInbound — activity timestamps are not demand. */
 export function anyProjectHasActivity(
   projects: Array<{ counts?: ProjectInventoryCounts | null }>,
 ): boolean {
-  return projects.some((project) => Boolean(project.counts?.lastActivityAt));
+  return anyProjectHasInbound(projects);
 }
 
 export function projectListStatus(input: {
   archivedAt?: string | Date | null;
+  lastGenuineInboundAt?: string | Date | null;
   lastActivityAt?: string | Date | null;
-  createdAt: string | Date;
+  createdAt?: string | Date;
   now?: Date;
 }): ProjectListStatus {
-  if (input.archivedAt) {
-    return { label: "Archived", tone: "muted" };
-  }
-
-  const now = input.now ?? new Date();
-  const lastTouch = input.lastActivityAt ?? input.createdAt;
-  const ageDays = daysSince(lastTouch, now);
-  if (ageDays !== null && ageDays >= PROJECT_STALE_DAYS) {
-    return { label: "Stale", tone: "warn" };
-  }
-
-  return { label: "Active", tone: "success" };
+  return projectDemandStatus({
+    archivedAt: input.archivedAt,
+    lastGenuineInboundAt: input.lastGenuineInboundAt,
+    now: input.now,
+  });
 }
 
 export function formatProjectActivity(
-  lastActivityAt: string | Date | null | undefined,
+  lastGenuineInboundAt: string | Date | null | undefined,
+  basis?: InboundReceivedBasis | null,
   now?: Date,
 ): string {
-  if (!lastActivityAt) {
-    return "—";
-  }
-
-  return formatRelativeAge(lastActivityAt, now);
+  return formatInboundDemandLine(lastGenuineInboundAt, basis, now);
 }

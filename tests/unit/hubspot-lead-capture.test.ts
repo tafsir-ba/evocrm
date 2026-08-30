@@ -172,6 +172,7 @@ describe("hubspot lead capture webhook", () => {
             externalId: "99",
             inboundSource: "hubspot",
             idempotencyKey: "hubspot:contact:99",
+            sourceCreatedAt: "2024-01-01T00:00:00.000Z",
           }),
           campaignEnrollmentPolicy: {
             defaultExcluded: true,

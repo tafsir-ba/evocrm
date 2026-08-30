@@ -184,6 +184,8 @@ function buildIntegrationAttributes(
     integrationAttributes.inboundSource = input.source.trim();
   }
 
+  integrationAttributes.receivedAt = new Date().toISOString();
+
   return { integration: integrationAttributes };
 }
 

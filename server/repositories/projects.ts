@@ -2,6 +2,16 @@ import "server-only";
 
 import mongoose from "mongoose";
 
+import { summarizeProjectInboundDemand } from "@/lib/inbound-received-at";
+import type { InboundReceivedBasis } from "@/lib/inbound-received-at";
+import { countAttachedCampaignsByProject } from "@/lib/project-attached-campaigns";
+import {
+  canPaginateProjectsInDatabase,
+  paginateProjectBrowser,
+  type ProjectBrowserSort,
+  type ProjectBrowserSortDir,
+  type ProjectBrowserView,
+} from "@/lib/project-browser";
 import { ActivityModel } from "@/models/activity";
 import { CampaignModel } from "@/models/campaign";
 import { LeadModel } from "@/models/lead";
@@ -38,6 +48,8 @@ export type ProjectListCounts = {
   opportunities: number;
   activeCampaigns: number;
   lastActivityAt: Date | null;
+  lastGenuineInboundAt: Date | null;
+  lastGenuineInboundBasis: InboundReceivedBasis | null;
 };
 
 export type ProjectListItem = ProjectRecord & {
@@ -71,12 +83,19 @@ export type ProjectListFilter = {
   search?: string;
   assignedTo?: string;
   withCounts?: boolean;
+  view?: ProjectBrowserView;
+  sort?: ProjectBrowserSort;
+  sortDir?: ProjectBrowserSortDir;
+  page?: number;
+  pageSize?: number;
 };
 
 function buildListQuery(filter: ProjectListFilter): Record<string, unknown> {
   const query: Record<string, unknown> = {};
 
-  if (!filter.includeArchived) {
+  if (filter.view === "archived") {
+    query.archivedAt = { $ne: null };
+  } else if (filter.view || !filter.includeArchived) {
     query.archivedAt = null;
   }
 
@@ -87,15 +106,28 @@ function buildListQuery(filter: ProjectListFilter): Record<string, unknown> {
   if (filter.search) {
     const escaped = filter.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(escaped, "i");
-    query.$or = [{ name: regex }, { reference: regex }, { city: regex }];
+    query.$or = [{ name: regex }, { reference: regex }, { city: regex }, { country: regex }];
   }
 
   return query;
 }
 
+function emptyProjectCounts(): ProjectListCounts {
+  return {
+    leads: 0,
+    properties: 0,
+    opportunities: 0,
+    activeCampaigns: 0,
+    lastActivityAt: null,
+    lastGenuineInboundAt: null,
+    lastGenuineInboundBasis: null,
+  };
+}
+
 async function loadProjectCounts(
   workspaceId: string,
   projectIds: string[],
+  options: { inventory?: boolean } = {},
 ): Promise<Map<string, ProjectListCounts>> {
   const counts = new Map<string, ProjectListCounts>();
 
@@ -107,7 +139,9 @@ async function loadProjectCounts(
   const workspaceObjectId = new mongoose.Types.ObjectId(workspaceId);
   const projectObjectIds = projectIds.map((id) => new mongoose.Types.ObjectId(id));
 
-  const [leadCounts, propertyCounts, opportunityCounts, campaignCounts, activityDates] =
+  const includeInventory = options.inventory !== false;
+
+  const [leadCounts, propertyCounts, opportunityCounts, attachedCampaigns, activityDates, inboundLeads] =
     await Promise.all([
       LeadModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
         {
@@ -119,66 +153,84 @@ async function loadProjectCounts(
         },
         { $group: { _id: "$projectId", count: { $sum: 1 } } },
       ]),
-      PropertyModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
-        {
-          $match: {
-            workspaceId: workspaceObjectId,
-            projectId: { $in: projectObjectIds },
-            archivedAt: null,
-          },
-        },
-        { $group: { _id: "$projectId", count: { $sum: 1 } } },
-      ]),
-      OpportunityModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
-        {
-          $match: {
-            workspaceId: workspaceObjectId,
-            projectId: { $in: projectObjectIds },
-            archivedAt: null,
-          },
-        },
-        { $group: { _id: "$projectId", count: { $sum: 1 } } },
-      ]),
-      CampaignModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
-        {
-          $match: {
+      includeInventory
+        ? PropertyModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+            {
+              $match: {
+                workspaceId: workspaceObjectId,
+                projectId: { $in: projectObjectIds },
+                archivedAt: null,
+              },
+            },
+            { $group: { _id: "$projectId", count: { $sum: 1 } } },
+          ])
+        : Promise.resolve([]),
+      includeInventory
+        ? OpportunityModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+            {
+              $match: {
+                workspaceId: workspaceObjectId,
+                projectId: { $in: projectObjectIds },
+                archivedAt: null,
+              },
+            },
+            { $group: { _id: "$projectId", count: { $sum: 1 } } },
+          ])
+        : Promise.resolve([]),
+      includeInventory
+        ? CampaignModel.find({
             workspaceId: workspaceObjectId,
             status: "active",
             archivedAt: null,
-            $or: [
-              { projectIds: { $size: 0 } },
-              { projectIds: { $in: projectObjectIds } },
-            ],
-          },
-        },
-        { $unwind: { path: "$projectIds", preserveNullAndEmptyArrays: true } },
-        {
-          $group: {
-            _id: "$projectIds",
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-      ActivityModel.aggregate<{ _id: mongoose.Types.ObjectId; lastActivityAt: Date }>([
-        {
-          $match: {
-            workspaceId: workspaceObjectId,
-            projectId: { $in: projectObjectIds },
-            archivedAt: null,
-          },
-        },
-        { $group: { _id: "$projectId", lastActivityAt: { $max: "$updatedAt" } } },
-      ]),
+            projectIds: { $in: projectObjectIds },
+          })
+            .select({ projectIds: 1 })
+            .lean<Array<{ projectIds?: mongoose.Types.ObjectId[] }>>()
+        : Promise.resolve([]),
+      includeInventory
+        ? ActivityModel.aggregate<{ _id: mongoose.Types.ObjectId; lastActivityAt: Date }>([
+            {
+              $match: {
+                workspaceId: workspaceObjectId,
+                projectId: { $in: projectObjectIds },
+                archivedAt: null,
+              },
+            },
+            { $group: { _id: "$projectId", lastActivityAt: { $max: "$updatedAt" } } },
+          ])
+        : Promise.resolve([]),
+      LeadModel.find({
+        workspaceId: workspaceObjectId,
+        projectId: { $in: projectObjectIds },
+        archivedAt: null,
+      })
+        .select({ projectId: 1, createdAt: 1, attributes: 1 })
+        .lean<
+          Array<{
+            projectId?: mongoose.Types.ObjectId;
+            createdAt?: Date;
+            attributes?: Record<string, unknown>;
+          }>
+        >(),
     ]);
 
   for (const projectId of projectIds) {
-    counts.set(projectId, {
-      leads: 0,
-      properties: 0,
-      opportunities: 0,
-      activeCampaigns: 0,
-      lastActivityAt: null,
-    });
+    counts.set(projectId, emptyProjectCounts());
+  }
+
+  const inboundByProject = summarizeProjectInboundDemand(
+    inboundLeads.map((lead) => ({
+      projectId: lead.projectId?.toString() ?? null,
+      createdAt: lead.createdAt ?? null,
+      attributes: lead.attributes ?? {},
+    })),
+  );
+  for (const [projectId, inbound] of inboundByProject) {
+    const existing = counts.get(projectId);
+    if (existing) {
+      existing.lastGenuineInboundAt = inbound.at;
+      existing.lastGenuineInboundBasis = inbound.basis;
+    }
   }
 
   for (const row of leadCounts) {
@@ -193,16 +245,15 @@ async function loadProjectCounts(
     const existing = counts.get(row._id.toString());
     if (existing) existing.opportunities = row.count;
   }
-  for (const row of campaignCounts) {
-    if (!row._id) {
-      for (const projectId of projectIds) {
-        const existing = counts.get(projectId);
-        if (existing) existing.activeCampaigns += row.count;
-      }
-      continue;
-    }
-    const existing = counts.get(row._id.toString());
-    if (existing) existing.activeCampaigns = row.count;
+  const attachedByProject = countAttachedCampaignsByProject(
+    attachedCampaigns.map((campaign) => ({
+      projectIds: (campaign.projectIds ?? []).map((id) => id.toString()),
+    })),
+    projectIds,
+  );
+  for (const [projectId, attachedCount] of attachedByProject) {
+    const existing = counts.get(projectId);
+    if (existing) existing.activeCampaigns = attachedCount;
   }
   for (const row of activityDates) {
     const existing = counts.get(row._id.toString());
@@ -238,6 +289,87 @@ export async function findProjects(
     ...project,
     counts: countMap.get(project.id),
   }));
+}
+
+export async function findProjectsPage(
+  workspaceId: string,
+  filter: ProjectListFilter = {},
+): Promise<{ projects: ProjectListItem[]; total: number }> {
+  await connectDb();
+  const view = filter.view ?? "all";
+  const sort = filter.sort ?? (filter.withCounts ? "inbound" : "name");
+  const sortDir = filter.sortDir ?? (sort === "name" || sort === "status" ? "asc" : "desc");
+  const page = Math.max(1, filter.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, filter.pageSize ?? 25));
+  const query = withWorkspaceScope(workspaceId, buildListQuery({ ...filter, view }));
+
+  if (canPaginateProjectsInDatabase({ view, sort, withCounts: filter.withCounts })) {
+    const skip = (page - 1) * pageSize;
+    const [documents, total] = await Promise.all([
+      ProjectModel.find(query)
+        .sort({ name: sortDir === "asc" ? 1 : -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean<ProjectDocument[]>(),
+      ProjectModel.countDocuments(query),
+    ]);
+
+    return {
+      projects: documents.map(toProjectRecord),
+      total,
+    };
+  }
+
+  const documents = await ProjectModel.find(query).lean<ProjectDocument[]>();
+  const records = documents.map(toProjectRecord);
+  const demandMap = filter.withCounts
+    ? await loadProjectCounts(
+        workspaceId,
+        records.map((project) => project.id),
+        { inventory: false },
+      )
+    : new Map<string, ProjectListCounts>();
+
+  const withDemand = records.map((project) => ({
+    ...project,
+    counts: demandMap.get(project.id) ?? emptyProjectCounts(),
+  }));
+
+  const pageResult = paginateProjectBrowser(withDemand, {
+    view,
+    sort,
+    sortDir,
+    page,
+    pageSize,
+  });
+
+  if (!filter.withCounts || pageResult.projects.length === 0) {
+    return pageResult;
+  }
+
+  const inventoryMap = await loadProjectCounts(
+    workspaceId,
+    pageResult.projects.map((project) => project.id),
+    { inventory: true },
+  );
+
+  return {
+    total: pageResult.total,
+    projects: pageResult.projects.map((project) => {
+      const inventory = inventoryMap.get(project.id);
+      const demand = project.counts ?? emptyProjectCounts();
+      return {
+        ...project,
+        counts: {
+          ...demand,
+          properties: inventory?.properties ?? 0,
+          opportunities: inventory?.opportunities ?? 0,
+          activeCampaigns: inventory?.activeCampaigns ?? 0,
+          lastActivityAt: inventory?.lastActivityAt ?? null,
+        },
+      };
+    }),
+  };
 }
 
 export async function findProjectById(
