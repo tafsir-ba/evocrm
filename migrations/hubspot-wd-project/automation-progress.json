@@ -591,6 +591,22 @@
       },
       "searchTotal": 225,
       "dryRunOnly": false
+    },
+    {
+      "slug": "tdl_pully",
+      "name": "TDL Pully",
+      "reference": "TDL_PULLY",
+      "destinationProjectId": "6a946edae5888deab8f95cfe",
+      "manifestSize": 160,
+      "created": 160,
+      "destinationLeadCount": 160,
+      "exceptionCount": 68,
+      "exceptionCounts": {
+        "multi_project": 67,
+        "notes_only": 1
+      },
+      "searchTotal": 227,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
