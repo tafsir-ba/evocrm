@@ -399,6 +399,24 @@
       },
       "searchTotal": 358,
       "dryRunOnly": false
+    },
+    {
+      "slug": "bude_the_residence",
+      "name": "Budé The Residence",
+      "reference": "BUDE_THE_RESIDENCE",
+      "destinationProjectId": "6a94694f6562983489e1a4e5",
+      "manifestSize": 28,
+      "created": 28,
+      "destinationLeadCount": 28,
+      "exceptionCount": 324,
+      "exceptionCounts": {
+        "multi_project": 84,
+        "missing_name": 236,
+        "notes_only": 3,
+        "no_project_signal": 1
+      },
+      "searchTotal": 336,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
