@@ -1158,6 +1158,24 @@
       },
       "searchTotal": 2,
       "dryRunOnly": false
+    },
+    {
+      "slug": "corsier",
+      "name": "Corsier",
+      "reference": "CORSIER",
+      "destinationProjectId": "6a947cc7d544938c6c8cd05a",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 556,
+      "exceptionCounts": {
+        "multi_project": 2,
+        "hubspot_id_match": 167,
+        "missing_name": 325,
+        "no_project_signal": 62
+      },
+      "searchTotal": 2,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
