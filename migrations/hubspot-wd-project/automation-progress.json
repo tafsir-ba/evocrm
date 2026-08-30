@@ -364,6 +364,24 @@
       },
       "searchTotal": 370,
       "dryRunOnly": false
+    },
+    {
+      "slug": "cressy",
+      "name": "Cressy",
+      "reference": "CRESSY",
+      "destinationProjectId": "6a946827842d838b91b62441",
+      "manifestSize": 265,
+      "created": 265,
+      "destinationLeadCount": 265,
+      "exceptionCount": 124,
+      "exceptionCounts": {
+        "multi_project": 100,
+        "cmp_product": 1,
+        "no_project_signal": 22,
+        "notes_only": 1
+      },
+      "searchTotal": 366,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
