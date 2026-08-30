@@ -449,6 +449,21 @@
       },
       "searchTotal": 327,
       "dryRunOnly": false
+    },
+    {
+      "slug": "cardinal",
+      "name": "Cardinal",
+      "reference": "CARDINAL",
+      "destinationProjectId": "6a946a83f543c29c0f9e55b4",
+      "manifestSize": 272,
+      "created": 272,
+      "destinationLeadCount": 272,
+      "exceptionCount": 43,
+      "exceptionCounts": {
+        "multi_project": 43
+      },
+      "searchTotal": 315,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
