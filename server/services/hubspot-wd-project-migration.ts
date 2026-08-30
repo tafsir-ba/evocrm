@@ -484,6 +484,19 @@ export async function runHubSpotWdProjectMigration(input: {
       idempotencyKey,
     );
     if (existingByKey) {
+      if (existingByKey.projectId === manifest.destinationProjectId) {
+        skipped += 1;
+        records.push({
+          hubspotContactId: contactId,
+          idempotencyKey,
+          cohort: eligibility.cohort,
+          exclusions: ["hubspot_id_match"],
+          outcome: "skipped",
+          unexpectedReason: null,
+          leadId: existingByKey.id,
+        });
+        continue;
+      }
       unexpected += 1;
       records.push({
         hubspotContactId: contactId,
@@ -495,7 +508,11 @@ export async function runHubSpotWdProjectMigration(input: {
         leadId: existingByKey.id,
       });
       aborted = true;
-      abortReason = "create_duplicate_unexpected";
+      abortReason =
+        existingByKey.projectId === WD_MIGRATION_GV_PROJECT_ID ||
+        existingByKey.projectId === WD_MIGRATION_GENERAL_PROJECT_ID
+          ? "wrong_destination"
+          : "idempotency_breach";
       continue;
     }
 

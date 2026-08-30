@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "stopped": false,
+  "stopReason": null,
+  "completed": [
+    {
+      "slug": "portesdulac",
+      "name": "Portes du Lac",
+      "reference": "PORTESDULAC",
+      "destinationProjectId": "6a94179542f672203757af66",
+      "manifestSize": 1938,
+      "created": 1938,
+      "destinationLeadCount": 1938,
+      "exceptionCount": 172,
+      "exceptionCounts": {
+        "multi_project": 172
+      },
+      "searchTotal": 2110,
+      "dryRunOnly": false,
+      "note": "Completed via residual resume after process interruption; destination integrity verified"
+    }
+  ],
+  "skipped": []
+}

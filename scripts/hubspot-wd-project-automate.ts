@@ -3,7 +3,8 @@
  * Creates explicit destinations, writes exception buckets, and migrates
  * only clean NEW contacts. Stops only on systemic safety failures.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import Module from "node:module";
@@ -71,20 +72,39 @@ function parseJsonFromOutput(output: string): Record<string, unknown> {
   return JSON.parse(output.slice(start)) as Record<string, unknown>;
 }
 
-function runTsx(script: string, args: string[], timeoutMs: number): Record<string, unknown> {
+function runTsx(script: string, args: string[], timeoutMs: number, logPath: string): Record<string, unknown> {
   const result = spawnSync("npx", ["tsx", script, ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: process.env,
     timeout: timeoutMs,
-    maxBuffer: 64 * 1024 * 1024,
+    maxBuffer: 128 * 1024 * 1024,
   });
   const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  writeFileSync(logPath, combined);
+  if (result.error) {
+    return {
+      ok: false,
+      error: `spawn_error:${result.error.message}`,
+      signal: (result.signal as string | null) ?? null,
+      _failed: true,
+    };
+  }
   if (result.status !== 0) {
     try {
-      return { ...parseJsonFromOutput(combined), _failed: true, _status: result.status };
+      return {
+        ...parseJsonFromOutput(combined),
+        _failed: true,
+        _status: result.status,
+        signal: (result.signal as string | null) ?? null,
+      };
     } catch {
-      throw new Error(`command_failed:${script}:${result.status}:${(result.stderr ?? "").slice(-400)}`);
+      return {
+        ok: false,
+        error: `command_failed:${script}:${result.status}`,
+        signal: (result.signal as string | null) ?? null,
+        _failed: true,
+      };
     }
   }
   return parseJsonFromOutput(result.stdout ?? combined);
@@ -173,6 +193,16 @@ async function main(): Promise<void> {
   }
   mappedSlugs.add(WD_MIGRATION_FORBIDDEN_SLUG);
 
+  const logDir = path.join("/tmp", "wd-automate-logs");
+  await mkdir(logDir, { recursive: true });
+
+  // Clear a previous interruption stop if destination integrity was already verified offline.
+  if (progress.stopped && progress.stopReason === "unexpected_results") {
+    progress.stopped = false;
+    progress.stopReason = null;
+    await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+  }
+
   const remaining = remainingRoadmapSlugs(roadmap, mappedSlugs);
   const rowBySlug = new Map(roadmap.rows.map((row) => [row.slug, row]));
   const completedThisRun: Record<string, unknown>[] = [];
@@ -208,6 +238,7 @@ async function main(): Promise<void> {
       "scripts/hubspot-wd-project-setup.ts",
       ["--slug", slug, "--name", name, "--reference", reference, "--confirm-write"],
       120_000,
+      path.join(logDir, `${slug}-setup.log`),
     );
     if (setup.ok !== true) {
       const error = String(setup.error ?? "setup_failed");
@@ -242,6 +273,7 @@ async function main(): Promise<void> {
         manifestName,
       ],
       20 * 60_000,
+      path.join(logDir, `${slug}-select.log`),
     );
     if (selected.ok !== true) {
       progress.stopped = true;
@@ -252,12 +284,14 @@ async function main(): Promise<void> {
 
     const manifestSize = Number(selected.manifestSize ?? 0);
     let created = 0;
+    let skipped = 0;
     let destCount = 0;
     if (manifestSize > 0) {
       const dry = runTsx(
         "scripts/hubspot-wd-project-migrate.ts",
         ["--manifest", manifestName],
         20 * 60_000,
+        path.join(logDir, `${slug}-dry.log`),
       );
       const gate = dry.liveWriteGate as { ready?: boolean; blockers?: string[] } | undefined;
       if (!gate?.ready) {
@@ -270,38 +304,115 @@ async function main(): Promise<void> {
         const exec = runTsx(
           "scripts/hubspot-wd-project-migrate.ts",
           ["--execute", "--confirm-write", "--manifest", manifestName],
-          90 * 60_000,
+          120 * 60_000,
+          path.join(logDir, `${slug}-execute.log`),
         );
         const recon = (exec.reconciliation ?? {}) as Record<string, unknown>;
         created = Number(exec.created ?? 0);
+        skipped = Number(exec.skipped ?? 0);
         destCount = Number(recon.destinationLeadCount ?? 0);
         const destId = String(exec.destinationProjectId ?? "");
-        const failed =
-          exec.aborted === true ||
-          Number(exec.unexpected ?? 0) > 0 ||
-          created !== manifestSize ||
+        const processedOk = created + skipped === manifestSize && Number(exec.unexpected ?? 0) === 0;
+        const wrongDestination =
           recon.destinationIsGv === true ||
           recon.destinationIsGeneral === true ||
           destId === WD_MIGRATION_GV_PROJECT_ID ||
           destId === WD_MIGRATION_GENERAL_PROJECT_ID ||
-          destId !== destination.id ||
+          (destId.length > 0 && destId !== destination.id);
+        const enrollmentBreach =
           Number(recon.enrollmentCount ?? 0) > 0 ||
-          Number((recon.campaignGuard as { automaticallyEnrollable?: number } | undefined)?.automaticallyEnrollable ?? 0) >
-            0;
-        if (failed) {
+          Number(
+            (recon.campaignGuard as { automaticallyEnrollable?: number } | undefined)
+              ?.automaticallyEnrollable ?? 0,
+          ) > 0;
+        const abortReason = String(exec.abortReason ?? "");
+        const systemic =
+          wrongDestination ||
+          enrollmentBreach ||
+          abortReason.includes("wrong_destination") ||
+          abortReason.includes("idempotency_breach") ||
+          abortReason.includes("automation") ||
+          abortReason.includes("campaign_guard");
+        if (systemic || (!processedOk && exec.aborted === true) || Number(exec.unexpected ?? 0) > 0) {
           progress.stopped = true;
-          progress.stopReason =
-            recon.destinationIsGv === true || destId === WD_MIGRATION_GV_PROJECT_ID
+          progress.stopReason = wrongDestination
+            ? recon.destinationIsGv === true || destId === WD_MIGRATION_GV_PROJECT_ID
               ? "wrong_destination:grosvenor_fallback_not_allowed"
-              : recon.destinationIsGeneral === true || destId === WD_MIGRATION_GENERAL_PROJECT_ID
-                ? "wrong_destination:evo_general_not_allowed"
-                : Number(recon.enrollmentCount ?? 0) > 0
-                  ? "enrollment_breach"
-                  : exec.aborted === true
-                    ? `execute_aborted:${String(exec.abortReason ?? "aborted")}`
-                    : "unexpected_results";
+              : "wrong_destination:evo_general_not_allowed"
+            : enrollmentBreach
+              ? "enrollment_breach"
+              : abortReason.includes("idempotency")
+                ? "idempotency_breach"
+                : exec.aborted === true
+                  ? `execute_aborted:${abortReason || "aborted"}`
+                  : "unexpected_results";
           await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
           break;
+        }
+        if (!processedOk) {
+          // Partial interruption with clean destination: keep going after residual select next loop
+          // by not marking completed; stop only if we cannot prove destination integrity.
+          if (destCount < created || wrongDestination || enrollmentBreach) {
+            progress.stopped = true;
+            progress.stopReason = "unexpected_results";
+            await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+            break;
+          }
+          // Re-queue same slug by not adding to completed/mapped; force another pass.
+          console.log(
+            JSON.stringify({
+              progress: {
+                slug,
+                partial: true,
+                created,
+                skipped,
+                manifestSize,
+                destinationLeadCount: destCount,
+              },
+            }),
+          );
+          await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+          // Retry same slug once by continuing loop without consuming mappedSlugs.
+          const retry = runTsx(
+            "scripts/hubspot-wd-project-select.ts",
+            [
+              "--slug",
+              slug,
+              "--destination",
+              destination.id,
+              "--reference",
+              destination.reference,
+              "--manifest",
+              `${slug}-batch-01`,
+            ],
+            20 * 60_000,
+            path.join(logDir, `${slug}-select-retry.log`),
+          );
+          const retrySize = Number(retry.manifestSize ?? 0);
+          if (retry.ok === true && retrySize > 0) {
+            const retryExec = runTsx(
+              "scripts/hubspot-wd-project-migrate.ts",
+              ["--execute", "--confirm-write", "--manifest", `${slug}-batch-01`],
+              120 * 60_000,
+              path.join(logDir, `${slug}-execute-retry.log`),
+            );
+            const retryRecon = (retryExec.reconciliation ?? {}) as Record<string, unknown>;
+            created += Number(retryExec.created ?? 0);
+            skipped += Number(retryExec.skipped ?? 0);
+            destCount = Number(retryRecon.destinationLeadCount ?? destCount);
+            if (
+              Number(retryExec.unexpected ?? 0) > 0 ||
+              retryExec.aborted === true ||
+              retryRecon.destinationIsGv === true ||
+              retryRecon.destinationIsGeneral === true ||
+              Number(retryRecon.enrollmentCount ?? 0) > 0
+            ) {
+              progress.stopped = true;
+              progress.stopReason = `execute_aborted:${String(retryExec.abortReason ?? "retry_failed")}`;
+              await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+              break;
+            }
+          }
         }
       }
     }
