@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-30T18:27:04.793Z",
+  "generatedAt": "2026-08-30T18:40:24.745Z",
   "mode": "execute",
   "catalog": {
-    "total": 23,
-    "highConfidence": 22,
+    "total": 28,
+    "highConfidence": 27,
     "unresolved": 1,
     "keys": [
       "grosvenor-vistas",
@@ -11,6 +11,11 @@
       "v77",
       "residence-les-pins",
       "arbora",
+      "avant-scene",
+      "bc-kingston",
+      "cressy",
+      "floreal",
+      "campanules",
       "defne",
       "smarthill",
       "villa-sorella",
@@ -33,10 +38,10 @@
   },
   "workspaces": 4,
   "projects": 59,
-  "applied": 32,
-  "skipped": 20,
-  "unresolved": 27,
-  "review": 7,
+  "applied": 37,
+  "skipped": 17,
+  "unresolved": 22,
+  "review": 5,
   "unresolvedCompact": [
     {
       "name": "Terra Vista",
@@ -95,13 +100,6 @@
       "note": "No official project match and no unique verified municipality in the name/reference."
     },
     {
-      "name": "Floréal",
-      "reference": "FLOREAL",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
       "name": "Princes",
       "reference": "PRINCES",
       "category": "no_place_signal",
@@ -130,32 +128,11 @@
       "note": "Budé is a Geneva neighbourhood (Petit-Saconnex / City of Geneva), not a unique Swiss commune. Official project site not verified."
     },
     {
-      "name": "Cressy",
-      "reference": "CRESSY",
-      "category": "ambiguous_place",
-      "placeSignal": "cressy",
-      "note": "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). Municipality left open."
-    },
-    {
       "name": "Seymaz 44",
       "reference": "SEYMAZ44",
       "category": "ambiguous_place",
       "placeSignal": "seymaz",
       "note": "La Seymaz is a watercourse / sector name, not a Swiss commune. Street number 44 is not treated as a verified address."
-    },
-    {
-      "name": "Campanules",
-      "reference": "CAMPANULES",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
-      "name": "Avant-Scène",
-      "reference": "AVANTSCENE",
-      "category": "no_place_signal",
-      "placeSignal": null,
-      "note": "No official project match and no unique verified municipality in the name/reference."
     },
     {
       "name": "Westend",
@@ -170,13 +147,6 @@
       "category": "no_place_signal",
       "placeSignal": null,
       "note": "No official project match and no unique verified municipality in the name/reference."
-    },
-    {
-      "name": "BC Kingston",
-      "reference": "BC_KINGSTON",
-      "category": "ambiguous_place",
-      "placeSignal": "kingston",
-      "note": "Kingston is not a unique country or project. Grosvenor Vistas and K2 have their own catalog evidence; BC Kingston does not."
     },
     {
       "name": "Jardin des Nations",
@@ -383,11 +353,11 @@
       "projectId": "6a9470bfac4a59fdc6dfaa4a",
       "name": "Floréal",
       "reference": "FLOREAL",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "user_confirmed",
+      "catalogKey": "floreal",
+      "countryCode": "CH",
+      "municipality": "Ecublens",
       "overwrittenManual": false
     },
     {
@@ -587,11 +557,11 @@
       "projectId": "6a946827842d838b91b62441",
       "name": "Cressy",
       "reference": "CRESSY",
-      "action": "review",
-      "reason": "ambiguous_place_signal",
+      "action": "apply",
+      "reason": "user_confirmed",
       "catalogKey": "cressy",
-      "countryCode": null,
-      "municipality": null,
+      "countryCode": "CH",
+      "municipality": "Confignon",
       "overwrittenManual": false
     },
     {
@@ -635,11 +605,11 @@
       "projectId": "6a94634b8625db128dceed95",
       "name": "Campanules",
       "reference": "CAMPANULES",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "user_confirmed",
+      "catalogKey": "campanules",
+      "countryCode": "CH",
+      "municipality": "Gollion",
       "overwrittenManual": false
     },
     {
@@ -647,11 +617,11 @@
       "projectId": "6a9461729b3a69351115418b",
       "name": "Avant-Scène",
       "reference": "AVANTSCENE",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "user_confirmed",
+      "catalogKey": "avant-scene",
+      "countryCode": "CH",
+      "municipality": "Neuchâtel",
       "overwrittenManual": false
     },
     {
@@ -719,11 +689,11 @@
       "projectId": "6a9458029b2a898bd2832509",
       "name": "BC Kingston",
       "reference": "BC_KINGSTON",
-      "action": "review",
-      "reason": "ambiguous_place_signal",
-      "catalogKey": "kingston",
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "user_confirmed",
+      "catalogKey": "bc-kingston",
+      "countryCode": "JM",
+      "municipality": "Kingston",
       "overwrittenManual": false
     },
     {
