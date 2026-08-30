@@ -7,8 +7,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { emptyProjectLocation } from "@/lib/project-location";
-import { leadRecordExtras } from "@/tests/helpers/crm-fixtures";
+import { leadRecordExtras, projectRecordExtras } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/integrations", () => ({
   findActiveWebsiteIntegrationByApiKeyHash: vi.fn(),
@@ -85,13 +84,11 @@ const projectA = {
   workspaceId: "ws-1",
   name: "Project A",
   reference: "project-a",
-  projectType: null,
-  defaultDripCampaignId: null,
+  ...projectRecordExtras,
   statusId: null,
   address: null,
   city: null,
   country: null,
-  location: emptyProjectLocation(),
   description: null,
   createdBy: "user-1",
   ownerId: null,

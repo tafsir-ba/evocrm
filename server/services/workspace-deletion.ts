@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { ActivityModel } from "@/models/activity";
 import { AuditLogModel } from "@/models/audit-log";
 import { CampaignModel } from "@/models/campaign";
+import { CompanyModel } from "@/models/company";
 import { CampaignEnrollmentModel } from "@/models/campaign-enrollment";
 import { CampaignSendModel } from "@/models/campaign-send";
 import { CampaignStepModel } from "@/models/campaign-step";
@@ -110,6 +111,7 @@ async function deleteWorkspaceData(workspaceId: string): Promise<void> {
   await LeadModel.deleteMany({ workspaceId: workspaceObjectId });
   await PropertyModel.deleteMany({ workspaceId: workspaceObjectId });
   await ProjectModel.deleteMany({ workspaceId: workspaceObjectId });
+  await CompanyModel.deleteMany({ workspaceId: workspaceObjectId });
   await IntegrationLogModel.deleteMany({ workspaceId: workspaceObjectId });
   await IntegrationModel.deleteMany({ workspaceId: workspaceObjectId });
   await DictionaryItemModel.deleteMany({ workspaceId: workspaceObjectId });

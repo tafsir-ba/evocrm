@@ -10,11 +10,21 @@ export const TEST_PROJECT_ID = "507f1f77bcf86cd799439011";
 
 export const projectRecordExtras: Pick<
   ProjectRecord,
-  "projectType" | "defaultDripCampaignId" | "location"
+  | "projectType"
+  | "defaultDripCampaignId"
+  | "commercialStage"
+  | "propertyTypeId"
+  | "website"
+  | "location"
+  | "companies"
 > = {
   projectType: null,
   defaultDripCampaignId: null,
+  commercialStage: null,
+  propertyTypeId: null,
+  website: null,
   location: emptyProjectLocation(),
+  companies: [],
 };
 
 export const campaignRecordExtras: Pick<
@@ -89,6 +99,28 @@ export const campaignStepRecordExtras: Pick<
   bodyHtml: null,
   bodyText: null,
 };
+
+export function buildTestProjectRecord(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
+  return {
+    id: TEST_PROJECT_ID,
+    workspaceId: "ws-1",
+    name: "Default Project",
+    reference: "default",
+    ...projectRecordExtras,
+    statusId: null,
+    address: null,
+    city: null,
+    country: null,
+    description: null,
+    createdBy: "user-1",
+    ownerId: null,
+    assignedTo: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
 
 export const leadRecordExtras = {
   projectId: TEST_PROJECT_ID,

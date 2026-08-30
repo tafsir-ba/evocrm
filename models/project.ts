@@ -7,6 +7,9 @@ const PROJECT_TYPES = [
   "other",
 ] as const;
 
+const COMMERCIAL_STAGES = ["planned", "pre_launch", "live", "sold_closed"] as const;
+const PROJECT_COMPANY_ROLES = ["developer", "owner", "marketing_sales_partner"] as const;
+
 const projectLocationSchema = new Schema(
   {
     countryCode: { type: String, trim: true, uppercase: true, default: null },
@@ -35,6 +38,15 @@ const projectLocationSchema = new Schema(
   { _id: false },
 );
 
+const projectCompanySchema = new Schema(
+  {
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", required: true },
+    role: { type: String, enum: PROJECT_COMPANY_ROLES, required: true },
+    isPrimary: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const projectSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
@@ -45,6 +57,13 @@ const projectSchema = new Schema(
       enum: PROJECT_TYPES,
       default: null,
     },
+    commercialStage: {
+      type: String,
+      enum: COMMERCIAL_STAGES,
+      default: null,
+    },
+    propertyTypeId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
+    website: { type: String, trim: true, default: null },
     defaultDripCampaignId: {
       type: Schema.Types.ObjectId,
       ref: "Campaign",
@@ -55,6 +74,7 @@ const projectSchema = new Schema(
     city: { type: String, trim: true, default: null },
     country: { type: String, trim: true, default: null },
     location: { type: projectLocationSchema, default: () => ({}) },
+    companies: { type: [projectCompanySchema], default: [] },
     description: { type: String, trim: true, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },

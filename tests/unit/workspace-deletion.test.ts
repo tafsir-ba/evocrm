@@ -50,6 +50,9 @@ vi.mock("@/models/property", () => ({
 vi.mock("@/models/project", () => ({
   ProjectModel: { deleteMany: vi.fn() },
 }));
+vi.mock("@/models/company", () => ({
+  CompanyModel: { deleteMany: vi.fn() },
+}));
 vi.mock("@/models/integration-log", () => ({
   IntegrationLogModel: { deleteMany: vi.fn() },
 }));

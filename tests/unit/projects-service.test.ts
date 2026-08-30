@@ -11,6 +11,14 @@ vi.mock("@/server/repositories/projects", () => ({
   findProjects: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/companies", () => ({
+  findCompaniesByIds: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/dictionary-items", () => ({
+  findDictionaryItemById: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -19,6 +27,8 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+import { findCompaniesByIds } from "@/server/repositories/companies";
+import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
 import {
   archiveProject,
@@ -74,6 +84,100 @@ describe("project service", () => {
       }),
     );
     expect(project.createdBy).toBe("user-1");
+    expect(createProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        city: "Geneva",
+        country: "Switzerland",
+      }),
+    );
+  });
+
+  it("normalizes a primary developer association and rejects unknown companies", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+    vi.mocked(findCompaniesByIds).mockResolvedValue([
+      {
+        id: "507f1f77bcf86cd7994390aa",
+        workspaceId: "ws-1",
+        name: "Promotor SA",
+        nameNormalized: "promotor sa",
+        website: null,
+        createdBy: "user-1",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(createProject).mockResolvedValue({
+      id: "project-1",
+      workspaceId: "ws-1",
+      name: "Green View",
+      reference: null,
+      ...projectRecordExtras,
+      companies: [
+        { companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true },
+      ],
+      statusId: null,
+      address: null,
+      city: null,
+      country: null,
+      description: null,
+      createdBy: "user-1",
+      ownerId: null,
+      assignedTo: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await createProjectForWorkspace("ws-1", "user-1", {
+      name: "Green View",
+      commercialStage: "planned",
+      companies: [
+        { companyId: "507f1f77bcf86cd7994390aa", role: "developer" },
+        { companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true },
+      ],
+    });
+
+    expect(createProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commercialStage: "planned",
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true }],
+      }),
+    );
+
+    vi.mocked(findCompaniesByIds).mockResolvedValue([]);
+    await expect(
+      createProjectForWorkspace("ws-1", "user-1", {
+        name: "Green View",
+        companies: [{ companyId: "507f1f77bcf86cd7994390ff", role: "developer" }],
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("validates property type against the workspace dictionary", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+    vi.mocked(findDictionaryItemById).mockResolvedValue({
+      id: "507f1f77bcf86cd7994390cc",
+      workspaceId: "ws-1",
+      dictionaryId: "dict-1",
+      type: "lead_status",
+      key: "apartment",
+      label: "Apartment",
+      color: "#000",
+      sortOrder: 0,
+      isDefault: false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+
+    await expect(
+      createProjectForWorkspace("ws-1", "user-1", {
+        name: "Green View",
+        propertyTypeId: "507f1f77bcf86cd7994390cc",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(createProject).not.toHaveBeenCalled();
   });
 
   it("enforces workspace-scoped reference uniqueness", async () => {

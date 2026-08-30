@@ -14,18 +14,36 @@ import {
   hasStructuredLocation,
   type ProjectLocation,
 } from "@/lib/project-location";
+import {
+  primaryDeveloperCompanyId,
+  PROJECT_COMMERCIAL_STAGE_LABELS,
+  PROJECT_TYPE_LABELS,
+  type ProjectCommercialStage,
+  type ProjectCompanyRole,
+  type ProjectType,
+} from "@/lib/project-operating-record";
 import { withProjectIdQuery } from "@/lib/project-scope";
 import { workspaceNavPath, workspacePath } from "@/lib/workspace-paths";
+
+type ProjectCompanyLink = {
+  companyId: string;
+  role: ProjectCompanyRole;
+  isPrimary: boolean;
+  company?: { id: string; name: string } | null;
+};
 
 type ProjectDetail = {
   id: string;
   name: string;
   reference: string | null;
   projectType: string | null;
+  commercialStage: string | null;
+  website: string | null;
   address: string | null;
   city: string | null;
   country: string | null;
   location?: ProjectLocation | null;
+  companies?: ProjectCompanyLink[];
   description: string | null;
   archivedAt: string | null;
 };
@@ -46,6 +64,22 @@ type ProjectDetailPanelProps = {
   canUpdate: boolean;
   canArchive: boolean;
 };
+
+function projectTypeLabel(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return value in PROJECT_TYPE_LABELS ? PROJECT_TYPE_LABELS[value as ProjectType] : value;
+}
+
+function commercialStageLabel(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return value in PROJECT_COMMERCIAL_STAGE_LABELS
+    ? PROJECT_COMMERCIAL_STAGE_LABELS[value as ProjectCommercialStage]
+    : value;
+}
 
 export function ProjectDetailPanel({
   workspaceSlug,
@@ -108,6 +142,12 @@ export function ProjectDetailPanel({
     );
   }
 
+  const stageLabel = commercialStageLabel(project.commercialStage);
+  const typeLabel = projectTypeLabel(project.projectType);
+  const primaryDeveloperId = primaryDeveloperCompanyId(project.companies ?? []);
+  const primaryDeveloper =
+    project.companies?.find((link) => link.companyId === primaryDeveloperId)?.company?.name ?? null;
+
   return (
     <>
       <PageHeader
@@ -163,15 +203,16 @@ export function ProjectDetailPanel({
       </div>
 
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          {project.archivedAt ? (
-            <Badge tone="muted">Archived</Badge>
-          ) : (
-            <Badge tone="success">Active</Badge>
-          )}
-          {project.projectType && <Badge tone="muted">{project.projectType}</Badge>}
+        <div className="flex flex-wrap items-center gap-2">
+          {project.archivedAt ? <Badge tone="muted">Archived</Badge> : null}
+          {stageLabel ? <Badge tone="success">{stageLabel}</Badge> : null}
+          {typeLabel ? <Badge tone="muted">{typeLabel}</Badge> : null}
         </div>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px]">
+          <div>
+            <dt className="text-[var(--color-ink-muted)]">Primary developer</dt>
+            <dd className="text-[var(--color-ink)]">{primaryDeveloper || "—"}</dd>
+          </div>
           <div>
             <dt className="text-[var(--color-ink-muted)]">Location</dt>
             <dd className="text-[var(--color-ink)]">
@@ -187,20 +228,33 @@ export function ProjectDetailPanel({
                   city: project.city,
                   country: project.country,
                 })}
-                {project.location?.countryCode
-                  ? ` · ${project.location.countryCode}`
-                  : ""}
-                {project.location?.cantonCode
-                  ? ` · ${project.location.cantonCode}`
-                  : ""}
-                {project.location?.postalCode
-                  ? ` · ${project.location.postalCode}`
-                  : ""}
-                {project.location?.reviewStatus === "review_needed"
-                  ? " · Review needed"
-                  : ""}
+                {project.location?.countryCode ? ` · ${project.location.countryCode}` : ""}
+                {project.location?.cantonCode ? ` · ${project.location.cantonCode}` : ""}
+                {project.location?.postalCode ? ` · ${project.location.postalCode}` : ""}
+                {project.location?.reviewStatus === "review_needed" ? " · Review needed" : ""}
               </dd>
             ) : null}
+          </div>
+          <div>
+            <dt className="text-[var(--color-ink-muted)]">Website</dt>
+            <dd className="text-[var(--color-ink)]">
+              {project.website ? (
+                /^https?:\/\//i.test(project.website) ? (
+                  <a
+                    href={project.website}
+                    className="text-[var(--color-brand-700)] hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {project.website}
+                  </a>
+                ) : (
+                  project.website
+                )
+              ) : (
+                "—"
+              )}
+            </dd>
           </div>
           <div className="md:col-span-2">
             <dt className="text-[var(--color-ink-muted)]">Description</dt>

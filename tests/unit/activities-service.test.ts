@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { activityRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
+import { activityRecordExtras, opportunityRecordExtras, projectRecordExtras } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/activities", () => ({
   findActivityById: vi.fn(),
@@ -191,8 +191,7 @@ describe("activities service", () => {
       workspaceId: "ws-1",
       name: "Default Project",
       reference: "default",
-      projectType: null,
-      defaultDripCampaignId: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,

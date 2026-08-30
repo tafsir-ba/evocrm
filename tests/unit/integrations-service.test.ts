@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { projectRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/integrations", () => ({
   createIntegration: vi.fn(),
   findIntegrationById: vi.fn(),
@@ -83,8 +85,7 @@ describe("integrations service", () => {
         workspaceId: "ws-1",
         name: "Only Project",
         reference: "only",
-        projectType: null,
-        defaultDripCampaignId: null,
+        ...projectRecordExtras,
         statusId: null,
         address: null,
         city: null,
@@ -199,8 +200,7 @@ describe("integrations service", () => {
         workspaceId: "ws-1",
         name: "Project A",
         reference: "a",
-        projectType: null,
-        defaultDripCampaignId: null,
+        ...projectRecordExtras,
         statusId: null,
         address: null,
         city: null,
@@ -218,8 +218,7 @@ describe("integrations service", () => {
         workspaceId: "ws-1",
         name: "Project B",
         reference: "b",
-        projectType: null,
-        defaultDripCampaignId: null,
+        ...projectRecordExtras,
         statusId: null,
         address: null,
         city: null,
@@ -258,8 +257,7 @@ describe("integrations service", () => {
         workspaceId: "ws-1",
         name: "Project A",
         reference: "a",
-        projectType: null,
-        defaultDripCampaignId: null,
+        ...projectRecordExtras,
         statusId: null,
         address: null,
         city: null,
@@ -277,8 +275,7 @@ describe("integrations service", () => {
         workspaceId: "ws-1",
         name: "Project B",
         reference: "b",
-        projectType: null,
-        defaultDripCampaignId: null,
+        ...projectRecordExtras,
         statusId: null,
         address: null,
         city: null,

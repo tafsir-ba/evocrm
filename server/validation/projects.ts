@@ -30,6 +30,14 @@ const projectTypeSchema = z.enum([
   "other",
 ]);
 
+const commercialStageSchema = z.enum(["planned", "pre_launch", "live", "sold_closed"]);
+
+const projectCompanyRoleSchema = z.enum([
+  "developer",
+  "owner",
+  "marketing_sales_partner",
+]);
+
 const projectLocationInputSchema = z
   .object({
     countryCode: z
@@ -57,6 +65,14 @@ const projectLocationInputSchema = z
     sourceUrl: z.string().trim().url().max(500).nullable().optional(),
     confidence: z.enum(PROJECT_LOCATION_CONFIDENCE).nullable().optional(),
     reviewStatus: z.enum(PROJECT_LOCATION_REVIEW_STATUSES).optional(),
+  })
+  .strict();
+
+const projectCompanySchema = z
+  .object({
+    companyId: objectIdSchema,
+    role: projectCompanyRoleSchema,
+    isPrimary: z.boolean().optional(),
   })
   .strict();
 
@@ -98,10 +114,14 @@ export const createProjectInputSchema = z
     projectType: projectTypeSchema.optional(),
     defaultDripCampaignId: objectIdSchema.nullable().optional(),
     statusId: objectIdSchema.optional(),
+    commercialStage: commercialStageSchema.optional(),
+    propertyTypeId: objectIdSchema.nullable().optional(),
+    website: z.string().trim().max(300).optional(),
     address: z.string().trim().max(200).optional(),
     city: z.string().trim().max(120).optional(),
     country: z.string().trim().max(120).optional(),
     location: projectLocationInputSchema.optional(),
+    companies: z.array(projectCompanySchema).max(20).optional(),
     description: z.string().trim().max(2000).optional(),
     ownerId: objectIdSchema.optional(),
     assignedTo: objectIdSchema.optional(),
@@ -115,10 +135,14 @@ export const updateProjectInputSchema = z
     projectType: projectTypeSchema.nullable().optional(),
     defaultDripCampaignId: objectIdSchema.nullable().optional(),
     statusId: objectIdSchema.nullable().optional(),
+    commercialStage: commercialStageSchema.nullable().optional(),
+    propertyTypeId: objectIdSchema.nullable().optional(),
+    website: z.string().trim().max(300).nullable().optional(),
     address: z.string().trim().max(200).nullable().optional(),
     city: z.string().trim().max(120).nullable().optional(),
     country: z.string().trim().max(120).nullable().optional(),
     location: projectLocationInputSchema.nullable().optional(),
+    companies: z.array(projectCompanySchema).max(20).optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     ownerId: objectIdSchema.nullable().optional(),
     assignedTo: objectIdSchema.nullable().optional(),

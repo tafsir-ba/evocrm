@@ -6,6 +6,7 @@ export { DictionaryModel, type DictionaryDocument } from "./dictionary";
 export { DictionaryItemModel, type DictionaryItemDocument } from "./dictionary-item";
 export { TagModel, type TagDocument } from "./tag";
 export { ProjectModel, type ProjectDocument } from "./project";
+export { CompanyModel, type CompanyDocument } from "./company";
 export { LeadModel, type LeadDocument } from "./lead";
 export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";

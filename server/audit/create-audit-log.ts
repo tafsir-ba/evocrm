@@ -18,6 +18,7 @@ export type AuditEntityType =
   | "campaign_enrollment"
   | "campaign_send"
   | "project"
+  | "company"
   | "dictionary"
   | "dictionary_item"
   | "tag"

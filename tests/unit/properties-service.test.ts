@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { projectRecordExtras } from "@/tests/helpers/crm-fixtures";
+
 vi.mock("@/server/repositories/properties", () => ({
   findPropertyByReference: vi.fn(),
   createProperty: vi.fn(),
@@ -111,8 +113,7 @@ describe("property service", () => {
       workspaceId: "ws-1",
       name: "Default Project",
       reference: "default",
-      projectType: null,
-      defaultDripCampaignId: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: null,
@@ -250,8 +251,7 @@ describe("property service", () => {
       workspaceId: "ws-1",
       name: "Green View",
       reference: "GV",
-      projectType: null,
-      defaultDripCampaignId: null,
+      ...projectRecordExtras,
       statusId: null,
       address: null,
       city: "Geneva",

@@ -1,7 +1,15 @@
 import "server-only";
 
+import {
+  emptyProjectLocation,
+  normalizeProjectLocation,
+  type ProjectLocation,
+} from "@/lib/project-location";
+import { normalizeProjectCompanies } from "@/lib/project-operating-record";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { findCompaniesByIds } from "@/server/repositories/companies";
+import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import {
   archiveProject,
   createProject,
@@ -16,23 +24,22 @@ import {
 } from "@/server/repositories/projects";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreateProjectInput, UpdateProjectInput } from "@/server/validation/projects";
-import {
-  emptyProjectLocation,
-  normalizeProjectLocation,
-  type ProjectLocation,
-} from "@/lib/project-location";
 
 function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
   return {
     name: project.name,
     reference: project.reference,
     projectType: project.projectType,
+    commercialStage: project.commercialStage,
+    propertyTypeId: project.propertyTypeId,
+    website: project.website,
     defaultDripCampaignId: project.defaultDripCampaignId,
     statusId: project.statusId,
     address: project.address,
     city: project.city,
     country: project.country,
     location: project.location,
+    companies: project.companies,
     description: project.description,
     ownerId: project.ownerId,
     assignedTo: project.assignedTo,
@@ -54,6 +61,77 @@ function locationFromManualInput(
       notes: "Manual location update.",
     },
   });
+}
+
+function legacyFieldsFromLocation(location: ProjectLocation | null | undefined): {
+  address: string | null;
+  city: string | null;
+  country: string | null;
+} {
+  if (!location) {
+    return { address: null, city: null, country: null };
+  }
+
+  return {
+    address: location.normalizedAddress,
+    city: location.municipality,
+    country: location.countryName,
+  };
+}
+
+async function validateProjectCompanies(
+  workspaceId: string,
+  companies: Array<{ companyId: string }>,
+): Promise<void> {
+  const ids = [...new Set(companies.map((item) => item.companyId))];
+  if (ids.length === 0) {
+    return;
+  }
+
+  const found = await findCompaniesByIds(workspaceId, ids);
+  if (found.length !== ids.length) {
+    throw new AppError("VALIDATION_ERROR", "One or more companies were not found.");
+  }
+}
+
+async function validatePropertyTypeId(
+  workspaceId: string,
+  propertyTypeId: string | null | undefined,
+): Promise<void> {
+  if (!propertyTypeId) {
+    return;
+  }
+
+  const item = await findDictionaryItemById(workspaceId, propertyTypeId);
+  if (!item || item.type !== "property_type" || !item.isActive) {
+    throw new AppError("VALIDATION_ERROR", "Property type is invalid.");
+  }
+}
+
+async function withCompanyNames(
+  workspaceId: string,
+  project: ProjectRecord,
+): Promise<ProjectRecord> {
+  if (project.companies.length === 0) {
+    return project;
+  }
+
+  const found = await findCompaniesByIds(
+    workspaceId,
+    project.companies.map((item) => item.companyId),
+  );
+  const byId = new Map(found.map((company) => [company.id, company]));
+
+  return {
+    ...project,
+    companies: project.companies.map((link) => {
+      const company = byId.get(link.companyId);
+      return {
+        ...link,
+        company: company ? { id: company.id, name: company.name } : null,
+      };
+    }),
+  };
 }
 
 export async function listProjectsForWorkspace(
@@ -80,7 +158,7 @@ export async function getProjectForWorkspace(
     throw new AppError("NOT_FOUND", "Project not found.");
   }
 
-  return project;
+  return withCompanyNames(workspaceId, project);
 }
 
 export async function createProjectForWorkspace(
@@ -99,24 +177,38 @@ export async function createProjectForWorkspace(
     }
   }
 
-  const project = await createProject({
+  const companies = normalizeProjectCompanies(input.companies);
+  await validateProjectCompanies(workspaceId, companies);
+  await validatePropertyTypeId(workspaceId, input.propertyTypeId);
+
+  const location = input.location
+    ? locationFromManualInput(input.location)
+    : emptyProjectLocation();
+  const legacy = legacyFieldsFromLocation(location);
+
+  const project = await withCompanyNames(
     workspaceId,
-    createdBy: actorId,
-    name: input.name,
-    reference: input.reference ?? null,
-    projectType: input.projectType ?? null,
-    defaultDripCampaignId: input.defaultDripCampaignId ?? null,
-    statusId: input.statusId ?? null,
-    address: input.address ?? null,
-    city: input.city ?? null,
-    country: input.country ?? null,
-    location: input.location
-      ? locationFromManualInput(input.location)
-      : emptyProjectLocation(),
-    description: input.description ?? null,
-    ownerId: input.ownerId ?? null,
-    assignedTo: input.assignedTo ?? null,
-  });
+    await createProject({
+      workspaceId,
+      createdBy: actorId,
+      name: input.name,
+      reference: input.reference ?? null,
+      projectType: input.projectType ?? null,
+      commercialStage: input.commercialStage ?? null,
+      propertyTypeId: input.propertyTypeId ?? null,
+      website: input.website ?? null,
+      defaultDripCampaignId: input.defaultDripCampaignId ?? null,
+      statusId: input.statusId ?? null,
+      address: input.address ?? legacy.address,
+      city: input.city ?? legacy.city,
+      country: input.country ?? legacy.country,
+      location,
+      companies,
+      description: input.description ?? null,
+      ownerId: input.ownerId ?? null,
+      assignedTo: input.assignedTo ?? null,
+    }),
+  );
 
   await createAuditLog({
     workspaceId,
@@ -178,6 +270,16 @@ export async function updateProjectForWorkspace(
   if (input.statusId !== undefined) {
     updatePayload.statusId = input.statusId;
   }
+  if (input.commercialStage !== undefined) {
+    updatePayload.commercialStage = input.commercialStage;
+  }
+  if (input.propertyTypeId !== undefined) {
+    await validatePropertyTypeId(workspaceId, input.propertyTypeId);
+    updatePayload.propertyTypeId = input.propertyTypeId;
+  }
+  if (input.website !== undefined) {
+    updatePayload.website = input.website?.trim() || null;
+  }
   if (input.address !== undefined) {
     updatePayload.address = input.address?.trim() || null;
   }
@@ -188,9 +290,27 @@ export async function updateProjectForWorkspace(
     updatePayload.country = input.country?.trim() || null;
   }
   if (input.location !== undefined) {
-    updatePayload.location = input.location
+    const location = input.location
       ? locationFromManualInput(input.location, existing.location)
       : emptyProjectLocation();
+    updatePayload.location = location;
+    if (input.address === undefined || input.city === undefined || input.country === undefined) {
+      const legacy = legacyFieldsFromLocation(location);
+      if (input.address === undefined) {
+        updatePayload.address = legacy.address;
+      }
+      if (input.city === undefined) {
+        updatePayload.city = legacy.city;
+      }
+      if (input.country === undefined) {
+        updatePayload.country = legacy.country;
+      }
+    }
+  }
+  if (input.companies !== undefined) {
+    const companies = normalizeProjectCompanies(input.companies);
+    await validateProjectCompanies(workspaceId, companies);
+    updatePayload.companies = companies;
   }
   if (input.description !== undefined) {
     updatePayload.description = input.description?.trim() || null;
@@ -218,7 +338,7 @@ export async function updateProjectForWorkspace(
     after: projectSnapshot(updated),
   });
 
-  return updated;
+  return withCompanyNames(workspaceId, updated);
 }
 
 export async function archiveProjectForWorkspace(

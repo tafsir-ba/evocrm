@@ -55,12 +55,19 @@ describe("project validation schemas", () => {
       city: null,
       country: null,
       description: null,
+      commercialStage: null,
+      propertyTypeId: null,
+      website: null,
+      location: null,
+      ownerId: null,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.reference).toBeNull();
       expect(result.data.address).toBeNull();
+      expect(result.data.commercialStage).toBeNull();
+      expect(result.data.location).toBeNull();
     }
   });
 
@@ -89,5 +96,38 @@ describe("project validation schemas", () => {
     if (create.success) {
       expect(create.data.location?.countryCode).toBe("JM");
     }
+  });
+
+  it("accepts commercial stage and company associations", () => {
+    const result = createProjectInputSchema.safeParse({
+      name: "Les Terrasses",
+      commercialStage: "pre_launch",
+      location: {
+        countryCode: "CH",
+        countryName: "Switzerland",
+        cantonCode: "GE",
+        municipality: "Geneva",
+        postalCode: "1201",
+        normalizedAddress: "Quai du Mont-Blanc",
+      },
+      companies: [
+        {
+          companyId: "507f1f77bcf86cd7994390aa",
+          role: "developer",
+          isPrimary: true,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(createProjectInputSchema.safeParse({ name: "X", commercialStage: "active" }).success).toBe(
+      false,
+    );
+    expect(
+      createProjectInputSchema.safeParse({
+        name: "X",
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "sponsor" }],
+      }).success,
+    ).toBe(false);
   });
 });

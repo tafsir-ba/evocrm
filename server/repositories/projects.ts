@@ -25,7 +25,12 @@ import { PropertyModel } from "@/models/property";
 import { connectDb } from "@/server/db/mongoose";
 import { ProjectModel, type ProjectDocument } from "@/models/project";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+import type { ProjectCommercialStage, ProjectCompanyAssociation } from "@/lib/project-operating-record";
 import { isValidObjectId } from "@/server/utils/mongo-id";
+
+export type ProjectCompanyLink = ProjectCompanyAssociation & {
+  company?: { id: string; name: string } | null;
+};
 
 export type ProjectRecord = {
   id: string;
@@ -33,12 +38,16 @@ export type ProjectRecord = {
   name: string;
   reference: string | null;
   projectType: string | null;
+  commercialStage: ProjectCommercialStage | null;
+  propertyTypeId: string | null;
+  website: string | null;
   defaultDripCampaignId: string | null;
   statusId: string | null;
   address: string | null;
   city: string | null;
   country: string | null;
   location?: ProjectLocation | null;
+  companies: ProjectCompanyLink[];
   description: string | null;
   createdBy: string;
   ownerId: string | null;
@@ -69,6 +78,9 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
     name: document.name,
     reference: document.reference ?? null,
     projectType: document.projectType ?? null,
+    commercialStage: (document.commercialStage as ProjectRecord["commercialStage"]) ?? null,
+    propertyTypeId: document.propertyTypeId?.toString() ?? null,
+    website: document.website ?? null,
     defaultDripCampaignId: document.defaultDripCampaignId?.toString() ?? null,
     statusId: document.statusId?.toString() ?? null,
     address: document.address ?? null,
@@ -77,6 +89,11 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
     location: normalizeProjectLocation(
       (document as ProjectDocument & { location?: ProjectLocation | null }).location,
     ),
+    companies: (document.companies ?? []).map((link) => ({
+      companyId: link.companyId.toString(),
+      role: link.role as ProjectCompanyLink["role"],
+      isPrimary: Boolean(link.isPrimary),
+    })),
     description: document.description ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
@@ -434,12 +451,16 @@ export async function createProject(input: {
   name: string;
   reference?: string | null;
   projectType?: string | null;
+  commercialStage?: ProjectCommercialStage | null;
+  propertyTypeId?: string | null;
+  website?: string | null;
   defaultDripCampaignId?: string | null;
   statusId?: string | null;
   address?: string | null;
   city?: string | null;
   country?: string | null;
   location?: ProjectLocation | null;
+  companies?: ProjectCompanyAssociation[];
   description?: string | null;
   createdBy: string;
   ownerId?: string | null;
@@ -451,12 +472,16 @@ export async function createProject(input: {
     name: input.name.trim(),
     reference: input.reference?.trim() || null,
     projectType: input.projectType ?? null,
+    commercialStage: input.commercialStage ?? null,
+    propertyTypeId: input.propertyTypeId ?? null,
+    website: input.website?.trim() || null,
     defaultDripCampaignId: input.defaultDripCampaignId ?? null,
     statusId: input.statusId ?? null,
     address: input.address?.trim() || null,
     city: input.city?.trim() || null,
     country: input.country?.trim() || null,
     location: normalizeProjectLocation(input.location ?? emptyProjectLocation()),
+    companies: input.companies ?? [],
     description: input.description?.trim() || null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
@@ -473,12 +498,16 @@ export async function updateProject(
     name: string;
     reference: string | null;
     projectType: string | null;
+    commercialStage: ProjectCommercialStage | null;
+    propertyTypeId: string | null;
+    website: string | null;
     defaultDripCampaignId: string | null;
     statusId: string | null;
     address: string | null;
     city: string | null;
     country: string | null;
     location: ProjectLocation | null;
+    companies: ProjectCompanyAssociation[];
     description: string | null;
     ownerId: string | null;
     assignedTo: string | null;

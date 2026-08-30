@@ -16,6 +16,8 @@ export type MemberSelectorProps = {
   placeholder?: string;
   emptyLabel?: string;
   className?: string;
+  id?: string;
+  name?: string;
 };
 
 export function MemberSelector({
@@ -26,6 +28,8 @@ export function MemberSelector({
   placeholder = "Unassigned",
   emptyLabel = "No workspace members available",
   className,
+  id,
+  name,
 }: MemberSelectorProps) {
   if (members.length === 0) {
     return (
@@ -47,6 +51,8 @@ export function MemberSelector({
 
   return (
     <select
+      id={id}
+      name={name}
       value={selectedUserId ?? ""}
       disabled={disabled}
       onChange={(event) => {
