@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "slug": "ormet",
+  "destinationProjectId": "6a94737a3a31c669cd059d07",
+  "destinationReference": "ORMET",
+  "counts": {
+    "multi_project": 23
+  },
+  "records": [
+    {
+      "hubspotContactId": "60801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "73151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "92751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "110751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "134851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "148401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "162501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "171551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "207051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "317901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "335451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "338351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "347801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "453901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1348051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1375826",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "8699445673",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "67134155106",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "126684317207",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "145716007697",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "156726391323",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "163795209524",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "165566997086",
+      "reason": "multi_project"
+    }
+  ]
+}

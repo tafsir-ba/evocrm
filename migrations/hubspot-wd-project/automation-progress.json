@@ -845,6 +845,25 @@
       },
       "searchTotal": 78,
       "dryRunOnly": false
+    },
+    {
+      "slug": "leparcdescrets",
+      "name": "Le Parc des Crêts",
+      "reference": "LEPARCDESCRETS",
+      "destinationProjectId": "6a940beeec2f44703ff6cd00",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 3223,
+      "exceptionCounts": {
+        "multi_project": 459,
+        "hubspot_id_match": 2724,
+        "missing_name": 27,
+        "notes_conflict": 1,
+        "notes_only": 12
+      },
+      "searchTotal": 3211,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
