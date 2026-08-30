@@ -607,6 +607,22 @@
       },
       "searchTotal": 227,
       "dryRunOnly": false
+    },
+    {
+      "slug": "crets_de_commugny",
+      "name": "Crêts de Commugny",
+      "reference": "CRETS_DE_COMMUGNY",
+      "destinationProjectId": "6a946f8a3e7aedd43f119b24",
+      "manifestSize": 168,
+      "created": 168,
+      "destinationLeadCount": 168,
+      "exceptionCount": 52,
+      "exceptionCounts": {
+        "multi_project": 47,
+        "missing_name": 5
+      },
+      "searchTotal": 220,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
