@@ -18,6 +18,24 @@
       "searchTotal": 2110,
       "dryRunOnly": false,
       "note": "Completed via residual resume after process interruption; destination integrity verified"
+    },
+    {
+      "slug": "arbora",
+      "name": "Arbora",
+      "reference": "ARBORA",
+      "destinationProjectId": "6a9422aaea1b5f415435d42d",
+      "manifestSize": 1642,
+      "created": 1642,
+      "destinationLeadCount": 1642,
+      "exceptionCount": 433,
+      "exceptionCounts": {
+        "multi_project": 409,
+        "notes_conflict": 21,
+        "missing_name": 3
+      },
+      "searchTotal": 2075,
+      "dryRunOnly": false,
+      "note": "Completed via residual retry after Mongo session/pool interruption; destination integrity verified"
     }
   ],
   "skipped": []

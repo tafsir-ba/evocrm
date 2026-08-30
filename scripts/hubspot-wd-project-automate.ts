@@ -69,7 +69,40 @@ function parseJsonFromOutput(output: string): Record<string, unknown> {
   if (start < 0) {
     throw new Error("command_output_not_json");
   }
-  return JSON.parse(output.slice(start)) as Record<string, unknown>;
+  // Prefer the first complete JSON value; ignore trailing stderr noise.
+  const slice = output.slice(start);
+  try {
+    return JSON.parse(slice) as Record<string, unknown>;
+  } catch {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let index = 0; index < slice.length; index += 1) {
+      const ch = slice[index]!;
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (ch === "\\") {
+          escape = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{") depth += 1;
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return JSON.parse(slice.slice(0, index + 1)) as Record<string, unknown>;
+        }
+      }
+    }
+    throw new Error("command_output_not_json");
+  }
 }
 
 function runTsx(script: string, args: string[], timeoutMs: number, logPath: string): Record<string, unknown> {
@@ -108,6 +141,13 @@ function runTsx(script: string, args: string[], timeoutMs: number, logPath: stri
     }
   }
   return parseJsonFromOutput(result.stdout ?? combined);
+}
+
+async function disconnectMongo(): Promise<void> {
+  const mongoose = await import("mongoose");
+  if (mongoose.default.connection.readyState !== 0) {
+    await mongoose.default.disconnect().catch(() => undefined);
+  }
 }
 
 type ProgressFile = {
@@ -231,9 +271,11 @@ async function main(): Promise<void> {
         aliasReference: alias.reference,
       });
       await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+      await disconnectMongo();
       continue;
     }
 
+    await disconnectMongo();
     const setup = runTsx(
       "scripts/hubspot-wd-project-setup.ts",
       ["--slug", slug, "--name", name, "--reference", reference, "--confirm-write"],
@@ -260,6 +302,7 @@ async function main(): Promise<void> {
     };
 
     const manifestName = `${slug}-batch-01`;
+    await disconnectMongo();
     const selected = runTsx(
       "scripts/hubspot-wd-project-select.ts",
       [
@@ -287,6 +330,7 @@ async function main(): Promise<void> {
     let skipped = 0;
     let destCount = 0;
     if (manifestSize > 0) {
+      await disconnectMongo();
       const dry = runTsx(
         "scripts/hubspot-wd-project-migrate.ts",
         ["--manifest", manifestName],
@@ -301,6 +345,7 @@ async function main(): Promise<void> {
         break;
       }
       if (execute) {
+        await disconnectMongo();
         const exec = runTsx(
           "scripts/hubspot-wd-project-migrate.ts",
           ["--execute", "--confirm-write", "--manifest", manifestName],
@@ -373,6 +418,7 @@ async function main(): Promise<void> {
           );
           await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
           // Retry same slug once by continuing loop without consuming mappedSlugs.
+          await disconnectMongo();
           const retry = runTsx(
             "scripts/hubspot-wd-project-select.ts",
             [
@@ -390,6 +436,7 @@ async function main(): Promise<void> {
           );
           const retrySize = Number(retry.manifestSize ?? 0);
           if (retry.ok === true && retrySize > 0) {
+            await disconnectMongo();
             const retryExec = runTsx(
               "scripts/hubspot-wd-project-migrate.ts",
               ["--execute", "--confirm-write", "--manifest", `${slug}-batch-01`],
@@ -417,10 +464,22 @@ async function main(): Promise<void> {
       }
     }
 
-    const integration = await findIntegrationById(
-      WD_MIGRATION_WORKSPACE_ID,
-      WD_MIGRATION_INTEGRATION_ID,
-    );
+    let integration = null as Awaited<ReturnType<typeof findIntegrationById>> | null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        integration = await findIntegrationById(
+          WD_MIGRATION_WORKSPACE_ID,
+          WD_MIGRATION_INTEGRATION_ID,
+        );
+        break;
+      } catch (error) {
+        await disconnectMongo();
+        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+        if (attempt === 4) {
+          throw error;
+        }
+      }
+    }
     if (
       integration?.defaultProjectId !== WD_MIGRATION_GV_PROJECT_ID ||
       integration.allowProjectOverride
