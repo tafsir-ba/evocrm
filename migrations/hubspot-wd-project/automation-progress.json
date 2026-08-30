@@ -86,6 +86,22 @@
       },
       "searchTotal": 1355,
       "dryRunOnly": false
+    },
+    {
+      "slug": "eveil",
+      "name": "Éveil",
+      "reference": "EVEIL",
+      "destinationProjectId": "6a943c5ac1e31b2481c99b0d",
+      "manifestSize": 857,
+      "created": 12,
+      "destinationLeadCount": 857,
+      "exceptionCount": 163,
+      "exceptionCounts": {
+        "multi_project": 162,
+        "cmp_product": 1
+      },
+      "searchTotal": 1020,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
