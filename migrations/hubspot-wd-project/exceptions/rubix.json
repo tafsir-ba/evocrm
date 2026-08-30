@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "slug": "rubix",
+  "destinationProjectId": "6a9466cfde8b87074899d25c",
+  "destinationReference": "RUBIX",
+  "counts": {
+    "multi_project": 12
+  },
+  "records": [
+    {
+      "hubspotContactId": "73701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "119751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "143101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "275601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "280301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "295751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "370351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "371751",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "377651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "382701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "711101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1318101",
+      "reason": "multi_project"
+    }
+  ]
+}

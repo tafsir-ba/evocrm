@@ -349,6 +349,21 @@
       },
       "searchTotal": 446,
       "dryRunOnly": false
+    },
+    {
+      "slug": "rubix",
+      "name": "Rubix",
+      "reference": "RUBIX",
+      "destinationProjectId": "6a9466cfde8b87074899d25c",
+      "manifestSize": 358,
+      "created": 358,
+      "destinationLeadCount": 358,
+      "exceptionCount": 12,
+      "exceptionCounts": {
+        "multi_project": 12
+      },
+      "searchTotal": 370,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
