@@ -120,6 +120,24 @@
       },
       "searchTotal": 840,
       "dryRunOnly": false
+    },
+    {
+      "slug": "jardinspala",
+      "name": "Jardins Pala",
+      "reference": "JARDINSPALA",
+      "destinationProjectId": "6a9446c0db72974d3666f72d",
+      "manifestSize": 529,
+      "created": 528,
+      "destinationLeadCount": 529,
+      "exceptionCount": 233,
+      "exceptionCounts": {
+        "multi_project": 19,
+        "missing_name": 91,
+        "notes_conflict": 7,
+        "notes_only": 116
+      },
+      "searchTotal": 601,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
