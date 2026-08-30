@@ -212,9 +212,6 @@ async function main(): Promise<void> {
   } = await import("../lib/hubspot-wd-project-migration");
   type MasterProjectRoadmap = import("../lib/hubspot-wd-project-migration").MasterProjectRoadmap;
   const { findIntegrationById } = await import("../server/repositories/integrations");
-  const { listHubSpotProjectMappings } = await import(
-    "../server/repositories/hubspot-project-mappings"
-  );
   const { findProjects } = await import("../server/repositories/projects");
   const mongoose = await import("mongoose");
 
@@ -224,21 +221,9 @@ async function main(): Promise<void> {
   const progressPath = path.join(process.cwd(), WD_MIGRATION_PROGRESS_FILE);
   const progress = await loadProgress(progressPath);
 
-  const mappings = await listHubSpotProjectMappings(
-    WD_MIGRATION_WORKSPACE_ID,
-    WD_MIGRATION_INTEGRATION_ID,
-  );
-  const mappedSlugs = new Set(
-    mappings
-      .filter(
-        (row) =>
-          row.status === "mapped" &&
-          row.evoProjectId &&
-          row.evoProjectId !== WD_MIGRATION_GV_PROJECT_ID &&
-          row.evoProjectId !== WD_MIGRATION_GENERAL_PROJECT_ID,
-      )
-      .map((row) => row.hubspotProjectId),
-  );
+  // Skip only checkpoint-completed slugs (not "mapped" alone). Setup maps before execute
+  // finishes, so treating DB mappings as done would strand interrupted projects.
+  const mappedSlugs = new Set<string>();
   for (const row of progress.completed) {
     if (typeof row.slug === "string") {
       mappedSlugs.add(row.slug);
@@ -250,8 +235,22 @@ async function main(): Promise<void> {
   const logDir = path.join("/tmp", "wd-automate-logs");
   await mkdir(logDir, { recursive: true });
 
-  // Clear a previous interruption stop if destination integrity was already verified offline.
-  if (progress.stopped && progress.stopReason === "unexpected_results") {
+  // Clear recoverable interruption stops so residual batches can resume.
+  // Never auto-clear true destination / enrollment / idempotency safety failures.
+  const stopReason = progress.stopReason ?? "";
+  const recoverableStop =
+    stopReason === "unexpected_results" ||
+    stopReason === "execute_aborted:create_failed" ||
+    stopReason === "execute_aborted:create_duplicate_unexpected";
+  const unsafeStop =
+    stopReason.includes("wrong_destination") ||
+    stopReason.includes("grosvenor") ||
+    stopReason.includes("evo_general") ||
+    stopReason.includes("idempotency_breach") ||
+    stopReason.includes("enrollment_breach") ||
+    stopReason.includes("campaign_guard") ||
+    stopReason.includes("automation");
+  if (progress.stopped && recoverableStop && !unsafeStop) {
     progress.stopped = false;
     progress.stopReason = null;
     await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);

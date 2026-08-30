@@ -50,6 +50,7 @@ import {
 import { findIntegrationById } from "@/server/repositories/integrations";
 import {
   countActiveLeadsForProject,
+  findActiveLeadByEmailNormalized,
   findLeadByIntegrationIdempotencyKey,
   findLeadsByIds,
   findLeadsForHubSpotGvPilotDedupe,
@@ -605,6 +606,86 @@ export async function runHubSpotWdProjectMigration(input: {
       });
     } catch (error) {
       const duplicate = error instanceof AppError && error.code === "CONFLICT";
+      if (duplicate) {
+        // Recoverable races: lead may already exist with this HubSpot key (or email) on
+        // the intended destination. Mirror hubspot-lead-capture duplicate handling.
+        const byKey = await findLeadByIntegrationIdempotencyKey(
+          WD_MIGRATION_WORKSPACE_ID,
+          WD_MIGRATION_INTEGRATION_ID,
+          idempotencyKey,
+        );
+        if (byKey && byKey.projectId === manifest.destinationProjectId) {
+          skipped += 1;
+          records.push({
+            hubspotContactId: contactId,
+            idempotencyKey,
+            cohort: eligibility.cohort,
+            exclusions: ["hubspot_id_match"],
+            outcome: "skipped",
+            unexpectedReason: null,
+            leadId: byKey.id,
+          });
+          continue;
+        }
+        if (
+          byKey &&
+          (byKey.projectId === WD_MIGRATION_GV_PROJECT_ID ||
+            byKey.projectId === WD_MIGRATION_GENERAL_PROJECT_ID)
+        ) {
+          unexpected += 1;
+          records.push({
+            hubspotContactId: contactId,
+            idempotencyKey,
+            cohort: eligibility.cohort,
+            exclusions: ["hubspot_id_match"],
+            outcome: "unexpected",
+            unexpectedReason: "create_duplicate_unexpected",
+            leadId: byKey.id,
+          });
+          aborted = true;
+          abortReason = "wrong_destination";
+          continue;
+        }
+        if (byKey) {
+          unexpected += 1;
+          records.push({
+            hubspotContactId: contactId,
+            idempotencyKey,
+            cohort: eligibility.cohort,
+            exclusions: ["hubspot_id_match"],
+            outcome: "unexpected",
+            unexpectedReason: "create_duplicate_unexpected",
+            leadId: byKey.id,
+          });
+          aborted = true;
+          abortReason = "idempotency_breach";
+          continue;
+        }
+        if (snapshot.emailNormalized) {
+          const byEmail = await findActiveLeadByEmailNormalized(
+            WD_MIGRATION_WORKSPACE_ID,
+            snapshot.emailNormalized,
+            undefined,
+            manifest.destinationProjectId,
+          );
+          const byEmailKey =
+            (byEmail?.attributes as { integration?: { idempotencyKey?: string } } | undefined)
+              ?.integration?.idempotencyKey ?? null;
+          if (byEmail && byEmailKey === idempotencyKey) {
+            skipped += 1;
+            records.push({
+              hubspotContactId: contactId,
+              idempotencyKey,
+              cohort: eligibility.cohort,
+              exclusions: ["hubspot_id_match"],
+              outcome: "skipped",
+              unexpectedReason: null,
+              leadId: byEmail.id,
+            });
+            continue;
+          }
+        }
+      }
       unexpected += 1;
       records.push({
         hubspotContactId: contactId,
