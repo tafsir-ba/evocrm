@@ -639,6 +639,22 @@
       },
       "searchTotal": 204,
       "dryRunOnly": false
+    },
+    {
+      "slug": "floreal",
+      "name": "Floréal",
+      "reference": "FLOREAL",
+      "destinationProjectId": "6a9470bfac4a59fdc6dfaa4a",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 175,
+      "exceptionCounts": {
+        "multi_project": 84,
+        "missing_name": 91
+      },
+      "searchTotal": 181,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
