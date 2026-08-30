@@ -333,6 +333,22 @@
       },
       "searchTotal": 438,
       "dryRunOnly": false
+    },
+    {
+      "slug": "domainedulac",
+      "name": "Domaine du Lac",
+      "reference": "DOMAINEDULAC",
+      "destinationProjectId": "6a94657dfc9fe9154441985d",
+      "manifestSize": 351,
+      "created": 351,
+      "destinationLeadCount": 351,
+      "exceptionCount": 96,
+      "exceptionCounts": {
+        "multi_project": 95,
+        "notes_only": 1
+      },
+      "searchTotal": 446,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
