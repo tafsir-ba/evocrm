@@ -100,6 +100,35 @@ describe("project location enrichment", () => {
     });
   });
 
+  it("applies user-confirmed Confignon for Résidence les Pins", () => {
+    const decision = decideProjectLocationEnrichment({
+      name: "Résidence les Pins",
+    });
+
+    expect(decision.action).toBe("apply");
+    expect(decision.reason).toBe("user_confirmed");
+    expect(decision.location.municipality).toBe("Confignon");
+    expect(decision.location.cantonCode).toBe("GE");
+    expect(decision.location.countryCode).toBe("CH");
+    expect(decision.location.provenance?.method).toBe("user_confirmed");
+    expect(decision.location.provenance?.catalogKey).toBe("residence-les-pins");
+  });
+
+  it("applies user-confirmed Crissier for Arbora", () => {
+    const decision = decideProjectLocationEnrichment({
+      name: "Arbora",
+    });
+
+    expect(decision.action).toBe("apply");
+    expect(decision.reason).toBe("user_confirmed");
+    expect(decision.location.municipality).toBe("Crissier");
+    expect(decision.location.cantonCode).toBe("VD");
+    expect(decision.location.countryCode).toBe("CH");
+    expect(decision.location.postalCode).toBe("1023");
+    expect(decision.location.provenance?.method).toBe("user_confirmed");
+    expect(decision.location.provenance?.catalogKey).toBe("arbora");
+  });
+
   it("refines a broader Geneva city to the evidenced municipality", () => {
     const decision = decideProjectLocationEnrichment({
       name: "Résidence les Pins",
@@ -111,6 +140,31 @@ describe("project location enrichment", () => {
     expect(decision.reason).toBe("high_confidence_locality_refinement");
     expect(decision.city).toBe("Confignon");
     expect(decision.location.municipality).toBe("Confignon");
+    expect(decision.location.provenance?.method).toBe("user_confirmed");
+  });
+
+  it("places researched promotions without inventing streets", () => {
+    const defne = decideProjectLocationEnrichment({ name: "Defne" });
+    expect(defne.action).toBe("apply");
+    expect(defne.location.municipality).toBe("Rolle");
+    expect(defne.location.provenance?.method).toBe("enrichment");
+
+    const smarthill = decideProjectLocationEnrichment({ name: "Smarthill" });
+    expect(smarthill.location.municipality).toBe("Crissier");
+    expect(smarthill.location.cantonCode).toBe("VD");
+
+    const sorella = decideProjectLocationEnrichment({ name: "Villa Sorella" });
+    expect(sorella.location.municipality).toBe("Corsier");
+    expect(sorella.location.cantonCode).toBe("GE");
+    expect(sorella.location.municipality).not.toBe("Corsier-sur-Vevey");
+
+    const pala = decideProjectLocationEnrichment({ name: "Jardins Pala" });
+    expect(pala.location.municipality).toBe("Bulle");
+    expect(pala.location.cantonCode).toBe("FR");
+
+    const rubix = decideProjectLocationEnrichment({ name: "Rubix" });
+    expect(rubix.location.municipality).toBe("Satigny");
+    expect(rubix.location.municipality).not.toBe("Meyrin");
   });
 
   it("does not overwrite a conflicting specific manual city", () => {

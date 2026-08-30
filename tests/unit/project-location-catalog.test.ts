@@ -23,6 +23,15 @@ describe("project location catalog", () => {
     expect(findCatalogEntryByKey("v77")?.postalCode).toBe("1253");
     expect(findCatalogEntryByKey("le-parc-des-crets")?.municipality).toBe("Troinex");
     expect(findCatalogEntryByKey("residence-les-pins")?.municipality).toBe("Confignon");
+    expect(findCatalogEntryByKey("arbora")?.municipality).toBe("Crissier");
+    expect(findCatalogEntryByKey("arbora")?.cantonCode).toBe("VD");
+    expect(findCatalogEntryByKey("defne")?.municipality).toBe("Rolle");
+    expect(findCatalogEntryByKey("smarthill")?.municipality).toBe("Crissier");
+    expect(findCatalogEntryByKey("villa-sorella")?.municipality).toBe("Corsier");
+    expect(findCatalogEntryByKey("villa-sorella")?.cantonCode).toBe("GE");
+    expect(findCatalogEntryByKey("jardins-pala")?.municipality).toBe("Bulle");
+    expect(findCatalogEntryByKey("jardins-pala")?.cantonCode).toBe("FR");
+    expect(findCatalogEntryByKey("rubix")?.municipality).toBe("Satigny");
     expect(findCatalogEntryByKey("buissonniere-4")?.municipality).toBe("Prilly");
     expect(findCatalogEntryByKey("residence-symbiose")?.municipality).toBe(
       "Le Mont-sur-Lausanne",
@@ -45,6 +54,35 @@ describe("project location catalog", () => {
     expect(entry?.normalizedAddress).not.toMatch(/chemin/i);
   });
 
+  it("records user-confirmed provenance on Les Pins and Arbora", () => {
+    const lesPins = findCatalogEntryByKey("residence-les-pins");
+    const arbora = findCatalogEntryByKey("arbora");
+    expect(lesPins?.confirmation).toBe("user");
+    expect(arbora?.confirmation).toBe("user");
+    expect(lesPins?.sources.some((source) => source.kind === "user_confirmed")).toBe(
+      true,
+    );
+    expect(arbora?.sources.some((source) => source.kind === "user_confirmed")).toBe(
+      true,
+    );
+  });
+
+  it("places Villa Sorella in Corsier GE, not Corsier-sur-Vevey", () => {
+    const entry = findCatalogEntryByKey("villa-sorella");
+    expect(entry?.cantonCode).toBe("GE");
+    expect(entry?.municipality).toBe("Corsier");
+    expect(entry?.postalCode).toBe("1246");
+    expect(entry?.municipality).not.toBe("Corsier-sur-Vevey");
+  });
+
+  it("places Rubix in Satigny from the published address, not Meyrin", () => {
+    const entry = findCatalogEntryByKey("rubix");
+    expect(entry?.municipality).toBe("Satigny");
+    expect(entry?.postalCode).toBe("1242");
+    expect(entry?.cantonCode).toBe("GE");
+    expect(entry?.municipality).not.toBe("Meyrin");
+  });
+
   it("leaves EvoHome General unresolved", () => {
     const entry = findCatalogEntryByKey("evohome-general");
     expect(entry?.reviewStatus).toBe("unresolved");
@@ -64,7 +102,7 @@ describe("project location catalog", () => {
   it("summarizes catalog coverage", () => {
     const summary = catalogCoverageSummary();
     expect(summary.total).toBe(PROJECT_LOCATION_CATALOG.length);
-    expect(summary.highConfidence).toBe(16);
+    expect(summary.highConfidence).toBe(22);
     expect(summary.unresolved).toBe(1);
   });
 });

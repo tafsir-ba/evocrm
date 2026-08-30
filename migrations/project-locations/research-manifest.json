@@ -9,6 +9,12 @@
       "authoritative press only to corroborate locality, not to invent streets"
     ],
     "doNotGuessFromProjectName": true,
+    "researchQueryConvention": {
+      "beforeUnresolved": true,
+      "swiss": "[project name] promotion, plus municipality/canton candidates when available",
+      "overseas": "[project name] development"
+    },
+    "userConfirmed": "Operator-provided locations (confirmation=user) are provenance, not inferred enrichment.",
     "placeSignal": "A municipality or locality in the project name/reference is a high-priority candidate. It is applied only after official Swiss commune (gg25) or official project/developer verification. Ambiguous or intercommunal names stay review-needed.",
     "backfill": "high-confidence verified catalog matches and verified unique place signals only",
     "coordinates": {
@@ -63,7 +69,74 @@
       "postalCode": "1232",
       "precision": "locality",
       "confidence": "high",
-      "sourceUrl": "https://www.evo-home.ch/fr/projects/residence-les-pins"
+      "sourceUrl": "https://www.evo-home.ch/fr/projects/residence-les-pins",
+      "confirmation": "user"
+    },
+    {
+      "key": "arbora",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Crissier",
+      "postalCode": "1023",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.losinger-marazzi.ch/fr/projets/202/arbora/",
+      "confirmation": "user"
+    },
+    {
+      "key": "defne",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Rolle",
+      "postalCode": "1180",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://defne-rolle.ch/",
+      "confirmation": "public_evidence"
+    },
+    {
+      "key": "smarthill",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Crissier",
+      "postalCode": "1023",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.hrs.ch/fr/projets/smarthill",
+      "confirmation": "public_evidence"
+    },
+    {
+      "key": "villa-sorella",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Corsier",
+      "postalCode": "1246",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.swissroc-properties.com/fr/sell/villa/corsier/geneve/villa-sorella-a",
+      "confirmation": "public_evidence"
+    },
+    {
+      "key": "jardins-pala",
+      "countryCode": "CH",
+      "cantonCode": "FR",
+      "municipality": "Bulle",
+      "postalCode": "1630",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.toffel-immobilier.ch/promotion-jardins-de-la-pala/",
+      "confirmation": "public_evidence"
+    },
+    {
+      "key": "rubix",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Satigny",
+      "postalCode": "1242",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://www.ftige.ch/rubix-pose-de-la-premiere-pierre/",
+      "confirmation": "public_evidence"
     },
     {
       "key": "buissonniere-4",
@@ -204,7 +277,6 @@
     "Cressy is an intercommunal Geneva quartier (Confignon / Bernex / Onex) and is not Cressier.",
     "BC Kingston has a Kingston signal but no official project country.",
     "Jardin des Nations and Seymaz 44 are neighbourhood / sector names, not unique communes.",
-    "Rubix / rubix-gva.ch spans Meyrin and Satigny — municipality conflict.",
-    "Branded names without a place signal or unique official site stay on the compact unresolved list."
+    "Branded names without a place signal or unique official site stay on the compact unresolved list after the promotion/development query convention."
   ]
 }

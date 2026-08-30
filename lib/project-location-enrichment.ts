@@ -86,6 +86,10 @@ const LOCALITY_ALIASES: Record<string, string[]> = {
   thonex: ["thonex"],
   mathod: ["mathod"],
   ecublens: ["ecublens"],
+  crissier: ["crissier"],
+  satigny: ["satigny"],
+  bulle: ["bulle"],
+  corsier: ["corsier"],
 };
 
 export function matchProjectLocationCatalog(
@@ -216,7 +220,7 @@ export function locationFromCatalogEntry(
     confidence: entry.confidence,
     reviewStatus: entry.reviewStatus,
     provenance: {
-      method: "enrichment",
+      method: entry.confirmation === "user" ? "user_confirmed" : "enrichment",
       catalogKey: entry.key,
       appliedAt,
       previousManual,
@@ -330,9 +334,11 @@ export function decideProjectLocationEnrichment(
       ? "high_confidence_country_correction"
       : cityIsBroaderRegion
         ? "high_confidence_locality_refinement"
-        : match.reason === "place_signal"
-          ? "verified_place_signal"
-          : "high_confidence_backfill",
+        : entry.confirmation === "user"
+          ? "user_confirmed"
+          : match.reason === "place_signal"
+            ? "verified_place_signal"
+            : "high_confidence_backfill",
     location,
     city: shouldFillCity ? entry.municipality : manual.city,
     country: shouldFillCountry ? entry.countryName : manual.country,

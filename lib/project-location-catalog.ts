@@ -10,7 +10,10 @@ export type ProjectLocationSourceKind =
   | "developer_site"
   | "agency_portfolio"
   | "municipal_mapping"
-  | "authoritative_press";
+  | "authoritative_press"
+  | "user_confirmed";
+
+export type ProjectLocationConfirmation = "user" | "public_evidence";
 
 export type ProjectLocationCatalogSource = {
   url: string;
@@ -40,6 +43,8 @@ export type ProjectLocationCatalogEntry = {
   sourceUrl: string | null;
   sources: ProjectLocationCatalogSource[];
   notes: string;
+  /** User-confirmed rows are operator-provided, not inferred from a search. */
+  confirmation?: ProjectLocationConfirmation;
 };
 
 export const PROJECT_LOCATION_CATALOG: ProjectLocationCatalogEntry[] = [
@@ -189,20 +194,265 @@ export const PROJECT_LOCATION_CATALOG: ProjectLocationCatalogEntry[] = [
     precision: "locality",
     confidence: "high",
     reviewStatus: "verified",
+    confirmation: "user",
     sourceUrl: "https://www.evo-home.ch/fr/projects/residence-les-pins",
     sources: [
       {
         url: "https://www.evo-home.ch/fr/projects/residence-les-pins",
-        kind: "agency_portfolio",
-        note: "EvoHome project page: family development on a 2,915 m² parcel in Confignon, Geneva.",
+        kind: "user_confirmed",
+        note: "User-confirmed: Confignon, canton Geneva, Switzerland. Not inferred from the project name.",
       },
       {
         url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=1232&type=locations&origins=zipcode",
         kind: "municipal_mapping",
-        note: "Swiss federal zipcode layer: 1232 - Confignon.",
+        note: "Supporting official map: 1232 - Confignon (GE).",
       },
     ],
-    notes: "No official street address published. Locality-level only.",
+    notes:
+      "User-confirmed municipality Confignon, canton Geneva. Street not recorded. Provenance method is user_confirmed.",
+  },
+  {
+    key: "arbora",
+    displayName: "Arbora",
+    aliases: ["Arbora"],
+    references: ["arbora"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "VD",
+    cantonName: "Vaud",
+    municipality: "Crissier",
+    postalCode: "1023",
+    normalizedAddress: "1023 Crissier",
+    latitude: 46.562,
+    longitude: 6.576,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "user",
+    sourceUrl: "https://www.losinger-marazzi.ch/fr/projets/202/arbora/",
+    sources: [
+      {
+        url: "user-confirmed",
+        kind: "user_confirmed",
+        note: "Operator-confirmed: Crissier, canton of Vaud, Switzerland. Not inferred from the project name.",
+      },
+      {
+        url: "https://www.losinger-marazzi.ch/fr/projets/202/arbora/",
+        kind: "official_project_site",
+        note: "Losinger Marazzi official promotion page: Arbora, Crissier (VD).",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Crissier&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Crissier (VD), PLZ 1023, rounded to 3 dp.",
+      },
+    ],
+    notes:
+      "User-confirmed municipality Crissier, canton Vaud. Street not recorded. Provenance method is user_confirmed.",
+  },
+  {
+    key: "defne",
+    displayName: "Defne",
+    aliases: ["Defne", "Résidence Defne", "Residence Defne"],
+    references: ["defne", "residencedefne"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "VD",
+    cantonName: "Vaud",
+    municipality: "Rolle",
+    postalCode: "1180",
+    normalizedAddress: "1180 Rolle",
+    latitude: 46.426,
+    longitude: 6.349,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "public_evidence",
+    sourceUrl: "https://defne-rolle.ch/",
+    sources: [
+      {
+        url: "https://defne-rolle.ch/",
+        kind: "official_project_site",
+        note: "Official promotion site: Résidence DEFNE à Rolle (VD).",
+      },
+      {
+        url: "https://residence-defne.ch/",
+        kind: "official_project_site",
+        note: "Alternate official hostname; homepage was intermittently unavailable during verification.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Rolle&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official Rolle commune centroid rounded to 3 decimals (locality precision).",
+      },
+    ],
+    notes:
+      "Found via “[Defne] promotion” research. Municipality is Rolle from first-party promotion copy.",
+  },
+  {
+    key: "smarthill",
+    displayName: "Smarthill",
+    aliases: ["Smarthill", "Smart Hill"],
+    references: ["smarthill"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "VD",
+    cantonName: "Vaud",
+    municipality: "Crissier",
+    postalCode: "1023",
+    normalizedAddress: "1023 Crissier",
+    latitude: 46.562,
+    longitude: 6.576,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "public_evidence",
+    sourceUrl: "https://www.hrs.ch/fr/projets/smarthill",
+    sources: [
+      {
+        url: "https://www.hrs.ch/fr/projets/smarthill",
+        kind: "official_project_site",
+        note: "HRS official project page: Smarthill, Crissier (VD).",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Crissier&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Crissier (VD), PLZ 1023, rounded to 3 dp.",
+      },
+    ],
+    notes: "Found via “[Smarthill] promotion” research. Locality-level Crissier only.",
+  },
+  {
+    key: "villa-sorella",
+    displayName: "Villa Sorella",
+    aliases: ["Villa Sorella"],
+    references: ["villasorella"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "GE",
+    cantonName: "Genève",
+    municipality: "Corsier",
+    postalCode: "1246",
+    normalizedAddress: "1246 Corsier",
+    latitude: 46.267,
+    longitude: 6.216,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "public_evidence",
+    sourceUrl: "https://www.swissroc-properties.com/fr/sell/villa/corsier/geneve/villa-sorella-a",
+    sources: [
+      {
+        url: "https://villasorella.ch/",
+        kind: "official_project_site",
+        note: "Dedicated project marketing hostname cited by Swissroc. Homepage was intermittently unavailable during verification.",
+      },
+      {
+        url: "https://www.swissroc-properties.com/fr/sell/villa/corsier/geneve/villa-sorella-a",
+        kind: "developer_site",
+        note: "Swissroc Properties: Villa Sorella promotion of two villas in Corsier (Geneva). Distinct from Corsier-sur-Vevey (VD).",
+      },
+      {
+        url: "https://www.huusli.ch/de/projects/6620fabbd6221bd372a6ce94",
+        kind: "agency_portfolio",
+        note: "Huusli listing: Chemin du Fournil, 1246 Corsier GE. Street-level address is not copied.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Corsier&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Corsier (GE), PLZ 1246, rounded to 3 dp.",
+      },
+    ],
+    notes:
+      "Found via “[Villa Sorella] promotion”. Municipality is Corsier (GE), not Corsier-sur-Vevey.",
+  },
+  {
+    key: "jardins-pala",
+    displayName: "Jardins Pala",
+    aliases: [
+      "Jardins Pala",
+      "Jardins de la Pala",
+      "Jardins de la Pâla",
+    ],
+    references: ["jardinspala", "jardinsdelapala"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "FR",
+    cantonName: "Fribourg",
+    municipality: "Bulle",
+    postalCode: "1630",
+    normalizedAddress: "1630 Bulle",
+    latitude: 46.605,
+    longitude: 7.067,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "public_evidence",
+    sourceUrl: "https://www.toffel-immobilier.ch/promotion-jardins-de-la-pala/",
+    sources: [
+      {
+        url: "https://www.toffel-immobilier.ch/promotion-jardins-de-la-pala/",
+        kind: "agency_portfolio",
+        note: "Toffel Immobilier promotion page: Jardins de la Pâla, Route de la Pâla, 1630 Bulle.",
+      },
+      {
+        url: "https://urbanproject-sa.ch/actualites/lancement-de-la-commercialisation-des-jardins-de-la-pala/",
+        kind: "developer_site",
+        note: "Urban Project: commercialisation of Jardins de la Pâla at Bulle.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Bulle&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Bulle (FR), PLZ 1630, rounded to 3 dp.",
+      },
+    ],
+    notes:
+      "Found via “[Jardins Pala] promotion”. Municipality is Bulle (FR). Street number is not recorded.",
+  },
+  {
+    key: "rubix",
+    displayName: "Rubix",
+    aliases: ["Rubix"],
+    references: ["rubix", "rubixgva"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "GE",
+    cantonName: "Genève",
+    municipality: "Satigny",
+    postalCode: "1242",
+    normalizedAddress: "Rue du Pré-Bouvier, 1242 Satigny",
+    latitude: 46.215,
+    longitude: 6.034,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    confirmation: "public_evidence",
+    sourceUrl: "https://www.ftige.ch/rubix-pose-de-la-premiere-pierre/",
+    sources: [
+      {
+        url: "https://rubix-gva.ch/",
+        kind: "official_project_site",
+        note: "Official promotion site for Rubix in the ZIMEYSA zone (Meyrin / Satigny).",
+      },
+      {
+        url: "https://www.ftige.ch/rubix-pose-de-la-premiere-pierre/",
+        kind: "official_project_site",
+        note: "FTI published address: Rue du Pré-Bouvier 31, 1242 Satigny (Genève). Municipality is Satigny, not guessed as Meyrin.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Satigny&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Satigny (GE), PLZ 1242, rounded to 3 dp.",
+      },
+    ],
+    notes:
+      "ZIMEYSA spans Meyrin and Satigny. Applied municipality is Satigny from the published FTI address, not a guess.",
   },
   {
     key: "buissonniere-4",

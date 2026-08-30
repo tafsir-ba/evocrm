@@ -20,7 +20,12 @@ export const PROJECT_LOCATION_REVIEW_STATUSES = [
 export type ProjectLocationReviewStatus =
   (typeof PROJECT_LOCATION_REVIEW_STATUSES)[number];
 
-export const PROJECT_LOCATION_METHODS = ["enrichment", "manual", "seed"] as const;
+export const PROJECT_LOCATION_METHODS = [
+  "enrichment",
+  "manual",
+  "seed",
+  "user_confirmed",
+] as const;
 
 export type ProjectLocationMethod = (typeof PROJECT_LOCATION_METHODS)[number];
 

@@ -8,7 +8,14 @@
  *   npm run enrich:project-locations -- --write-report
  *
  * Dry-run by default. Never invents locations. High-confidence catalog
- * matches only. Requires MONGODB_URI for live apply.
+ * matches and unique verified place signals only. User-confirmed rows
+ * keep provenance.method = user_confirmed (operator-provided, not inferred).
+ *
+ * Research convention before marking a record unresolved:
+ *   Swiss:     "[project name] promotion" (+ municipality/canton if known)
+ *   Overseas:  "[project name] development"
+ *
+ * Requires MONGODB_URI for live apply.
  */
 import Module from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -189,7 +196,7 @@ async function main(): Promise<void> {
           generatedAt: report.generatedAt,
           mode: report.mode,
           policy:
-            "Place names in the project title are candidates. Official maps or project sites must verify them. This list is only genuine ambiguities and names with no verifiable place signal.",
+            "Place names in the project title are candidates. Official maps or project sites must verify them. Swiss records were searched as “[name] promotion” and overseas as “[name] development” before remaining here. This list is only genuine ambiguities and names with no verifiable place signal.",
           items: unresolvedCompact,
         },
         null,
