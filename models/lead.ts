@@ -12,6 +12,7 @@ const leadSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", default: null },
     statusId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", required: true },
     sourceId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
@@ -62,6 +63,7 @@ const leadSchema = new Schema(
 leadSchema.index({ workspaceId: 1 });
 leadSchema.index({ workspaceId: 1, projectId: 1 });
 leadSchema.index({ workspaceId: 1, projectId: 1, archivedAt: 1 });
+leadSchema.index({ workspaceId: 1, companyId: 1, archivedAt: 1 });
 leadSchema.index({ workspaceId: 1, createdAt: -1 });
 leadSchema.index({ workspaceId: 1, updatedAt: -1 });
 leadSchema.index({ workspaceId: 1, archivedAt: 1 });

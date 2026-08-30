@@ -79,4 +79,21 @@ describe("lead validation", () => {
     const result = updateLeadInputSchema.safeParse({});
     expect(result.success).toBe(false);
   });
+
+  it("accepts an optional company association without requiring person free text", () => {
+    const create = createLeadApiInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "507f1f77bcf86cd799439011",
+      companyId: "507f1f77bcf86cd7994390aa",
+    });
+    expect(create.success).toBe(true);
+
+    const update = updateLeadInputSchema.safeParse({ companyId: "507f1f77bcf86cd7994390aa" });
+    expect(update.success).toBe(true);
+
+    const list = leadListQuerySchema.safeParse({ companyId: "507f1f77bcf86cd7994390aa" });
+    expect(list.success).toBe(true);
+  });
 });

@@ -39,7 +39,7 @@ export const PROJECT_COMPANY_ROLES = [
 export type ProjectCompanyRole = (typeof PROJECT_COMPANY_ROLES)[number];
 
 export const PROJECT_COMPANY_ROLE_LABELS: Record<ProjectCompanyRole, string> = {
-  developer: "Developer / promoter",
+  developer: "Developer / client",
   owner: "Owner",
   marketing_sales_partner: "Marketing / sales partner",
 };
@@ -51,6 +51,11 @@ export type ProjectCompanyProvenance = {
   appliedAt: string;
   notes: string;
 };
+
+export const PRIMARY_COMPANY_ROLE: ProjectCompanyRole = "developer";
+
+export const PRIMARY_COMPANY_REQUIRED_MESSAGE =
+  "Select a primary company (developer or client). A project is created for a company and its people, not as a standalone record.";
 
 export type ProjectCompanyAssociationInput = {
   companyId: string;
@@ -140,4 +145,26 @@ export function retainExistingCompanyProvenance(
     const prior = existingByKey.get(`${item.companyId}:${item.role}`);
     return prior?.provenance ? { ...item, provenance: prior.provenance } : item;
   });
+}
+
+export function hasPrimaryBusinessCompany(
+  associations: Array<Pick<ProjectCompanyAssociation, "companyId" | "role" | "isPrimary">>,
+): boolean {
+  return primaryDeveloperCompanyId(associations) !== null;
+}
+
+export function primaryCompanyLink<T extends { companyId: string; role: string; isPrimary?: boolean }>(
+  associations: T[] | null | undefined,
+): T | null {
+  const primaryId = primaryDeveloperCompanyId(
+    (associations ?? []).map((item) => ({
+      companyId: item.companyId,
+      role: item.role as ProjectCompanyRole,
+      isPrimary: Boolean(item.isPrimary),
+    })),
+  );
+  if (!primaryId) {
+    return null;
+  }
+  return associations?.find((item) => item.companyId === primaryId) ?? null;
 }

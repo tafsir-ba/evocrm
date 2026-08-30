@@ -47,6 +47,7 @@ export const leadListQuerySchema = z.object({
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
   projectId: objectIdSchema.optional(),
+  companyId: objectIdSchema.optional(),
   statusId: objectIdSchema.optional(),
   sourceId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),
@@ -92,6 +93,7 @@ const createLeadInputObjectSchema = z
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,
     emailConsentStatus: emailConsentStatusSchema.optional(),
+    companyId: objectIdSchema.optional(),
     createdAt: z.coerce.date().optional(),
   })
   .strict();
@@ -131,6 +133,7 @@ export const updateLeadInputSchema = z
     emailConsentStatus: emailConsentStatusSchema.optional(),
     emailUnsubscribedAt: z.coerce.date().nullable().optional(),
     emailUnsubscribeReason: z.string().trim().max(500).nullable().optional(),
+    companyId: objectIdSchema.nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

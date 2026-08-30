@@ -64,7 +64,8 @@ describe("ProjectFormPage", () => {
 
     expect(await screen.findByLabelText(/Project \/ development name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Internal reference/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Primary developer")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Primary company/)).toBeInTheDocument();
+    expect(screen.getByText(/company this development is for/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Commercial stage")).toBeInTheDocument();
     expect(screen.getByLabelText("Project type")).toBeInTheDocument();
     expect(screen.getByLabelText("Property type")).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("ProjectFormPage", () => {
     await screen.findByLabelText(/Project \/ development name/);
     await user.type(screen.getByLabelText(/Project \/ development name/), "Les Terrasses");
     await user.type(screen.getByLabelText(/Internal reference/), "LT-01");
-    await user.selectOptions(screen.getByLabelText("Primary developer"), COMPANY_ID);
+    await user.selectOptions(screen.getByLabelText(/Primary company/), COMPANY_ID);
     await user.selectOptions(screen.getByLabelText("Commercial stage"), "pre_launch");
     await user.selectOptions(screen.getByLabelText("Project type"), "development");
     await user.selectOptions(screen.getByLabelText("Property type"), PROPERTY_TYPE_ID);
@@ -198,7 +199,14 @@ describe("ProjectFormPage", () => {
                 notes: "Operator confirmed.",
               },
             },
-            companies: [],
+            companies: [
+              {
+                companyId: COMPANY_ID,
+                role: "developer",
+                isPrimary: true,
+                company: { id: COMPANY_ID, name: "Promotor SA" },
+              },
+            ],
             description: null,
             ownerId: null,
             assignedTo: null,
@@ -236,6 +244,22 @@ describe("ProjectFormPage", () => {
     });
     expect(body.location.provenance).toBeUndefined();
     expect(push).toHaveBeenCalledWith(`/w/demo/projects/${projectId}`);
+  });
+
+  it("does not create without a primary company", async () => {
+    const user = userEvent.setup();
+    render(<ProjectFormPage workspaceSlug="demo" mode="create" />);
+
+    await screen.findByLabelText(/Project \/ development name/);
+    expect(screen.getByLabelText(/Primary company/)).toBeRequired();
+    await user.type(screen.getByLabelText(/Project \/ development name/), "Orphan Development");
+    await user.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(
+      vi.mocked(global.fetch).mock.calls.some(([url, init]) => {
+        return String(url).endsWith("/projects") && init?.method === "POST";
+      }),
+    ).toBe(false);
   });
 
   it("does not require coordinates to create", async () => {

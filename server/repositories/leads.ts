@@ -31,8 +31,9 @@ function isDuplicateKeyError(error: unknown): boolean {
 export type LeadRecord = {
   id: string;
   workspaceId: string;
-  projectId: string | null;
-  statusId: string;
+    projectId: string | null;
+    companyId?: string | null;
+    statusId: string;
   sourceId: string | null;
   ownerId: string | null;
   assignedTo: string | null;
@@ -69,6 +70,9 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
     projectId: toObjectIdString(document.projectId),
+    companyId: toObjectIdString(
+      (document as LeadDocument & { companyId?: mongoose.Types.ObjectId | null }).companyId,
+    ),
     statusId: document.statusId.toString(),
     sourceId: document.sourceId?.toString() ?? null,
     ownerId: document.ownerId?.toString() ?? null,
@@ -106,6 +110,7 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
 export type LeadListFilter = {
   includeArchived?: boolean;
   projectId?: string;
+  companyId?: string;
   search?: string;
   statusId?: string;
   sourceId?: string;
@@ -134,6 +139,9 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
 
   if (filter.projectId) {
     query.projectId = filter.projectId;
+  }
+  if (filter.companyId) {
+    query.companyId = filter.companyId;
   }
 
   if (filter.statusId) {
@@ -269,6 +277,30 @@ export async function findLeadsByIds(
   ).lean();
 
   return documents.map((document) => toLeadRecord(document as LeadDocument));
+}
+
+export async function findLeadsByCompanyIds(
+  workspaceId: string,
+  companyIds: string[],
+  options: { limit?: number } = {},
+): Promise<LeadRecord[]> {
+  const ids = [...new Set(companyIds.filter((id) => mongoose.isValidObjectId(id)))];
+  if (ids.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+  const documents = await LeadModel.find(
+    withWorkspaceScope(workspaceId, {
+      companyId: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
+      archivedAt: null,
+    }),
+  )
+    .sort({ fullName: 1 })
+    .limit(options.limit ?? 50)
+    .lean<LeadDocument[]>();
+
+  return documents.map(toLeadRecord);
 }
 
 export type PilotDedupeLead = {
@@ -489,6 +521,7 @@ export async function createLead(input: {
   emailConsentStatus?: string;
   createdBy: string;
   createdAt?: Date;
+  companyId?: string | null;
 }): Promise<LeadRecord> {
   await connectDb();
   try {
@@ -519,6 +552,7 @@ export async function createLead(input: {
       attributes: input.attributes ?? {},
       emailConsentStatus: input.emailConsentStatus ?? "unknown",
       createdBy: input.createdBy,
+      companyId: input.companyId ?? null,
       archivedAt: null,
       ...(input.createdAt
         ? { createdAt: input.createdAt, updatedAt: input.createdAt }
@@ -566,6 +600,7 @@ export async function updateLead(
     emailConsentStatus: string;
     emailUnsubscribedAt: Date | null;
     emailUnsubscribeReason: string | null;
+    companyId: string | null;
   }>,
 ): Promise<LeadRecord | null> {
   await connectDb();

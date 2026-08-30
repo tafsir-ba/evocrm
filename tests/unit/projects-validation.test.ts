@@ -104,7 +104,13 @@ describe("project validation schemas", () => {
       address: null,
       city: "Petit Saconnex",
       country: "Switzerland",
-      companies: [],
+      companies: [
+        {
+          companyId: "507f1f77bcf86cd7994390aa",
+          role: "developer",
+          isPrimary: true,
+        },
+      ],
       description: null,
       ownerId: null,
       assignedTo: null,
@@ -155,6 +161,9 @@ describe("project validation schemas", () => {
 
     const create = createProjectInputSchema.safeParse({
       name: "Grosvenor Vistas",
+      companies: [
+        { companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true },
+      ],
       location: {
         countryCode: "jm",
         municipality: "Kingston",
@@ -232,5 +241,21 @@ describe("project validation schemas", () => {
         companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "sponsor" }],
       }).success,
     ).toBe(false);
+  });
+
+  it("requires a primary company (developer/client) on standard create", () => {
+    expect(createProjectInputSchema.safeParse({ name: "Standalone" }).success).toBe(false);
+    expect(
+      createProjectInputSchema.safeParse({
+        name: "Standalone",
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "owner" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      updateProjectInputSchema.safeParse({
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "owner" }],
+      }).success,
+    ).toBe(false);
+    expect(updateProjectInputSchema.safeParse({ name: "Keep legacy" }).success).toBe(true);
   });
 });

@@ -357,6 +357,8 @@ describe("project API routes", () => {
       archivedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      companyPeople: [],
+      associablePeople: [],
     });
 
     const response = await getProjectById(

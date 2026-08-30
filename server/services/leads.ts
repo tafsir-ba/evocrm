@@ -20,6 +20,7 @@ import {
 } from "@/server/repositories/leads";
 import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 import { findTagById } from "@/server/repositories/tags";
+import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
@@ -332,7 +333,22 @@ function leadSnapshot(lead: LeadRecord): Record<string, unknown> {
     propertyTypeInterests: lead.propertyTypeInterests,
     transactionIntent: lead.transactionIntent,
     usagePurpose: lead.usagePurpose,
+    companyId: lead.companyId ?? null,
   };
+}
+
+async function validateOptionalCompanyId(
+  workspaceId: string,
+  companyId: string | null | undefined,
+): Promise<void> {
+  if (!companyId) {
+    return;
+  }
+
+  const found = await findCompaniesByIds(workspaceId, [companyId]);
+  if (found.length !== 1) {
+    throw new AppError("VALIDATION_ERROR", "Company was not found.");
+  }
 }
 
 export async function listLeadsForWorkspace(
@@ -394,6 +410,7 @@ export async function createLeadForWorkspace(
     input.assignedTo,
     "Assigned to",
   );
+  await validateOptionalCompanyId(workspaceId, input.companyId);
 
   const fullName = deriveFullName(input.firstName, input.lastName);
   const emailFields = input.email ? normalizeLeadEmail(input.email) : null;
@@ -437,6 +454,7 @@ export async function createLeadForWorkspace(
     tags: input.tags ?? [],
     attributes: input.attributes ?? {},
     emailConsentStatus: input.emailConsentStatus ?? "unknown",
+    companyId: input.companyId ?? null,
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
   });
 
@@ -506,6 +524,9 @@ export async function updateLeadForWorkspace(
       input.assignedTo,
       "Assigned to",
     );
+  }
+  if (input.companyId !== undefined) {
+    await validateOptionalCompanyId(workspaceId, input.companyId);
   }
 
   const updatePayload: Parameters<typeof updateLead>[2] = {};
@@ -619,6 +640,9 @@ export async function updateLeadForWorkspace(
   }
   if (input.emailUnsubscribeReason !== undefined) {
     updatePayload.emailUnsubscribeReason = input.emailUnsubscribeReason;
+  }
+  if (input.companyId !== undefined) {
+    updatePayload.companyId = input.companyId;
   }
 
   const updated = await updateLead(workspaceId, leadId, updatePayload);
