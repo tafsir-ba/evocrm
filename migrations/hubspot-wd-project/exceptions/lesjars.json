@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "slug": "lesjars",
+  "destinationProjectId": "6a9472881beae69acd3d5047",
+  "destinationReference": "LESJARS",
+  "counts": {
+    "multi_project": 49
+  },
+  "records": [
+    {
+      "hubspotContactId": "33401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "44551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "48351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "57701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "58051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "73451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "76901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "163301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "168101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "191851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "207051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "215351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "224301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "236101",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "240601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "245601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "245851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "248351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "254701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "255001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "262001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "265401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "268651",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "269451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "272851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "276001",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "295551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "296351",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "302301",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "304451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "306701",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "318451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "324601",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "327501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "328401",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "328801",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "329851",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "331501",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "331901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "335451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "338451",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "343151",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "347251",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "349951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "351551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "361051",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "366901",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "369551",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "377201",
+      "reason": "multi_project"
+    }
+  ]
+}

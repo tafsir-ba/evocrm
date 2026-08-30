@@ -749,6 +749,21 @@
       },
       "searchTotal": 153,
       "dryRunOnly": false
+    },
+    {
+      "slug": "lesjars",
+      "name": "Les Jars",
+      "reference": "LESJARS",
+      "destinationProjectId": "6a9472881beae69acd3d5047",
+      "manifestSize": 100,
+      "created": 100,
+      "destinationLeadCount": 100,
+      "exceptionCount": 49,
+      "exceptionCounts": {
+        "multi_project": 49
+      },
+      "searchTotal": 149,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
