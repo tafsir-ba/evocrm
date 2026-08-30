@@ -864,6 +864,22 @@
       },
       "searchTotal": 3211,
       "dryRunOnly": false
+    },
+    {
+      "slug": "ormet",
+      "name": "Ormet",
+      "reference": "ORMET",
+      "destinationProjectId": "6a94737a3a31c669cd059d07",
+      "manifestSize": 23,
+      "created": 23,
+      "destinationLeadCount": 53,
+      "exceptionCount": 53,
+      "exceptionCounts": {
+        "multi_project": 23,
+        "hubspot_id_match": 30
+      },
+      "searchTotal": 76,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
