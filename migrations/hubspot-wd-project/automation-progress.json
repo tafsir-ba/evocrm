@@ -575,6 +575,22 @@
       },
       "searchTotal": 232,
       "dryRunOnly": false
+    },
+    {
+      "slug": "versoix",
+      "name": "Versoix",
+      "reference": "VERSOIX",
+      "destinationProjectId": "6a946e4f4ab39b7b02abe60d",
+      "manifestSize": 129,
+      "created": 129,
+      "destinationLeadCount": 129,
+      "exceptionCount": 98,
+      "exceptionCounts": {
+        "multi_project": 96,
+        "notes_only": 2
+      },
+      "searchTotal": 225,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
