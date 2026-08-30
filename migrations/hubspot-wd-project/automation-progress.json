@@ -102,6 +102,24 @@
       },
       "searchTotal": 1020,
       "dryRunOnly": false
+    },
+    {
+      "slug": "osmose",
+      "name": "Osmose",
+      "reference": "OSMOSE",
+      "destinationProjectId": "6a9444afa822ceedf6f7b57a",
+      "manifestSize": 574,
+      "created": 574,
+      "destinationLeadCount": 574,
+      "exceptionCount": 266,
+      "exceptionCounts": {
+        "multi_project": 248,
+        "missing_name": 2,
+        "cmp_product": 1,
+        "notes_conflict": 15
+      },
+      "searchTotal": 840,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
