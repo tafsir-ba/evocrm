@@ -58,7 +58,7 @@ const sampleLead = {
   nextAction: {
     id: "a2",
     title: "Relance Genève",
-    at: "2026-08-31T09:00:00.000Z",
+    at: "2026-08-20T09:00:00.000Z",
   },
 };
 
@@ -98,13 +98,20 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
   }) as typeof fetch;
 }
 
+async function expandDesktopRow(user: ReturnType<typeof userEvent.setup>) {
+  const expandButtons = await screen.findAllByRole("button", {
+    name: "Show details for François Côté",
+  });
+  await user.click(expandButtons[0]!);
+}
+
 describe("LeadsPanel table", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockLeadsFetch();
   });
 
-  it("renders a triage table from real lead fields including French text and UTM", async () => {
+  it("renders a single-line triage table without permanent contact or duplicate status controls", async () => {
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -116,31 +123,57 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.getAllByRole("columnheader", { name: "Lead" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("columnheader", { name: "Lead" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Owner" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Tags" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Age" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Urgency" })).toBeInTheDocument();
 
     expect(screen.getAllByText("Les Terrasses").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Site web").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Genève-Printemps/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nouveau").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Appel François/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Camille Müller").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Relance Genève/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Overdue").length).toBeGreaterThan(0);
     expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("+1").length).toBeGreaterThan(0);
 
-    const mail = screen.getAllByRole("link", { name: /françois@évohome.ch/i })[0];
-    expect(mail).toHaveAttribute("href", "mailto:françois@évohome.ch");
-    const phone = screen.getAllByRole("link", { name: /\+41 79 123 45 67/ })[0];
-    expect(phone).toHaveAttribute("href", "tel:+41791234567");
+    expect(screen.queryByText("françois@évohome.ch")).not.toBeInTheDocument();
+    expect(screen.queryByText("+41 79 123 45 67")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Genève-Printemps/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Contact François Côté" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Open François Côté" }).length).toBeGreaterThan(0);
   });
 
-  it("keeps existing filters and only shows supported quick actions", async () => {
+  it("reveals contact channels from the compact icon popover", async () => {
+    const user = userEvent.setup();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
+
+    const contactButtons = await screen.findAllByRole("button", {
+      name: "Contact François Côté",
+    });
+    await user.click(contactButtons[0]!);
+
+    const mail = await screen.findByRole("menuitem", { name: /françois@évohome.ch/i });
+    expect(mail).toHaveAttribute("href", "mailto:françois@évohome.ch");
+    const phone = screen.getByRole("menuitem", { name: /\+41 79 123 45 67/ });
+    expect(phone).toHaveAttribute("href", "tel:+41791234567");
+  });
+
+  it("keeps existing filters and only exposes supported actions after row open", async () => {
+    const user = userEvent.setup();
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -162,13 +195,16 @@ describe("LeadsPanel table", () => {
     expect(screen.getByDisplayValue("All intents")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All usage purposes")).toBeInTheDocument();
 
+    await expandDesktopRow(user);
+
     expect(screen.getAllByLabelText("Change status for François Côté").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Assign François Côté").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Archive" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Genève-Printemps/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /whatsapp|call now|email blast/i })).not.toBeInTheDocument();
   });
 
-  it("patches status and assignment through the existing lead update API", async () => {
+  it("patches status and assignment through the existing lead update API after row open", async () => {
     const user = userEvent.setup();
     render(
       <LeadsPanel
@@ -180,7 +216,9 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    const statusSelect = await screen.findAllByLabelText("Change status for François Côté");
+    await expandDesktopRow(user);
+
+    const statusSelect = screen.getAllByLabelText("Change status for François Côté");
     await user.selectOptions(statusSelect[0]!, statuses[1].id);
 
     await waitFor(() => {
@@ -219,6 +257,7 @@ describe("LeadsPanel table", () => {
   });
 
   it("hides assign and status controls when the user cannot update leads", async () => {
+    const user = userEvent.setup();
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -230,13 +269,15 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    await expandDesktopRow(user);
     expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Camille Müller").length).toBeGreaterThan(0);
   });
 
-  it("still supports archived restore without inventing extra row controls", async () => {
+  it("still supports archived restore from the opened row", async () => {
+    const user = userEvent.setup();
     mockLeadsFetch([{ ...sampleLead, archivedAt: "2026-08-29T12:00:00.000Z" }]);
     render(
       <LeadsPanel
@@ -248,8 +289,10 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    expect(await screen.findAllByRole("button", { name: "Restore" })).not.toHaveLength(0);
+    expect(await screen.findAllByText("Archived")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+    await expandDesktopRow(user);
+    expect(screen.getAllByRole("button", { name: "Restore" }).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Archived").length).toBeGreaterThan(0);
   });
 });

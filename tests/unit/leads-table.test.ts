@@ -4,9 +4,11 @@ import {
   formatActivityLine,
   formatCompactUtm,
   formatNextActionWhen,
+  formatNextStepCell,
   formatOwnerName,
   formatRelativeAge,
   formatSourceContext,
+  leadUrgency,
   telHref,
   visibleLeadTags,
 } from "@/lib/leads-table";
@@ -105,5 +107,78 @@ describe("leads table presentation", () => {
       last: "1d",
       next: null,
     });
+  });
+
+  it("prefers the next actionable step as a single cell", () => {
+    const localNow = new Date(2026, 7, 30, 12, 0, 0);
+    expect(
+      formatNextStepCell({
+        lastActivity: { id: "a1", title: "Appel François", at: new Date(2026, 7, 28, 12, 0, 0) },
+        nextAction: { id: "a2", title: "Relance Genève", at: new Date(2026, 7, 31, 9, 0, 0) },
+        now: localNow,
+      }),
+    ).toEqual({
+      text: "Tomorrow · Relance Genève",
+      kind: "next",
+    });
+    expect(
+      formatNextStepCell({
+        lastActivity: { id: "a1", title: "Appel François", at: new Date(2026, 7, 28, 12, 0, 0) },
+        now: localNow,
+      }),
+    ).toEqual({
+      text: "Last · 2d · Appel François",
+      kind: "last",
+    });
+  });
+
+  it("derives urgency from next action, staleness, and assignment only", () => {
+    const now = new Date(2026, 7, 30, 12, 0, 0);
+    const createdAt = new Date(2026, 7, 20, 12, 0, 0);
+
+    expect(
+      leadUrgency({
+        createdAt,
+        assignedUser: { id: "u1" },
+        nextAction: { id: "n1", title: "Relance", at: new Date(2026, 7, 28, 9, 0, 0) },
+        now,
+      }).label,
+    ).toBe("Overdue");
+
+    expect(
+      leadUrgency({
+        createdAt,
+        assignedUser: { id: "u1" },
+        nextAction: { id: "n1", title: "Relance", at: new Date(2026, 7, 30, 15, 0, 0) },
+        now,
+      }).label,
+    ).toBe("Today");
+
+    expect(
+      leadUrgency({
+        createdAt,
+        assignedUser: { id: "u1" },
+        lastActivity: { id: "a1", title: "Appel", at: new Date(2026, 7, 10, 12, 0, 0) },
+        now,
+      }).label,
+    ).toBe("Stale");
+
+    expect(
+      leadUrgency({
+        createdAt: now,
+        assignedUser: null,
+        lastActivity: { id: "a1", title: "Appel", at: now },
+        now,
+      }).label,
+    ).toBe("Unassigned");
+
+    expect(
+      leadUrgency({
+        createdAt: now,
+        assignedUser: { id: "u1" },
+        lastActivity: { id: "a1", title: "Appel", at: now },
+        now,
+      }).label,
+    ).toBeNull();
   });
 });

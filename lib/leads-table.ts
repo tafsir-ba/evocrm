@@ -210,3 +210,90 @@ export function formatActivityLine(input: {
       : null,
   };
 }
+
+export function formatNextStepCell(input: {
+  lastActivity?: LeadTableActivityEvent | null;
+  nextAction?: LeadTableActivityEvent | null;
+  lastContactedAt?: string | Date | null;
+  now?: Date;
+}): { text: string; kind: "next" | "last" | "empty" } {
+  const now = input.now ?? new Date();
+  if (input.nextAction?.title.trim()) {
+    return {
+      text: `${formatNextActionWhen(input.nextAction.at, now)} · ${input.nextAction.title.trim()}`,
+      kind: "next",
+    };
+  }
+
+  const lines = formatActivityLine(input);
+  if (lines.last) {
+    return { text: `Last · ${lines.last}`, kind: "last" };
+  }
+
+  return { text: "—", kind: "empty" };
+}
+
+export type LeadUrgencyLevel =
+  | "overdue"
+  | "today"
+  | "soon"
+  | "stale"
+  | "unassigned"
+  | "none";
+
+export type LeadUrgency = {
+  level: LeadUrgencyLevel;
+  label: string | null;
+  tone: "danger" | "warn" | "info" | "muted";
+  sortRank: number;
+};
+
+const STALE_DAY_THRESHOLD = 7;
+const SOON_DAY_THRESHOLD = 2;
+
+export function leadUrgency(input: {
+  nextAction?: LeadTableActivityEvent | null;
+  lastActivity?: LeadTableActivityEvent | null;
+  lastContactedAt?: string | Date | null;
+  createdAt: string | Date;
+  assignedUser?: { id: string } | null;
+  archivedAt?: string | Date | null;
+  now?: Date;
+}): LeadUrgency {
+  if (input.archivedAt) {
+    return { level: "none", label: null, tone: "muted", sortRank: 9 };
+  }
+
+  const now = input.now ?? new Date();
+  const nextAt = parseLeadDate(input.nextAction?.at);
+  if (nextAt) {
+    const dayDelta = Math.round(
+      (startOfLocalDay(nextAt).getTime() - startOfLocalDay(now).getTime()) / DAY_MS,
+    );
+    if (dayDelta < 0) {
+      return { level: "overdue", label: "Overdue", tone: "danger", sortRank: 0 };
+    }
+    if (dayDelta === 0) {
+      return { level: "today", label: "Today", tone: "warn", sortRank: 1 };
+    }
+    if (dayDelta <= SOON_DAY_THRESHOLD) {
+      return { level: "soon", label: "Soon", tone: "info", sortRank: 2 };
+    }
+  }
+
+  const lastTouch = parseLeadDate(
+    input.lastActivity?.at ?? input.lastContactedAt ?? input.createdAt,
+  );
+  if (lastTouch) {
+    const ageDays = (now.getTime() - lastTouch.getTime()) / DAY_MS;
+    if (ageDays >= STALE_DAY_THRESHOLD) {
+      return { level: "stale", label: "Stale", tone: "warn", sortRank: 3 };
+    }
+  }
+
+  if (!input.assignedUser) {
+    return { level: "unassigned", label: "Unassigned", tone: "muted", sortRank: 4 };
+  }
+
+  return { level: "none", label: null, tone: "muted", sortRank: 5 };
+}

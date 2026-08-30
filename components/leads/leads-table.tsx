@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import type { ChangeEvent, ReactNode } from "react";
+import { Fragment, useState, type ChangeEvent, type ReactNode } from "react";
 
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
-import { IconChevronRight, IconMail, IconPhone } from "@/lib/icons";
+import { IconChevronDown, IconChevronRight, IconMail, IconPhone } from "@/lib/icons";
 import {
-  formatActivityLine,
+  formatNextStepCell,
   formatOwnerName,
   formatRelativeAge,
   formatSourceContext,
   formatUtmTitle,
+  leadUrgency,
   telHref,
   visibleLeadTags,
 } from "@/lib/leads-table";
@@ -75,7 +77,7 @@ type LeadsTableProps = {
 };
 
 const compactSelectClass =
-  "h-7 max-w-[9.5rem] min-w-[6.75rem] appearance-none truncate rounded border border-[var(--color-line)] bg-white bg-[length:12px_12px] bg-[right_0.4rem_center] bg-no-repeat px-2 pr-6 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)] disabled:opacity-60";
+  "h-7 max-w-[10rem] min-w-[7rem] appearance-none truncate rounded border border-[var(--color-line)] bg-white bg-[length:12px_12px] bg-[right_0.4rem_center] bg-no-repeat px-2 pr-6 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)] disabled:opacity-60";
 
 function RowSelect({
   value,
@@ -83,14 +85,12 @@ function RowSelect({
   label,
   onChange,
   children,
-  className,
 }: {
   value: string;
   disabled?: boolean;
   label: string;
   onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
   children: ReactNode;
-  className?: string;
 }) {
   return (
     <select
@@ -99,7 +99,7 @@ function RowSelect({
       aria-label={label}
       onClick={(event) => event.stopPropagation()}
       onChange={onChange}
-      className={cn(compactSelectClass, className)}
+      className={compactSelectClass}
       style={{
         backgroundImage:
           "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>\")",
@@ -116,7 +116,7 @@ function TagChip({ tag }: { tag: { id: string; name: string; color: string } }) 
   return (
     <span
       title={tag.name}
-      className="inline-flex max-w-[7.5rem] truncate rounded border px-1.5 py-px text-[10.5px] font-medium leading-4"
+      className="inline-flex max-w-[6.5rem] truncate rounded border px-1.5 py-px text-[10.5px] font-medium leading-4"
       style={
         color
           ? {
@@ -132,45 +132,12 @@ function TagChip({ tag }: { tag: { id: string; name: string; color: string } }) 
   );
 }
 
-function ContactChannels({ lead }: { lead: LeadTableItem }) {
-  if (!lead.email && !lead.phone) {
-    return <span className="text-[var(--color-ink-faint)]">No contact</span>;
-  }
-
-  return (
-    <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-      {lead.email ? (
-        <a
-          href={`mailto:${lead.email}`}
-          className="inline-flex min-w-0 max-w-[14rem] items-center gap-1 text-[var(--color-ink-muted)] hover:text-[var(--color-brand-700)]"
-          title={lead.email}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <IconMail size={12} className="shrink-0" />
-          <span className="truncate">{lead.email}</span>
-        </a>
-      ) : null}
-      {lead.phone ? (
-        <a
-          href={telHref(lead.phone)}
-          className="inline-flex items-center gap-1 whitespace-nowrap text-[var(--color-ink-muted)] hover:text-[var(--color-brand-700)]"
-          title={lead.phone}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <IconPhone size={12} className="shrink-0" />
-          <span>{lead.phone}</span>
-        </a>
-      ) : null}
-    </span>
-  );
-}
-
-function LeadTags({ tags }: { tags: LeadTableItem["tagsResolved"] }) {
+function LeadTags({ tags, max = 1 }: { tags: LeadTableItem["tagsResolved"]; max?: number }) {
   if (tags.length === 0) {
     return <span className="text-[var(--color-ink-faint)]">—</span>;
   }
 
-  const { visible, overflow } = visibleLeadTags(tags, 2);
+  const { visible, overflow } = visibleLeadTags(tags, max);
 
   return (
     <div className="flex min-w-0 items-center gap-1">
@@ -181,7 +148,7 @@ function LeadTags({ tags }: { tags: LeadTableItem["tagsResolved"] }) {
         <span
           className="text-[10.5px] font-medium text-[var(--color-ink-muted)]"
           title={tags
-            .slice(2)
+            .slice(max)
             .map((tag) => tag.name)
             .join(", ")}
         >
@@ -192,121 +159,102 @@ function LeadTags({ tags }: { tags: LeadTableItem["tagsResolved"] }) {
   );
 }
 
-function ActivityCell({ lead }: { lead: LeadTableItem }) {
-  const lines = formatActivityLine({
-    lastActivity: lead.lastActivity,
-    nextAction: lead.nextAction,
-    lastContactedAt: lead.lastContactedAt,
-  });
-
-  if (!lines.last && !lines.next) {
-    return <span className="text-[var(--color-ink-faint)]">—</span>;
+function ContactPopover({ lead }: { lead: LeadTableItem }) {
+  if (!lead.email && !lead.phone) {
+    return (
+      <span
+        className="inline-flex h-6 w-6 items-center justify-center text-[var(--color-ink-faint)]"
+        title="No contact"
+        aria-label={`No contact for ${lead.fullName}`}
+      >
+        —
+      </span>
+    );
   }
 
   return (
-    <div className="min-w-0 leading-snug">
-      {lines.last ? (
-        <p className="truncate text-[var(--color-ink-soft)]" title={lines.last}>
-          {lines.last}
-        </p>
-      ) : null}
-      {lines.next ? (
-        <p className="truncate text-[var(--color-ink-muted)]" title={lines.next}>
-          Next {lines.next}
-        </p>
-      ) : null}
-    </div>
+    <Dropdown
+      align="left"
+      trigger={
+        <button
+          type="button"
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+          aria-label={`Contact ${lead.fullName}`}
+        >
+          {lead.email ? <IconMail size={13} /> : <IconPhone size={13} />}
+        </button>
+      }
+    >
+      <div className="flex min-w-[12rem] flex-col gap-0.5 p-0.5">
+        {lead.email ? (
+          <a
+            role="menuitem"
+            href={`mailto:${lead.email}`}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+          >
+            <IconMail size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
+            <span className="truncate">{lead.email}</span>
+          </a>
+        ) : null}
+        {lead.phone ? (
+          <a
+            role="menuitem"
+            href={telHref(lead.phone)}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+          >
+            <IconPhone size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
+            <span>{lead.phone}</span>
+          </a>
+        ) : null}
+      </div>
+    </Dropdown>
   );
 }
 
-function SourceCell({ lead }: { lead: LeadTableItem }) {
-  const { source, context } = formatSourceContext(lead.source?.label, lead.attributes);
-  const utmTitle = formatUtmTitle(lead.attributes);
-
-  return (
-    <div className="min-w-0 leading-snug">
-      <p className="truncate text-[var(--color-ink-soft)]">{source}</p>
-      {context ? (
-        <p className="truncate text-[11px] text-[var(--color-ink-muted)]" title={utmTitle}>
-          {context}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function StatusCell({
+function StatusSelect({
   lead,
   statuses,
-  canUpdate,
   pending,
   onStatusChange,
 }: {
   lead: LeadTableItem;
   statuses: LeadTableDictionaryItem[];
-  canUpdate: boolean;
   pending: boolean;
   onStatusChange: (statusId: string) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
-      {lead.status ? (
-        <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
-      ) : (
-        <span className="text-[var(--color-ink-faint)]">—</span>
-      )}
-      <span className="tabular text-[11px] text-[var(--color-ink-muted)]">
-        {formatRelativeAge(lead.createdAt)}
-      </span>
-      {lead.archivedAt ? (
-        <Badge tone="muted" size="sm">
-          Archived
-        </Badge>
-      ) : null}
-      {canUpdate && !lead.archivedAt && statuses.length > 0 ? (
-        <RowSelect
-          value={lead.status?.id ?? lead.statusId ?? ""}
-          disabled={pending}
-          label={`Change status for ${lead.fullName}`}
-          className="max-w-[8.5rem] min-w-[6.5rem]"
-          onChange={(event) => {
-            const nextStatusId = event.target.value;
-            if (nextStatusId && nextStatusId !== (lead.status?.id ?? lead.statusId)) {
-              onStatusChange(nextStatusId);
-            }
-          }}
-        >
-          {lead.status || lead.statusId ? null : <option value="">Set status</option>}
-          {statuses.map((status) => (
-            <option key={status.id} value={status.id}>
-              {status.label}
-            </option>
-          ))}
-        </RowSelect>
-      ) : null}
-    </div>
+    <RowSelect
+      value={lead.status?.id ?? lead.statusId ?? ""}
+      disabled={pending}
+      label={`Change status for ${lead.fullName}`}
+      onChange={(event) => {
+        const nextStatusId = event.target.value;
+        if (nextStatusId && nextStatusId !== (lead.status?.id ?? lead.statusId)) {
+          onStatusChange(nextStatusId);
+        }
+      }}
+    >
+      {lead.status || lead.statusId ? null : <option value="">Set status</option>}
+      {statuses.map((status) => (
+        <option key={status.id} value={status.id}>
+          {status.label}
+        </option>
+      ))}
+    </RowSelect>
   );
 }
 
-function OwnerCell({
+function AssignSelect({
   lead,
   members,
-  canUpdate,
   pending,
   onAssign,
 }: {
   lead: LeadTableItem;
   members: LeadTableMember[];
-  canUpdate: boolean;
   pending: boolean;
   onAssign: (assignedTo: string | null) => void;
 }) {
-  if (!canUpdate || lead.archivedAt || members.length === 0) {
-    return (
-      <span className="truncate text-[var(--color-ink-soft)]">{formatOwnerName(lead.assignedUser)}</span>
-    );
-  }
-
   return (
     <RowSelect
       value={lead.assignedUser?.id ?? ""}
@@ -328,41 +276,148 @@ function OwnerCell({
   );
 }
 
+function UrgencyBadge({ lead }: { lead: LeadTableItem }) {
+  const urgency = leadUrgency(lead);
+  if (!urgency.label) {
+    return <span className="text-[var(--color-ink-faint)]">—</span>;
+  }
+
+  return (
+    <Badge tone={urgency.tone} size="sm">
+      {urgency.label}
+    </Badge>
+  );
+}
+
+function NextStepCell({ lead }: { lead: LeadTableItem }) {
+  const step = formatNextStepCell(lead);
+  const urgency = leadUrgency(lead);
+  const hot = urgency.level === "overdue" || urgency.level === "today";
+
+  return (
+    <p
+      className={cn(
+        "truncate",
+        step.kind === "empty" && "text-[var(--color-ink-faint)]",
+        step.kind === "last" && "text-[var(--color-ink-muted)]",
+        step.kind === "next" && (hot ? "font-medium text-[var(--color-danger-fg)]" : "text-[var(--color-ink-soft)]"),
+      )}
+      title={step.text}
+    >
+      {step.text}
+    </p>
+  );
+}
+
 function RowActions({
   workspaceSlug,
   lead,
-  canArchive,
-  pending,
-  onArchive,
-  onRestore,
+  expanded,
+  onToggleExpanded,
 }: {
   workspaceSlug: string;
   lead: LeadTableItem;
-  canArchive: boolean;
-  pending: boolean;
-  onArchive: () => void;
-  onRestore: () => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }) {
   return (
     <div className="inline-flex items-center justify-end gap-0.5">
+      <button
+        type="button"
+        className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+        aria-expanded={expanded}
+        aria-label={expanded ? `Hide details for ${lead.fullName}` : `Show details for ${lead.fullName}`}
+        onClick={onToggleExpanded}
+      >
+        {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+      </button>
       <Link
         href={workspacePath(workspaceSlug, "leads", lead.id)}
-        className="inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+        className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
         aria-label={`Open ${lead.fullName}`}
       >
         Open
-        <IconChevronRight size={13} />
       </Link>
-      {canArchive && lead.archivedAt ? (
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onRestore}>
-          Restore
-        </Button>
-      ) : null}
-      {canArchive && !lead.archivedAt ? (
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onArchive}>
-          Archive
-        </Button>
-      ) : null}
+    </div>
+  );
+}
+
+function ExpandedDetails({
+  lead,
+  statuses,
+  members,
+  canUpdate,
+  canArchive,
+  pending,
+  onAssign,
+  onStatusChange,
+  onArchive,
+  onRestore,
+}: {
+  lead: LeadTableItem;
+  statuses: LeadTableDictionaryItem[];
+  members: LeadTableMember[];
+  canUpdate: boolean;
+  canArchive: boolean;
+  pending: boolean;
+  onAssign: (assignedTo: string | null) => void;
+  onStatusChange: (statusId: string) => void;
+  onArchive: () => void;
+  onRestore: () => void;
+}) {
+  const source = formatSourceContext(lead.source?.label, lead.attributes);
+  const utmTitle = formatUtmTitle(lead.attributes);
+  const last = formatNextStepCell({
+    lastActivity: lead.lastActivity,
+    lastContactedAt: lead.lastContactedAt,
+  });
+
+  return (
+    <div className="grid gap-3 px-3 py-2.5 text-[12.5px] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]">
+      <div className="min-w-0 space-y-1 text-[var(--color-ink-soft)]">
+        {lead.email ? (
+          <p>
+            <a className="hover:text-[var(--color-brand-700)]" href={`mailto:${lead.email}`}>
+              {lead.email}
+            </a>
+          </p>
+        ) : null}
+        {lead.phone ? (
+          <p>
+            <a className="hover:text-[var(--color-brand-700)]" href={telHref(lead.phone)}>
+              {lead.phone}
+            </a>
+          </p>
+        ) : null}
+        {utmTitle ? <p title={utmTitle}>UTM {source.context}</p> : null}
+        {last.kind === "last" ? <p>{last.text}</p> : null}
+        {lead.tagsResolved.length > 0 ? <LeadTags tags={lead.tagsResolved} max={6} /> : null}
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {canUpdate && !lead.archivedAt && statuses.length > 0 ? (
+          <StatusSelect
+            lead={lead}
+            statuses={statuses}
+            pending={pending}
+            onStatusChange={onStatusChange}
+          />
+        ) : null}
+        {canUpdate && !lead.archivedAt && members.length > 0 ? (
+          <AssignSelect lead={lead} members={members} pending={pending} onAssign={onAssign} />
+        ) : null}
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        {canArchive && lead.archivedAt ? (
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onRestore}>
+            Restore
+          </Button>
+        ) : null}
+        {canArchive && !lead.archivedAt ? (
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onArchive}>
+            Archive
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -397,14 +452,29 @@ export function LeadsTable({
   onArchive,
   onRestore,
 }: LeadsTableProps) {
+  const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
+  const columnCount = (canDelete ? 1 : 0) + 10;
+
+  function toggleExpanded(leadId: string) {
+    setExpandedLeadIds((current) => {
+      const next = new Set(current);
+      if (next.has(leadId)) {
+        next.delete(leadId);
+      } else {
+        next.add(leadId);
+      }
+      return next;
+    });
+  }
+
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-[1080px] w-full text-[12.5px] leading-snug">
+        <table className="min-w-[1020px] w-full text-[12.5px] leading-none">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
               {canDelete && (
-                <th className="w-9 px-2 py-1.5">
+                <th className="w-8 px-1.5 py-1">
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 rounded border-[var(--color-line)]"
@@ -419,17 +489,19 @@ export function LeadsTable({
                   />
                 </th>
               )}
-              <th className="px-2 py-1.5 text-left">Lead</th>
-              <th className="w-[9.5rem] px-2 py-1.5 text-left">Project</th>
-              <th className="w-[10rem] px-2 py-1.5 text-left">Source</th>
-              <th className="w-[11.5rem] px-2 py-1.5 text-left">Status</th>
-              <th className="w-[9.5rem] px-2 py-1.5 text-left">Owner</th>
-              <th className="w-[12.5rem] px-2 py-1.5 text-left">Activity</th>
-              <th className="w-[8.5rem] px-2 py-1.5 text-left">Tags</th>
-              <th className="w-[8.5rem] px-2 py-1.5 text-right">Actions</th>
+              <th className="px-1.5 py-1 text-left">Lead</th>
+              <th className="w-[8.5rem] px-1.5 py-1 text-left">Project</th>
+              <th className="w-[7.5rem] px-1.5 py-1 text-left">Source</th>
+              <th className="w-[7.5rem] px-1.5 py-1 text-left">Status</th>
+              <th className="w-[7.5rem] px-1.5 py-1 text-left">Owner</th>
+              <th className="w-[3.25rem] px-1.5 py-1 text-left">Age</th>
+              <th className="w-[12rem] px-1.5 py-1 text-left">Next</th>
+              <th className="w-[5.5rem] px-1.5 py-1 text-left">Urgency</th>
+              <th className="w-[6.5rem] px-1.5 py-1 text-left">Tags</th>
+              <th className="w-[5.5rem] px-1.5 py-1 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-line)]">
+          <tbody>
             {leads.map((lead) => {
               const pending = pendingLeadId === lead.id;
               const selected = isSelectedLead(
@@ -438,86 +510,121 @@ export function LeadsTable({
                 selectedLeadIds,
                 excludedLeadIds,
               );
+              const expanded = expandedLeadIds.has(lead.id);
+              const urgency = leadUrgency(lead);
+              const source = formatSourceContext(lead.source?.label, lead.attributes);
+              const utmTitle = formatUtmTitle(lead.attributes);
 
               return (
-                <tr
-                  key={lead.id}
-                  className={cn(
-                    "align-middle hover:bg-[var(--color-canvas)]",
-                    selected && "bg-[var(--color-brand-50)]/40",
-                    pending && "opacity-80",
-                  )}
-                >
-                  {canDelete && (
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-[var(--color-line)]"
-                        checked={selected}
-                        onChange={() => onToggleLead(lead.id)}
-                        aria-label={`Select ${lead.fullName}`}
+                <Fragment key={lead.id}>
+                  <tr
+                    className={cn(
+                      "border-b border-[var(--color-line)]",
+                      selected && "bg-[var(--color-brand-50)]/40",
+                      pending && "opacity-80",
+                      urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
+                      urgency.level === "today" && "bg-[var(--color-warn-bg)]/30",
+                      expanded && "border-b-0",
+                    )}
+                  >
+                    {canDelete && (
+                      <td className="px-1.5 py-1">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-[var(--color-line)]"
+                          checked={selected}
+                          onChange={() => onToggleLead(lead.id)}
+                          aria-label={`Select ${lead.fullName}`}
+                        />
+                      </td>
+                    )}
+                    <td className="min-w-[11rem] px-1.5 py-1">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <Link
+                          href={workspacePath(workspaceSlug, "leads", lead.id)}
+                          className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
+                        >
+                          {lead.fullName}
+                        </Link>
+                        <ContactPopover lead={lead} />
+                      </div>
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <p
+                        className="truncate text-[var(--color-ink-soft)]"
+                        title={
+                          lead.project
+                            ? [lead.project.name, lead.project.reference].filter(Boolean).join(" · ")
+                            : undefined
+                        }
+                      >
+                        {lead.project?.name ?? "—"}
+                      </p>
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <p className="truncate text-[var(--color-ink-soft)]" title={utmTitle ?? source.source}>
+                        {source.source}
+                      </p>
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <div className="flex items-center gap-1">
+                        {lead.status ? (
+                          <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
+                        ) : (
+                          <span className="text-[var(--color-ink-faint)]">—</span>
+                        )}
+                        {lead.archivedAt ? (
+                          <Badge tone="muted" size="sm">
+                            Archived
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <p className="truncate text-[var(--color-ink-soft)]" title={formatOwnerName(lead.assignedUser)}>
+                        {formatOwnerName(lead.assignedUser)}
+                      </p>
+                    </td>
+                    <td className="px-1.5 py-1 tabular text-[var(--color-ink-muted)]">
+                      {formatRelativeAge(lead.createdAt)}
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <NextStepCell lead={lead} />
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <UrgencyBadge lead={lead} />
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <LeadTags tags={lead.tagsResolved} />
+                    </td>
+                    <td className="px-1.5 py-1 text-right">
+                      <RowActions
+                        workspaceSlug={workspaceSlug}
+                        lead={lead}
+                        expanded={expanded}
+                        onToggleExpanded={() => toggleExpanded(lead.id)}
                       />
                     </td>
-                  )}
-                  <td className="min-w-[14rem] px-2 py-1.5">
-                    <Link
-                      href={workspacePath(workspaceSlug, "leads", lead.id)}
-                      className="block truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
-                    >
-                      {lead.fullName}
-                    </Link>
-                    <div className="mt-0.5 text-[11.5px]">
-                      <ContactChannels lead={lead} />
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <p className="truncate text-[var(--color-ink-soft)]">
-                      {lead.project?.name ?? "—"}
-                    </p>
-                    {lead.project?.reference ? (
-                      <p className="truncate text-[11px] text-[var(--color-ink-muted)]">
-                        {lead.project.reference}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <SourceCell lead={lead} />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <StatusCell
-                      lead={lead}
-                      statuses={statuses}
-                      canUpdate={canUpdate}
-                      pending={pending}
-                      onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <OwnerCell
-                      lead={lead}
-                      members={members}
-                      canUpdate={canUpdate}
-                      pending={pending}
-                      onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <ActivityCell lead={lead} />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <LeadTags tags={lead.tagsResolved} />
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
-                    <RowActions
-                      workspaceSlug={workspaceSlug}
-                      lead={lead}
-                      canArchive={canArchive}
-                      pending={pending}
-                      onArchive={() => onArchive(lead.id, lead.fullName)}
-                      onRestore={() => onRestore(lead.id, lead.fullName)}
-                    />
-                  </td>
-                </tr>
+                  </tr>
+                  {expanded ? (
+                    <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)]">
+                      <td colSpan={columnCount}>
+                        <ExpandedDetails
+                          lead={lead}
+                          statuses={statuses}
+                          members={members}
+                          canUpdate={canUpdate}
+                          canArchive={canArchive}
+                          pending={pending}
+                          onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
+                          onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
+                          onArchive={() => onArchive(lead.id, lead.fullName)}
+                          onRestore={() => onRestore(lead.id, lead.fullName)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
             })}
           </tbody>
@@ -533,108 +640,83 @@ export function LeadsTable({
             selectedLeadIds,
             excludedLeadIds,
           );
+          const expanded = expandedLeadIds.has(lead.id);
           const source = formatSourceContext(lead.source?.label, lead.attributes);
+          const urgency = leadUrgency(lead);
 
           return (
             <li
               key={lead.id}
-              className={cn("px-3 py-2.5", selected && "bg-[var(--color-brand-50)]/40")}
+              className={cn(
+                "px-3 py-2",
+                selected && "bg-[var(--color-brand-50)]/40",
+                urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
+              )}
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-center gap-2">
                 {canDelete ? (
                   <input
                     type="checkbox"
-                    className="mt-1 h-3.5 w-3.5 rounded border-[var(--color-line)]"
+                    className="h-3.5 w-3.5 rounded border-[var(--color-line)]"
                     checked={selected}
                     onChange={() => onToggleLead(lead.id)}
                     aria-label={`Select ${lead.fullName}`}
                   />
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Link
                       href={workspacePath(workspaceSlug, "leads", lead.id)}
                       className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                     >
                       {lead.fullName}
                     </Link>
-                    <span className="shrink-0 tabular text-[11px] text-[var(--color-ink-muted)]">
+                    <ContactPopover lead={lead} />
+                    <span className="ml-auto shrink-0 tabular text-[11px] text-[var(--color-ink-muted)]">
                       {formatRelativeAge(lead.createdAt)}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-[11.5px]">
-                    <ContactChannels lead={lead} />
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {lead.status ? (
+                      <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
+                    ) : null}
+                    <UrgencyBadge lead={lead} />
+                    <span className="truncate text-[11.5px] text-[var(--color-ink-soft)]">
+                      {formatOwnerName(lead.assignedUser)}
+                    </span>
                   </div>
-                  <p className="mt-1 truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                  <div className="mt-1">
+                    <NextStepCell lead={lead} />
+                  </div>
+                </div>
+                <RowActions
+                  workspaceSlug={workspaceSlug}
+                  lead={lead}
+                  expanded={expanded}
+                  onToggleExpanded={() => toggleExpanded(lead.id)}
+                />
+              </div>
+              {expanded ? (
+                <div className="mt-2 border-t border-[var(--color-line)] pt-2">
+                  <p className="mb-2 truncate text-[11.5px] text-[var(--color-ink-muted)]">
                     {[lead.project?.name, source.source, source.context]
                       .filter((value) => value && value !== "—")
                       .join(" · ") || "No project or source"}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {lead.status ? (
-                      <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
-                    ) : null}
-                    <span className="text-[11.5px] text-[var(--color-ink-soft)]">
-                      {formatOwnerName(lead.assignedUser)}
-                    </span>
-                    <LeadTags tags={lead.tagsResolved} />
-                  </div>
-                  <div className="mt-1 text-[11.5px]">
-                    <ActivityCell lead={lead} />
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {canUpdate && !lead.archivedAt && statuses.length > 0 ? (
-                      <RowSelect
-                        value={lead.status?.id ?? lead.statusId ?? ""}
-                        disabled={pending}
-                        label={`Change status for ${lead.fullName}`}
-                        onChange={(event) => {
-                          const nextStatusId = event.target.value;
-                          if (nextStatusId && nextStatusId !== (lead.status?.id ?? lead.statusId)) {
-                            onStatusChange(lead.id, nextStatusId);
-                          }
-                        }}
-                      >
-                        {lead.status || lead.statusId ? null : <option value="">Set status</option>}
-                        {statuses.map((status) => (
-                          <option key={status.id} value={status.id}>
-                            {status.label}
-                          </option>
-                        ))}
-                      </RowSelect>
-                    ) : null}
-                    {canUpdate && !lead.archivedAt && members.length > 0 ? (
-                      <RowSelect
-                        value={lead.assignedUser?.id ?? ""}
-                        disabled={pending}
-                        label={`Assign ${lead.fullName}`}
-                        onChange={(event) =>
-                          onAssign(lead.id, event.target.value === "" ? null : event.target.value)
-                        }
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((member) => (
-                          <option key={member.userId} value={member.userId}>
-                            {formatOwnerName({
-                              id: member.userId,
-                              name: member.name,
-                              email: member.email,
-                            })}
-                          </option>
-                        ))}
-                      </RowSelect>
-                    ) : null}
-                    <RowActions
-                      workspaceSlug={workspaceSlug}
-                      lead={lead}
-                      canArchive={canArchive}
-                      pending={pending}
-                      onArchive={() => onArchive(lead.id, lead.fullName)}
-                      onRestore={() => onRestore(lead.id, lead.fullName)}
-                    />
-                  </div>
+                  <ExpandedDetails
+                    lead={lead}
+                    statuses={statuses}
+                    members={members}
+                    canUpdate={canUpdate}
+                    canArchive={canArchive}
+                    pending={pending}
+                    onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
+                    onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
+                    onArchive={() => onArchive(lead.id, lead.fullName)}
+                    onRestore={() => onRestore(lead.id, lead.fullName)}
+                  />
                 </div>
-              </div>
+              ) : null}
             </li>
           );
         })}
