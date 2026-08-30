@@ -990,6 +990,21 @@
       },
       "searchTotal": 33,
       "dryRunOnly": false
+    },
+    {
+      "slug": "domicim-echoparc",
+      "name": "Domicim Échoparc",
+      "reference": "DOMICIM-ECHOPARC",
+      "destinationProjectId": "6a947bab53853e7fe07b192e",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 24,
+      "exceptionCounts": {
+        "missing_name": 24
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
