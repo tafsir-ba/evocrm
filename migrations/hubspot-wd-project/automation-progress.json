@@ -702,6 +702,22 @@
       },
       "searchTotal": 166,
       "dryRunOnly": false
+    },
+    {
+      "slug": "defne",
+      "name": "Defne",
+      "reference": "DEFNE",
+      "destinationProjectId": "6a9471af5747d97c3a788d09",
+      "manifestSize": 6,
+      "created": 6,
+      "destinationLeadCount": 6,
+      "exceptionCount": 155,
+      "exceptionCounts": {
+        "multi_project": 57,
+        "missing_name": 98
+      },
+      "searchTotal": 161,
+      "dryRunOnly": false
     }
   ],
   "skipped": []

@@ -1,0 +1,37 @@
+{
+  "name": "defne-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9471af5747d97c3a788d09",
+  "destinationReference": "DEFNE",
+  "slug": "defne",
+  "sourceHubSpotProjectId": "defne",
+  "size": 6,
+  "selection": {
+    "pool": "new_write_eligible",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "cmp_product",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "33801",
+    "801451",
+    "5713546068",
+    "17169707872",
+    "21914934935",
+    "60990657356"
+  ],
+  "idChecksum": "4c047d19e4c8cc2154d77d6c3a916aa221a7658546a647ea2bcca3a70f344a74"
+}
