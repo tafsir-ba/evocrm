@@ -186,6 +186,21 @@
       },
       "searchTotal": 679,
       "dryRunOnly": false
+    },
+    {
+      "slug": "bc_kingston",
+      "name": "BC Kingston",
+      "reference": "BC_KINGSTON",
+      "destinationProjectId": "6a9458029b2a898bd2832509",
+      "manifestSize": 602,
+      "created": 602,
+      "destinationLeadCount": 602,
+      "exceptionCount": 68,
+      "exceptionCounts": {
+        "multi_project": 68
+      },
+      "searchTotal": 670,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
