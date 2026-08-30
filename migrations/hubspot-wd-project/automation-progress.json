@@ -235,6 +235,22 @@
       },
       "searchTotal": 648,
       "dryRunOnly": false
+    },
+    {
+      "slug": "ltb",
+      "name": "LTB",
+      "reference": "LTB",
+      "destinationProjectId": "6a945b5d4abe68cd32bb9b39",
+      "manifestSize": 571,
+      "created": 571,
+      "destinationLeadCount": 571,
+      "exceptionCount": 74,
+      "exceptionCounts": {
+        "multi_project": 73,
+        "notes_only": 1
+      },
+      "searchTotal": 644,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
