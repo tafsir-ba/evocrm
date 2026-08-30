@@ -496,6 +496,22 @@
       },
       "searchTotal": 302,
       "dryRunOnly": false
+    },
+    {
+      "slug": "princes",
+      "name": "Princes",
+      "reference": "PRINCES",
+      "destinationProjectId": "6a946bf4072755357a8c516d",
+      "manifestSize": 177,
+      "created": 177,
+      "destinationLeadCount": 177,
+      "exceptionCount": 91,
+      "exceptionCounts": {
+        "multi_project": 89,
+        "notes_only": 2
+      },
+      "searchTotal": 266,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
