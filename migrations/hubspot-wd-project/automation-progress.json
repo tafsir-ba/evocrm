@@ -910,6 +910,22 @@
       },
       "searchTotal": 64,
       "dryRunOnly": false
+    },
+    {
+      "slug": "cardis-echoparc",
+      "name": "Cardis Échoparc",
+      "reference": "CARDIS-ECHOPARC",
+      "destinationProjectId": "6a947b2b5637cd3e9b67aba9",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 57,
+      "exceptionCounts": {
+        "missing_name": 55,
+        "notes_only": 2
+      },
+      "searchTotal": 0,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
