@@ -926,6 +926,21 @@
       },
       "searchTotal": 0,
       "dryRunOnly": false
+    },
+    {
+      "slug": "corniche",
+      "name": "Corniche",
+      "reference": "CORNICHE",
+      "destinationProjectId": "6a947b3926660fd5a8517d98",
+      "manifestSize": 41,
+      "created": 41,
+      "destinationLeadCount": 41,
+      "exceptionCount": 11,
+      "exceptionCounts": {
+        "multi_project": 11
+      },
+      "searchTotal": 52,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
