@@ -1096,6 +1096,22 @@
       },
       "searchTotal": 9,
       "dryRunOnly": false
+    },
+    {
+      "slug": "bude_the_residence_frederic",
+      "name": "Budé The Residence (Frédéric)",
+      "reference": "BUDE_THE_RESIDENCE_FREDERIC",
+      "destinationProjectId": "6a947c8479ec7c0a71a6fcfe",
+      "manifestSize": 0,
+      "created": 0,
+      "destinationLeadCount": 0,
+      "exceptionCount": 5,
+      "exceptionCounts": {
+        "missing_name": 4,
+        "cmp_product": 1
+      },
+      "searchTotal": 5,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
