@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "slug": "visp_litterna",
+  "destinationProjectId": "6a945d6e01e9e500a7744c1f",
+  "destinationReference": "VISP_LITTERNA",
+  "counts": {
+    "multi_project": 2
+  },
+  "records": [
+    {
+      "hubspotContactId": "349951",
+      "reason": "multi_project"
+    },
+    {
+      "hubspotContactId": "1318101",
+      "reason": "multi_project"
+    }
+  ]
+}

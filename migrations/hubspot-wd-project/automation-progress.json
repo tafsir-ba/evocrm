@@ -251,6 +251,21 @@
       },
       "searchTotal": 644,
       "dryRunOnly": false
+    },
+    {
+      "slug": "visp_litterna",
+      "name": "Visp Litterna",
+      "reference": "VISP_LITTERNA",
+      "destinationProjectId": "6a945d6e01e9e500a7744c1f",
+      "manifestSize": 581,
+      "created": 581,
+      "destinationLeadCount": 581,
+      "exceptionCount": 2,
+      "exceptionCounts": {
+        "multi_project": 2
+      },
+      "searchTotal": 583,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
