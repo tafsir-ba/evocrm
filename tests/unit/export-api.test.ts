@@ -34,6 +34,7 @@ const emptyExportBundle = {
   tags: [],
   projects: [],
   leads: [],
+  leadProjectMemberships: [],
   properties: [],
   opportunities: [],
   activities: [],

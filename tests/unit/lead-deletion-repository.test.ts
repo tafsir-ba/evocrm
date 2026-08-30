@@ -36,12 +36,17 @@ vi.mock("@/models/lead", () => ({
   LeadModel: { deleteMany: vi.fn() },
 }));
 
+vi.mock("@/models/lead-project-membership", () => ({
+  LeadProjectMembershipModel: { deleteMany: vi.fn() },
+}));
+
 import { ActivityModel } from "@/models/activity";
 import { CampaignEnrollmentModel } from "@/models/campaign-enrollment";
 import { CampaignSendModel } from "@/models/campaign-send";
 import { DocumentModel } from "@/models/document";
 import { ImportRowResultModel } from "@/models/import-row-result";
 import { LeadModel } from "@/models/lead";
+import { LeadProjectMembershipModel } from "@/models/lead-project-membership";
 import { OpportunityModel } from "@/models/opportunity";
 import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 
@@ -70,6 +75,9 @@ describe("lead deletion repository", () => {
     vi.mocked(OpportunityModel.deleteMany).mockResolvedValue({ deletedCount: 1 } as never);
     vi.mocked(ImportRowResultModel.deleteMany).mockResolvedValue({ deletedCount: 2 } as never);
     vi.mocked(LeadModel.deleteMany).mockResolvedValue({ deletedCount: 1 } as never);
+    vi.mocked(LeadProjectMembershipModel.deleteMany).mockResolvedValue({
+      deletedCount: 1,
+    } as never);
   });
 
   it("deletes opportunity-linked enrollments and import row results", async () => {

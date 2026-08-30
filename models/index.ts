@@ -8,6 +8,10 @@ export { TagModel, type TagDocument } from "./tag";
 export { ProjectModel, type ProjectDocument } from "./project";
 export { CompanyModel, type CompanyDocument } from "./company";
 export { LeadModel, type LeadDocument } from "./lead";
+export {
+  LeadProjectMembershipModel,
+  type LeadProjectMembershipDocument,
+} from "./lead-project-membership";
 export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";
 export { ActivityModel, type ActivityDocument } from "./activity";

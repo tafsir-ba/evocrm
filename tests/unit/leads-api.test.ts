@@ -114,6 +114,49 @@ describe("lead API routes", () => {
     expect(body.pagination.total).toBe(1);
   });
 
+  it("forwards includeAssociated so list can match secondary memberships", async () => {
+    vi.mocked(requireAuth).mockResolvedValue({
+      user: { id: "user-1", email: "a@b.com" },
+    });
+    vi.mocked(resolveWorkspace).mockResolvedValue({
+      id: "ws-1",
+      slug: "demo",
+      name: "Demo",
+      timezone: "UTC",
+      defaultCurrency: "USD",
+    });
+    vi.mocked(requirePermission).mockResolvedValue({
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["lead:read"],
+      },
+    });
+    vi.mocked(listLeadsForWorkspace).mockResolvedValue({
+      leads: [],
+      total: 0,
+    });
+
+    const response = await getLeads(
+      new Request(
+        "http://localhost/api/workspaces/demo/leads?projectId=507f1f77bcf86cd799439051&includeAssociated=true",
+      ),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(listLeadsForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        projectId: "507f1f77bcf86cd799439051",
+        includeAssociated: true,
+      }),
+    );
+  });
+
   it("creates lead with lead:create permission", async () => {
     vi.mocked(requireAuth).mockResolvedValue({
       user: { id: "user-1", email: "a@b.com" },

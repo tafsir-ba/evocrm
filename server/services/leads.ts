@@ -18,6 +18,13 @@ import {
   type LeadListFilter,
   type LeadRecord,
 } from "@/server/repositories/leads";
+import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
+import {
+  ensurePrimaryMembershipForLead,
+  loadMembershipsByLeadIds,
+  type LeadProjectMembershipSummary,
+} from "@/server/services/lead-project-memberships";
+import { buildMembershipProvenance } from "@/lib/lead-project-membership";
 import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
@@ -64,6 +71,8 @@ export type LeadProjectSummary = {
 
 export type LeadListItem = LeadRecord & {
   project: LeadProjectSummary | null;
+  projectMemberships?: LeadProjectMembershipSummary[];
+  secondaryProjects?: LeadProjectSummary[];
   status: LeadDictionarySummary | null;
   source: LeadDictionarySummary | null;
   tagsResolved: LeadTagSummary[];
@@ -290,7 +299,21 @@ async function resolveProjectSummary(
   };
 }
 
-async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
+function secondaryProjectsFromMemberships(
+  memberships: LeadProjectMembershipSummary[],
+): LeadProjectSummary[] {
+  return memberships
+    .filter((membership) => !membership.isPrimary && membership.project)
+    .map((membership) => membership.project!)
+    .filter(
+      (project, index, all) => all.findIndex((item) => item.id === project.id) === index,
+    );
+}
+
+async function enrichLeadListItem(
+  lead: LeadRecord,
+  memberships: LeadProjectMembershipSummary[] = [],
+): Promise<LeadListItem> {
   const [project, status, source, tagsResolved, assignedUser] = await Promise.all([
     resolveProjectSummary(lead.workspaceId, lead.projectId),
     resolveDictionarySummary(lead.workspaceId, lead.statusId, "lead_status"),
@@ -302,6 +325,8 @@ async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
   return {
     ...lead,
     project,
+    projectMemberships: memberships,
+    secondaryProjects: secondaryProjectsFromMemberships(memberships),
     status,
     source,
     tagsResolved,
@@ -312,7 +337,11 @@ async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
 }
 
 async function enrichLeadRecord(lead: LeadRecord): Promise<LeadDetail> {
-  const listItem = await enrichLeadListItem(lead);
+  const membershipsByLead = await loadMembershipsByLeadIds(lead.workspaceId, [lead.id]);
+  const listItem = await enrichLeadListItem(
+    lead,
+    membershipsByLead.get(lead.id) ?? [],
+  );
   const ownerUser = await resolveUserSummary(lead.ownerId);
   return { ...listItem, ownerUser };
 }
@@ -335,15 +364,60 @@ function leadSnapshot(lead: LeadRecord): Record<string, unknown> {
   };
 }
 
+async function resolveListFilter(
+  workspaceId: string,
+  filter: LeadListFilter,
+): Promise<LeadListFilter> {
+  if (!filter.projectId || !filter.includeAssociated) {
+    return filter;
+  }
+
+  const associatedLeadIds = await findLeadIdsForProjectMembership(
+    workspaceId,
+    filter.projectId,
+  );
+  const requested = filter.leadIds?.length
+    ? associatedLeadIds.filter((id) => filter.leadIds!.includes(id))
+    : associatedLeadIds;
+
+  return {
+    ...filter,
+    projectId: undefined,
+    leadIds: requested,
+  };
+}
+
 export async function listLeadsForWorkspace(
   workspaceId: string,
   filter: LeadListFilter = {},
 ): Promise<{ leads: LeadListItem[]; total: number }> {
   await assertValidProjectFilter(workspaceId, filter.projectId);
-  const { leads, total } = await findLeads(workspaceId, filter);
+  if (filter.projectId && filter.includeAssociated) {
+    const associatedLeadIds = await findLeadIdsForProjectMembership(
+      workspaceId,
+      filter.projectId,
+    );
+    const requested = filter.leadIds?.length
+      ? associatedLeadIds.filter((id) => filter.leadIds!.includes(id))
+      : associatedLeadIds;
+    if (requested.length === 0) {
+      return { leads: [], total: 0 };
+    }
+  }
+
+  const listFilter = await resolveListFilter(workspaceId, filter);
+  const { leads, total } = await findLeads(workspaceId, listFilter);
+  const membershipsByLead = await loadMembershipsByLeadIds(
+    workspaceId,
+    leads.map((lead) => lead.id),
+  );
 
   const [enriched, activitySummaries] = await Promise.all([
-    Promise.all(leads.map((lead) => enrichLeadListItem(lead))),
+    Promise.all(
+      leads.map((lead) =>
+        enrichLeadListItem(lead, membershipsByLead.get(lead.id) ?? []),
+      ),
+    ),
     findLeadActivitySummaries(
       workspaceId,
       leads.map((lead) => lead.id),
@@ -438,6 +512,24 @@ export async function createLeadForWorkspace(
     attributes: input.attributes ?? {},
     emailConsentStatus: input.emailConsentStatus ?? "unknown",
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+  });
+
+  await ensurePrimaryMembershipForLead({
+    workspaceId,
+    leadId: lead.id,
+    projectId: input.projectId,
+    actorId,
+    source: "lead_create",
+    joinedAt: lead.createdAt,
+    sourceOrder: 0,
+    provenance: buildMembershipProvenance({
+      method: "lead_create",
+      source: "lead_create",
+      notes: "Primary membership from lead create.",
+      appliedAt: lead.createdAt,
+      sourceMembershipDate: lead.createdAt,
+      sourceOrder: 0,
+    }),
   });
 
   await createAuditLog({
@@ -774,6 +866,7 @@ function buildBulkDeleteLeadFilter(
     includeArchived: filters.includeArchived,
     search: filters.search,
     projectId: filters.projectId,
+    includeAssociated: filters.includeAssociated,
     statusId: filters.statusId,
     sourceId: filters.sourceId,
     assignedTo: filters.assignedTo,
@@ -796,7 +889,10 @@ export async function purgeLeadsForWorkspace(
   input: BulkDeleteLeadsInput,
 ): Promise<{ deletedCount: number; requestedCount: number }> {
   const leadIds = input.selectAll
-    ? await findLeadIds(workspaceId, buildBulkDeleteLeadFilter(input))
+    ? await findLeadIds(
+        workspaceId,
+        await resolveListFilter(workspaceId, buildBulkDeleteLeadFilter(input)),
+      )
     : await findLeadIds(workspaceId, {
         leadIds: input.leadIds ?? [],
         includeArchived: true,

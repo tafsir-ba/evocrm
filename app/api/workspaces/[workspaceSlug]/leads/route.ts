@@ -41,6 +41,7 @@ export async function GET(request: Request, context: RouteContext) {
       includeArchived: query.includeArchived,
       search: query.search,
       projectId: query.projectId,
+      includeAssociated: query.includeAssociated,
       statusId: query.statusId,
       sourceId: query.sourceId,
       assignedTo: query.assignedTo,

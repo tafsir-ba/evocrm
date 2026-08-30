@@ -42,6 +42,7 @@ DictionaryItem
 Tag
 Project
 Lead
+LeadProjectMembership
 Property
 Opportunity
 Activity
@@ -326,6 +327,21 @@ Demand-side record (buyer/inquirer).
 | `archivedAt` | |
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
+
+**Project memberships:** A lead may belong to multiple projects through `LeadProjectMembership`. Exactly one membership is primary. `Lead.projectId` is the denormalized primary project (list/filter/search default, email uniqueness, campaign matching). Secondary memberships never create campaign or drip enrollment.
+
+| Field | Description |
+|-------|-------------|
+| `workspaceId` | Tenant scope |
+| `leadId` | Contact (lead) |
+| `projectId` | Associated project |
+| `isPrimary` | Exactly one active primary per lead |
+| `joinedAt` | Membership date (historical HubSpot order uses source date) |
+| `sourceOrder` | Stable order within the contact |
+| `source` | `lead_create`, `backfill`, `manual`, `hubspot_association`, `import` |
+| `provenance` | Method, source, appliedAt, notes, optional HubSpot ids |
+
+Unique active `(workspaceId, leadId, projectId)`. Unique active primary `(workspaceId, leadId)` where `isPrimary` is true. Changing primary is a deliberate API/UI action; historical import selects the earliest `joinedAt` / `sourceOrder`.
 
 **Phase 4:** Mongoose model at `/models/lead.ts`. `fullName` derived server-side from `firstName` + `lastName`. `emailNormalized` unique per **project** within a workspace for non-archived leads with email (partial unique index on `{ workspaceId, projectId, emailNormalized }` + service check). `phoneNormalized` stored for search; duplicate phone warns but does not block. `statusId` validated as same-workspace `lead_status` dictionary item; `sourceId` as `lead_source`. `tags[]` validated as same-workspace tags with `entityTypes` including `lead`. Archive via `DELETE` sets `archivedAt`. `Lead.notes` is a static internal field — not the future Activity type Note timeline. Assignment UI uses `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) for active member picker; create/edit send `assignedTo` validated server-side.
 
@@ -719,6 +735,7 @@ All foreign keys must resolve within the same workspace:
 | `Document.linkedEntityId` | Linked entity must exist in same workspace |
 | `CampaignStep.documentIds` | Documents must be same workspace |
 | `CampaignEnrollment` | Lead/opportunity must be same workspace |
+| `LeadProjectMembership.leadId` / `projectId` | Lead and project must exist in same workspace |
 
 ---
 
@@ -732,6 +749,7 @@ Workspace
   ├─ Project
   ├─ Property ── (optional Project)
   ├─ Lead
+  │    └─ LeadProjectMembership ── Project
   ├─ Opportunity ── Lead + Property
   ├─ Activity ── (optional Lead / Property / Opportunity)
   ├─ Document ── linked entity

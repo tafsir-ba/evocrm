@@ -272,6 +272,7 @@ export async function evaluateCampaignAutoEnrollmentForLead(input: {
   });
 
   for (const campaign of campaigns) {
+    // Associations / secondary memberships never enroll. Only the primary projectId.
     if (campaign.projectIds.length > 0 && !campaign.projectIds.includes(lead.projectId)) {
       continue;
     }

@@ -12,6 +12,7 @@ import { IconChevronDown, IconChevronRight, IconMail, IconPhone } from "@/lib/ic
 import {
   formatNextStepCell,
   formatOwnerName,
+  formatProjectMembershipCell,
   formatRelativeAge,
   formatSourceContext,
   formatUtmTitle,
@@ -19,6 +20,7 @@ import {
   telHref,
   visibleLeadTags,
 } from "@/lib/leads-table";
+import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -48,6 +50,14 @@ export type LeadTableItem = {
   statusId?: string;
   source: LeadTableDictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
+  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  projectMemberships?: Array<{
+    id: string;
+    projectId: string;
+    isPrimary: boolean;
+    sourceOrder: number;
+    project: { id: string; name: string; reference: string | null } | null;
+  }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
   lastActivity?: { id: string; title: string; at: string | Date } | null;
@@ -553,12 +563,24 @@ export function LeadsTable({
                       <p
                         className="truncate text-[var(--color-ink-soft)]"
                         title={
-                          lead.project
-                            ? [lead.project.name, lead.project.reference].filter(Boolean).join(" · ")
-                            : undefined
+                          formatProjectMembershipCell({
+                            primaryName: lead.project
+                              ? [lead.project.name, lead.project.reference]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : null,
+                            secondaryCount: lead.secondaryProjects?.length ?? 0,
+                          }).text
                         }
                       >
-                        {lead.project?.name ?? "—"}
+                        {lead.projectMemberships && lead.projectMemberships.length > 0 ? (
+                          <LeadProjectMemberships
+                            memberships={lead.projectMemberships}
+                            compact
+                          />
+                        ) : (
+                          lead.project?.name ?? "—"
+                        )}
                       </p>
                     </td>
                     <td className="px-1.5 py-1">
@@ -699,7 +721,14 @@ export function LeadsTable({
               {expanded ? (
                 <div className="mt-2 border-t border-[var(--color-line)] pt-2">
                   <p className="mb-2 truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                    {[lead.project?.name, source.source, source.context]
+                    {[
+                      formatProjectMembershipCell({
+                        primaryName: lead.project?.name,
+                        secondaryCount: lead.secondaryProjects?.length ?? 0,
+                      }).text,
+                      source.source,
+                      source.context,
+                    ]
                       .filter((value) => value && value !== "—")
                       .join(" · ") || "No project or source"}
                   </p>
