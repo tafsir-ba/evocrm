@@ -167,7 +167,7 @@ describe("ProjectFormPage", () => {
       if (url.endsWith(`/projects/${projectId}`) && method === "GET") {
         return jsonResponse({
           project: {
-            name: "Petit Saconnex",
+            name: "Résidence Petit Saconnex",
             reference: "PSX",
             projectType: null,
             commercialStage: "live",
@@ -214,7 +214,7 @@ describe("ProjectFormPage", () => {
 
     render(<ProjectFormPage workspaceSlug="demo" mode="edit" projectId={projectId} />);
 
-    expect(await screen.findByDisplayValue("Petit Saconnex")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Résidence Petit Saconnex")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save project" }));
 
     await waitFor(() => {
