@@ -138,6 +138,22 @@
       },
       "searchTotal": 601,
       "dryRunOnly": false
+    },
+    {
+      "slug": "jardindesnations",
+      "name": "Jardin des Nations",
+      "reference": "JARDINDESNATIONS",
+      "destinationProjectId": "6a9453a2ece4a64e90a4e094",
+      "manifestSize": 195,
+      "created": 195,
+      "destinationLeadCount": 195,
+      "exceptionCount": 493,
+      "exceptionCounts": {
+        "multi_project": 21,
+        "missing_name": 472
+      },
+      "searchTotal": 688,
+      "dryRunOnly": false
     }
   ],
   "skipped": []
