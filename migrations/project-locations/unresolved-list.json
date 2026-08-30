@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-08-30T18:21:58.715Z",
+  "mode": "execute",
+  "policy": "Place names in the project title are candidates. Official maps or project sites must verify them. This list is only genuine ambiguities and names with no verifiable place signal.",
+  "items": [
+    {
+      "name": "Villa Sorella",
+      "reference": "VILLA_SORELLA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Terra Vista",
+      "reference": "TERRA_VISTA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Seymaz 44 (VPI)",
+      "reference": "SEYMAZ44-VPI",
+      "category": "ambiguous_place",
+      "placeSignal": "seymaz",
+      "note": "La Seymaz is a watercourse / sector name, not a Swiss commune. Street number 44 is not treated as a verified address."
+    },
+    {
+      "name": "Hedonia",
+      "reference": "HEDONIA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Les Jars",
+      "reference": "LESJARS",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "The View",
+      "reference": "THE_VIEW",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Résidence Serena",
+      "reference": "RESIDENCE_SERENA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Defne",
+      "reference": "DEFNE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "L'Orée des Champs",
+      "reference": "LOREE_DES_CHAMPS",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "La Colline",
+      "reference": "LACOLLINE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Floréal",
+      "reference": "FLOREAL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Princes",
+      "reference": "PRINCES",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Cardinal",
+      "reference": "CARDINAL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Carawina",
+      "reference": "CARAWINA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Budé The Residence",
+      "reference": "BUDE_THE_RESIDENCE",
+      "category": "ambiguous_place",
+      "placeSignal": "bude",
+      "note": "Budé is a Geneva neighbourhood (Petit-Saconnex / City of Geneva), not a unique Swiss commune. Official project site not verified."
+    },
+    {
+      "name": "Cressy",
+      "reference": "CRESSY",
+      "category": "ambiguous_place",
+      "placeSignal": "cressy",
+      "note": "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). Municipality left open."
+    },
+    {
+      "name": "Rubix",
+      "reference": "RUBIX",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Seymaz 44",
+      "reference": "SEYMAZ44",
+      "category": "ambiguous_place",
+      "placeSignal": "seymaz",
+      "note": "La Seymaz is a watercourse / sector name, not a Swiss commune. Street number 44 is not treated as a verified address."
+    },
+    {
+      "name": "Campanules",
+      "reference": "CAMPANULES",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Avant-Scène",
+      "reference": "AVANTSCENE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Westend",
+      "reference": "WESTEND",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "LTB",
+      "reference": "LTB",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "BC Kingston",
+      "reference": "BC_KINGSTON",
+      "category": "ambiguous_place",
+      "placeSignal": "kingston",
+      "note": "Kingston is not a unique country or project. Grosvenor Vistas and K2 have their own catalog evidence; BC Kingston does not."
+    },
+    {
+      "name": "Jardin des Nations",
+      "reference": "JARDINDESNATIONS",
+      "category": "ambiguous_place",
+      "placeSignal": "jardin-des-nations",
+      "note": "Jardin des Nations is a Geneva-area neighbourhood spanning more than one commune (Pregny-Chambésy / Grand-Saconnex). Not a unique municipality."
+    },
+    {
+      "name": "Jardins Pala",
+      "reference": "JARDINSPALA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Osmose",
+      "reference": "OSMOSE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Alcove",
+      "reference": "ALCOVE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Smarthill",
+      "reference": "SMARTHILL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Arbora",
+      "reference": "ARBORA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Portes du Lac",
+      "reference": "PORTESDULAC",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "EvoHome General Database",
+      "reference": "EVO-GENERAL",
+      "category": "catalog_unresolved",
+      "placeSignal": "evohome-general",
+      "note": "Catch-all CRM scope, not a real-estate site. No geography is invented."
+    },
+    {
+      "name": "Evohome",
+      "reference": "Evo",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    }
+  ]
+}

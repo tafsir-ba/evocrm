@@ -629,6 +629,88 @@ export const PROJECT_LOCATION_CATALOG: ProjectLocationCatalogEntry[] = [
     notes:
       "Applied only to the Halter / Swissroc Domaine du Lac in Nyon. A conflicting specific city is not overwritten.",
   },
+  {
+    key: "bochet-thonex",
+    displayName: "Bochet",
+    aliases: [
+      "Bochet",
+      "Pierre à Bochet",
+      "Pierre-à-Bochet",
+      "Pierre à Bochet 17",
+    ],
+    references: ["BOCHET", "pierreabochet"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "GE",
+    cantonName: "Genève",
+    municipality: "Thônex",
+    postalCode: "1226",
+    normalizedAddress: "Pierre-à-Bochet, 1226 Thônex",
+    latitude: 46.195,
+    longitude: 6.208,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    sourceUrl: "https://swissroc.ch/fr/projets/pierre-a-bochet-17/",
+    sources: [
+      {
+        url: "https://swissroc.ch/fr/projets/pierre-a-bochet-17/",
+        kind: "developer_site",
+        note: "Swissroc official project page: Pierre à Bochet 17 in Thônex.",
+      },
+      {
+        url: "https://pierre-bochet17.ch/",
+        kind: "official_project_site",
+        note: "Official marketing site: residence at Thônex, Pierre-à-Bochet.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Th%C3%B4nex&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Thônex (GE), PLZ 1226.",
+      },
+    ],
+    notes:
+      "CRM name Bochet is the Pierre-à-Bochet locality in Thônex, confirmed by the official project/developer sites. Street number 17 is not used as a coordinate.",
+  },
+  {
+    key: "ormet-ecublens",
+    displayName: "Ormet",
+    aliases: ["Ormet", "Ormet 68"],
+    references: ["ORMET", "ormet68"],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: "VD",
+    cantonName: "Vaud",
+    municipality: "Ecublens",
+    postalCode: "1024",
+    normalizedAddress: "Ormet, 1024 Ecublens",
+    latitude: 46.529,
+    longitude: 6.557,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    sourceUrl: "https://ormet68.ch/",
+    sources: [
+      {
+        url: "https://ormet68.ch/",
+        kind: "official_project_site",
+        note: "Official site: four villas in Ecublens. Street number 68 is not used as a coordinate.",
+      },
+      {
+        url: "https://swissroc.ch/fr/projets/ormet-68/",
+        kind: "developer_site",
+        note: "Swissroc official project page: Ormet 68 in Ecublens, near EPFL/UNIL.",
+      },
+      {
+        url: "https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=Ecublens&type=locations&origins=gg25",
+        kind: "municipal_mapping",
+        note: "Official commune centroid for Ecublens (VD), PLZ 1024.",
+      },
+    ],
+    notes: "CRM name Ormet is the official Ormet 68 project in Ecublens.",
+  },
 ];
 
 export function catalogMatchKeys(entry: ProjectLocationCatalogEntry): string[] {

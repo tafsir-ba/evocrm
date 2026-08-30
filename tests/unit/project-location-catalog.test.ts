@@ -35,6 +35,8 @@ describe("project location catalog", () => {
     expect(findCatalogEntryByKey("vista-brent")?.municipality).toBe("Brent");
     expect(findCatalogEntryByKey("vista-brent")?.postalCode).toBe("1817");
     expect(findCatalogEntryByKey("domaine-du-lac-nyon")?.municipality).toBe("Nyon");
+    expect(findCatalogEntryByKey("bochet-thonex")?.municipality).toBe("Thônex");
+    expect(findCatalogEntryByKey("ormet-ecublens")?.municipality).toBe("Ecublens");
   });
 
   it("does not invent a street for Buissonnière 4 from the project name", () => {
@@ -62,7 +64,7 @@ describe("project location catalog", () => {
   it("summarizes catalog coverage", () => {
     const summary = catalogCoverageSummary();
     expect(summary.total).toBe(PROJECT_LOCATION_CATALOG.length);
-    expect(summary.highConfidence).toBe(14);
+    expect(summary.highConfidence).toBe(16);
     expect(summary.unresolved).toBe(1);
   });
 });

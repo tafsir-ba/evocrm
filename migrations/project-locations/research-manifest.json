@@ -9,7 +9,8 @@
       "authoritative press only to corroborate locality, not to invent streets"
     ],
     "doNotGuessFromProjectName": true,
-    "backfill": "high-confidence verified catalog matches only",
+    "placeSignal": "A municipality or locality in the project name/reference is a high-priority candidate. It is applied only after official Swiss commune (gg25) or official project/developer verification. Ambiguous or intercommunal names stay review-needed.",
+    "backfill": "high-confidence verified catalog matches and verified unique place signals only",
     "coordinates": {
       "exact_project": 5,
       "address": 5,
@@ -18,9 +19,10 @@
     },
     "preserveManual": true,
     "reviewNeededWhen": [
-      "no catalog match",
+      "no catalog match and no unique verified place signal",
       "conflicting specific manual city",
-      "catch-all scopes such as EvoHome General"
+      "catch-all scopes such as EvoHome General",
+      "ambiguous place signals (Cressy, Kingston, Jardin des Nations, Seymaz)"
     ]
   },
   "entries": [
@@ -165,11 +167,44 @@
       "precision": "locality",
       "confidence": "high",
       "sourceUrl": "https://www.halter.ch/en/projects/domaine-du-lac"
+    },
+    {
+      "key": "bochet-thonex",
+      "countryCode": "CH",
+      "cantonCode": "GE",
+      "municipality": "Thônex",
+      "postalCode": "1226",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://swissroc.ch/fr/projets/pierre-a-bochet-17/"
+    },
+    {
+      "key": "ormet-ecublens",
+      "countryCode": "CH",
+      "cantonCode": "VD",
+      "municipality": "Ecublens",
+      "postalCode": "1024",
+      "precision": "locality",
+      "confidence": "high",
+      "sourceUrl": "https://ormet68.ch/"
     }
   ],
+  "verifiedPlaceSignals": [
+    "Veyrier",
+    "Versoix",
+    "Collex-Bossy",
+    "Corsier-sur-Vevey",
+    "Gland",
+    "Pully",
+    "Chardonne",
+    "Visp",
+    "Mathod"
+  ],
   "intentionallyUnresolvedExamples": [
-    "Commune-only CRM names (Veyrier, Versoix, Collex-Bossy, Cressy) are not guessed.",
-    "Rubix / rubix-gva.ch spans Meyrin and Satigny — municipality conflict, left unresolved.",
-    "Arbora, Portes du Lac, BC Kingston, and other names without a unique official site stay unresolved."
+    "Cressy is an intercommunal Geneva quartier (Confignon / Bernex / Onex) and is not Cressier.",
+    "BC Kingston has a Kingston signal but no official project country.",
+    "Jardin des Nations and Seymaz 44 are neighbourhood / sector names, not unique communes.",
+    "Rubix / rubix-gva.ch spans Meyrin and Satigny — municipality conflict.",
+    "Branded names without a place signal or unique official site stay on the compact unresolved list."
   ]
 }

@@ -12,6 +12,10 @@ import {
   catalogMatchKeys,
   type ProjectLocationCatalogEntry,
 } from "@/lib/project-location-catalog";
+import {
+  extractPlaceSignal,
+  type VerifiedSwissPlace,
+} from "@/lib/swiss-place-gazetteer";
 
 export type ProjectLocationMatchInput = {
   name: string;
@@ -26,12 +30,19 @@ export type ProjectLocationMatch =
   | {
       status: "matched";
       entry: ProjectLocationCatalogEntry;
-      reason: "name" | "alias" | "reference" | "short_reference";
+      reason: "name" | "alias" | "reference" | "short_reference" | "place_signal";
     }
   | {
       status: "unresolved";
       entry: ProjectLocationCatalogEntry | null;
-      reason: "no_match" | "ambiguous" | "catalog_unresolved" | "name_conflict";
+      reason:
+        | "no_match"
+        | "ambiguous"
+        | "catalog_unresolved"
+        | "name_conflict"
+        | "ambiguous_place_signal";
+      placeSignal?: string | null;
+      placeNote?: string | null;
     };
 
 export type ProjectLocationApplyDecision = {
@@ -64,6 +75,17 @@ const LOCALITY_ALIASES: Record<string, string[]> = {
   epalinges: ["epalinges"],
   brent: ["brent"],
   nyon: ["nyon"],
+  veyrier: ["veyrier"],
+  versoix: ["versoix"],
+  collexbossy: ["collexbossy", "collex"],
+  corsiervevey: ["corsiervevey", "corsiersurvevey"],
+  gland: ["gland"],
+  pully: ["pully"],
+  chardonne: ["chardonne"],
+  visp: ["visp", "viege"],
+  thonex: ["thonex"],
+  mathod: ["mathod"],
+  ecublens: ["ecublens"],
 };
 
 export function matchProjectLocationCatalog(
@@ -119,7 +141,58 @@ export function matchProjectLocationCatalog(
     return { status: "matched", entry: match.entry, reason: match.reason };
   }
 
+  const place = extractPlaceSignal(input.name, input.reference);
+  if (place.status === "verified") {
+    return {
+      status: "matched",
+      entry: catalogEntryFromVerifiedPlace(place.place),
+      reason: "place_signal",
+    };
+  }
+  if (place.status === "ambiguous") {
+    return {
+      status: "unresolved",
+      entry: null,
+      reason: "ambiguous_place_signal",
+      placeSignal: place.signal.key,
+      placeNote: place.signal.reason,
+    };
+  }
+
   return { status: "unresolved", entry: null, reason: "no_match" };
+}
+
+export function catalogEntryFromVerifiedPlace(
+  place: VerifiedSwissPlace,
+): ProjectLocationCatalogEntry {
+  return {
+    key: `place:${place.key}`,
+    displayName: place.displayName,
+    aliases: place.aliases,
+    references: [],
+    shortReferences: [],
+    countryCode: "CH",
+    countryName: "Switzerland",
+    cantonCode: place.cantonCode,
+    cantonName: place.cantonName,
+    municipality: place.municipality,
+    postalCode: place.postalCode,
+    normalizedAddress: `${place.postalCode} ${place.municipality}`,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    precision: "locality",
+    confidence: "high",
+    reviewStatus: "verified",
+    sourceUrl: place.sourceUrl,
+    sources: [
+      {
+        url: place.sourceUrl,
+        kind: "municipal_mapping",
+        note: place.notes,
+      },
+    ],
+    notes: `Place signal verified against the official Swiss commune register (gg25). ${place.notes}`,
+  };
 }
 
 export function locationFromCatalogEntry(
@@ -161,23 +234,27 @@ export function decideProjectLocationEnrichment(
   const match = matchProjectLocationCatalog(input);
 
   if (match.status !== "matched") {
-    const shouldFlagCatalogGap =
-      match.reason === "catalog_unresolved" && !hasStructuredLocation(existing);
-    const reviewLocation = shouldFlagCatalogGap
+    const shouldFlagReview =
+      (match.reason === "catalog_unresolved" ||
+        match.reason === "ambiguous_place_signal") &&
+      !hasStructuredLocation(existing);
+    const reviewLocation = shouldFlagReview
       ? emptyProjectLocation({
           reviewStatus: "review_needed",
           provenance: {
             method: "enrichment",
-            catalogKey: match.entry?.key ?? null,
+            catalogKey: match.entry?.key ?? match.placeSignal ?? null,
             appliedAt,
             previousManual: null,
-            notes: `Unresolved: ${match.reason}. ${match.entry?.notes ?? "No high-confidence public evidence applied."}`,
+            notes:
+              match.placeNote ??
+              `Unresolved: ${match.reason}. ${match.entry?.notes ?? "No high-confidence public evidence applied."}`,
           },
         })
       : existing;
 
     return {
-      action: shouldFlagCatalogGap ? "review" : "skip",
+      action: shouldFlagReview ? "review" : "skip",
       reason: match.reason,
       location: reviewLocation,
       city: input.city ?? null,
@@ -253,13 +330,74 @@ export function decideProjectLocationEnrichment(
       ? "high_confidence_country_correction"
       : cityIsBroaderRegion
         ? "high_confidence_locality_refinement"
-        : "high_confidence_backfill",
+        : match.reason === "place_signal"
+          ? "verified_place_signal"
+          : "high_confidence_backfill",
     location,
     city: shouldFillCity ? entry.municipality : manual.city,
     country: shouldFillCountry ? entry.countryName : manual.country,
     address: manual.address,
     overwrittenManual,
   };
+}
+
+export type CompactUnresolvedItem = {
+  name: string;
+  reference: string | null;
+  category: "ambiguous_place" | "catalog_unresolved" | "no_place_signal";
+  placeSignal: string | null;
+  note: string;
+};
+
+export function describeUnresolvedDecision(
+  input: ProjectLocationMatchInput,
+  decision: ProjectLocationApplyDecision,
+): CompactUnresolvedItem | null {
+  if (decision.action === "apply") {
+    return null;
+  }
+  if (/\[qa-/i.test(input.name)) {
+    return null;
+  }
+
+  const match = matchProjectLocationCatalog(input);
+  if (match.status === "unresolved" && match.reason === "ambiguous_place_signal") {
+    return {
+      name: input.name,
+      reference: input.reference ?? null,
+      category: "ambiguous_place",
+      placeSignal: match.placeSignal ?? null,
+      note: match.placeNote ?? "Place signal could not be uniquely verified.",
+    };
+  }
+  if (match.status === "unresolved" && match.reason === "catalog_unresolved") {
+    return {
+      name: input.name,
+      reference: input.reference ?? null,
+      category: "catalog_unresolved",
+      placeSignal: match.entry?.key ?? null,
+      note: match.entry?.notes ?? "Catalog entry is not high-confidence verified.",
+    };
+  }
+  if (decision.action === "review") {
+    return {
+      name: input.name,
+      reference: input.reference ?? null,
+      category: "ambiguous_place",
+      placeSignal: decision.location.provenance?.catalogKey ?? null,
+      note: decision.location.provenance?.notes ?? decision.reason,
+    };
+  }
+  if (decision.reason === "no_match") {
+    return {
+      name: input.name,
+      reference: input.reference ?? null,
+      category: "no_place_signal",
+      placeSignal: null,
+      note: "No official project match and no unique verified municipality in the name/reference.",
+    };
+  }
+  return null;
 }
 
 export function projectLocationFilterValue(

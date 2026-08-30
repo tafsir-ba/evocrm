@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-30T18:11:06.516Z",
+  "generatedAt": "2026-08-30T18:21:58.715Z",
   "mode": "execute",
   "catalog": {
-    "total": 15,
-    "highConfidence": 14,
+    "total": 17,
+    "highConfidence": 16,
     "unresolved": 1,
     "keys": [
       "grosvenor-vistas",
@@ -20,16 +20,328 @@
       "namaya",
       "eveil-epalinges",
       "vista-brent",
-      "domaine-du-lac-nyon"
+      "domaine-du-lac-nyon",
+      "bochet-thonex",
+      "ormet-ecublens"
     ]
   },
   "workspaces": 4,
-  "projects": 52,
-  "applied": 14,
-  "skipped": 37,
-  "unresolved": 38,
-  "review": 1,
+  "projects": 59,
+  "applied": 26,
+  "skipped": 26,
+  "unresolved": 33,
+  "review": 7,
+  "unresolvedCompact": [
+    {
+      "name": "Villa Sorella",
+      "reference": "VILLA_SORELLA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Terra Vista",
+      "reference": "TERRA_VISTA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Seymaz 44 (VPI)",
+      "reference": "SEYMAZ44-VPI",
+      "category": "ambiguous_place",
+      "placeSignal": "seymaz",
+      "note": "La Seymaz is a watercourse / sector name, not a Swiss commune. Street number 44 is not treated as a verified address."
+    },
+    {
+      "name": "Hedonia",
+      "reference": "HEDONIA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Les Jars",
+      "reference": "LESJARS",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "The View",
+      "reference": "THE_VIEW",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Résidence Serena",
+      "reference": "RESIDENCE_SERENA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Defne",
+      "reference": "DEFNE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "L'Orée des Champs",
+      "reference": "LOREE_DES_CHAMPS",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "La Colline",
+      "reference": "LACOLLINE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Floréal",
+      "reference": "FLOREAL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Princes",
+      "reference": "PRINCES",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Cardinal",
+      "reference": "CARDINAL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Carawina",
+      "reference": "CARAWINA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Budé The Residence",
+      "reference": "BUDE_THE_RESIDENCE",
+      "category": "ambiguous_place",
+      "placeSignal": "bude",
+      "note": "Budé is a Geneva neighbourhood (Petit-Saconnex / City of Geneva), not a unique Swiss commune. Official project site not verified."
+    },
+    {
+      "name": "Cressy",
+      "reference": "CRESSY",
+      "category": "ambiguous_place",
+      "placeSignal": "cressy",
+      "note": "Cressy (Geneva) is an intercommunal quartier on Confignon, Bernex and Onex, and is not the communes Cressier (FR/NE). Municipality left open."
+    },
+    {
+      "name": "Rubix",
+      "reference": "RUBIX",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Seymaz 44",
+      "reference": "SEYMAZ44",
+      "category": "ambiguous_place",
+      "placeSignal": "seymaz",
+      "note": "La Seymaz is a watercourse / sector name, not a Swiss commune. Street number 44 is not treated as a verified address."
+    },
+    {
+      "name": "Campanules",
+      "reference": "CAMPANULES",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Avant-Scène",
+      "reference": "AVANTSCENE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Westend",
+      "reference": "WESTEND",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "LTB",
+      "reference": "LTB",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "BC Kingston",
+      "reference": "BC_KINGSTON",
+      "category": "ambiguous_place",
+      "placeSignal": "kingston",
+      "note": "Kingston is not a unique country or project. Grosvenor Vistas and K2 have their own catalog evidence; BC Kingston does not."
+    },
+    {
+      "name": "Jardin des Nations",
+      "reference": "JARDINDESNATIONS",
+      "category": "ambiguous_place",
+      "placeSignal": "jardin-des-nations",
+      "note": "Jardin des Nations is a Geneva-area neighbourhood spanning more than one commune (Pregny-Chambésy / Grand-Saconnex). Not a unique municipality."
+    },
+    {
+      "name": "Jardins Pala",
+      "reference": "JARDINSPALA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Osmose",
+      "reference": "OSMOSE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Alcove",
+      "reference": "ALCOVE",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Smarthill",
+      "reference": "SMARTHILL",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Arbora",
+      "reference": "ARBORA",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "Portes du Lac",
+      "reference": "PORTESDULAC",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    },
+    {
+      "name": "EvoHome General Database",
+      "reference": "EVO-GENERAL",
+      "category": "catalog_unresolved",
+      "placeSignal": "evohome-general",
+      "note": "Catch-all CRM scope, not a real-estate site. No geography is invented."
+    },
+    {
+      "name": "Evohome",
+      "reference": "Evo",
+      "category": "no_place_signal",
+      "placeSignal": null,
+      "note": "No official project match and no unique verified municipality in the name/reference."
+    }
+  ],
   "results": [
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a94737a3a31c669cd059d07",
+      "name": "Ormet",
+      "reference": "ORMET",
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "ormet-ecublens",
+      "countryCode": "CH",
+      "municipality": "Ecublens",
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a94736cd29a3272eaae6b4f",
+      "name": "Villa Sorella",
+      "reference": "VILLA_SORELLA",
+      "action": "skip",
+      "reason": "no_match",
+      "catalogKey": null,
+      "countryCode": null,
+      "municipality": null,
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a94734e9ec3b3f964a63b1a",
+      "name": "Terra Vista",
+      "reference": "TERRA_VISTA",
+      "action": "skip",
+      "reason": "no_match",
+      "catalogKey": null,
+      "countryCode": null,
+      "municipality": null,
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a9473283e8b00dfbd79747d",
+      "name": "Seymaz 44 (VPI)",
+      "reference": "SEYMAZ44-VPI",
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "seymaz",
+      "countryCode": null,
+      "municipality": null,
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a947319a702e2d6f378c2ef",
+      "name": "Mathod",
+      "reference": "MATHOD",
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:mathod",
+      "countryCode": "CH",
+      "municipality": "Mathod",
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a9472fb597d08873e518eff",
+      "name": "Hedonia",
+      "reference": "HEDONIA",
+      "action": "skip",
+      "reason": "no_match",
+      "catalogKey": null,
+      "countryCode": null,
+      "municipality": null,
+      "overwrittenManual": false
+    },
+    {
+      "workspaceId": "6a2f0444438006b304af77ec",
+      "projectId": "6a9472881beae69acd3d5047",
+      "name": "Les Jars",
+      "reference": "LESJARS",
+      "action": "skip",
+      "reason": "no_match",
+      "catalogKey": null,
+      "countryCode": null,
+      "municipality": null,
+      "overwrittenManual": false
+    },
     {
       "workspaceId": "6a2f0444438006b304af77ec",
       "projectId": "6a9471eb3edd667f3890f92b",
@@ -119,11 +431,11 @@
       "projectId": "6a94703cdf13a83dd1f19113",
       "name": "Veyrier",
       "reference": "VEYRIER",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:veyrier",
+      "countryCode": "CH",
+      "municipality": "Veyrier",
       "overwrittenManual": false
     },
     {
@@ -143,11 +455,11 @@
       "projectId": "6a946edae5888deab8f95cfe",
       "name": "TDL Pully",
       "reference": "TDL_PULLY",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:pully",
+      "countryCode": "CH",
+      "municipality": "Pully",
       "overwrittenManual": false
     },
     {
@@ -155,11 +467,11 @@
       "projectId": "6a946e4f4ab39b7b02abe60d",
       "name": "Versoix",
       "reference": "VERSOIX",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:versoix",
+      "countryCode": "CH",
+      "municipality": "Versoix",
       "overwrittenManual": false
     },
     {
@@ -167,11 +479,11 @@
       "projectId": "6a946db9298a6f2202271942",
       "name": "Bochet",
       "reference": "BOCHET",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "high_confidence_backfill",
+      "catalogKey": "bochet-thonex",
+      "countryCode": "CH",
+      "municipality": "Thônex",
       "overwrittenManual": false
     },
     {
@@ -179,11 +491,11 @@
       "projectId": "6a946d83e84a462f1ee3e21f",
       "name": "Collex-Bossy",
       "reference": "COLLEX_BOSSY",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:collex-bossy",
+      "countryCode": "CH",
+      "municipality": "Collex-Bossy",
       "overwrittenManual": false
     },
     {
@@ -227,11 +539,11 @@
       "projectId": "6a946bc770605e4c59b9af5a",
       "name": "Aquarelle Chardonne",
       "reference": "AQUARELLECHARDONNE",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:chardonne",
+      "countryCode": "CH",
+      "municipality": "Chardonne",
       "overwrittenManual": false
     },
     {
@@ -239,11 +551,11 @@
       "projectId": "6a946b919b112e202440a029",
       "name": "Gland (Cardis)",
       "reference": "GLAND_CARDIS",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:gland",
+      "countryCode": "CH",
+      "municipality": "Gland",
       "overwrittenManual": false
     },
     {
@@ -287,9 +599,9 @@
       "projectId": "6a94694f6562983489e1a4e5",
       "name": "Budé The Residence",
       "reference": "BUDE_THE_RESIDENCE",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "bude",
       "countryCode": null,
       "municipality": null,
       "overwrittenManual": false
@@ -311,9 +623,9 @@
       "projectId": "6a946827842d838b91b62441",
       "name": "Cressy",
       "reference": "CRESSY",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "cressy",
       "countryCode": null,
       "municipality": null,
       "overwrittenManual": false
@@ -347,9 +659,9 @@
       "projectId": "6a9465309fec2eea59a62a36",
       "name": "Seymaz 44",
       "reference": "SEYMAZ44",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "seymaz",
       "countryCode": null,
       "municipality": null,
       "overwrittenManual": false
@@ -395,11 +707,11 @@
       "projectId": "6a945d6e01e9e500a7744c1f",
       "name": "Visp Litterna",
       "reference": "VISP_LITTERNA",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:visp",
+      "countryCode": "CH",
+      "municipality": "Visp",
       "overwrittenManual": false
     },
     {
@@ -419,11 +731,11 @@
       "projectId": "6a945add8154645eabb07305",
       "name": "Gland (Evo)",
       "reference": "GLAND_EVO",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:gland",
+      "countryCode": "CH",
+      "municipality": "Gland",
       "overwrittenManual": false
     },
     {
@@ -431,11 +743,11 @@
       "projectId": "6a945a2ed2ebb646e413cddf",
       "name": "Corsier-sur-Vevey",
       "reference": "CORSIER_SUR_VEVEY",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
-      "countryCode": null,
-      "municipality": null,
+      "action": "apply",
+      "reason": "verified_place_signal",
+      "catalogKey": "place:corsier-sur-vevey",
+      "countryCode": "CH",
+      "municipality": "Corsier-sur-Vevey",
       "overwrittenManual": false
     },
     {
@@ -443,9 +755,9 @@
       "projectId": "6a9458029b2a898bd2832509",
       "name": "BC Kingston",
       "reference": "BC_KINGSTON",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "kingston",
       "countryCode": null,
       "municipality": null,
       "overwrittenManual": false
@@ -479,9 +791,9 @@
       "projectId": "6a9453a2ece4a64e90a4e094",
       "name": "Jardin des Nations",
       "reference": "JARDINDESNATIONS",
-      "action": "skip",
-      "reason": "no_match",
-      "catalogKey": null,
+      "action": "review",
+      "reason": "ambiguous_place_signal",
+      "catalogKey": "jardin-des-nations",
       "countryCode": null,
       "municipality": null,
       "overwrittenManual": false

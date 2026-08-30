@@ -87,9 +87,10 @@ async function main(): Promise<void> {
   }
 
   const { catalogCoverageSummary } = await import("../lib/project-location-catalog");
-  const { decideProjectLocationEnrichment } = await import(
-    "../lib/project-location-enrichment"
-  );
+  const {
+    decideProjectLocationEnrichment,
+    describeUnresolvedDecision,
+  } = await import("../lib/project-location-enrichment");
   const { findAllWorkspaces, findWorkspaceById } = await import(
     "../server/repositories/workspaces"
   );
@@ -111,6 +112,7 @@ async function main(): Promise<void> {
   }
 
   const results: Array<Record<string, unknown>> = [];
+  const unresolvedCompact: Array<Record<string, unknown>> = [];
   let applied = 0;
   let skipped = 0;
   let review = 0;
@@ -132,6 +134,10 @@ async function main(): Promise<void> {
         overwrittenManual: decision.overwrittenManual,
       };
       results.push(row);
+      const unresolvedItem = describeUnresolvedDecision(project, decision);
+      if (unresolvedItem) {
+        unresolvedCompact.push(unresolvedItem);
+      }
 
       if (decision.action === "apply") {
         applied += 1;
@@ -165,6 +171,7 @@ async function main(): Promise<void> {
     skipped,
     unresolved: review + results.filter((row) => row.reason === "no_match").length,
     review,
+    unresolvedCompact,
     results,
   };
 
@@ -173,8 +180,24 @@ async function main(): Promise<void> {
   if (options.writeReport) {
     await mkdir(REPORT_DIR, { recursive: true });
     const file = path.join(REPORT_DIR, "last-run-report.json");
+    const unresolvedFile = path.join(REPORT_DIR, "unresolved-list.json");
     await writeFile(file, `${JSON.stringify(report, null, 2)}\n`);
+    await writeFile(
+      unresolvedFile,
+      `${JSON.stringify(
+        {
+          generatedAt: report.generatedAt,
+          mode: report.mode,
+          policy:
+            "Place names in the project title are candidates. Official maps or project sites must verify them. This list is only genuine ambiguities and names with no verifiable place signal.",
+          items: unresolvedCompact,
+        },
+        null,
+        2,
+      )}\n`,
+    );
     console.error(`[enrich:project-locations] wrote ${file}`);
+    console.error(`[enrich:project-locations] wrote ${unresolvedFile}`);
   }
 }
 
