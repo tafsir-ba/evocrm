@@ -9,7 +9,9 @@ import {
   requireHubSpotClientSecret,
 } from "@/server/security/integration-credentials";
 import {
+  collapseHubSpotEventsByContact,
   isHubSpotContactCreationEvent,
+  isHubSpotOngoingSyncEvent,
   parseHubSpotWebhookEvents,
   verifyHubSpotSignatureV3,
 } from "@/server/utils/hubspot-webhook";
@@ -102,6 +104,20 @@ describe("hubspot webhook helpers", () => {
     expect(events).toHaveLength(2);
     expect(isHubSpotContactCreationEvent(events[0])).toBe(true);
     expect(isHubSpotContactCreationEvent(events[1])).toBe(false);
+    expect(isHubSpotOngoingSyncEvent(events[1])).toBe(true);
+    expect(collapseHubSpotEventsByContact(events)).toHaveLength(2);
+    expect(
+      collapseHubSpotEventsByContact([
+        { objectId: 99, subscriptionType: "contact.creation", occurredAt: 1 },
+        { objectId: 99, subscriptionType: "contact.propertyChange", occurredAt: 5 },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        objectId: 99,
+        subscriptionType: "contact.propertyChange",
+        occurredAt: 5,
+      }),
+    ]);
   });
 
   it("verifies HubSpot signature v3", () => {

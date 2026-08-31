@@ -168,6 +168,7 @@ If CI uses a test auth bypass instead of real Google OAuth:
 | Resend | Mock send; assert payload includes unsubscribe |
 | Auth.js session | Test helper to inject session |
 | Cron | Test endpoint with `CRON_SECRET` header |
+| HubSpot ongoing sync | Pure planner tests plus mocked I/O: duplicate delivery, out-of-order events, create vs update, webhook-loss reconcile, project conflict, multi-project, campaign guard, date/source |
 
 ---
 

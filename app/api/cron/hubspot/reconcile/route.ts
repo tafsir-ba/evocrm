@@ -1,7 +1,6 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
-import { clampCampaignSendBatchLimit } from "@/lib/campaign-send-limits";
 import { requireCronAuth } from "@/server/security/cron-auth";
-import { sendDueCampaignEmails } from "@/server/services/campaign-sending";
+import { reconcileHubSpotOngoingSync } from "@/server/services/hubspot-ongoing-sync";
 
 export async function POST(request: Request) {
   try {
@@ -10,11 +9,17 @@ export async function POST(request: Request) {
     const url = new URL(request.url);
     const limitParam = url.searchParams.get("limit");
     const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
-    const limit = clampCampaignSendBatchLimit(parsedLimit);
+    const limit =
+      parsedLimit && Number.isFinite(parsedLimit)
+        ? Math.min(Math.max(parsedLimit, 1), 100)
+        : 50;
 
-    const summary = await sendDueCampaignEmails(limit);
+    const summary = await reconcileHubSpotOngoingSync({ limit });
 
-    return successResponse({ ...summary });
+    return successResponse({
+      ...summary,
+      triggerAutomation: false,
+    });
   } catch (error) {
     return handleRouteError(error);
   }

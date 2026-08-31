@@ -8,12 +8,14 @@ describe("integration logs", () => {
       externalId: "form-1",
       emailPresent: true,
       apiKey: "secret-should-not-appear-as-object",
+      email: "hidden@example.com",
       nested: { bad: "value" },
     });
 
     expect(summary.externalId).toBe("form-1");
     expect(summary.emailPresent).toBe(true);
     expect(summary).not.toHaveProperty("apiKey");
+    expect(summary).not.toHaveProperty("email");
     expect(summary).not.toHaveProperty("nested");
   });
 

@@ -564,6 +564,27 @@ export async function findLeadByIntegrationIdempotencyKey(
   return document ? toLeadRecord(document) : null;
 }
 
+export async function findLeadByHubSpotContactId(
+  workspaceId: string,
+  contactId: string,
+): Promise<LeadRecord | null> {
+  await connectDb();
+  const trimmed = contactId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const document = await LeadModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      archivedAt: null,
+      $or: [
+        { "attributes.integration.idempotencyKey": `hubspot:contact:${trimmed}` },
+        { "attributes.integration.externalId": trimmed },
+      ],
+    }),
+  ).lean<LeadDocument>();
+  return document ? toLeadRecord(document) : null;
+}
+
 export async function findLeadByPhoneNormalized(
   workspaceId: string,
   phoneNormalized: string,

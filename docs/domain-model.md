@@ -632,7 +632,34 @@ External system connection (settings/internal in V1). Website lead capture is th
 | `updatedAt` | |
 | `archivedAt` | Set when archived (soft delete) |
 
-Setup protocol: `docs/website-lead-capture-setup.md`.
+Setup protocol: `docs/website-lead-capture-setup.md`. Ongoing HubSpot sync: `docs/hubspot-ongoing-sync.md`.
+
+---
+
+### HubSpotSyncCursor
+
+Per-integration watermark for the ongoing HubSpot connector (not historical GV/WD runs).
+
+| Field | Description |
+|-------|-------------|
+| `workspaceId` / `integrationId` / `portalId` | |
+| `status` | `pending_cutover`, `dry_run_verified`, `active`, `paused` |
+| `cutoverAt` | HubSpot `createdate` after this may count as new acquisition |
+| `lastReconciledModifiedAt` | Missed-event search pointer |
+| `dryRunVerifiedAt` | Required before `active` |
+| `dryRunSummary` | Counts only (no PII) |
+
+### HubSpotSyncEvent
+
+Durable event ledger for HubSpot webhook/reconcile deliveries.
+
+| Field | Description |
+|-------|-------------|
+| `eventKey` | Contact id + version timestamp + hashed email |
+| `contactId` | HubSpot id (not email) |
+| `status` | `received`, `processed`, `skipped`, `failed`, `dead_letter` |
+| `outcome` | `created`, `updated`, `duplicate`, `parked`, `would_*`, … |
+| `payloadSummary` | Non-PII counts/reasons |
 
 ---
 

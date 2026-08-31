@@ -7,4 +7,9 @@ export async function register() {
     "./server/campaign-cron-worker"
   );
   startInternalCampaignCronWorker();
+
+  const { startInternalHubSpotSyncCronWorker } = await import(
+    "./server/hubspot-sync-cron-worker"
+  );
+  startInternalHubSpotSyncCronWorker();
 }

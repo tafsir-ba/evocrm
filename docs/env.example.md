@@ -110,7 +110,10 @@ Access via signed URLs only. Not required before Phase 8.
 
 | Variable | Required from | Description |
 |----------|---------------|-------------|
-| `CRON_SECRET` | Phase 10 | Bearer token for `POST /api/cron/campaigns/send-due` |
+| `CRON_SECRET` | Phase 10 | Bearer token for `POST /api/cron/campaigns/send-due` and `POST /api/cron/hubspot/reconcile` |
+| `HUBSPOT_ONGOING_SYNC_RELEASE_GATE` | Ongoing HubSpot sync | `off` (default), `dry-run`, or `enabled`. Mutations require `enabled` plus a verified cursor. |
+| `HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE` | Ongoing HubSpot sync | `true` to persist webhook upserts. Default off. |
+| `HUBSPOT_ONGOING_SYNC_RECONCILE` | Ongoing HubSpot sync | `true` to run the missed-event reconcile worker/cron. Default off. |
 
 ---
 
@@ -160,6 +163,10 @@ RESEND_API_KEY=replace-with-resend-key
 EMAIL_FROM=noreply@example.com
 EMAIL_REPLY_TO=support@example.com
 CRON_SECRET=replace-with-openssl-rand-base64-32
+# HubSpot ongoing sync — leave unset/off until cutover (docs/hubspot-ongoing-sync.md)
+# HUBSPOT_ONGOING_SYNC_RELEASE_GATE=off
+# HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE=false
+# HUBSPOT_ONGOING_SYNC_RECONCILE=false
 
 # Phase 11 (optional until billing)
 # STRIPE_SECRET_KEY=sk_test_...

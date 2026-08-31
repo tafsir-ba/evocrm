@@ -17,6 +17,14 @@ const SENSITIVE_SUMMARY_KEYS = new Set([
   "secret",
   "password",
   "credentials",
+  "email",
+  "phone",
+  "firstname",
+  "first_name",
+  "lastname",
+  "last_name",
+  "fullname",
+  "full_name",
 ]);
 
 function isSensitiveSummaryKey(key: string): boolean {

@@ -28,7 +28,8 @@
     "import:project-companies": "npx tsx scripts/import-project-companies.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "reconcile:hubspot-portal": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-portal-reconciliation.ts"
+    "reconcile:hubspot-portal": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-portal-reconciliation.ts",
+    "cutover:hubspot-ongoing": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-ongoing-sync-cutover.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { HUBSPOT_ONGOING_CONTACT_PROPERTIES } from "@/lib/hubspot-ongoing-sync";
 import { AppError } from "@/server/errors";
 
 export type HubSpotContact = {
@@ -9,6 +10,7 @@ export type HubSpotContact = {
   email: string | null;
   phone: string | null;
   createdAt: string | null;
+  lastModifiedAt: string | null;
   properties: Record<string, string | null>;
 };
 
@@ -182,26 +184,9 @@ export async function fetchHubSpotContact(input: {
     accessToken: input.accessToken,
     path: `/crm/v3/objects/contacts/${encodeURIComponent(input.contactId)}`,
     searchParams: {
-      properties: [
-        "firstname",
-        "lastname",
-        "email",
-        "phone",
-        "mobilephone",
-        "hs_lead_status",
-        "company",
-        "jobtitle",
-        "industry",
-        "state",
-        "hs_state_code",
-        "associatedcompanyid",
-        "product_intersted_in",
-        "city",
-        "country",
-        "message",
-        "notes_last_contacted",
-        "createdate",
-      ].join(","),
+      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES, "hs_lead_status", "notes_last_contacted"].join(
+        ",",
+      ),
     },
   });
 
@@ -221,6 +206,7 @@ export async function fetchHubSpotContact(input: {
     id?: string;
     properties?: Record<string, string | null | undefined>;
     createdAt?: string;
+    updatedAt?: string;
   };
   const properties = payload.properties ?? {};
   const firstName = readProperty(properties, "firstname") ?? "HubSpot";
@@ -231,6 +217,9 @@ export async function fetchHubSpotContact(input: {
   const createdAt =
     readProperty(properties, "createdate") ??
     (typeof payload.createdAt === "string" ? payload.createdAt : null);
+  const lastModifiedAt =
+    readProperty(properties, "hs_lastmodifieddate") ??
+    (typeof payload.updatedAt === "string" ? payload.updatedAt : null);
 
   return {
     id: payload.id ?? input.contactId,
@@ -239,6 +228,7 @@ export async function fetchHubSpotContact(input: {
     email,
     phone,
     createdAt,
+    lastModifiedAt,
     properties: Object.fromEntries(
       Object.entries(properties).map(([key, value]) => [
         key,
@@ -246,6 +236,86 @@ export async function fetchHubSpotContact(input: {
       ]),
     ),
   };
+}
+
+export async function searchHubSpotContactsModifiedSince(input: {
+  accessToken: string;
+  modifiedAfterIso: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ contacts: HubSpotContactRaw[]; nextAfter: string | null }> {
+  const modifiedMs = Date.parse(input.modifiedAfterIso);
+  if (!Number.isFinite(modifiedMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot reconcile watermark.");
+  }
+
+  const { ok, status, body } = await hubspotPostJson({
+    accessToken: input.accessToken,
+    path: "/crm/v3/objects/contacts/search",
+    body: {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "lastmodifieddate",
+              operator: "GT",
+              value: String(modifiedMs),
+            },
+          ],
+        },
+      ],
+      sorts: [{ propertyName: "lastmodifieddate", direction: "ASCENDING" }],
+      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES],
+      limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+      ...(input.after ? { after: input.after } : {}),
+    },
+  });
+
+  if (!ok) {
+    throw new AppError(
+      "INTERNAL_ERROR",
+      `HubSpot contact search failed (${status}).`,
+      { expose: false },
+    );
+  }
+
+  const payload = body as {
+    results?: Array<{
+      id?: string;
+      properties?: Record<string, string | null | undefined>;
+    }>;
+    paging?: { next?: { after?: string } };
+  };
+
+  return {
+    contacts: (payload.results ?? []).map((result) => ({
+      id: String(result.id ?? ""),
+      properties: Object.fromEntries(
+        Object.entries(result.properties ?? {}).map(([key, value]) => [
+          key,
+          typeof value === "string" ? value : null,
+        ]),
+      ),
+    })),
+    nextAfter: payload.paging?.next?.after ?? null,
+  };
+}
+
+export async function fetchHubSpotContactProjectAssociationIds(input: {
+  accessToken: string;
+  contactId: string;
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/contacts/${encodeURIComponent(input.contactId)}/associations/projects`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
 }
 
 export async function assertHubSpotAccessToken(accessToken: string): Promise<void> {
