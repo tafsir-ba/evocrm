@@ -1,6 +1,14 @@
 import "server-only";
 
 import { HUBSPOT_ONGOING_CONTACT_PROPERTIES } from "@/lib/hubspot-ongoing-sync";
+import {
+  HUBSPOT_EMAIL_PROPERTIES,
+  HUBSPOT_NOTE_PROPERTIES,
+  mapHubSpotEmailObjectToTimelineItem,
+  mapHubSpotFormMessageToTimelineItem,
+  mapHubSpotNoteObjectToTimelineItem,
+  type HubSpotTimelineItem,
+} from "@/lib/hubspot-notes-sync";
 import { AppError } from "@/server/errors";
 
 export type HubSpotContact = {
@@ -378,6 +386,195 @@ export async function fetchHubSpotContactProjectAssociationIds(input: {
   const { ok, body } = await hubspotGetJson({
     accessToken: input.accessToken,
     path: `/crm/v4/objects/contacts/${encodeURIComponent(input.contactId)}/associations/projects`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
+}
+
+async function fetchHubSpotAssociationIds(input: {
+  accessToken: string;
+  contactId: string;
+  toObjectType: "notes" | "emails";
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/contacts/${encodeURIComponent(input.contactId)}/associations/${input.toObjectType}`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
+}
+
+async function batchReadHubSpotObjects(input: {
+  accessToken: string;
+  objectType: "notes" | "emails";
+  ids: string[];
+  properties: readonly string[];
+}): Promise<Array<{ id: string; properties: Record<string, string | null> }>> {
+  if (input.ids.length === 0) {
+    return [];
+  }
+  const results: Array<{ id: string; properties: Record<string, string | null> }> = [];
+  const chunkSize = 100;
+  for (let offset = 0; offset < input.ids.length; offset += chunkSize) {
+    const chunk = input.ids.slice(offset, offset + chunkSize);
+    const { ok, body } = await hubspotPostJson({
+      accessToken: input.accessToken,
+      path: `/crm/v3/objects/${input.objectType}/batch/read`,
+      body: {
+        properties: [...input.properties],
+        inputs: chunk.map((id) => ({ id })),
+      },
+    });
+    if (!ok) {
+      continue;
+    }
+    const payload = body as {
+      results?: Array<{ id?: string; properties?: Record<string, string | null | undefined> }>;
+    };
+    for (const row of payload.results ?? []) {
+      if (!row.id) {
+        continue;
+      }
+      results.push({
+        id: String(row.id),
+        properties: Object.fromEntries(
+          Object.entries(row.properties ?? {}).map(([key, value]) => [
+            key,
+            typeof value === "string" ? value : null,
+          ]),
+        ),
+      });
+    }
+  }
+  return results;
+}
+
+export async function listHubSpotContactTimelineItems(input: {
+  accessToken: string;
+  contactId: string;
+  formMessage?: string | null;
+  formLabel?: string | null;
+  formOccurredAt?: string | null;
+}): Promise<HubSpotTimelineItem[]> {
+  const [noteIds, emailIds] = await Promise.all([
+    fetchHubSpotAssociationIds({
+      accessToken: input.accessToken,
+      contactId: input.contactId,
+      toObjectType: "notes",
+    }),
+    fetchHubSpotAssociationIds({
+      accessToken: input.accessToken,
+      contactId: input.contactId,
+      toObjectType: "emails",
+    }),
+  ]);
+
+  const [notes, emails] = await Promise.all([
+    batchReadHubSpotObjects({
+      accessToken: input.accessToken,
+      objectType: "notes",
+      ids: noteIds,
+      properties: HUBSPOT_NOTE_PROPERTIES,
+    }),
+    batchReadHubSpotObjects({
+      accessToken: input.accessToken,
+      objectType: "emails",
+      ids: emailIds,
+      properties: HUBSPOT_EMAIL_PROPERTIES,
+    }),
+  ]);
+
+  const items: HubSpotTimelineItem[] = [
+    ...notes.map((note) =>
+      mapHubSpotNoteObjectToTimelineItem({
+        id: note.id,
+        contactId: input.contactId,
+        properties: note.properties,
+      }),
+    ),
+    ...emails.map((email) =>
+      mapHubSpotEmailObjectToTimelineItem({
+        id: email.id,
+        contactId: input.contactId,
+        properties: email.properties,
+      }),
+    ),
+  ];
+
+  const formItem = mapHubSpotFormMessageToTimelineItem({
+    contactId: input.contactId,
+    message: input.formMessage,
+    formLabel: input.formLabel,
+    occurredAt: input.formOccurredAt,
+  });
+  if (formItem) {
+    items.push(formItem);
+  }
+
+  return items;
+}
+
+export async function searchHubSpotNoteObjectsModifiedSince(input: {
+  accessToken: string;
+  modifiedAfterIso: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ ids: string[]; nextAfter: string | null }> {
+  const modifiedMs = Date.parse(input.modifiedAfterIso);
+  if (!Number.isFinite(modifiedMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot notes watermark.");
+  }
+  const { ok, body } = await hubspotPostJson({
+    accessToken: input.accessToken,
+    path: "/crm/v3/objects/notes/search",
+    body: {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "hs_lastmodifieddate",
+              operator: "GTE",
+              value: String(modifiedMs),
+            },
+          ],
+        },
+      ],
+      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      properties: ["hs_lastmodifieddate"],
+      limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+      ...(input.after ? { after: input.after } : {}),
+    },
+  });
+  if (!ok) {
+    return { ids: [], nextAfter: null };
+  }
+  const payload = body as {
+    results?: Array<{ id?: string }>;
+    paging?: { next?: { after?: string } };
+  };
+  return {
+    ids: (payload.results ?? []).map((row) => String(row.id ?? "")).filter(Boolean),
+    nextAfter: payload.paging?.next?.after ?? null,
+  };
+}
+
+export async function fetchHubSpotNoteContactIds(input: {
+  accessToken: string;
+  noteId: string;
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/notes/${encodeURIComponent(input.noteId)}/associations/contacts`,
   });
   if (!ok) {
     return [];

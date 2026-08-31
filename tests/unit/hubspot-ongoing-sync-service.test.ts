@@ -78,8 +78,19 @@ vi.mock("@/server/services/lead-project-memberships", () => ({
   applyPlannedMembershipsToLead: vi.fn(),
 }));
 
-vi.mock("@/server/services/integration-logs", () => ({
-  writeIntegrationLog: vi.fn(),
+vi.mock("@/server/services/hubspot-notes-sync", () => ({
+  processHubSpotNotesForContact: vi.fn().mockResolvedValue({
+    received: 0,
+    created: 0,
+    duplicates: 0,
+    skipped: 0,
+    parked: 0,
+    failed: 0,
+    excluded: 0,
+    wouldCreate: 0,
+    contactsScanned: 0,
+    searched: false,
+  }),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({
@@ -147,6 +158,12 @@ const cursor = {
   dryRunVerifiedAt: new Date("2026-08-30T00:00:00.000Z"),
   dryRunSummary: {},
   baselineContactCount: null,
+  notesStatus: "pending_cutover" as const,
+  notesDryRunVerifiedAt: null,
+  notesDryRunSummary: {},
+  lastNotesReconciledModifiedAt: null,
+  lastNotesReconciledAfter: null,
+  lastNotesReconciledContactId: null,
   sideEffectGuard: { triggerAutomation: false },
   createdAt: new Date(),
   updatedAt: new Date(),

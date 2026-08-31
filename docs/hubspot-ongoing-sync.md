@@ -16,6 +16,7 @@ Canonical operators: this document. Historical project-by-project import remains
 | Reconciliation cron | **Off** by default (`HUBSPOT_ONGOING_SYNC_RECONCILE` must be `true`) |
 | Legacy replay as “new” | Prevented by cutover watermark |
 | Automatic campaign/drip enrollment from this sync | Never (`triggerAutomation: false`) |
+| Notes / inbound engagement timeline | Separate workstream; **off** until its own dry-run + `HUBSPOT_NOTES_SYNC_RELEASE_GATE` |
 
 Do not subscribe the production HubSpot app, import/backfill, or set the release gate to `enabled` without an explicit cutover.
 
@@ -50,7 +51,7 @@ Fallback: POST /api/cron/hubspot/reconcile (CRON_SECRET)
   searches HubSpot lastmodifieddate > cursor, same planner
 ```
 
-Idempotency is keyed by **HubSpot contact ID** + **event/version timestamp** + **normalized email** (email is hashed in the event key; never stored on the ledger). Retries cannot duplicate contacts, memberships, or activities. This path does not create activities.
+Idempotency is keyed by **HubSpot contact ID** + **event/version timestamp** + **normalized email** (email is hashed in the event key; never stored on the ledger). Retries cannot duplicate contacts or memberships. Lead upsert never enrolls campaigns (`triggerAutomation: false`). **Notes/timeline is a separate gated workstream** (below).
 
 ---
 
@@ -183,6 +184,55 @@ Reports never include name, email, or phone.
 
 ---
 
+## Notes / inbound engagement workstream (distinct)
+
+Synchronizes HubSpot **contact notes**, **form-submission messages**, and **permitted inbound email** onto the matching EvoHome lead as Activity type `Note` / `Email` on the timeline. This is not lead upsert and cannot change project, status, or source.
+
+### Identity
+
+1. HubSpot contact ID on the CRM lead (`attributes.integration.externalId` / `hubspot:contact:{id}`).
+2. Safe fallback only: exactly one active workspace lead with that normalized email. If more than one lead shares the email (including multi-project), **park** — do not attach the note to anyone.
+
+One HubSpot engagement → **one** EvoHome activity (`workspaceId` + `hubspotExternalActivityId` unique). Multi-project memberships do not fan-out duplicates.
+
+### Privacy
+
+**Include:** user-authored CRM notes, form `message` / form-labelled submissions, inbound email (`INCOMING` / `INCOMING_EMAIL`).
+
+**Exclude:** empty bodies; HubSpot workflow/sequence/automation/import sources; outbound email; mailer-daemon / `hubspot.com` / noreply senders; generated “system” copy. HTML is stripped to readable text (max 5000 chars). Reports never include note bodies.
+
+### Persistence
+
+- Original HubSpot timestamp → Activity `createdAt` / `completedAt` (completed so they are history, not overdue tasks)
+- External id + source/form labels + provenance on `attributes.integration`
+- Replay-safe: existing `hubspotExternalActivityId` is a duplicate; the activity is not overwritten
+- `triggerAutomation: false`; `assignedTo` null; lead project/status never patched
+
+### Gates (independent of lead upsert)
+
+| Gate | Default | Role |
+|------|---------|------|
+| `HUBSPOT_NOTES_SYNC_RELEASE_GATE` | `off` | `off` / `dry-run` / `enabled` |
+| `HUBSPOT_NOTES_SYNC_INCREMENTAL` | off | After a successful lead upsert, sync that contact’s timeline |
+| `HUBSPOT_NOTES_SYNC_BACKFILL` | off | Historical backfill of HubSpot-linked leads |
+| `HUBSPOT_NOTES_SYNC_RECONCILE` | off | `POST /api/cron/hubspot/notes` missed-event search |
+| Cursor `notesStatus=active` + `notesDryRunVerifiedAt` | pending | Per-integration notes cutover |
+
+Private app also needs **notes read** and **emails read**. Missing scopes return empty lists (no CRM writes, no crash).
+
+### Rollout
+
+1. Keep notes gates **off** until lead sync dry-run is understood.
+2. `npm run cutover:hubspot-notes -- --workspace-id=... --integration-id=... --dry-run` — scans HubSpot-linked CRM leads, fetches timeline items, writes `would_create` ledger rows. Must scan ≥ 1 contact.
+3. `npm run cutover:hubspot-notes -- --verify-dry-run` then `--activate`.
+4. Staging: `HUBSPOT_NOTES_SYNC_RELEASE_GATE=enabled` and `HUBSPOT_NOTES_SYNC_INCREMENTAL=true`. Confirm one inbound note/form/email on the lead timeline, **no** project/status change, **no** campaign enrollment.
+5. Historical: `HUBSPOT_NOTES_SYNC_BACKFILL=true` and `npm run cutover:hubspot-notes -- --backfill` (refuses to mutate unless gate enabled + cursor active).
+6. Optional: `HUBSPOT_NOTES_SYNC_RECONCILE=true` for `POST /api/cron/hubspot/notes`.
+
+Rollback: `HUBSPOT_NOTES_SYNC_RELEASE_GATE=off`. Existing timeline notes remain; they are not deleted.
+
+---
+
 ## Coordination (do not duplicate)
 
 | Workstream | This sync |
@@ -190,7 +240,7 @@ Reports never include name, email, or phone.
 | WD/GV migration scripts | Unchanged; inbound sources `hubspot-wd-project` / `hubspot-gv-pilot` stay legacy |
 | Multi-project native memberships | Reuses `planHubSpotMultiProjectMemberships` / `applyPlannedMembershipsToLead`; does not apply the held cohort |
 | CMP lead intelligence | Same field contract + non-destructive apply rules |
-| Dashboard genuine inbound | Live `inboundSource=hubspot` after watermark remains genuine inbound; organic uses original `createdate`; legacy still excluded |
+| HubSpot notes / inbound engagement | Independent of lead upsert | Does not apply held multi-project cohort; one activity per HubSpot engagement id | Does not write lead intelligence fields | Timeline `createdAt` is HubSpot original time; not acquisition |
 
 ---
 

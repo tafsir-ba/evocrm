@@ -176,6 +176,8 @@ export function buildTestLeadRecord(overrides: Partial<LeadRecord> = {}): LeadRe
 
 export const activityRecordExtras = {
   projectId: TEST_PROJECT_ID,
+  hubspotExternalActivityId: null,
+  attributes: {},
 };
 
 export const opportunityRecordExtras = {

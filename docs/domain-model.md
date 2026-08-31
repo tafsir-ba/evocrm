@@ -448,6 +448,8 @@ Follow-up action (call, visit, task, email, etc.).
 | `cancelledAt` | Set when status behavior is `cancelled` |
 | `outcome` | |
 | `nextActionDate` | |
+| `hubspotExternalActivityId` | Sparse unique with workspace; HubSpot notes sync idempotency |
+| `attributes` | Provenance for HubSpot notes (`integration.sourceOccurredAt`, labels) |
 | `createdBy` | |
 | `createdAt` | |
 | `updatedAt` | |
@@ -648,6 +650,8 @@ Per-integration watermark for the ongoing HubSpot connector (not historical GV/W
 | `lastReconciledModifiedAt` | Fixed search filter for the in-progress page sequence; advanced only after that sequence is exhausted with no failures |
 | `lastReconciledAfter` | HubSpot `paging.next.after` for the **same** filter; never applied to a newer watermark |
 | `lastReconciledContactId` | Tie-break id so equal `lastmodifieddate` values are not skipped after exhaustion |
+| `notesStatus` / `notesDryRunVerifiedAt` / `notesDryRunSummary` | Independent notes/timeline cutover |
+| `lastNotesReconciledModifiedAt` / `After` / `ContactId` | Notes missed-event pointer |
 | `dryRunVerifiedAt` | Required before `active` |
 | `dryRunSummary` | Counts only (no PII) |
 

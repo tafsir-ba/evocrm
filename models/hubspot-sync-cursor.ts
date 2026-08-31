@@ -24,6 +24,16 @@ const hubspotSyncCursorSchema = new Schema(
     dryRunVerifiedAt: { type: Date, default: null },
     dryRunSummary: { type: Schema.Types.Mixed, default: {} },
     baselineContactCount: { type: Number, default: null },
+    notesStatus: {
+      type: String,
+      enum: HUBSPOT_SYNC_CURSOR_STATUSES,
+      default: "pending_cutover",
+    },
+    notesDryRunVerifiedAt: { type: Date, default: null },
+    notesDryRunSummary: { type: Schema.Types.Mixed, default: {} },
+    lastNotesReconciledModifiedAt: { type: Date, default: null },
+    lastNotesReconciledAfter: { type: String, trim: true, default: null },
+    lastNotesReconciledContactId: { type: String, trim: true, default: null },
     sideEffectGuard: {
       type: Schema.Types.Mixed,
       required: true,

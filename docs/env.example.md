@@ -114,6 +114,10 @@ Access via signed URLs only. Not required before Phase 8.
 | `HUBSPOT_ONGOING_SYNC_RELEASE_GATE` | Ongoing HubSpot sync | `off` (default), `dry-run`, or `enabled`. Mutations require `enabled` plus a verified cursor. |
 | `HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE` | Ongoing HubSpot sync | `true` to persist webhook upserts. Default off. |
 | `HUBSPOT_ONGOING_SYNC_RECONCILE` | Ongoing HubSpot sync | `true` to run the missed-event reconcile worker/cron. Default off. |
+| `HUBSPOT_NOTES_SYNC_RELEASE_GATE` | HubSpot notes/timeline | `off` (default), `dry-run`, or `enabled`. Independent of lead upsert. |
+| `HUBSPOT_NOTES_SYNC_INCREMENTAL` | HubSpot notes/timeline | `true` to attach notes after a lead upsert. Default off. |
+| `HUBSPOT_NOTES_SYNC_BACKFILL` | HubSpot notes/timeline | `true` to allow historical notes backfill. Default off. |
+| `HUBSPOT_NOTES_SYNC_RECONCILE` | HubSpot notes/timeline | `true` to run the notes missed-event cron. Default off. |
 
 ---
 
@@ -167,6 +171,10 @@ CRON_SECRET=replace-with-openssl-rand-base64-32
 # HUBSPOT_ONGOING_SYNC_RELEASE_GATE=off
 # HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE=false
 # HUBSPOT_ONGOING_SYNC_RECONCILE=false
+# HUBSPOT_NOTES_SYNC_RELEASE_GATE=off
+# HUBSPOT_NOTES_SYNC_INCREMENTAL=false
+# HUBSPOT_NOTES_SYNC_BACKFILL=false
+# HUBSPOT_NOTES_SYNC_RECONCILE=false
 
 # Phase 11 (optional until billing)
 # STRIPE_SECRET_KEY=sk_test_...

@@ -721,6 +721,14 @@ POST /api/cron/hubspot/reconcile
 
 Missed-event fallback for the HubSpot → EvoHome ongoing lead sync. Default **off** (`HUBSPOT_ONGOING_SYNC_RECONCILE` must be `true` for the internal worker). Paging keeps a fixed `lastmodifieddate` filter until the HubSpot `nextAfter` sequence is exhausted; failures do not advance the cursor. Never enrolls campaigns. Counts-only response (no PII). See `docs/hubspot-ongoing-sync.md`.
 
+```txt
+POST /api/cron/hubspot/notes
+```
+
+**Protection:** `Authorization: Bearer <CRON_SECRET>`.
+
+Missed-event fallback for the HubSpot notes / inbound-engagement workstream. Default **off** (`HUBSPOT_NOTES_SYNC_RECONCILE` plus `HUBSPOT_NOTES_SYNC_RELEASE_GATE`). Never changes lead project/status and never enrolls campaigns. Counts-only response (no PII).
+
 ---
 
 ## Signed Document URL Pattern

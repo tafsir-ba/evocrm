@@ -23,9 +23,14 @@ function getCronSecret(): string | undefined {
   return secret || undefined;
 }
 
-function getCronBaseUrl(): string | undefined {
-  const baseUrl = process.env.NEXTAUTH_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
-  return baseUrl || undefined;
+function notesReconcileEnabled(): boolean {
+  const enabled = process.env.HUBSPOT_NOTES_SYNC_RECONCILE?.trim().toLowerCase();
+  return enabled === "true" || enabled === "1";
+}
+
+function leadReconcileEnabled(): boolean {
+  const enabled = process.env.HUBSPOT_ONGOING_SYNC_RECONCILE?.trim().toLowerCase();
+  return enabled === "true" || enabled === "1";
 }
 
 export function shouldStartInternalHubSpotSyncCron(): boolean {
@@ -35,8 +40,31 @@ export function shouldStartInternalHubSpotSyncCron(): boolean {
   if (!getCronSecret() || !getCronBaseUrl()) {
     return false;
   }
-  const enabled = process.env.HUBSPOT_ONGOING_SYNC_RECONCILE?.trim().toLowerCase();
-  return enabled === "true" || enabled === "1";
+  return leadReconcileEnabled() || notesReconcileEnabled();
+}
+
+function getCronBaseUrl(): string | undefined {
+  const baseUrl = process.env.NEXTAUTH_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  return baseUrl || undefined;
+}
+
+async function postCron(path: string, cronSecret: string, baseUrl: string): Promise<void> {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${cronSecret}` },
+    signal: AbortSignal.timeout(CRON_FETCH_TIMEOUT_MS),
+  });
+  const payload = (await response.json().catch(() => null)) as { data?: unknown } | null;
+  console.info(
+    "[hubspot-sync-cron]",
+    JSON.stringify({
+      at: new Date().toISOString(),
+      path,
+      status: response.status,
+      ok: response.ok,
+      summary: payload?.data ?? payload,
+    }),
+  );
 }
 
 async function runHubSpotSyncCronTick(): Promise<void> {
@@ -52,24 +80,12 @@ async function runHubSpotSyncCronTick(): Promise<void> {
 
   workerRunning = true;
   try {
-    const response = await fetch(
-      `${baseUrl.replace(/\/$/, "")}/api/cron/hubspot/reconcile`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cronSecret}` },
-        signal: AbortSignal.timeout(CRON_FETCH_TIMEOUT_MS),
-      },
-    );
-    const payload = (await response.json().catch(() => null)) as { data?: unknown } | null;
-    console.info(
-      "[hubspot-sync-cron]",
-      JSON.stringify({
-        at: new Date().toISOString(),
-        status: response.status,
-        ok: response.ok,
-        summary: payload?.data ?? payload,
-      }),
-    );
+    if (leadReconcileEnabled()) {
+      await postCron("/api/cron/hubspot/reconcile", cronSecret, baseUrl);
+    }
+    if (notesReconcileEnabled()) {
+      await postCron("/api/cron/hubspot/notes", cronSecret, baseUrl);
+    }
   } catch (error) {
     console.error("[hubspot-sync-cron] tick failed", error);
   } finally {

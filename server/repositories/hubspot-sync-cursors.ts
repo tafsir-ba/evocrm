@@ -27,6 +27,12 @@ export type HubSpotSyncCursorRecord = {
   dryRunVerifiedAt: Date | null;
   dryRunSummary: Record<string, unknown>;
   baselineContactCount: number | null;
+  notesStatus: HubSpotSyncCursorStatus;
+  notesDryRunVerifiedAt: Date | null;
+  notesDryRunSummary: Record<string, unknown>;
+  lastNotesReconciledModifiedAt: Date | null;
+  lastNotesReconciledAfter: string | null;
+  lastNotesReconciledContactId: string | null;
   sideEffectGuard: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -47,6 +53,12 @@ function toRecord(document: HubSpotSyncCursorDocument): HubSpotSyncCursorRecord 
     dryRunVerifiedAt: document.dryRunVerifiedAt ?? null,
     dryRunSummary: (document.dryRunSummary as Record<string, unknown>) ?? {},
     baselineContactCount: document.baselineContactCount ?? null,
+    notesStatus: (document.notesStatus as HubSpotSyncCursorStatus | undefined) ?? "pending_cutover",
+    notesDryRunVerifiedAt: document.notesDryRunVerifiedAt ?? null,
+    notesDryRunSummary: (document.notesDryRunSummary as Record<string, unknown>) ?? {},
+    lastNotesReconciledModifiedAt: document.lastNotesReconciledModifiedAt ?? null,
+    lastNotesReconciledAfter: document.lastNotesReconciledAfter ?? null,
+    lastNotesReconciledContactId: document.lastNotesReconciledContactId ?? null,
     sideEffectGuard:
       (document.sideEffectGuard as Record<string, unknown>) ??
       { ...HUBSPOT_ONGOING_SYNC_SIDE_EFFECT_GUARD },
@@ -102,6 +114,12 @@ export async function updateHubSpotSyncCursor(
     dryRunVerifiedAt: Date | null;
     dryRunSummary: Record<string, unknown>;
     baselineContactCount: number | null;
+    notesStatus: HubSpotSyncCursorStatus;
+    notesDryRunVerifiedAt: Date | null;
+    notesDryRunSummary: Record<string, unknown>;
+    lastNotesReconciledModifiedAt: Date | null;
+    lastNotesReconciledAfter: string | null;
+    lastNotesReconciledContactId: string | null;
   }>,
 ): Promise<HubSpotSyncCursorRecord | null> {
   await connectDb();

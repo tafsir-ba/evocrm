@@ -78,6 +78,7 @@ import {
 } from "@/server/services/integration-logs";
 import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
 import type { HubSpotWebhookEvent } from "@/server/utils/hubspot-webhook";
+import { processHubSpotNotesForContact } from "@/server/services/hubspot-notes-sync";
 
 assertOngoingSyncSideEffectGuard();
 
@@ -693,6 +694,18 @@ export async function processOngoingHubSpotContact(input: {
         triggerAutomation: false,
       },
     });
+
+    await Promise.resolve(
+      processHubSpotNotesForContact({
+        integration: input.integration,
+        contactId,
+        path: "incremental",
+        email: contact.email,
+        formMessage: contact.properties.message,
+        formOccurredAt: contact.createdAt,
+        cursor: input.cursor,
+      }),
+    ).catch(() => undefined);
 
     return { outcome: existing ? "updated" : "created", leadId };
   } catch (error) {

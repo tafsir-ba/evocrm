@@ -18,6 +18,8 @@ const activitySchema = new Schema(
     cancelledAt: { type: Date, default: null },
     outcome: { type: String, trim: true, default: null },
     nextActionDate: { type: Date, default: null },
+    hubspotExternalActivityId: { type: String, trim: true, default: null },
+    attributes: { type: Schema.Types.Mixed, default: {} },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     archivedAt: { type: Date, default: null },
   },
@@ -46,6 +48,15 @@ activitySchema.index({ workspaceId: 1, statusId: 1, dueDate: 1, archivedAt: 1 })
 activitySchema.index({ workspaceId: 1, leadId: 1, createdAt: -1 });
 activitySchema.index({ workspaceId: 1, propertyId: 1, createdAt: -1 });
 activitySchema.index({ workspaceId: 1, opportunityId: 1, createdAt: -1 });
+activitySchema.index(
+  { workspaceId: 1, hubspotExternalActivityId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      hubspotExternalActivityId: { $type: "string", $gt: "" },
+    },
+  },
+);
 
 export type ActivityDocument = InferSchemaType<typeof activitySchema> & {
   _id: mongoose.Types.ObjectId;
