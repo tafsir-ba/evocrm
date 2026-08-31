@@ -182,10 +182,6 @@ async function main(): Promise<void> {
   const { snapshotForFinalMigration } = await import(
     "../server/services/hubspot-final-migration"
   );
-  const { ensureCmpMembershipForSnapshot } = await import(
-    "../server/services/hubspot-cmp-membership"
-  );
-  const { contactHasCmpProductSignal } = await import("../lib/hubspot-cmp-membership");
   type MappedProject = import("../lib/hubspot-final-migration-policy").MappedProject;
   type FinalMigrationCache = import("../server/services/hubspot-final-migration-cached").FinalMigrationCache;
 
@@ -395,23 +391,13 @@ async function main(): Promise<void> {
     }
     totals.membershipsAddedSum += result.membershipsAdded;
 
-    if (persist && contactHasCmpProductSignal(snapshot.productValues)) {
-      const cmp = await ensureCmpMembershipForSnapshot({
-        snapshot,
-        actorId,
-        properties: row.properties,
-        persist: true,
-      });
-      if (cmp.outcome === "created") totals.cmpEnsured += 1;
-    }
-
     if (persist && result.outcome !== "error") {
       processedIds.push(row.id);
     }
 
-    if (totals.scanned % 100 === 0) {
+    if (totals.scanned % 25 === 0) {
       console.error(
-        `[final-migration] progress scanned=${totals.scanned} created=${totals.created} legacy=${totals.legacy_general} mem+=${totals.memberships_added} err=${totals.error}`,
+        `[final-migration] progress scanned=${totals.scanned} created=${totals.created} legacy=${totals.legacy_general} mem+=${totals.memberships_added} err=${totals.error} last=${row.id}`,
       );
       if (persist) {
         await mkdir(path.dirname(checkpointPath), { recursive: true });
