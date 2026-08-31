@@ -42,6 +42,8 @@ const leadEnrichmentRunSchema = new Schema(
     failureMessage: { type: String, default: null },
     demoMode: { type: Boolean, default: false },
     sources: { type: Schema.Types.Mixed, default: [] },
+    candidates: { type: Schema.Types.Mixed, default: [] },
+    selectedCandidateId: { type: String, default: null },
     suggestions: { type: [suggestionSchema], default: [] },
     summaryDraft: { type: Schema.Types.Mixed, default: null },
     acceptedSummary: { type: Schema.Types.Mixed, default: null },

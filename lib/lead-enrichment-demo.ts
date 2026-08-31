@@ -1,3 +1,4 @@
+import type { LeadEnrichmentCandidate } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentFieldKey } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentIdentityMatch } from "@/lib/lead-enrichment";
@@ -17,6 +18,7 @@ export type DemoSynthesis = {
   }>;
   summary: { text: string; citationUrls: string[] };
   hits: LeadEnrichmentSearchHit[];
+  candidates?: LeadEnrichmentCandidate[];
 };
 
 const retrievedAt = "2026-08-31T12:00:00.000Z";
@@ -28,6 +30,20 @@ export function getLeadEnrichmentDemoFixture(input: {
   const email = input.email.trim().toLowerCase();
 
   if (email === DEMO_AMBIGUOUS_EMAIL) {
+    const geneva = {
+      fieldKey: "jobTitle" as const,
+      value: "Head of Sales",
+      confidencePercent: 80,
+      rationale: "Public Geneva directory lists this John Smith as Head of Sales.",
+      sourceUrls: ["https://www.example.com/people/john-smith-geneva"],
+    };
+    const zurich = {
+      fieldKey: "jobTitle" as const,
+      value: "Orthopaedic Surgery Resident",
+      confidencePercent: 82,
+      rationale: "Public Zurich listing describes a different John Smith.",
+      sourceUrls: ["https://www.example.com/people/john-smith-zurich"],
+    };
     return {
       identityMatch: "ambiguous",
       identityRationale:
@@ -46,6 +62,86 @@ export function getLeadEnrichmentDemoFixture(input: {
           title: "John Smith — Zurich",
           snippet: "A different John Smith listed in Zurich.",
           retrievedAt,
+        },
+      ],
+      candidates: [
+        {
+          id: "cand-1",
+          label: "John Smith — Head of Sales · Geneva",
+          headline: "Head of Sales",
+          employer: "Example Corp",
+          location: "Geneva, Switzerland",
+          profileUrl: "https://www.example.com/people/john-smith-geneva",
+          sourceUrls: ["https://www.example.com/people/john-smith-geneva"],
+          confidencePercent: 80,
+          mostLikely: true,
+          suggestions: [
+            geneva,
+            {
+              fieldKey: "companyName",
+              value: "Example Corp",
+              confidencePercent: 78,
+              rationale: "Employer named on the Geneva directory page.",
+              sourceUrls: ["https://www.example.com/people/john-smith-geneva"],
+            },
+            {
+              fieldKey: "city",
+              value: "Geneva",
+              confidencePercent: 80,
+              rationale: "City listed on the Geneva directory page.",
+              sourceUrls: ["https://www.example.com/people/john-smith-geneva"],
+            },
+            {
+              fieldKey: "country",
+              value: "Switzerland",
+              confidencePercent: 80,
+              rationale: "Country listed on the Geneva directory page.",
+              sourceUrls: ["https://www.example.com/people/john-smith-geneva"],
+            },
+          ],
+          summary: {
+            text: "Public Geneva directory lists John Smith as Head of Sales at Example Corp.",
+            citationUrls: ["https://www.example.com/people/john-smith-geneva"],
+          },
+        },
+        {
+          id: "cand-2",
+          label: "John Smith — Orthopaedic Surgery Resident · Zurich",
+          headline: "Orthopaedic Surgery Resident",
+          employer: "Hôpital universitaire",
+          location: "Zurich, Switzerland",
+          profileUrl: "https://www.example.com/people/john-smith-zurich",
+          sourceUrls: ["https://www.example.com/people/john-smith-zurich"],
+          confidencePercent: 82,
+          mostLikely: false,
+          suggestions: [
+            zurich,
+            {
+              fieldKey: "companyName",
+              value: "Hôpital universitaire",
+              confidencePercent: 80,
+              rationale: "Hospital named on the Zurich listing.",
+              sourceUrls: ["https://www.example.com/people/john-smith-zurich"],
+            },
+            {
+              fieldKey: "city",
+              value: "Zurich",
+              confidencePercent: 82,
+              rationale: "City listed on the Zurich directory page.",
+              sourceUrls: ["https://www.example.com/people/john-smith-zurich"],
+            },
+            {
+              fieldKey: "country",
+              value: "Switzerland",
+              confidencePercent: 80,
+              rationale: "Country listed on the Zurich directory page.",
+              sourceUrls: ["https://www.example.com/people/john-smith-zurich"],
+            },
+          ],
+          summary: {
+            text: "A different John Smith is listed in Zurich as an orthopaedic surgery resident.",
+            citationUrls: ["https://www.example.com/people/john-smith-zurich"],
+          },
         },
       ],
     };

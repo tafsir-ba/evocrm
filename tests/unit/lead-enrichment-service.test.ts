@@ -68,6 +68,7 @@ import {
   applyLeadEnrichmentDecisions,
   getLeadEnrichmentCapability,
   revokeLeadEnrichment,
+  selectLeadEnrichmentCandidate,
   startLeadEnrichment,
 } from "@/server/services/lead-enrichment";
 import { buildTestLeadRecord } from "@/tests/helpers/crm-fixtures";
@@ -128,6 +129,8 @@ describe("lead enrichment service", () => {
       failureMessage: null,
       demoMode: true,
       sources: [],
+      candidates: [],
+      selectedCandidateId: null,
       suggestions: [],
       summaryDraft: null,
       acceptedSummary: null,
@@ -137,34 +140,46 @@ describe("lead enrichment service", () => {
       updatedAt: new Date().toISOString(),
     }));
     vi.mocked(updateEnrichmentRun).mockImplementation(async (_ws, id, patch) => {
-      const record = {
+      const previous = (await vi.mocked(findEnrichmentRunById)("ws-1", id)) ?? {
         id,
         workspaceId: "ws-1",
         leadId: "lead-1",
         initiatedBy: "user-1",
-        status: (patch.status as never) ?? "reviewing",
+        status: "reviewing" as const,
         queryFullName: "Amira Keller",
         queryEmail: DEMO_UNIQUE_EMAIL,
         allowedSources: ["company_website"],
-        searchProvider: patch.searchProvider ?? "demo_fixture",
-        aiModel: patch.aiModel ?? "demo-fixture",
+        searchProvider: "demo_fixture",
+        aiModel: "demo-fixture",
         retrievedAt: new Date().toISOString(),
         expiresAt: null,
-        identityMatch: (patch.identityMatch as never) ?? "unique",
-        identityRationale: patch.identityRationale ?? null,
-        failureMessage: patch.failureMessage ?? null,
+        identityMatch: "unique" as const,
+        identityRationale: null,
+        failureMessage: null,
         demoMode: true,
-        sources: (patch.sources as never) ?? [],
-        suggestions: (patch.suggestions as never) ?? [],
-        summaryDraft: (patch.summaryDraft as never) ?? null,
-        acceptedSummary: (patch.acceptedSummary as never) ?? null,
+        sources: [],
+        candidates: [],
+        selectedCandidateId: null,
+        suggestions: [],
+        summaryDraft: null,
+        acceptedSummary: null,
         revokedAt: null,
         revokedBy: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      vi.mocked(findEnrichmentRunById).mockResolvedValue(record);
-      return record;
+      const record = {
+        ...previous,
+        id,
+        ...patch,
+        retrievedAt:
+          patch.retrievedAt instanceof Date
+            ? patch.retrievedAt.toISOString()
+            : (patch.retrievedAt ?? previous.retrievedAt),
+        updatedAt: new Date().toISOString(),
+      };
+      vi.mocked(findEnrichmentRunById).mockResolvedValue(record as never);
+      return record as never;
     });
   });
 
@@ -185,9 +200,48 @@ describe("lead enrichment service", () => {
       allowedSources: ["company_website"],
     });
 
-    expect(run.status).toBe("ambiguous");
+    expect(run.status).toBe("reviewing");
     expect(run.suggestions).toEqual([]);
+    expect(run.candidates).toHaveLength(2);
+    expect(run.candidates[0]?.mostLikely).toBe(true);
+    expect(run.selectedCandidateId).toBeNull();
     expect(updateLead).not.toHaveBeenCalled();
+  });
+
+  it("applies the chosen candidate instead of the most likely one", async () => {
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "John Smith",
+        firstName: "John",
+        lastName: "Smith",
+        email: DEMO_AMBIGUOUS_EMAIL,
+      }),
+    );
+
+    const started = await startLeadEnrichment({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      allowedSources: ["company_website"],
+    });
+    expect(started.candidates[1]?.id).toBe("cand-2");
+
+    const run = await selectLeadEnrichmentCandidate({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      runId: started.id,
+      actorId: "user-1",
+      candidateId: "cand-2",
+    });
+
+    expect(run.selectedCandidateId).toBe("cand-2");
+    expect(run.suggestions.some((item) => item.proposedValue === "Orthopaedic Surgery Resident")).toBe(
+      true,
+    );
+    expect(updateLead).toHaveBeenCalled();
+    const patch = vi.mocked(updateLead).mock.calls.at(-1)![2];
+    expect(patch.jobTitle).toBe("Orthopaedic Surgery Resident");
+    expect(patch.city).toBe("Zurich");
   });
 
   it("applies cited safe fields immediately after a unique match", async () => {
@@ -304,6 +358,8 @@ describe("lead enrichment service", () => {
       failureMessage: null,
       demoMode: true,
       sources: [],
+      candidates: [],
+      selectedCandidateId: null,
       suggestions: [suggestion],
       summaryDraft: null,
       acceptedSummary: null,
@@ -367,6 +423,8 @@ describe("lead enrichment service", () => {
       failureMessage: null,
       demoMode: true,
       sources: [],
+      candidates: [],
+      selectedCandidateId: null,
       suggestions: [suggestion],
       summaryDraft: null,
       acceptedSummary: null,
@@ -436,6 +494,8 @@ describe("lead enrichment service", () => {
       failureMessage: null,
       demoMode: true,
       sources: [],
+      candidates: [],
+      selectedCandidateId: null,
       suggestions: [suggestion],
       summaryDraft: null,
       acceptedSummary: null,
@@ -863,6 +923,8 @@ describe("lead enrichment service", () => {
       failureMessage: null,
       demoMode: true,
       sources: [],
+      candidates: [],
+      selectedCandidateId: null,
       suggestions: [suggestion],
       summaryDraft: null,
       acceptedSummary: null,

@@ -37,11 +37,14 @@ import {
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
 import { EnrichedField } from "@/components/leads/enriched-field";
+import { EnrichmentCandidateList } from "@/components/leads/lead-enrichment-candidates";
 import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
 import { LeadFinancialSituationTab } from "@/components/leads/lead-financial-situation-tab";
 import {
+  hasEnrichmentCandidateAlternatives,
   isUniqueEnrichmentReveal,
   readWebEnrichmentAttributes,
+  type LeadEnrichmentCandidate,
   type LeadEnrichmentSuggestion,
 } from "@/lib/lead-enrichment";
 import type { LeadFieldProvenanceMethod } from "@/lib/lead-intelligence";
@@ -165,8 +168,11 @@ export function LeadDetailPanel({
       suggestions: LeadEnrichmentSuggestion[];
       acceptedSummary: { text: string; citationUrls: string[] } | null;
       summaryDraft: { text: string; citationUrls: string[] } | null;
+      candidates?: LeadEnrichmentCandidate[];
+      selectedCandidateId?: string | null;
     }>
   >([]);
+  const [candidatePending, setCandidatePending] = useState(false);
   const [enrichmentEnabled, setEnrichmentEnabled] = useState(false);
   const [revealRunId, setRevealRunId] = useState<string | null>(null);
   const [estimatePending, setEstimatePending] = useState(false);
@@ -530,6 +536,34 @@ export function LeadDetailPanel({
     await loadLead({ silent: true });
   }
 
+  async function applyCandidate(candidateId: string) {
+    if (!activeRun || candidatePending) return;
+    if (activeRun.selectedCandidateId === candidateId && activeRun.status === "accepted") {
+      return;
+    }
+    setCandidatePending(true);
+    try {
+      const response = await fetch(
+        `${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/candidates`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateId }),
+        },
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? "Could not apply that match.");
+      }
+      setRevealRunId(activeRun.id);
+      await loadLead({ silent: true });
+    } catch (applyError) {
+      setError(applyError instanceof Error ? applyError.message : "Could not apply that match.");
+    } finally {
+      setCandidatePending(false);
+    }
+  }
+
   async function revertActiveRun() {
     if (!activeRun) return;
     if (!window.confirm("Revert this enrichment run and restore previous CRM values?")) {
@@ -801,6 +835,27 @@ export function LeadDetailPanel({
                   label: "Overview",
                   content: (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-5 px-5">
+                      {canEnrich &&
+                      activeRun &&
+                      hasEnrichmentCandidateAlternatives(activeRun) ? (
+                        <div className="md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/40 p-3">
+                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
+                            Matches found
+                          </p>
+                          <p className="mb-2 text-[13px] text-[var(--color-ink-soft)]">
+                            {activeRun.selectedCandidateId
+                              ? "Most likely is applied. Choose another person if this is the wrong match."
+                              : "Most likely is listed first. Choose which person to apply."}
+                          </p>
+                          <EnrichmentCandidateList
+                            candidates={activeRun.candidates ?? []}
+                            selectedId={activeRun.selectedCandidateId ?? null}
+                            appliedId={activeRun.selectedCandidateId ?? null}
+                            onSelect={(candidateId) => void applyCandidate(candidateId)}
+                            disabled={candidatePending}
+                          />
+                        </div>
+                      ) : null}
                       <Info label="Budget" value={formatBudget(lead.budgetMin, lead.budgetMax)} />
                       <Info label="Language" value={lead.language ?? "—"} />
                       <Info

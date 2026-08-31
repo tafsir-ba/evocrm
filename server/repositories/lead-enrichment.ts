@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 
+import type { LeadEnrichmentCandidate } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentIdentityMatch } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSuggestion } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSummary } from "@/lib/lead-enrichment";
@@ -31,6 +32,8 @@ export type LeadEnrichmentRunRecord = {
   failureMessage: string | null;
   demoMode: boolean;
   sources: LeadEnrichmentSearchHit[];
+  candidates: LeadEnrichmentCandidate[];
+  selectedCandidateId: string | null;
   suggestions: LeadEnrichmentSuggestion[];
   summaryDraft: LeadEnrichmentSummary | null;
   acceptedSummary: LeadEnrichmentSummary | null;
@@ -58,6 +61,8 @@ function toRecord(document: {
   failureMessage?: string | null;
   demoMode?: boolean;
   sources?: LeadEnrichmentSearchHit[];
+  candidates?: LeadEnrichmentCandidate[];
+  selectedCandidateId?: string | null;
   suggestions?: LeadEnrichmentSuggestion[];
   summaryDraft?: LeadEnrichmentSummary | null;
   acceptedSummary?: LeadEnrichmentSummary | null;
@@ -84,6 +89,8 @@ function toRecord(document: {
     failureMessage: document.failureMessage ?? null,
     demoMode: document.demoMode === true,
     sources: document.sources ?? [],
+    candidates: document.candidates ?? [],
+    selectedCandidateId: document.selectedCandidateId ?? null,
     suggestions: document.suggestions ?? [],
     summaryDraft: document.summaryDraft ?? null,
     acceptedSummary: document.acceptedSummary ?? null,
@@ -163,6 +170,8 @@ export async function updateEnrichmentRun(
     identityRationale: string | null;
     failureMessage: string | null;
     sources: LeadEnrichmentSearchHit[];
+    candidates: LeadEnrichmentCandidate[];
+    selectedCandidateId: string | null;
     suggestions: LeadEnrichmentSuggestion[];
     summaryDraft: LeadEnrichmentSummary | null;
     acceptedSummary: LeadEnrichmentSummary | null;

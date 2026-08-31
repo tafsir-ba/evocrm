@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { EnrichmentCandidateList } from "@/components/leads/lead-enrichment-candidates";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
+import type { LeadEnrichmentCandidate } from "@/lib/lead-enrichment";
+import { isUniqueEnrichmentReveal, needsEnrichmentCandidateChoice } from "@/lib/lead-enrichment";
 
 type RunPayload = {
   id: string;
@@ -13,12 +15,16 @@ type RunPayload = {
   identityRationale: string | null;
   failureMessage: string | null;
   demoMode: boolean;
+  candidates?: LeadEnrichmentCandidate[];
+  selectedCandidateId?: string | null;
 };
 
 export type EnrichmentAppliedRun = {
   id: string;
   status: string;
   identityMatch: string | null;
+  candidates?: LeadEnrichmentCandidate[];
+  selectedCandidateId?: string | null;
 };
 
 const PROGRESS_STEPS = [
@@ -48,6 +54,8 @@ export function LeadEnrichmentModal({
   const [progressIndex, setProgressIndex] = useState(0);
   const [run, setRun] = useState<RunPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
   const onAppliedRef = useRef(onApplied);
   const onCloseRef = useRef(onClose);
   onAppliedRef.current = onApplied;
@@ -59,6 +67,8 @@ export function LeadEnrichmentModal({
       setProgressIndex(0);
       setRun(null);
       setError(null);
+      setSelectedCandidateId(null);
+      setApplying(false);
       return;
     }
 
@@ -84,12 +94,15 @@ export function LeadEnrichmentModal({
         if (cancelled) return;
         const next = payload.data.run as RunPayload;
         setRun(next);
+        setSelectedCandidateId(next.candidates?.find((candidate) => candidate.mostLikely)?.id ?? next.candidates?.[0]?.id ?? null);
         setPhase("done");
         if (isUniqueEnrichmentReveal(next)) {
           onAppliedRef.current({
             id: next.id,
             status: next.status,
             identityMatch: next.identityMatch,
+            candidates: next.candidates,
+            selectedCandidateId: next.selectedCandidateId,
           });
           closeTimer = window.setTimeout(() => {
             if (!cancelled) {
@@ -116,6 +129,40 @@ export function LeadEnrichmentModal({
   }, [open, api]);
 
   const uniqueReveal = Boolean(run && !error && isUniqueEnrichmentReveal(run));
+  const choosing = Boolean(run && !error && needsEnrichmentCandidateChoice(run));
+
+  async function applySelectedCandidate() {
+    if (!run || !selectedCandidateId) {
+      return;
+    }
+    setApplying(true);
+    setError(null);
+    try {
+      const response = await fetch(`${api}/${run.id}/candidates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId: selectedCandidateId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Could not apply that match.");
+      }
+      const next = payload.data.run as RunPayload;
+      setRun(next);
+      onAppliedRef.current({
+        id: next.id,
+        status: next.status,
+        identityMatch: next.identityMatch,
+        candidates: next.candidates,
+        selectedCandidateId: next.selectedCandidateId,
+      });
+      onCloseRef.current();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not apply that match.");
+    } finally {
+      setApplying(false);
+    }
+  }
 
   return (
     <Modal
@@ -129,6 +176,14 @@ export function LeadEnrichmentModal({
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
+            {choosing ? (
+              <Button
+                onClick={() => void applySelectedCandidate()}
+                disabled={!selectedCandidateId || applying}
+              >
+                {applying ? "Applying…" : "Apply this person"}
+              </Button>
+            ) : null}
           </div>
         ) : null
       }
@@ -172,7 +227,21 @@ export function LeadEnrichmentModal({
               Dry-run / demo fixture. No live web search was sent.
             </p>
           ) : null}
-          {run?.status === "ambiguous" || run?.identityMatch === "ambiguous" ? (
+          {choosing ? (
+            <>
+              <p className="text-[13px] text-[var(--color-ink)]">
+                {run?.identityRationale ||
+                  "Several public professionals match. The first is the most likely — pick another if that is the wrong person."}
+              </p>
+              <EnrichmentCandidateList
+                candidates={run?.candidates ?? []}
+                selectedId={selectedCandidateId}
+                onSelect={setSelectedCandidateId}
+                disabled={applying}
+              />
+            </>
+          ) : null}
+          {!choosing && (run?.status === "ambiguous" || run?.identityMatch === "ambiguous") ? (
             <p className="text-[13px] text-[var(--color-ink)]">
               {run.identityRationale ||
                 run.failureMessage ||
