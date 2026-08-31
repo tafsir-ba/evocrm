@@ -290,7 +290,7 @@ describe("lead project membership service", () => {
       }),
     ).rejects.toThrow("write failed");
 
-    expect(updateMembership.mock.calls.map(([, id, input]) => [id, input])).toEqual([
+    expect(vi.mocked(updateMembership).mock.calls.map(([, id, input]) => [id, input])).toEqual([
       ["mem-1", { isPrimary: false }],
       ["mem-2", { isPrimary: true }],
       ["mem-2", { isPrimary: false }],
@@ -316,7 +316,7 @@ describe("lead project membership service", () => {
       }),
     ).rejects.toThrow("email conflict");
 
-    expect(updateMembership.mock.calls.map(([, id, input]) => [id, input])).toEqual([
+    expect(vi.mocked(updateMembership).mock.calls.map(([, id, input]) => [id, input])).toEqual([
       ["mem-1", { isPrimary: false }],
       ["mem-2", { isPrimary: true }],
       ["mem-2", { isPrimary: false }],
