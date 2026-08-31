@@ -90,7 +90,7 @@ Leads appear in primary navigation (`/w/[workspaceSlug]/leads`). No separate Con
 
 `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) lists active workspace members for lead assignment pickers in create/edit UI.
 
-Opportunities section on lead detail is implemented in Phase 6. **Phase 7:** Activities tab loads real workspace-scoped activities. Timeline Notes and Files tabs remain placeholders.
+Opportunities section on lead detail is implemented in Phase 6. **Phase 7:** Activities tab loads real workspace-scoped activities. **Notes tab:** timestamped internal notes (Activity type `note`) with optional follow-up task. Files tab is implemented.
 
 ---
 

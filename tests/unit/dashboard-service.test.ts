@@ -515,6 +515,7 @@ describe("dashboard service", () => {
       property: null,
       opportunity: null,
       assignedUser: { id: "user-1", name: "Agent", email: "agent@example.com" },
+      createdByUser: { id: "user-1", name: "Agent", email: "agent@example.com" },
       isOverdue: false,
       isUpcoming: true,
     });
