@@ -3,9 +3,10 @@ import "server-only";
 import {
   MARKET_INCOME_DISCLAIMER,
   emptyFinancialSnapshot,
-  hasOccupationalEstimateInputs,
+  occupationalEstimateLocation,
   parseOccupationalEstimatePayload,
   parseOccupationalWageRange,
+  resolveOccupationalJobTitle,
   type LeadFinancialSituationSnapshot,
   type MarketIncomeEstimate,
 } from "@/lib/lead-financial-situation";
@@ -127,24 +128,35 @@ export async function requestMarketIncomeEstimate(input: {
   if (!lead || lead.archivedAt) {
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
-  const jobTitle = lead.jobTitle?.trim();
-  if (!hasOccupationalEstimateInputs(lead) || !jobTitle) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      "Market-income estimate needs a job title and a location (city, region, or country).",
-    );
-  }
-  const location = [lead.city, lead.stateRegion, lead.country].filter(Boolean).join(", ");
   const companies = lead.companyId
     ? await findCompaniesByIds(input.workspaceId, [lead.companyId])
     : [];
   const companyName = companies[0]?.name?.trim() || null;
+  const roleLead = {
+    jobTitle: lead.jobTitle,
+    industry: lead.industry,
+    companyName,
+    professionalProfileUrl: lead.professionalProfileUrl,
+    city: lead.city,
+    stateRegion: lead.stateRegion,
+    country: lead.country,
+  };
+  const resolvedRole = resolveOccupationalJobTitle(roleLead);
+  const location = occupationalEstimateLocation(roleLead);
+  if (!resolvedRole || !location) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Market-income estimate needs a location and a role — job title, a law-firm / registry profile, or a company that implies the occupation.",
+    );
+  }
+  const jobTitle = resolvedRole.jobTitle;
 
   let sources: Array<{ url: string; title: string }> = [];
   let rangeMin: number | null = null;
   let rangeMax: number | null = null;
-  let methodology =
-    "Occupational estimate: typical pay for this role and market, not this person’s income.";
+  let methodology = resolvedRole.inferred
+    ? `Role inferred as ${jobTitle} from the employer or professional registry. Occupational estimate: typical pay for this role and market, not this person’s income.`
+    : "Occupational estimate: typical pay for this role and market, not this person’s income.";
   let confidencePercent = 40;
   let provider = "demo_fixture";
   let model = "none";

@@ -18,6 +18,7 @@ import {
   filterEnrichmentHitsForPerson,
   isLeadEnrichmentFieldKey,
   isPlausibleJobTitle,
+  mergeInferredOccupationalSuggestions,
   mergeEnrichmentHits,
   preferHitsInProjectMarket,
   shouldContinueEnrichmentSearch,
@@ -466,7 +467,14 @@ export async function startLeadEnrichment(input: {
     }
 
     const suggestions = buildSuggestions({
-      synthesis: { suggestions: candidates[0]?.suggestions ?? synthesis.suggestions },
+      synthesis: {
+        ...synthesis,
+        suggestions: mergeInferredOccupationalSuggestions({
+          suggestions: candidates[0]?.suggestions ?? synthesis.suggestions,
+          hits,
+          known: current.values,
+        }),
+      },
       current,
       retrievedAt,
       searchProvider: provider,
@@ -583,7 +591,13 @@ export async function selectLeadEnrichmentCandidate(input: {
     ...candidate.suggestions.flatMap((suggestion) => suggestion.sourceUrls),
   ];
   const suggestions = buildSuggestions({
-    synthesis: { suggestions: candidate.suggestions },
+    synthesis: {
+      suggestions: mergeInferredOccupationalSuggestions({
+        suggestions: candidate.suggestions,
+        hits: run.sources,
+        known: current.values,
+      }),
+    },
     current,
     retrievedAt,
     searchProvider: run.searchProvider ?? "unknown",

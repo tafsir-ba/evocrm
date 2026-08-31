@@ -325,10 +325,12 @@ export function LeadFinancialSituationTab({
         </p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-          Typical pay for this role and market (for example a CTO at a company like Neho in
-          Switzerland). Enrich requests it after a unique match when job title and location are on
-          the profile. It fills income, employment type, and a discussion budget, and sets source
-          to Occupational estimate. Declared-by-lead, document, or advisor values are left alone.
+          Typical pay for this role and market (for example an avocat at a Geneva firm, or a CTO
+          at a company like Neho in Switzerland). Enrich infers the role from the job title, a
+          bar / registry profile, or a firm that makes the occupation obvious, then uses the
+          location on the profile. It fills income, employment type, and a discussion budget, and
+          sets source to Occupational estimate. Declared-by-lead, document, or advisor values are
+          left alone.
         </p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">

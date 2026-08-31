@@ -769,6 +769,184 @@ export function isPlausibleJobTitle(value: string): boolean {
   return true;
 }
 
+const LEGAL_REGISTRY_PATTERN =
+  /odage\.ch|ordre[- ]des[- ]avocats|barreau|anwaltskammer|law[- ]society|bar association|annuaire-des-membres|attorney[- ]directory/i;
+const LEGAL_FIRM_PATTERN =
+  /associ[ée]|avocat|\battorneys?\b|\blawyers?\b|\blaw\s*firm\b|\brechtsanw|\bstudio legale\b|\bsolicitors?\b/i;
+const LEGAL_TITLE_PATTERN =
+  /\b(avocat(?:e)?|attorney(?:-at-law)?|lawyer|counsel|solicitor|rechtsanwalt)\b/i;
+const LEGAL_INDUSTRY_PATTERN = /\b(legal|law|juridique|avocat)\b/i;
+
+export type OccupationalRoleEvidence = {
+  jobTitle?: string | null;
+  industry?: string | null;
+  companyName?: string | null;
+  professionalProfileUrl?: string | null;
+  otherProfessional?: string | null;
+  hits?: Array<{ url: string; title: string; snippet?: string }>;
+};
+
+export type OccupationalRoleInference = {
+  jobTitle: string;
+  industry: string;
+  sourceUrls: string[];
+  rationale: string;
+};
+
+function occupationalHaystack(input: OccupationalRoleEvidence): string {
+  return [
+    input.jobTitle,
+    input.industry,
+    input.companyName,
+    input.professionalProfileUrl,
+    input.otherProfessional,
+    ...(input.hits ?? []).map((hit) => `${hit.title} ${hit.url} ${hit.snippet ?? ""}`),
+  ]
+    .filter(Boolean)
+    .join(" \n ");
+}
+
+function matchingOccupationalUrls(input: OccupationalRoleEvidence, pattern: RegExp): string[] {
+  const urls: string[] = [];
+  if (input.professionalProfileUrl && pattern.test(input.professionalProfileUrl)) {
+    urls.push(input.professionalProfileUrl);
+  }
+  for (const hit of input.hits ?? []) {
+    if (pattern.test(`${hit.url} ${hit.title} ${hit.snippet ?? ""}`)) {
+      urls.push(hit.url);
+    }
+  }
+  return [...new Set(urls.filter((url) => url.startsWith("https://")))];
+}
+
+export function inferOccupationalRole(
+  input: OccupationalRoleEvidence,
+): OccupationalRoleInference | null {
+  const existingTitle = input.jobTitle?.trim();
+  if (existingTitle && isPlausibleJobTitle(existingTitle)) {
+    return {
+      jobTitle: existingTitle,
+      industry:
+        input.industry?.trim() || (LEGAL_TITLE_PATTERN.test(existingTitle) ? "Legal" : ""),
+      sourceUrls: matchingOccupationalUrls(input, LEGAL_TITLE_PATTERN),
+      rationale: "Job title already on the lead.",
+    };
+  }
+
+  const hay = occupationalHaystack(input);
+  const french = /odage|avocat|associ[ée]|gen[eè]ve|suisse|barreau/i.test(hay);
+  const registryUrls = matchingOccupationalUrls(input, LEGAL_REGISTRY_PATTERN);
+  const firmUrls = matchingOccupationalUrls(input, LEGAL_FIRM_PATTERN);
+  const titleUrls = matchingOccupationalUrls(input, LEGAL_TITLE_PATTERN);
+  const isLegal =
+    registryUrls.length > 0 ||
+    LEGAL_FIRM_PATTERN.test(input.companyName ?? "") ||
+    LEGAL_TITLE_PATTERN.test(hay) ||
+    LEGAL_REGISTRY_PATTERN.test(input.professionalProfileUrl ?? "") ||
+    LEGAL_INDUSTRY_PATTERN.test(input.industry ?? "");
+
+  if (!isLegal) {
+    return null;
+  }
+
+  const jobTitle = french ? "Avocat" : "Attorney";
+  let sourceUrls =
+    registryUrls.length > 0 ? registryUrls : titleUrls.length > 0 ? titleUrls : firmUrls;
+  if (sourceUrls.length === 0 && input.professionalProfileUrl?.startsWith("https://")) {
+    sourceUrls = [input.professionalProfileUrl];
+  }
+  if (sourceUrls.length === 0) {
+    sourceUrls = [...new Set((input.hits ?? []).map((hit) => hit.url).filter((url) => url.startsWith("https://")))];
+  }
+  return {
+    jobTitle,
+    industry: input.industry?.trim() || "Legal",
+    sourceUrls,
+    rationale: french
+      ? "Bar directory or law-firm listing implies a practising avocat."
+      : "Bar directory or law-firm listing implies a practising attorney.",
+  };
+}
+
+export function mergeInferredOccupationalSuggestions(input: {
+  suggestions: Array<{
+    fieldKey: string;
+    value: string;
+    confidencePercent: number;
+    rationale: string;
+    sourceUrls: string[];
+  }>;
+  hits: Array<{ url: string; title: string; snippet?: string }>;
+  known?: {
+    jobTitle?: string | null;
+    industry?: string | null;
+    companyName?: string | null;
+    professionalProfileUrl?: string | null;
+  };
+}): Array<{
+  fieldKey: string;
+  value: string;
+  confidencePercent: number;
+  rationale: string;
+  sourceUrls: string[];
+}> {
+  const suggestions = [...input.suggestions];
+  const hasTitle = suggestions.some((row) => row.fieldKey === "jobTitle" && row.value.trim());
+  const hasIndustry = suggestions.some((row) => row.fieldKey === "industry" && row.value.trim());
+  if (hasTitle && hasIndustry) {
+    return suggestions;
+  }
+
+  const companyName =
+    input.known?.companyName ??
+    suggestions.find((row) => row.fieldKey === "companyName")?.value ??
+    null;
+  const professionalProfileUrl =
+    input.known?.professionalProfileUrl ??
+    suggestions.find((row) => row.fieldKey === "professionalProfileUrl")?.value ??
+    null;
+  const inferred = inferOccupationalRole({
+    jobTitle: hasTitle ? suggestions.find((row) => row.fieldKey === "jobTitle")?.value : input.known?.jobTitle,
+    industry: hasIndustry
+      ? suggestions.find((row) => row.fieldKey === "industry")?.value
+      : input.known?.industry,
+    companyName,
+    professionalProfileUrl,
+    hits: input.hits,
+  });
+  if (!inferred) {
+    return suggestions;
+  }
+  const fallbackUrls =
+    suggestions
+      .find((row) => row.fieldKey === "companyName" || row.fieldKey === "professionalProfileUrl")
+      ?.sourceUrls.filter((url) => url.startsWith("https://")) ?? [];
+  const sourceUrls = inferred.sourceUrls.length > 0 ? inferred.sourceUrls : fallbackUrls;
+  if (sourceUrls.length === 0) {
+    return suggestions;
+  }
+
+  if (!hasTitle) {
+    suggestions.push({
+      fieldKey: "jobTitle",
+      value: inferred.jobTitle,
+      confidencePercent: 75,
+      rationale: inferred.rationale,
+      sourceUrls,
+    });
+  }
+  if (!hasIndustry) {
+    suggestions.push({
+      fieldKey: "industry",
+      value: inferred.industry,
+      confidencePercent: 75,
+      rationale: inferred.rationale,
+      sourceUrls,
+    });
+  }
+  return suggestions;
+}
+
 export function mergeEnrichmentHits(
   groups: Array<Array<{ url: string; title: string; snippet: string; retrievedAt: string }>>,
 ): Array<{ url: string; title: string; snippet: string; retrievedAt: string }> {
