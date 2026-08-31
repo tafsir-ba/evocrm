@@ -108,10 +108,14 @@
       "conflictWhen": "explicit_wd_project_other_than_destination",
       "conflictBucket": "product_vs_wd_conflict:CMP",
       "routeAmbiguityToGeneral": false,
-      "status": "active",
-      "notes": "Priority CMP wave: Product interested in=CMP is explicit attribution when wd_project is blank. Conflicting explicit wd_project stays in product_vs_wd_conflict:CMP. Never route ambiguity to EvoHome General."
+      "status": "complete_for_live_eq_cohort",
+      "liveCohortDistinct": 8316,
+      "businessExpectationAbout": 8317,
+      "reconciliation": "migrations/hubspot-wd-project/cmp-full-cohort-reconciliation-summary.json",
+      "notes": "Priority CMP wave: Product interested in=CMP is explicit attribution when wd_project is blank. Live HubSpot EQ cohort fully accounted exclusively (migrated / conflict held / missing contact). Never route ambiguity to EvoHome General."
     }
   ],
+  "end_line_roadmap": "migrations/hubspot-wd-project/end-line-roadmap.json",
   "nameless_email_reclassification": {
     "status": "active",
     "when": "firstname_or_lastname_blank_and_valid_email_present",
