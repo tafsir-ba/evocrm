@@ -1,7 +1,9 @@
 /**
- * Enrich existing HubSpot CMP leads with industry, job title, state/region,
- * and associated company. Fills blank or HubSpot-owned values only.
- * Never enrolls campaigns or drips.
+ * One-time HubSpot → EvoHome CMP lead intelligence backfill.
+ * Cohort: EvoHome leads with CMP project membership.
+ * Fills blank or HubSpot-owned industry, job title, state/region, and company.
+ * Never overwrites manual CRM edits. Never changes memberships, status, source
+ * dates, dripping, campaigns, or consent.
  *
  * Usage:
  *   npm run enrich:hubspot-cmp-lead-intelligence
@@ -10,6 +12,8 @@
  *
  * Dry-run by default. Writes require --execute --confirm-write.
  */
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import Module from "node:module";
 
 const loadable = Module as unknown as {
@@ -54,13 +58,24 @@ function bootstrapEnv(): void {
   }
 }
 
+function argValue(argv: string[], name: string): string | undefined {
+  const prefix = `--${name}=`;
+  const found = argv.find((item) => item.startsWith(prefix));
+  return found ? found.slice(prefix.length) : undefined;
+}
+
 async function main(): Promise<void> {
   bootstrapEnv();
   const argv = process.argv.slice(2);
-  const workspaceId =
-    argv.find((arg) => arg.startsWith("--workspace-id="))?.split("=")[1]?.trim() ?? null;
+  const workspaceId = argValue(argv, "workspace-id")?.trim() ?? null;
   const execute = argv.includes("--execute");
   const confirmWrite = argv.includes("--confirm-write");
+  const reportOut =
+    argValue(argv, "report-out") ??
+    path.join(
+      "migrations/hubspot-wd-project",
+      execute ? "cmp-lead-intelligence-execute.json" : "cmp-lead-intelligence-dry-run.json",
+    );
 
   if (execute && !confirmWrite) {
     throw new Error("Refusing to write: pass --confirm-write with --execute.");
@@ -74,24 +89,37 @@ async function main(): Promise<void> {
     execute,
     confirmWrite,
   });
-  console.log(
-    JSON.stringify(
-      {
-        mode: report.mode,
-        persisted: report.persisted,
-        persistReason: report.persistReason,
-        scanned: report.scanned,
-        eligible: report.eligible,
-        applied: report.applied,
-        skipped: report.skipped,
-        notCmp: report.notCmp,
-        missingContact: report.missingContact,
-        enrollCampaigns: false,
-      },
-      null,
-      2,
-    ),
-  );
+
+  const publicReport = {
+    mode: report.mode,
+    persisted: report.persisted,
+    persistReason: report.persistReason,
+    cmpLeadsScanned: report.cmpLeadsScanned,
+    hubspotMatches: report.hubspotMatches,
+    unmatchedContacts: report.unmatchedContacts,
+    unmatchedMissingId: report.unmatchedMissingId,
+    unmatchedNotFound: report.unmatchedNotFound,
+    unmatchedAmbiguousEmail: report.unmatchedAmbiguousEmail,
+    errors: report.errors,
+    valuesAvailable: report.valuesAvailable,
+    wouldChangeRecords: report.wouldChangeRecords,
+    wouldChangeFields: report.wouldChangeFields,
+    filledRecords: report.filledRecords,
+    filledFields: report.filledFields,
+    skippedUnchanged: report.skippedUnchanged,
+    skippedPreserved: report.skippedPreserved,
+    enrollCampaigns: false,
+    mutateLeadProject: false,
+    mutateLeadStatus: false,
+    mutateConsent: false,
+    samples: report.samples,
+  };
+
+  console.log(JSON.stringify(publicReport, null, 2));
+
+  await mkdir(path.dirname(reportOut), { recursive: true });
+  await writeFile(reportOut, `${JSON.stringify(publicReport, null, 2)}\n`);
+
   const mongoose = await import("mongoose");
   await mongoose.default.disconnect().catch(() => undefined);
 }

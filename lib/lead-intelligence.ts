@@ -50,7 +50,12 @@ export function parseHubSpotContactIdFromIdempotencyKey(
   if (!key?.startsWith(HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX)) {
     return null;
   }
-  const contactId = key.slice(HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX.length).trim();
+  const rest = key.slice(HUBSPOT_CONTACT_IDEMPOTENCY_PREFIX.length).trim();
+  if (!rest) {
+    return null;
+  }
+  const projectIdx = rest.indexOf(":project:");
+  const contactId = (projectIdx >= 0 ? rest.slice(0, projectIdx) : rest).trim();
   return contactId || null;
 }
 
@@ -109,7 +114,11 @@ export function isHubSpotOwnedProvenance(
   return provenance?.method === "hubspot";
 }
 
-export type IntelligenceApplyDecision = "apply" | "skip_blank_incoming" | "skip_preserved";
+export type IntelligenceApplyDecision =
+  | "apply"
+  | "skip_blank_incoming"
+  | "skip_preserved"
+  | "skip_unchanged";
 
 /**
  * HubSpot/import enrichment may fill blanks or refresh HubSpot-owned values.
@@ -130,6 +139,11 @@ export function canApplyIntelligenceValue(input: {
     return "apply";
   }
   if (isHubSpotOwnedProvenance(input.existingProvenance)) {
+    const existing = normalizeIntelligenceText(input.existingValue);
+    const incoming = normalizeIntelligenceText(input.incomingValue);
+    if (existing === incoming) {
+      return "skip_unchanged";
+    }
     return "apply";
   }
   return "skip_preserved";

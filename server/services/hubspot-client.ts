@@ -307,6 +307,33 @@ async function searchHubSpotContacts(input: {
   };
 }
 
+export async function searchHubSpotContactsByEmail(input: {
+  accessToken: string;
+  email: string;
+}): Promise<HubSpotContact[]> {
+  const email = input.email.trim();
+  if (!email) {
+    return [];
+  }
+  const page = await searchHubSpotContacts({
+    accessToken: input.accessToken,
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "email",
+            operator: "EQ",
+            value: email,
+          },
+        ],
+      },
+    ],
+    sortProperty: "createdate",
+    limit: 2,
+  });
+  return page.contacts;
+}
+
 export async function searchHubSpotContactsModifiedSince(input: {
   accessToken: string;
   modifiedAfterIso: string;

@@ -352,6 +352,19 @@ export async function findLeadsByIds(
   return documents.map((document) => toLeadRecord(document as LeadDocument));
 }
 
+export async function findActiveLeadsByProjectId(
+  workspaceId: string,
+  projectId: string,
+): Promise<LeadRecord[]> {
+  await connectDb();
+  const documents = await LeadModel.find(
+    withWorkspaceScope(workspaceId, { projectId, archivedAt: null }),
+  )
+    .sort({ createdAt: 1 })
+    .lean<LeadDocument[]>();
+  return documents.map(toLeadRecord);
+}
+
 export async function findLeadsByCompanyIds(
   workspaceId: string,
   companyIds: string[],

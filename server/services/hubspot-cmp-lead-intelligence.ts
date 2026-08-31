@@ -5,12 +5,18 @@ import {
   HUBSPOT_LEAD_INTELLIGENCE_PROPERTIES,
   normalizeIntelligenceText,
   readHubSpotContactIdFromLeadAttributes,
+  type LeadIntelligenceField,
   type LeadIntelligenceValues,
 } from "@/lib/lead-intelligence";
+import { CMP_PROJECT_ID } from "@/lib/hubspot-cmp-membership";
 import {
+  assertCmpIntelligenceWritePayload,
   HUBSPOT_CMP_INTELLIGENCE_SIDE_EFFECT_GUARD,
   HUBSPOT_CMP_INTELLIGENCE_SOURCE,
   planHubSpotCmpLeadIntelligence,
+  summarizeCmpIntelligenceRows,
+  type CmpIntelligenceMatchMethod,
+  type CmpIntelligenceRow,
   type HubSpotIntelligenceContactSnapshot,
 } from "@/lib/hubspot-cmp-lead-intelligence";
 import { createAuditLog } from "@/server/audit/create-audit-log";
@@ -18,37 +24,29 @@ import {
   findCompanyByNameForWorkspace,
   resolveOrCreateCompanyByName,
 } from "@/server/services/companies";
-import { fetchHubSpotContactsByIds } from "@/server/services/hubspot-client";
+import {
+  fetchHubSpotContactsByIds,
+  searchHubSpotContactsByEmail,
+  type HubSpotContact,
+  type HubSpotContactRaw,
+} from "@/server/services/hubspot-client";
 import { updateLeadForWorkspace } from "@/server/services/leads";
 import { findIntegrations } from "@/server/repositories/integrations";
-import { findLeadsWithHubSpotContactIdempotency, type LeadRecord } from "@/server/repositories/leads";
+import {
+  findActiveLeadsByProjectId,
+  findLeadsByIds,
+  type LeadRecord,
+} from "@/server/repositories/leads";
+import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findAllWorkspaces, findWorkspaceById } from "@/server/repositories/workspaces";
 import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
 
-export type HubSpotCmpIntelligenceRow = {
-  workspaceId: string;
-  leadId: string;
-  contactId: string | null;
-  eligible: boolean;
-  reason: string;
-  applied: string[];
-  skipped: Array<{ field: string; reason: string }>;
-  companyName: string | null;
-  wouldCreateCompany: boolean;
-  persisted: boolean;
-};
-
-export type HubSpotCmpIntelligenceReport = {
-  mode: "dry-run" | "execute";
-  persisted: boolean;
-  persistReason: string | null;
-  scanned: number;
-  eligible: number;
-  applied: number;
-  skipped: number;
-  notCmp: number;
-  missingContact: number;
-  rows: HubSpotCmpIntelligenceRow[];
+export type HubSpotCmpIntelligenceReport = ReturnType<typeof summarizeCmpIntelligenceRows> & {
+  enrollCampaigns: false;
+  mutateLeadProject: false;
+  mutateLeadStatus: false;
+  mutateConsent: false;
+  rows: CmpIntelligenceRow[];
 };
 
 function leadIntelligenceValues(lead: LeadRecord): LeadIntelligenceValues {
@@ -78,6 +76,26 @@ function snapshotFromRaw(input: {
   };
 }
 
+function snapshotFromContact(contact: HubSpotContact): HubSpotIntelligenceContactSnapshot {
+  return snapshotFromRaw({
+    id: contact.id,
+    properties: contact.properties,
+  });
+}
+
+function incomingAvailableFields(
+  incoming: Partial<LeadIntelligenceValues>,
+): LeadIntelligenceField[] {
+  const fields: LeadIntelligenceField[] = [];
+  for (const field of ["industry", "jobTitle", "stateRegion", "companyId"] as const) {
+    if (!normalizeIntelligenceText(incoming[field] ?? null)) {
+      continue;
+    }
+    fields.push(field);
+  }
+  return fields;
+}
+
 export function shouldApplyAssociatedCompany(input: {
   existingCompanyId: string | null;
   existingProvenance: LeadRecord["intelligenceProvenance"];
@@ -90,6 +108,48 @@ export function shouldApplyAssociatedCompany(input: {
       incomingValue: input.companyName,
     }) === "apply"
   );
+}
+
+async function loadCmpMembershipLeads(
+  workspaceId: string,
+): Promise<LeadRecord[]> {
+  const [byProject, membershipIds] = await Promise.all([
+    findActiveLeadsByProjectId(workspaceId, CMP_PROJECT_ID),
+    findLeadIdsForProjectMembership(workspaceId, CMP_PROJECT_ID),
+  ]);
+  const byId = new Map(byProject.map((lead) => [lead.id, lead]));
+  const missing = membershipIds.filter((id) => !byId.has(id));
+  if (missing.length > 0) {
+    const extra = await findLeadsByIds(workspaceId, missing);
+    for (const lead of extra) {
+      if (lead.archivedAt) {
+        continue;
+      }
+      byId.set(lead.id, lead);
+    }
+  }
+  return [...byId.values()];
+}
+
+function resolveHubSpotAccessToken(integration: {
+  credentialsEncrypted?: string | null;
+  createdBy: string;
+}): { accessToken: string; actorId: string } {
+  if (integration.credentialsEncrypted) {
+    try {
+      const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
+      if (credentials.accessToken?.trim()) {
+        return { accessToken: credentials.accessToken, actorId: integration.createdBy };
+      }
+    } catch {
+      // One-time operator backfill may use HUBSPOT_ACCESS_TOKEN when vault decrypt is unavailable.
+    }
+  }
+  const envToken = process.env.HUBSPOT_ACCESS_TOKEN?.trim();
+  if (envToken) {
+    return { accessToken: envToken, actorId: integration.createdBy };
+  }
+  throw new Error("hubspot_access_token_unavailable");
 }
 
 export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
@@ -113,7 +173,7 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
     Boolean(workspace),
   );
 
-  const rows: HubSpotCmpIntelligenceRow[] = [];
+  const rows: CmpIntelligenceRow[] = [];
 
   for (const workspace of resolved) {
     const integrations = await findIntegrations(workspace.id, {
@@ -121,12 +181,16 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
       status: "active",
     });
     const integration = integrations[0];
-    if (!integration?.credentialsEncrypted) {
+    if (!integration) {
+      continue;
+    }
+    if (!integration.credentialsEncrypted && !process.env.HUBSPOT_ACCESS_TOKEN?.trim()) {
       continue;
     }
 
-    const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
-    const leads = await findLeadsWithHubSpotContactIdempotency(workspace.id);
+    const { accessToken, actorId } = resolveHubSpotAccessToken(integration);
+
+    const leads = await loadCmpMembershipLeads(workspace.id);
     const contactIds = [
       ...new Set(
         leads
@@ -135,159 +199,220 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
       ),
     ];
 
-    const contacts = await fetchHubSpotContactsByIds({
-      accessToken: credentials.accessToken,
-      contactIds,
-      properties: [...HUBSPOT_LEAD_INTELLIGENCE_PROPERTIES],
-    });
-    const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
+    let contactsById = new Map<string, HubSpotContactRaw>();
+    try {
+      const contacts = await fetchHubSpotContactsByIds({
+        accessToken,
+        contactIds,
+        properties: [...HUBSPOT_LEAD_INTELLIGENCE_PROPERTIES],
+      });
+      contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
+    } catch (error) {
+      for (const lead of leads) {
+        rows.push({
+          leadId: lead.id,
+          contactId: readHubSpotContactIdFromLeadAttributes(lead.attributes),
+          matchMethod: "none",
+          eligible: false,
+          reason: "hubspot_batch_failed",
+          applied: [],
+          skipped: [],
+          incomingAvailable: [],
+          persisted: false,
+          errorCode: error instanceof Error ? error.message.slice(0, 80) : "hubspot_batch_failed",
+        });
+      }
+      continue;
+    }
 
     for (const lead of leads) {
-      const contactId = readHubSpotContactIdFromLeadAttributes(lead.attributes);
-      if (!contactId) {
-        rows.push({
-          workspaceId: workspace.id,
-          leadId: lead.id,
-          contactId: null,
-          eligible: false,
-          reason: "missing_hubspot_contact_id",
-          applied: [],
-          skipped: [],
-          companyName: null,
-          wouldCreateCompany: false,
-          persisted: false,
-        });
-        continue;
-      }
+      try {
+        let contactId = readHubSpotContactIdFromLeadAttributes(lead.attributes);
+        let matchMethod: CmpIntelligenceMatchMethod = contactId ? "hubspot_contact_id" : "none";
+        let snapshot: HubSpotIntelligenceContactSnapshot | null = null;
 
-      const contact = contactsById.get(contactId);
-      if (!contact) {
-        rows.push({
-          workspaceId: workspace.id,
-          leadId: lead.id,
-          contactId,
-          eligible: false,
-          reason: "hubspot_contact_not_found",
-          applied: [],
-          skipped: [],
-          companyName: null,
-          wouldCreateCompany: false,
-          persisted: false,
-        });
-        continue;
-      }
-
-      const snapshot = snapshotFromRaw(contact);
-      const companyName = normalizeIntelligenceText(snapshot.properties.company);
-      const applyCompany = shouldApplyAssociatedCompany({
-        existingCompanyId: lead.companyId ?? null,
-        existingProvenance: lead.intelligenceProvenance,
-        companyName,
-      });
-
-      let resolvedCompanyId: string | null = null;
-      let wouldCreateCompany = false;
-      if (applyCompany && companyName) {
-        const existingCompany = await findCompanyByNameForWorkspace(workspace.id, companyName);
-        if (existingCompany) {
-          resolvedCompanyId = existingCompany.id;
-        } else if (persisted) {
-          const created = await resolveOrCreateCompanyByName(
-            workspace.id,
-            integration.createdBy,
-            companyName,
-          );
-          resolvedCompanyId = created?.company.id ?? null;
-          wouldCreateCompany = Boolean(created?.created);
-        } else {
-          wouldCreateCompany = true;
-          resolvedCompanyId = "dry-run-company";
+        if (contactId) {
+          const contact = contactsById.get(contactId);
+          if (contact) {
+            snapshot = snapshotFromRaw(contact);
+          }
         }
-      }
 
-      const plan = planHubSpotCmpLeadIntelligence({
-        snapshot,
-        existing: leadIntelligenceValues(lead),
-        existingProvenance: lead.intelligenceProvenance,
-        resolvedCompanyId,
-        requireCmpProduct: true,
-      });
+        if (!snapshot && !contactId && lead.email) {
+          const emailMatches = await searchHubSpotContactsByEmail({
+            accessToken,
+            email: lead.email,
+          });
+          if (emailMatches.length > 1) {
+            rows.push({
+              leadId: lead.id,
+              contactId: null,
+              matchMethod: "none",
+              eligible: false,
+              reason: "email_ambiguous",
+              applied: [],
+              skipped: [],
+              incomingAvailable: [],
+              persisted: false,
+            });
+            continue;
+          }
+          if (emailMatches.length === 1) {
+            snapshot = snapshotFromContact(emailMatches[0]!);
+            contactId = emailMatches[0]!.id;
+            matchMethod = "unique_email";
+          }
+        }
 
-      if (!plan.eligible) {
-        rows.push({
-          workspaceId: workspace.id,
+        if (!contactId) {
+          rows.push({
+            leadId: lead.id,
+            contactId: null,
+            matchMethod: "none",
+            eligible: false,
+            reason: "missing_hubspot_contact_id",
+            applied: [],
+            skipped: [],
+            incomingAvailable: [],
+            persisted: false,
+          });
+          continue;
+        }
+
+        if (!snapshot) {
+          rows.push({
+            leadId: lead.id,
+            contactId,
+            matchMethod,
+            eligible: false,
+            reason: "hubspot_contact_not_found",
+            applied: [],
+            skipped: [],
+            incomingAvailable: [],
+            persisted: false,
+          });
+          continue;
+        }
+
+        const companyName = normalizeIntelligenceText(snapshot.properties.company);
+        const applyCompany = shouldApplyAssociatedCompany({
+          existingCompanyId: lead.companyId ?? null,
+          existingProvenance: lead.intelligenceProvenance,
+          companyName,
+        });
+
+        let resolvedCompanyId: string | null = null;
+        if (applyCompany && companyName) {
+          const existingCompany = await findCompanyByNameForWorkspace(workspace.id, companyName);
+          if (existingCompany) {
+            resolvedCompanyId = existingCompany.id;
+          } else if (persisted) {
+            const created = await resolveOrCreateCompanyByName(
+              workspace.id,
+              integration.createdBy,
+              companyName,
+            );
+            resolvedCompanyId = created?.company.id ?? null;
+          } else {
+            resolvedCompanyId = "dry-run-company";
+          }
+        }
+
+        const plan = planHubSpotCmpLeadIntelligence({
+          snapshot,
+          existing: leadIntelligenceValues(lead),
+          existingProvenance: lead.intelligenceProvenance,
+          resolvedCompanyId,
+          requireCmpProduct: false,
+        });
+
+        const patch: Partial<LeadIntelligenceValues> = { ...plan.values };
+        if (patch.companyId === "dry-run-company") {
+          delete patch.companyId;
+        }
+        assertCmpIntelligenceWritePayload(patch);
+
+        const applied = plan.applied.filter((field) => {
+          if (field !== "companyId") {
+            return true;
+          }
+          return Boolean(patch.companyId) || (!persisted && Boolean(companyName));
+        });
+
+        const row: CmpIntelligenceRow = {
           leadId: lead.id,
           contactId,
-          eligible: false,
+          matchMethod,
+          eligible: true,
           reason: plan.reason,
+          applied,
+          skipped: plan.skipped,
+          incomingAvailable: incomingAvailableFields({
+            industry: plan.incoming.industry ?? null,
+            jobTitle: plan.incoming.jobTitle ?? null,
+            stateRegion: plan.incoming.stateRegion ?? null,
+            companyId: companyName,
+          }),
+          persisted: false,
+        };
+
+        if (persisted && Object.keys(patch).length > 0) {
+          await updateLeadForWorkspace(
+            workspace.id,
+            lead.id,
+            integration.createdBy,
+            patch,
+            {
+              ...HUBSPOT_CMP_INTELLIGENCE_SIDE_EFFECT_GUARD,
+              intelligenceMethod: "hubspot",
+              intelligenceSource: HUBSPOT_CMP_INTELLIGENCE_SOURCE,
+            },
+          );
+          await createAuditLog({
+            workspaceId: workspace.id,
+            actorId: integration.createdBy,
+            action: "lead.hubspot_cmp_intelligence_enriched",
+            entityType: "lead",
+            entityId: lead.id,
+            after: {
+              applied,
+              source: HUBSPOT_CMP_INTELLIGENCE_SOURCE,
+              enrollCampaigns: false,
+              mutateLeadProject: false,
+              mutateLeadStatus: false,
+              mutateConsent: false,
+            },
+          });
+          row.persisted = true;
+        }
+
+        rows.push(row);
+      } catch (error) {
+        rows.push({
+          leadId: lead.id,
+          contactId: readHubSpotContactIdFromLeadAttributes(lead.attributes),
+          matchMethod: "none",
+          eligible: false,
+          reason: "enrichment_error",
           applied: [],
           skipped: [],
-          companyName: plan.companyName,
-          wouldCreateCompany: false,
+          incomingAvailable: [],
           persisted: false,
+          errorCode: error instanceof Error ? error.message.slice(0, 80) : "enrichment_error",
         });
-        continue;
       }
-
-      const values = { ...plan.values };
-      if (values.companyId === "dry-run-company") {
-        delete values.companyId;
-      }
-
-      const row: HubSpotCmpIntelligenceRow = {
-        workspaceId: workspace.id,
-        leadId: lead.id,
-        contactId,
-        eligible: true,
-        reason: plan.reason,
-        applied: plan.applied,
-        skipped: plan.skipped,
-        companyName: plan.companyName,
-        wouldCreateCompany,
-        persisted: false,
-      };
-
-      if (persisted && plan.applied.length > 0) {
-        await updateLeadForWorkspace(
-          workspace.id,
-          lead.id,
-          integration.createdBy,
-          values,
-          {
-            ...HUBSPOT_CMP_INTELLIGENCE_SIDE_EFFECT_GUARD,
-            intelligenceMethod: "hubspot",
-            intelligenceSource: HUBSPOT_CMP_INTELLIGENCE_SOURCE,
-          },
-        );
-        await createAuditLog({
-          workspaceId: workspace.id,
-          actorId: integration.createdBy,
-          action: "lead.hubspot_cmp_intelligence_enriched",
-          entityType: "lead",
-          entityId: lead.id,
-          after: {
-            applied: plan.applied,
-            source: HUBSPOT_CMP_INTELLIGENCE_SOURCE,
-            enrollCampaigns: false,
-          },
-        });
-        row.persisted = true;
-      }
-
-      rows.push(row);
     }
   }
 
+  const summary = summarizeCmpIntelligenceRows(rows, { persisted, persistReason });
   return {
-    mode: persisted ? "execute" : "dry-run",
-    persisted,
-    persistReason,
-    scanned: rows.length,
-    eligible: rows.filter((row) => row.eligible).length,
-    applied: rows.filter((row) => row.applied.length > 0).length,
-    skipped: rows.filter((row) => row.eligible && row.applied.length === 0).length,
-    notCmp: rows.filter((row) => row.reason === "not_cmp_product").length,
-    missingContact: rows.filter((row) => row.reason === "hubspot_contact_not_found").length,
+    ...summary,
+    enrollCampaigns: false,
+    mutateLeadProject: false,
+    mutateLeadStatus: false,
+    mutateConsent: false,
     rows,
   };
 }
+
+export { HUBSPOT_CMP_INTELLIGENCE_SIDE_EFFECT_GUARD };

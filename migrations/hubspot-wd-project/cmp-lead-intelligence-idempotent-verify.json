@@ -1,0 +1,39 @@
+{
+  "mode": "dry-run",
+  "persisted": false,
+  "persistReason": "dry_run",
+  "cmpLeadsScanned": 8346,
+  "hubspotMatches": 8346,
+  "unmatchedContacts": 0,
+  "unmatchedMissingId": 0,
+  "unmatchedNotFound": 0,
+  "unmatchedAmbiguousEmail": 0,
+  "errors": 0,
+  "valuesAvailable": {
+    "industry": 8255,
+    "jobTitle": 8281,
+    "stateRegion": 1512,
+    "companyId": 130
+  },
+  "wouldChangeRecords": 0,
+  "wouldChangeFields": {
+    "industry": 0,
+    "jobTitle": 0,
+    "stateRegion": 0,
+    "companyId": 0
+  },
+  "filledRecords": 0,
+  "filledFields": {
+    "industry": 0,
+    "jobTitle": 0,
+    "stateRegion": 0,
+    "companyId": 0
+  },
+  "skippedUnchanged": 18178,
+  "skippedPreserved": 0,
+  "enrollCampaigns": false,
+  "mutateLeadProject": false,
+  "mutateLeadStatus": false,
+  "mutateConsent": false,
+  "samples": []
+}

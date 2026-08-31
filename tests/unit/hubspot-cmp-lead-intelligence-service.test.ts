@@ -10,11 +10,17 @@ vi.mock("@/server/repositories/integrations", () => ({
 }));
 
 vi.mock("@/server/repositories/leads", () => ({
-  findLeadsWithHubSpotContactIdempotency: vi.fn(),
+  findActiveLeadsByProjectId: vi.fn(),
+  findLeadsByIds: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/lead-project-memberships", () => ({
+  findLeadIdsForProjectMembership: vi.fn(),
 }));
 
 vi.mock("@/server/services/hubspot-client", () => ({
   fetchHubSpotContactsByIds: vi.fn(),
+  searchHubSpotContactsByEmail: vi.fn(),
 }));
 
 vi.mock("@/server/services/leads", () => ({
@@ -35,10 +41,15 @@ vi.mock("@/server/security/integration-credentials", () => ({
 }));
 
 import { findIntegrations } from "@/server/repositories/integrations";
-import { findLeadsWithHubSpotContactIdempotency } from "@/server/repositories/leads";
+import { findActiveLeadsByProjectId, findLeadsByIds } from "@/server/repositories/leads";
+import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
-import { findCompanyByNameForWorkspace } from "@/server/services/companies";
-import { fetchHubSpotContactsByIds } from "@/server/services/hubspot-client";
+import { findCompanyByNameForWorkspace, resolveOrCreateCompanyByName } from "@/server/services/companies";
+import {
+  fetchHubSpotContactsByIds,
+  searchHubSpotContactsByEmail,
+} from "@/server/services/hubspot-client";
+import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
 import { runHubSpotCmpLeadIntelligenceEnrichment } from "@/server/services/hubspot-cmp-lead-intelligence";
 import { updateLeadForWorkspace } from "@/server/services/leads";
 import { leadRecordExtras } from "@/tests/helpers/crm-fixtures";
@@ -88,6 +99,12 @@ const lead = {
 describe("HubSpot CMP lead intelligence enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.HUBSPOT_ACCESS_TOKEN;
+    vi.mocked(decodeHubSpotCredentials).mockReturnValue({
+      accessToken: "pat-test",
+      clientSecret: null,
+      portalId: "12345",
+    });
     vi.mocked(findWorkspaceById).mockResolvedValue({ id: "ws-1" } as never);
     vi.mocked(findIntegrations).mockResolvedValue([
       {
@@ -96,8 +113,15 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
         createdBy: "user-1",
       } as never,
     ]);
-    vi.mocked(findLeadsWithHubSpotContactIdempotency).mockResolvedValue([lead] as never);
+    vi.mocked(findActiveLeadsByProjectId).mockResolvedValue([lead] as never);
+    vi.mocked(findLeadIdsForProjectMembership).mockResolvedValue(["lead-1"]);
+    vi.mocked(findLeadsByIds).mockResolvedValue([]);
     vi.mocked(findCompanyByNameForWorkspace).mockResolvedValue(null);
+    vi.mocked(resolveOrCreateCompanyByName).mockResolvedValue({
+      company: { id: "co-new" },
+      created: true,
+    } as never);
+    vi.mocked(searchHubSpotContactsByEmail).mockResolvedValue([]);
     vi.mocked(fetchHubSpotContactsByIds).mockResolvedValue([
       {
         id: "99",
@@ -116,18 +140,27 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
     } as never);
   });
 
-  it("dry-runs CMP fills without writing or enrolling", async () => {
+  it("dry-runs CMP membership fills without writing or enrolling", async () => {
     const report = await runHubSpotCmpLeadIntelligenceEnrichment({
       workspaceId: "ws-1",
     });
 
     expect(report.persisted).toBe(false);
-    expect(report.eligible).toBe(1);
-    expect(report.applied).toBe(1);
+    expect(report.cmpLeadsScanned).toBe(1);
+    expect(report.hubspotMatches).toBe(1);
+    expect(report.wouldChangeRecords).toBe(1);
+    expect(report.valuesAvailable).toMatchObject({
+      industry: 1,
+      jobTitle: 1,
+      stateRegion: 1,
+      companyId: 1,
+    });
+    expect(report.enrollCampaigns).toBe(false);
     expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+    expect(searchHubSpotContactsByEmail).not.toHaveBeenCalled();
   });
 
-  it("writes blank CMP fields with the no-enrollment guard", async () => {
+  it("writes blank CMP fields with the no-enrollment guard and only intelligence keys", async () => {
     const report = await runHubSpotCmpLeadIntelligenceEnrichment({
       workspaceId: "ws-1",
       execute: true,
@@ -135,6 +168,8 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
     });
 
     expect(report.persisted).toBe(true);
+    expect(report.filledRecords).toBe(1);
+    expect(report.filledFields.industry).toBe(1);
     expect(updateLeadForWorkspace).toHaveBeenCalledWith(
       "ws-1",
       "lead-1",
@@ -147,14 +182,20 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
       expect.objectContaining({
         triggerAutomation: false,
         enrollCampaigns: false,
-        enrollDrips: false,
+        mutateLeadProject: false,
+        mutateLeadStatus: false,
+        mutateConsent: false,
         intelligenceMethod: "hubspot",
       }),
+    );
+    const patch = vi.mocked(updateLeadForWorkspace).mock.calls[0][3] as Record<string, unknown>;
+    expect(Object.keys(patch).sort()).toEqual(
+      ["companyId", "industry", "jobTitle", "stateRegion"].sort(),
     );
   });
 
   it("does not overwrite a manual industry on execute", async () => {
-    vi.mocked(findLeadsWithHubSpotContactIdempotency).mockResolvedValue([
+    vi.mocked(findActiveLeadsByProjectId).mockResolvedValue([
       {
         ...lead,
         industry: "Private banking",
@@ -184,12 +225,13 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
     );
   });
 
-  it("skips non-CMP HubSpot contacts", async () => {
+  it("still enriches CMP-membership leads when HubSpot product is not CMP", async () => {
     vi.mocked(fetchHubSpotContactsByIds).mockResolvedValue([
       {
         id: "99",
         properties: {
           industry: "Finance",
+          jobtitle: "Analyst",
           product_intersted_in: "WD",
         },
       },
@@ -201,7 +243,121 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
       confirmWrite: true,
     });
 
-    expect(report.notCmp).toBe(1);
+    expect(report.filledRecords).toBe(1);
+    expect(updateLeadForWorkspace).toHaveBeenCalled();
+  });
+
+  it("falls back to a unique HubSpot email match when contact id is missing", async () => {
+    vi.mocked(findActiveLeadsByProjectId).mockResolvedValue([
+      {
+        ...lead,
+        attributes: {},
+      },
+    ] as never);
+    vi.mocked(searchHubSpotContactsByEmail).mockResolvedValue([
+      {
+        id: "88",
+        email: "ada@example.com",
+        properties: {
+          industry: "Finance",
+          jobtitle: "Analyst",
+        },
+      },
+    ] as never);
+
+    const report = await runHubSpotCmpLeadIntelligenceEnrichment({
+      workspaceId: "ws-1",
+    });
+
+    expect(report.hubspotMatches).toBe(1);
+    expect(report.rows[0]?.matchMethod).toBe("unique_email");
+    expect(searchHubSpotContactsByEmail).toHaveBeenCalled();
+  });
+
+  it("parks an ambiguous email fallback and does not write", async () => {
+    vi.mocked(findActiveLeadsByProjectId).mockResolvedValue([
+      {
+        ...lead,
+        attributes: {},
+      },
+    ] as never);
+    vi.mocked(searchHubSpotContactsByEmail).mockResolvedValue([
+      { id: "88", properties: {} },
+      { id: "89", properties: {} },
+    ] as never);
+
+    const report = await runHubSpotCmpLeadIntelligenceEnrichment({
+      workspaceId: "ws-1",
+      execute: true,
+      confirmWrite: true,
+    });
+
+    expect(report.unmatchedAmbiguousEmail).toBe(1);
     expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent when HubSpot-owned values already match", async () => {
+    vi.mocked(findCompanyByNameForWorkspace).mockResolvedValue({ id: "co-1" } as never);
+    vi.mocked(findActiveLeadsByProjectId).mockResolvedValue([
+      {
+        ...lead,
+        industry: "Finance",
+        jobTitle: "Analyst",
+        stateRegion: "Geneva",
+        companyId: "co-1",
+        intelligenceProvenance: {
+          industry: {
+            method: "hubspot",
+            source: "hubspot_cmp_enrichment",
+            appliedAt: "2026-08-01T00:00:00.000Z",
+            notes: null,
+          },
+          jobTitle: {
+            method: "hubspot",
+            source: "hubspot_cmp_enrichment",
+            appliedAt: "2026-08-01T00:00:00.000Z",
+            notes: null,
+          },
+          stateRegion: {
+            method: "hubspot",
+            source: "hubspot_cmp_enrichment",
+            appliedAt: "2026-08-01T00:00:00.000Z",
+            notes: null,
+          },
+          companyId: {
+            method: "hubspot",
+            source: "hubspot_cmp_enrichment",
+            appliedAt: "2026-08-01T00:00:00.000Z",
+            notes: null,
+          },
+        },
+      },
+    ] as never);
+
+    const report = await runHubSpotCmpLeadIntelligenceEnrichment({
+      workspaceId: "ws-1",
+      execute: true,
+      confirmWrite: true,
+    });
+
+    expect(report.wouldChangeRecords).toBe(0);
+    expect(report.skippedUnchanged).toBeGreaterThan(0);
+    expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to HUBSPOT_ACCESS_TOKEN when vault decrypt fails", async () => {
+    vi.mocked(decodeHubSpotCredentials).mockImplementation(() => {
+      throw new Error("Unsupported state or unable to authenticate data");
+    });
+    process.env.HUBSPOT_ACCESS_TOKEN = "pat-from-env";
+
+    const report = await runHubSpotCmpLeadIntelligenceEnrichment({
+      workspaceId: "ws-1",
+    });
+
+    expect(report.hubspotMatches).toBe(1);
+    expect(fetchHubSpotContactsByIds).toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: "pat-from-env" }),
+    );
   });
 });
