@@ -616,6 +616,105 @@ describe("lead enrichment service", () => {
     expect(updateLead).not.toHaveBeenCalled();
   });
 
+  it("applies the Swiss profile when Vista Brent ties the name to Switzerland", async () => {
+    vi.mocked(getEnv).mockImplementation(
+      () =>
+        ({
+          OPENAI_API_KEY: "sk-test",
+          TAVILY_API_KEY: undefined,
+          BRAVE_SEARCH_API_KEY: undefined,
+          LEAD_ENRICHMENT_DEMO: undefined,
+          OPENAI_ENRICHMENT_MODEL: undefined,
+        }) as never,
+    );
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      ...workspace,
+      defaultCurrency: "CHF",
+      leadEnrichment: { ...workspace.leadEnrichment, demoMode: false },
+    } as never);
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "philippe.nougaret@gmail.com",
+        firstName: "philippe.nougaret@gmail.com",
+        lastName: "",
+        email: "philippe.nougaret@gmail.com",
+        phone: "0763162433",
+        projectId: "proj-vistabrent",
+      }),
+    );
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "proj-vistabrent",
+      name: "Vista Brent / Taquà",
+      reference: "VISTABRENT",
+      location: {
+        countryCode: "CH",
+        cantonName: "Vaud",
+        municipality: "Brent",
+      },
+    } as never);
+
+    const canadaHit = {
+      url: "https://theorg.com/org/cdpq/org-chart/philippe-nougaret",
+      title: "Philippe Nougaret — CDPQ",
+      snippet: "Vice President, Montréal, Canada",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+    const swissHit = {
+      url: "https://www.linkedin.com/in/philippe-nougaret",
+      title: "Philippe Nougaret - CPW – Nestlé",
+      snippet: "Regional Marketing Director Europe, Lausanne",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+
+    const synthesize = vi.fn(async (input: { hits: Array<{ url: string }> }) => {
+      expect(input.hits.map((hit) => hit.url)).toEqual([swissHit.url]);
+      return {
+        identityMatch: "unique" as const,
+        identityRationale: "Nestlé Lausanne matches the project market",
+        model: "gpt-test",
+        suggestions: [
+          {
+            fieldKey: "companyName" as const,
+            value: "Cereal Partners Worldwide",
+            confidencePercent: 80,
+            rationale: "LinkedIn Lausanne",
+            sourceUrls: [swissHit.url],
+          },
+          {
+            fieldKey: "city" as const,
+            value: "Lausanne",
+            confidencePercent: 80,
+            rationale: "LinkedIn Lausanne",
+            sourceUrls: [swissHit.url],
+          },
+          {
+            fieldKey: "country" as const,
+            value: "Switzerland",
+            confidencePercent: 80,
+            rationale: "LinkedIn Lausanne",
+            sourceUrls: [swissHit.url],
+          },
+        ],
+        summary: { text: "CPW Nestlé in Lausanne", citationUrls: [swissHit.url] },
+      };
+    });
+
+    const run = await startLeadEnrichment({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      providers: {
+        search: async () => ({ hits: [canadaHit, swissHit], provider: "tavily" }),
+        synthesize,
+      },
+    });
+
+    expect(synthesize).toHaveBeenCalled();
+    expect(run.status).toBe("accepted");
+    expect(updateLead).toHaveBeenCalled();
+    expect(vi.mocked(updateLead).mock.calls[0]![2].city).toBe("Lausanne");
+  });
+
   it("searches the project area first for a common name", async () => {
     vi.mocked(getEnv).mockImplementation(
       () =>

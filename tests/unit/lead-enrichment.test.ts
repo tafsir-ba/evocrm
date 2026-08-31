@@ -16,6 +16,7 @@ import {
   enrichmentPlaceFromProject,
   looksLikeSwissPhone,
   tavilyCountryFromMarketHints,
+  preferHitsInProjectMarket,
   rankEnrichmentHits,
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
@@ -296,6 +297,30 @@ describe("lead enrichment contract", () => {
       '"carmen smith" LinkedIn',
       '"carmen smith"',
     ]);
+  });
+
+  it("keeps the person in the project market when the same name appears abroad", () => {
+    const canada = {
+      url: "https://theorg.com/org/cdpq/org-chart/philippe-nougaret",
+      title: "Philippe Nougaret — CDPQ",
+      snippet: "Vice President, Montréal, Canada",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+    const switzerland = {
+      url: "https://www.linkedin.com/in/philippe-nougaret",
+      title: "Philippe Nougaret - CPW – Nestlé",
+      snippet: "Regional Marketing Director Europe, Lausanne",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+    const hints = ["Montreux", "Switzerland", "Suisse"];
+    expect(preferHitsInProjectMarket([canada, switzerland], hints)).toEqual({
+      hits: [switzerland],
+      narrowed: true,
+    });
+    expect(preferHitsInProjectMarket([canada], hints)).toEqual({
+      hits: [canada],
+      narrowed: false,
+    });
   });
 
   it("uses Swiss mobile and CHF as market clues, and ignores enrichment-written city", () => {

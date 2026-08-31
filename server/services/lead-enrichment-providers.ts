@@ -262,7 +262,7 @@ export async function defaultSynthesize(input: SynthesizeInput): Promise<Synthes
     .join("\n\n");
   const market =
     input.marketHints && input.marketHints.length > 0
-      ? `Lead market clues (phone / CRM location / workspace): ${input.marketHints.join(", ")}. Prefer the person in that market. If results describe people in different countries (for example Lausanne vs Montréal), identityMatch must be ambiguous unless only one person matches the market.`
+      ? `This lead’s project/phone market is ${input.marketHints.join(", ")}. That geography is the prior (for example Vista Brent → Montreux → Switzerland). If the same name appears in another country, ignore that other person. identityMatch is unique when one professional remains in this market. It is ambiguous only if two people remain in this same market.`
       : "If results describe more than one professional with this name, identityMatch must be ambiguous.";
   const prompt = `You are an internal CRM research assistant. Extract every public professional/business fact that the search results support. Be thorough, not timid. Do not invent facts, URLs, or numbers.
 

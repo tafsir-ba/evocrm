@@ -542,6 +542,19 @@ export function marketsMentionedInText(text: string): string[] {
   return [...found];
 }
 
+export function preferHitsInProjectMarket<
+  T extends { url: string; title: string; snippet?: string },
+>(hits: T[], marketHints: string[]): { hits: T[]; narrowed: boolean } {
+  if (hits.length === 0 || marketHints.length === 0) {
+    return { hits, narrowed: false };
+  }
+  const matching = hits.filter((hit) => hitMatchesMarket(hit, marketHints));
+  if (matching.length === 0 || matching.length === hits.length) {
+    return { hits, narrowed: false };
+  }
+  return { hits: matching, narrowed: true };
+}
+
 export function hitMatchesMarket(
   hit: { url: string; title: string; snippet?: string },
   hints: string[],

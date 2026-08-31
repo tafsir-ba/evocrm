@@ -19,6 +19,7 @@ import {
   isLeadEnrichmentFieldKey,
   isPlausibleJobTitle,
   mergeEnrichmentHits,
+  preferHitsInProjectMarket,
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
   tavilyCountryFromMarketHints,
@@ -370,6 +371,8 @@ export async function startLeadEnrichment(input: {
           break;
         }
       }
+      const narrowed = preferHitsInProjectMarket(hits, marketHints);
+      hits = narrowed.hits;
       if (hits.length === 0) {
         const updated = await updateEnrichmentRun(input.workspaceId, run.id, {
           status: "failed",
