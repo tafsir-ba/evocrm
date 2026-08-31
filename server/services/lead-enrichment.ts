@@ -23,7 +23,9 @@ import {
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
   tavilyCountryFromMarketHints,
+  appendUnusedHitCandidates,
   mergeWebEnrichmentAttributes,
+  normalizeEnrichmentCandidates,
   readWebEnrichmentAttributes,
   sanitizeEnrichmentText,
   type LeadEnrichmentAllowedSource,
@@ -327,6 +329,7 @@ export async function startLeadEnrichment(input: {
         identityRationale: fixture.identityRationale,
         suggestions: fixture.suggestions,
         summary: fixture.summary,
+        candidates: fixture.candidates ?? [],
         model: "demo-fixture",
       };
     } else {
@@ -383,6 +386,8 @@ export async function startLeadEnrichment(input: {
           failureMessage:
             "No public professional web sources were retrieved for this name and email. Enrichment will not invent a profile.",
           sources: [],
+          candidates: [],
+          selectedCandidateId: null,
           suggestions: [],
           summaryDraft: null,
         });
@@ -398,9 +403,20 @@ export async function startLeadEnrichment(input: {
       });
     }
 
+    const candidates = appendUnusedHitCandidates(
+      normalizeEnrichmentCandidates({
+        candidates: synthesis.candidates,
+        suggestions: synthesis.suggestions,
+        summary: synthesis.summary,
+        fallbackLabel: fullName,
+      }),
+      hits,
+    );
+    const primarySuggestions = candidates[0]?.suggestions ?? synthesis.suggestions;
+
     if (
       synthesis.identityMatch === "unique" &&
-      suggestedLocationConflictsWithMarket(synthesis.suggestions, marketHints)
+      suggestedLocationConflictsWithMarket(primarySuggestions, marketHints)
     ) {
       synthesis = {
         ...synthesis,
@@ -410,7 +426,25 @@ export async function startLeadEnrichment(input: {
       };
     }
 
-    if (synthesis.identityMatch !== "unique") {
+    if (candidates.length > 1) {
+      const updated = await updateEnrichmentRun(input.workspaceId, run.id, {
+        status: "reviewing",
+        searchProvider: provider,
+        aiModel: synthesis.model,
+        retrievedAt: new Date(retrievedAt),
+        identityMatch: synthesis.identityMatch,
+        identityRationale: synthesis.identityRationale,
+        failureMessage: "Several public professionals match. Choose which one to apply.",
+        sources: hits,
+        candidates,
+        selectedCandidateId: null,
+        suggestions: [],
+        summaryDraft: null,
+      });
+      return updated;
+    }
+
+    if (synthesis.identityMatch !== "unique" || candidates.length === 0) {
       const updated = await updateEnrichmentRun(input.workspaceId, run.id, {
         status: synthesis.identityMatch === "ambiguous" ? "ambiguous" : "failed",
         searchProvider: provider,
@@ -423,6 +457,8 @@ export async function startLeadEnrichment(input: {
             ? "Identity is ambiguous. No enrichment result was produced."
             : "No unique public professional identity matched name and email.",
         sources: hits,
+        candidates,
+        selectedCandidateId: null,
         suggestions: [],
         summaryDraft: null,
       });
@@ -430,7 +466,7 @@ export async function startLeadEnrichment(input: {
     }
 
     const suggestions = buildSuggestions({
-      synthesis,
+      synthesis: { suggestions: candidates[0]?.suggestions ?? synthesis.suggestions },
       current,
       retrievedAt,
       searchProvider: provider,
@@ -460,6 +496,8 @@ export async function startLeadEnrichment(input: {
       identityMatch: "unique",
       identityRationale: synthesis.identityRationale,
       sources: hits,
+      candidates,
+      selectedCandidateId: candidates[0]?.id ?? "cand-1",
       suggestions,
       summaryDraft,
     });
@@ -497,6 +535,110 @@ export async function startLeadEnrichment(input: {
     });
     throw error;
   }
+}
+
+export async function selectLeadEnrichmentCandidate(input: {
+  workspaceId: string;
+  leadId: string;
+  runId: string;
+  actorId: string;
+  candidateId: string;
+}): Promise<LeadEnrichmentRunRecord> {
+  const run = await findEnrichmentRunById(input.workspaceId, input.runId);
+  if (!run || run.leadId !== input.leadId) {
+    throw new AppError("NOT_FOUND", "Enrichment run not found.");
+  }
+  if (run.revokedAt || run.status === "failed" || run.status === "expired" || run.status === "searching") {
+    throw new AppError("VALIDATION_ERROR", "This enrichment run cannot be updated.");
+  }
+  const candidate = run.candidates.find((item) => item.id === input.candidateId);
+  if (!candidate) {
+    throw new AppError("VALIDATION_ERROR", "Choose one of the people found for this lead.");
+  }
+  if (run.selectedCandidateId === candidate.id && run.status === "accepted") {
+    return run;
+  }
+
+  const alreadyApplied =
+    Boolean(run.acceptedSummary) ||
+    run.suggestions.some((suggestion) => suggestion.status === "accepted" || suggestion.status === "edited");
+  if (alreadyApplied) {
+    await revertLeadEnrichmentRun({
+      workspaceId: input.workspaceId,
+      leadId: input.leadId,
+      runId: input.runId,
+      actorId: input.actorId,
+    });
+  }
+
+  const lead = await findLeadById(input.workspaceId, input.leadId);
+  if (!lead || lead.archivedAt) {
+    throw new AppError("NOT_FOUND", "Lead not found.");
+  }
+  const current = await currentFieldMap(lead);
+  const retrievedAt = run.retrievedAt ?? new Date().toISOString();
+  const retrievedUrls = [
+    ...run.sources.map((hit) => hit.url),
+    ...candidate.sourceUrls,
+    ...candidate.suggestions.flatMap((suggestion) => suggestion.sourceUrls),
+  ];
+  const suggestions = buildSuggestions({
+    synthesis: { suggestions: candidate.suggestions },
+    current,
+    retrievedAt,
+    searchProvider: run.searchProvider ?? "unknown",
+    aiModel: run.aiModel ?? "unknown",
+    retrievedUrls,
+  });
+  const citationUrls = citeOnlyRetrievedUrls(candidate.summary.citationUrls, retrievedUrls);
+  const summaryDraft: LeadEnrichmentSummary | null =
+    candidate.summary.text && citationUrls.length > 0
+      ? {
+          text: candidate.summary.text,
+          citationUrls,
+          status: "draft",
+          acceptedAt: null,
+          acceptedBy: null,
+        }
+      : null;
+
+  await updateEnrichmentRun(input.workspaceId, run.id, {
+    status: "reviewing",
+    identityMatch: "unique",
+    failureMessage: null,
+    suggestions,
+    summaryDraft,
+    selectedCandidateId: candidate.id,
+  });
+
+  const safeDecisions = suggestions
+    .filter((suggestion) =>
+      isSafeToAutoApplySuggestion({
+        currentValue: suggestion.currentValue,
+        currentOrigin: suggestion.currentOrigin,
+      }),
+    )
+    .map((suggestion) => ({
+      suggestionId: suggestion.id,
+      action: "accept" as const,
+    }));
+
+  if (safeDecisions.length === 0 && !summaryDraft) {
+    const updated = await findEnrichmentRunById(input.workspaceId, run.id);
+    if (!updated) {
+      throw new AppError("NOT_FOUND", "Enrichment run not found.");
+    }
+    return updated;
+  }
+
+  return applyLeadEnrichmentDecisions({
+    workspaceId: input.workspaceId,
+    leadId: input.leadId,
+    runId: run.id,
+    actorId: input.actorId,
+    decisions: safeDecisions,
+    summaryAction: summaryDraft ? "accept" : undefined,
+  });
 }
 
 export async function applyLeadEnrichmentDecisions(input: {

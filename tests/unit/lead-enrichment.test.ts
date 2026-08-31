@@ -7,6 +7,9 @@ import {
   HIGH_CONFIDENCE_THRESHOLD,
   isSafeToAutoApplySuggestion,
   isUniqueEnrichmentReveal,
+  normalizeEnrichmentCandidates,
+  needsEnrichmentCandidateChoice,
+  appendUnusedHitCandidates,
   citeOnlyRetrievedUrls,
   emailLocalPartToPersonName,
   enrichmentPersonQueryName,
@@ -108,6 +111,7 @@ describe("lead enrichment contract", () => {
     });
     expect(fixture.identityMatch).toBe("ambiguous");
     expect(fixture.suggestions).toEqual([]);
+    expect(fixture.candidates).toHaveLength(2);
   });
 
   it("returns cited unique demo suggestions", () => {
@@ -172,10 +176,116 @@ describe("lead enrichment contract", () => {
   it("treats unique accepted/reviewing runs as a one-click profile reveal", () => {
     expect(isUniqueEnrichmentReveal({ status: "accepted", identityMatch: "unique" })).toBe(true);
     expect(isUniqueEnrichmentReveal({ status: "reviewing", identityMatch: "unique" })).toBe(true);
+    expect(
+      isUniqueEnrichmentReveal({
+        status: "reviewing",
+        identityMatch: "unique",
+        candidates: [{ id: "cand-1" }, { id: "cand-2" }],
+      }),
+    ).toBe(false);
     expect(isUniqueEnrichmentReveal({ status: "ambiguous", identityMatch: "ambiguous" })).toBe(
       false,
     );
     expect(isUniqueEnrichmentReveal({ status: "failed", identityMatch: "none" })).toBe(false);
+  });
+
+  it("normalizes LLM people into pickable candidates and wraps a single suggestion set", () => {
+    const many = normalizeEnrichmentCandidates({
+      fallbackLabel: "Mélina Roulet",
+      candidates: [
+        {
+          label: "Social Scientist / GIS Specialist",
+          headline: "Social Scientist",
+          location: "Commugny, Switzerland",
+          suggestions: [
+            {
+              fieldKey: "jobTitle",
+              value: "Social Scientist / Geographer / GIS Specialist",
+              confidencePercent: 80,
+              rationale: "Directory",
+              sourceUrls: ["https://example.com/gis"],
+            },
+          ],
+        },
+        {
+          headline: "Orthopaedic Surgery Resident",
+          employer: "HFR",
+          location: "Lausanne, Switzerland",
+          sourceUrls: ["https://example.com/ortho"],
+          suggestions: [
+            {
+              fieldKey: "jobTitle",
+              value: "Orthopaedic Surgery Resident",
+              confidencePercent: 82,
+              rationale: "LinkedIn",
+              sourceUrls: ["https://example.com/ortho"],
+            },
+          ],
+        },
+      ],
+    });
+    expect(many).toHaveLength(2);
+    expect(many[0]?.mostLikely).toBe(true);
+    expect(many[1]?.label).toContain("Orthopaedic Surgery Resident");
+    expect(needsEnrichmentCandidateChoice({ candidates: many })).toBe(true);
+    expect(
+      needsEnrichmentCandidateChoice({ candidates: many, selectedCandidateId: "cand-1" }),
+    ).toBe(false);
+
+    const single = normalizeEnrichmentCandidates({
+      suggestions: [
+        {
+          fieldKey: "jobTitle",
+          value: "Head of Sales",
+          confidencePercent: 80,
+          rationale: "Team page",
+          sourceUrls: ["https://example.com/amira"],
+        },
+      ],
+      summary: { text: "Head of Sales", citationUrls: ["https://example.com/amira"] },
+    });
+    expect(single).toHaveLength(1);
+    expect(single[0]?.id).toBe("cand-1");
+    expect(needsEnrichmentCandidateChoice({ candidates: single })).toBe(false);
+  });
+
+  it("adds leftover LinkedIn profiles as alternate candidates", () => {
+    const withHits = appendUnusedHitCandidates(
+      normalizeEnrichmentCandidates({
+        suggestions: [
+          {
+            fieldKey: "jobTitle",
+            value: "Social Scientist",
+            confidencePercent: 80,
+            rationale: "Directory",
+            sourceUrls: ["https://example.com/gis"],
+          },
+        ],
+      }),
+      [
+        {
+          url: "https://example.com/gis",
+          title: "Social Scientist",
+          snippet: "GIS specialist",
+          retrievedAt: "2026-08-31T12:00:00.000Z",
+        },
+        {
+          url: "https://www.linkedin.com/in/melina-roulet-ortho",
+          title: "Mélina Roulet – Orthopaedic Surgery Resident",
+          snippet: "Médecin assistante en orthopédie, Lausanne",
+          retrievedAt: "2026-08-31T12:00:00.000Z",
+        },
+        {
+          url: "https://www.linkedin.com/pub/dir/Melina/Roulet",
+          title: "4 Melina Roulet profiles",
+          snippet: "Directory",
+          retrievedAt: "2026-08-31T12:00:00.000Z",
+        },
+      ],
+    );
+    expect(withHits).toHaveLength(2);
+    expect(withHits[1]?.label).toContain("Orthopaedic Surgery Resident");
+    expect(withHits[1]?.profileUrl).toContain("linkedin.com/in/");
   });
 
   it("requests a labelled occupational estimate only after a unique reveal with job and location", () => {

@@ -158,6 +158,28 @@ export type LeadEnrichmentSummary = {
   acceptedBy: string | null;
 };
 
+export type LeadEnrichmentCandidateSuggestion = {
+  fieldKey: LeadEnrichmentFieldKey;
+  value: string;
+  confidencePercent: number;
+  rationale: string;
+  sourceUrls: string[];
+};
+
+export type LeadEnrichmentCandidate = {
+  id: string;
+  label: string;
+  headline: string | null;
+  employer: string | null;
+  location: string | null;
+  profileUrl: string | null;
+  sourceUrls: string[];
+  confidencePercent: number;
+  mostLikely: boolean;
+  suggestions: LeadEnrichmentCandidateSuggestion[];
+  summary: { text: string; citationUrls: string[] };
+};
+
 export function isLeadEnrichmentFieldKey(value: string): value is LeadEnrichmentFieldKey {
   return (LEAD_ENRICHMENT_FIELD_KEYS as readonly string[]).includes(value);
 }
@@ -876,12 +898,264 @@ export function originLabel(
 export function isUniqueEnrichmentReveal(run: {
   status: string;
   identityMatch?: string | null;
+  candidates?: unknown[] | null;
+  selectedCandidateId?: string | null;
 }): boolean {
+  if ((run.candidates?.length ?? 0) > 1 && !run.selectedCandidateId) {
+    return false;
+  }
   return (
     run.identityMatch === "unique" &&
     run.status !== "ambiguous" &&
     run.status !== "failed"
   );
+}
+
+export function hasEnrichmentCandidateAlternatives(run: {
+  candidates?: unknown[] | null;
+}): boolean {
+  return (run.candidates?.length ?? 0) > 1;
+}
+
+export function needsEnrichmentCandidateChoice(run: {
+  candidates?: unknown[] | null;
+  selectedCandidateId?: string | null;
+}): boolean {
+  return hasEnrichmentCandidateAlternatives(run) && !run.selectedCandidateId;
+}
+
+function asCandidateSuggestion(item: unknown): LeadEnrichmentCandidateSuggestion | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const row = item as Record<string, unknown>;
+  if (typeof row.fieldKey !== "string" || typeof row.value !== "string") {
+    return null;
+  }
+  if (!isLeadEnrichmentFieldKey(row.fieldKey)) {
+    return null;
+  }
+  return {
+    fieldKey: row.fieldKey,
+    value: row.value,
+    confidencePercent: Number(row.confidencePercent) || 0,
+    rationale: typeof row.rationale === "string" ? row.rationale : "",
+    sourceUrls: Array.isArray(row.sourceUrls)
+      ? row.sourceUrls.filter((url): url is string => typeof url === "string")
+      : [],
+  };
+}
+
+function buildCandidateLabel(input: {
+  label?: string | null;
+  headline?: string | null;
+  employer?: string | null;
+  location?: string | null;
+  fallback: string;
+}): string {
+  if (input.label && input.label.trim()) {
+    return input.label.trim();
+  }
+  const parts = [input.headline, input.employer, input.location].filter(
+    (part): part is string => Boolean(part && part.trim()),
+  );
+  return parts.length > 0 ? parts.join(" · ") : input.fallback;
+}
+
+function usedCandidateUrls(candidates: LeadEnrichmentCandidate[]): Set<string> {
+  return new Set(
+    candidates.flatMap((candidate) => [
+      candidate.profileUrl,
+      ...candidate.sourceUrls,
+      ...candidate.suggestions.flatMap((suggestion) => suggestion.sourceUrls),
+      ...candidate.summary.citationUrls,
+    ]).filter((url): url is string => Boolean(url)),
+  );
+}
+
+function looksLikeDistinctPersonHit(hit: LeadEnrichmentSearchHit): boolean {
+  if (/profiles|directory|search results|people also/i.test(hit.title)) {
+    return false;
+  }
+  try {
+    const host = new URL(hit.url).hostname.replace(/^www\./, "");
+    if (host.includes("linkedin.com") && /\/in\//.test(hit.url)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return / — | – | - /.test(hit.title);
+}
+
+export function appendUnusedHitCandidates(
+  candidates: LeadEnrichmentCandidate[],
+  hits: LeadEnrichmentSearchHit[],
+): LeadEnrichmentCandidate[] {
+  if (hits.length === 0) {
+    return candidates;
+  }
+  const used = usedCandidateUrls(candidates);
+  const extras: LeadEnrichmentCandidate[] = [];
+  for (const hit of hits) {
+    if (candidates.length + extras.length >= 5) {
+      break;
+    }
+    if (used.has(hit.url) || !looksLikeDistinctPersonHit(hit)) {
+      continue;
+    }
+    used.add(hit.url);
+    const index = candidates.length + extras.length;
+    extras.push({
+      id: `cand-${index + 1}`,
+      label: hit.title || `Match ${index + 1}`,
+      headline: null,
+      employer: null,
+      location: null,
+      profileUrl: hit.url,
+      sourceUrls: [hit.url],
+      confidencePercent: 60,
+      mostLikely: false,
+      suggestions: [
+        {
+          fieldKey: "professionalProfileUrl",
+          value: hit.url,
+          confidencePercent: 70,
+          rationale: "Public profile URL from search results.",
+          sourceUrls: [hit.url],
+        },
+        {
+          fieldKey: "otherProfessional",
+          value: hit.snippet || hit.title,
+          confidencePercent: 55,
+          rationale: "Snippet from a distinct public professional listing.",
+          sourceUrls: [hit.url],
+        },
+      ],
+      summary: {
+        text: hit.snippet || hit.title,
+        citationUrls: [hit.url],
+      },
+    });
+  }
+  return extras.length > 0 ? [...candidates, ...extras] : candidates;
+}
+
+export function normalizeEnrichmentCandidates(input: {
+  candidates?: unknown;
+  suggestions?: unknown;
+  summary?: { text?: string; citationUrls?: string[] } | null;
+  fallbackLabel?: string;
+}): LeadEnrichmentCandidate[] {
+  const topSuggestions = Array.isArray(input.suggestions)
+    ? input.suggestions.flatMap((item) => {
+        const parsed = asCandidateSuggestion(item);
+        return parsed ? [parsed] : [];
+      })
+    : [];
+  const topSummary = {
+    text: input.summary?.text ?? "",
+    citationUrls: Array.isArray(input.summary?.citationUrls)
+      ? input.summary.citationUrls.filter((url): url is string => typeof url === "string")
+      : [],
+  };
+  const rawCandidates = Array.isArray(input.candidates) ? input.candidates : [];
+  const parsed = rawCandidates.flatMap((item, index) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const row = item as Record<string, unknown>;
+    const suggestions = Array.isArray(row.suggestions)
+      ? row.suggestions.flatMap((suggestion) => {
+          const parsedSuggestion = asCandidateSuggestion(suggestion);
+          return parsedSuggestion ? [parsedSuggestion] : [];
+        })
+      : [];
+    const summaryRaw =
+      row.summary && typeof row.summary === "object"
+        ? (row.summary as Record<string, unknown>)
+        : {};
+    const headline = typeof row.headline === "string" ? row.headline : null;
+    const employer = typeof row.employer === "string" ? row.employer : null;
+    const location = typeof row.location === "string" ? row.location : null;
+    const jobTitle = suggestions.find((suggestion) => suggestion.fieldKey === "jobTitle")?.value;
+    const companyName = suggestions.find((suggestion) => suggestion.fieldKey === "companyName")?.value;
+    const city = suggestions.find((suggestion) => suggestion.fieldKey === "city")?.value;
+    const country = suggestions.find((suggestion) => suggestion.fieldKey === "country")?.value;
+    return [
+      {
+        id: typeof row.id === "string" && row.id.trim() ? row.id.trim() : `cand-${index + 1}`,
+        label: buildCandidateLabel({
+          label: typeof row.label === "string" ? row.label : null,
+          headline: headline ?? jobTitle ?? null,
+          employer: employer ?? companyName ?? null,
+          location: location ?? ([city, country].filter(Boolean).join(", ") || null),
+          fallback: input.fallbackLabel ?? `Match ${index + 1}`,
+        }),
+        headline: headline ?? jobTitle ?? null,
+        employer: employer ?? companyName ?? null,
+        location: location ?? ([city, country].filter(Boolean).join(", ") || null),
+        profileUrl: typeof row.profileUrl === "string" ? row.profileUrl : null,
+        sourceUrls: Array.isArray(row.sourceUrls)
+          ? row.sourceUrls.filter((url): url is string => typeof url === "string")
+          : [],
+        confidencePercent: Math.min(85, Math.max(0, Number(row.confidencePercent) || 0)),
+        mostLikely: index === 0,
+        suggestions,
+        summary: {
+          text: typeof summaryRaw.text === "string" ? summaryRaw.text : "",
+          citationUrls: Array.isArray(summaryRaw.citationUrls)
+            ? summaryRaw.citationUrls.filter((url): url is string => typeof url === "string")
+            : [],
+        },
+      } satisfies LeadEnrichmentCandidate,
+    ];
+  });
+
+  if (parsed.length > 0) {
+    if (parsed[0] && parsed[0].suggestions.length === 0 && topSuggestions.length > 0) {
+      parsed[0] = {
+        ...parsed[0],
+        suggestions: topSuggestions,
+        summary: parsed[0].summary.text ? parsed[0].summary : topSummary,
+      };
+    }
+    return parsed.slice(0, 5);
+  }
+
+  if (topSuggestions.length === 0) {
+    return [];
+  }
+
+  const jobTitle = topSuggestions.find((suggestion) => suggestion.fieldKey === "jobTitle")?.value;
+  const companyName = topSuggestions.find((suggestion) => suggestion.fieldKey === "companyName")?.value;
+  const city = topSuggestions.find((suggestion) => suggestion.fieldKey === "city")?.value;
+  const country = topSuggestions.find((suggestion) => suggestion.fieldKey === "country")?.value;
+  return [
+    {
+      id: "cand-1",
+      label: buildCandidateLabel({
+        headline: jobTitle ?? null,
+        employer: companyName ?? null,
+        location: [city, country].filter(Boolean).join(", ") || null,
+        fallback: input.fallbackLabel ?? "Most likely match",
+      }),
+      headline: jobTitle ?? null,
+      employer: companyName ?? null,
+      location: [city, country].filter(Boolean).join(", ") || null,
+      profileUrl:
+        topSuggestions.find((suggestion) => suggestion.fieldKey === "professionalProfileUrl")
+          ?.value ?? null,
+      sourceUrls: [...new Set(topSuggestions.flatMap((suggestion) => suggestion.sourceUrls))],
+      confidencePercent: Math.min(
+        85,
+        Math.max(0, ...topSuggestions.map((suggestion) => suggestion.confidencePercent)),
+      ),
+      mostLikely: true,
+      suggestions: topSuggestions,
+      summary: topSummary,
+    },
+  ];
 }
 
 export type WebEnrichmentAttributes = {

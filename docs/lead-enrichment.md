@@ -8,12 +8,13 @@ Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KE
 2. Clicking **Enrich** starts public-web search immediately (default allowed sources: professional directories, company sites, news/press, registries). A short animated progress state is shown. There is no source-picker or per-field accept gate before results appear.
 3. Search is meant to work like a broker Googling the person in the **project’s area**, not worldwide. The first queries are `name + project place` (Cressy / Confignon / canton Genève → **Geneva**; Vista Brent → **Montreux**) then `name + LinkedIn + place`. If the lead’s display name is the email, the local-part is turned into a person name (`yanis_berger96` → `yanis berger`). Also used: Swiss mobile, CRM city/country that was not itself enrichment-written, workspace `CHF`. Work-email domains search `name + domain`. A bare global name search is only a last fallback. Empty Tavily results fall through to Brave / OpenAI web search. Contact-data vendors are dropped. The project geo is the market prior (Vista Brent → Montreux → Switzerland). When the same name appears in several countries, keep the person in that market and drop the others. Stay **ambiguous** only if two people remain in the same market, or if the only hits are abroad.
 4. Search-provider hits are synthesized server-side with OpenAI. Citations must come from retrieved https URLs (Tavily / Brave / OpenAI `web_search` annotations). Empty retrieval → failed run, no invented profile.
-5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value” on the profile.
+5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once when there is a single unique person. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value” on the profile.
 6. On a unique match the dialog shows a brief “Profile filled” beat and **closes onto the lead**. Enriched fields pulse once. Each value has a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
+6b. When search finds **more than one person**, Enrich does not auto-apply. The dialog (and the Overview “Matches found” block) lists candidates with the most likely first. The operator picks which person to apply. Switching later reverts the previous match and writes the chosen one.
 7. **What we know** is a cited summary stored on the lead. It is not a campaign, drip, status change, or outbound message.
 8. If the operator has `lead:financial_update` and the profile now has job title plus city/region/country, Enrich also requests a labelled **occupational pay estimate** (typical pay for this role and market, e.g. a CTO at a company like Neho in Switzerland). That estimate **pre-fills working figures** on the financial tab (annual income = range midpoint, employment type from the job title, discussion budget ≈ 6× midpoint, source `occupational_estimate`) so a broker can gauge affordability and whether to pitch. Declared-by-lead / document / advisor values are not overwritten. Deposit and financing stay empty. This is not a credit or mortgage application. Snippet wage bands are preferred; if search has no numbers, a capped OpenAI occupational range is stored. Agents without financial permission still get the profile + summary only.
 
-Ambiguous identity → run status `ambiguous`, **no suggestions**, no profile write; the dialog stays open with the reason. Missing verifiable source → confidence capped; high confidence is rejected.
+Several people in the same market → run status `reviewing`, **no auto-write**, candidates listed for the operator to pick. If the model cannot name distinct people, status stays `ambiguous` with no suggestions. Missing verifiable source → confidence capped; high confidence is rejected.
 
 ## Data model
 
@@ -29,6 +30,8 @@ Workspace-scoped. One document per manual run.
 | `retrievedAt`, `expiresAt` | Retention / re-enrichment |
 | `identityMatch` | `unique` \| `ambiguous` \| `none` |
 | `sources[]` | `{ url, title, retrievedAt, snippet }` |
+| `candidates[]` | Distinct people found; most likely first. Used when the operator must pick. |
+| `selectedCandidateId` | Which candidate was applied |
 | `suggestions[]` | Field proposals (below) |
 | `summaryDraft` / `acceptedSummary` | Cited summary; accepted only after review |
 | `demoMode` | Fixture / dry-run, no live providers |
@@ -84,6 +87,7 @@ GET    /api/workspaces/:slug/settings/lead-enrichment
 PATCH  /api/workspaces/:slug/settings/lead-enrichment     # settings:update
 GET    /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich (full runs) or lead:read (overlay + capability only)
 POST   /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich — start run
+POST   /api/workspaces/:slug/leads/:id/enrichment/:runId/candidates
 POST   /api/workspaces/:slug/leads/:id/enrichment/:runId/decisions
 POST   /api/workspaces/:slug/leads/:id/enrichment/:runId/revert
 DELETE /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich_revoke

@@ -10,6 +10,10 @@ export const startLeadEnrichmentSchema = z.object({
     .optional(),
 });
 
+export const selectEnrichmentCandidateSchema = z.object({
+  candidateId: z.string().trim().min(1).max(80),
+});
+
 export const enrichmentDecisionSchema = z.object({
   decisions: z
     .array(
@@ -37,6 +41,7 @@ export const updateLeadEnrichmentSettingsSchema = z
   });
 
 export type StartLeadEnrichmentInput = z.infer<typeof startLeadEnrichmentSchema>;
+export type SelectEnrichmentCandidateInput = z.infer<typeof selectEnrichmentCandidateSchema>;
 export type EnrichmentDecisionInput = z.infer<typeof enrichmentDecisionSchema>;
 export type UpdateLeadEnrichmentSettingsInput = z.infer<
   typeof updateLeadEnrichmentSettingsSchema

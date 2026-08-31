@@ -26,11 +26,25 @@ export type SynthesizeSuggestion = {
   sourceUrls: string[];
 };
 
+export type SynthesizeCandidate = {
+  id?: string;
+  label?: string;
+  headline?: string | null;
+  employer?: string | null;
+  location?: string | null;
+  profileUrl?: string | null;
+  sourceUrls?: string[];
+  confidencePercent?: number;
+  suggestions?: SynthesizeSuggestion[];
+  summary?: { text: string; citationUrls: string[] };
+};
+
 export type SynthesizeResult = {
   identityMatch: LeadEnrichmentIdentityMatch;
   identityRationale: string;
   suggestions: SynthesizeSuggestion[];
   summary: { text: string; citationUrls: string[] };
+  candidates?: SynthesizeCandidate[];
   model: string;
 };
 
@@ -278,11 +292,27 @@ Return JSON:
 {
   "identityMatch": "unique" | "ambiguous" | "none",
   "identityRationale": "string",
+  "candidates": [
+    {
+      "id": "cand-1",
+      "label": "Name — role · employer · city",
+      "headline": "short job title",
+      "employer": "company",
+      "location": "city, country",
+      "profileUrl": "https://...",
+      "sourceUrls": ["https://..."],
+      "confidencePercent": 0-85,
+      "suggestions": [{"fieldKey":"companyName|jobTitle|industry|city|stateRegion|country|preferredContactClues|professionalProfileUrl|otherProfessional","value":"string","confidencePercent":0-85,"rationale":"string","sourceUrls":["https://..."]}],
+      "summary": {"text":"cited summary for this person only","citationUrls":["https://..."]}
+    }
+  ],
   "suggestions": [{"fieldKey":"companyName|jobTitle|industry|city|stateRegion|country|preferredContactClues|professionalProfileUrl|otherProfessional","value":"string","confidencePercent":0-85,"rationale":"string","sourceUrls":["https://..."]}],
-  "summary": {"text":"cited summary of public professional facts","citationUrls":["https://..."]}
+  "summary": {"text":"cited summary of the most likely person","citationUrls":["https://..."]}
 }
 
 Identity: unique when the results describe one professional matching this name in the lead’s market. A distinctive name (three parts or a hyphenated surname) can be unique even if the email is not printed on the page. Use work-email domain as extra corroboration when present. Ambiguous when several people match, or when the only hits are a different country than the lead’s phone/market. None when nothing corroborates the person.
+
+Always list every distinct professional the results mention in candidates[] (up to 5), even when identityMatch is unique. Put the most likely person first. Top-level suggestions/summary repeat that first person. A broker must be able to pick a different candidate (for example two LinkedIn profiles for the same name).
 
 Fill every field the sources support: employer, short job title (role only, e.g. Counsel — never a sentence or “employee of the …”), industry, city, region, country, public profile/company URL, contact clues. Prefer LinkedIn and employer pages over org-chart scrapers. Prefer current or recent pages over 10+ year-old reports.
 
@@ -328,31 +358,33 @@ Never extract income, wealth, credit, property ownership, health, home address, 
     parsed.summary && typeof parsed.summary === "object"
       ? (parsed.summary as Record<string, unknown>)
       : {};
+  const suggestions = suggestionsRaw.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const row = item as Record<string, unknown>;
+    if (typeof row.fieldKey !== "string" || typeof row.value !== "string") {
+      return [];
+    }
+    return [
+      {
+        fieldKey: row.fieldKey as LeadEnrichmentFieldKey,
+        value: row.value,
+        confidencePercent: Number(row.confidencePercent) || 0,
+        rationale: typeof row.rationale === "string" ? row.rationale : "",
+        sourceUrls: Array.isArray(row.sourceUrls)
+          ? row.sourceUrls.filter((url): url is string => typeof url === "string")
+          : [],
+      },
+    ];
+  });
   return {
     identityMatch,
     identityRationale:
       typeof parsed.identityRationale === "string" ? parsed.identityRationale : "",
     model,
-    suggestions: suggestionsRaw.flatMap((item) => {
-      if (!item || typeof item !== "object") {
-        return [];
-      }
-      const row = item as Record<string, unknown>;
-      if (typeof row.fieldKey !== "string" || typeof row.value !== "string") {
-        return [];
-      }
-      return [
-        {
-          fieldKey: row.fieldKey as LeadEnrichmentFieldKey,
-          value: row.value,
-          confidencePercent: Number(row.confidencePercent) || 0,
-          rationale: typeof row.rationale === "string" ? row.rationale : "",
-          sourceUrls: Array.isArray(row.sourceUrls)
-            ? row.sourceUrls.filter((url): url is string => typeof url === "string")
-            : [],
-        },
-      ];
-    }),
+    suggestions,
+    candidates: Array.isArray(parsed.candidates) ? (parsed.candidates as SynthesizeCandidate[]) : [],
     summary: {
       text: typeof summaryRaw.text === "string" ? summaryRaw.text : "",
       citationUrls: Array.isArray(summaryRaw.citationUrls)
