@@ -131,6 +131,27 @@ async function loadCmpMembershipLeads(
   return [...byId.values()];
 }
 
+function resolveHubSpotAccessToken(integration: {
+  credentialsEncrypted?: string | null;
+  createdBy: string;
+}): { accessToken: string; actorId: string } {
+  if (integration.credentialsEncrypted) {
+    try {
+      const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
+      if (credentials.accessToken?.trim()) {
+        return { accessToken: credentials.accessToken, actorId: integration.createdBy };
+      }
+    } catch {
+      // One-time operator backfill may use HUBSPOT_ACCESS_TOKEN when vault decrypt is unavailable.
+    }
+  }
+  const envToken = process.env.HUBSPOT_ACCESS_TOKEN?.trim();
+  if (envToken) {
+    return { accessToken: envToken, actorId: integration.createdBy };
+  }
+  throw new Error("hubspot_access_token_unavailable");
+}
+
 export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
   workspaceId?: string | null;
   execute?: boolean;
@@ -160,11 +181,15 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
       status: "active",
     });
     const integration = integrations[0];
-    if (!integration?.credentialsEncrypted) {
+    if (!integration) {
+      continue;
+    }
+    if (!integration.credentialsEncrypted && !process.env.HUBSPOT_ACCESS_TOKEN?.trim()) {
       continue;
     }
 
-    const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
+    const { accessToken, actorId } = resolveHubSpotAccessToken(integration);
+
     const leads = await loadCmpMembershipLeads(workspace.id);
     const contactIds = [
       ...new Set(
@@ -177,7 +202,7 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
     let contactsById = new Map<string, HubSpotContactRaw>();
     try {
       const contacts = await fetchHubSpotContactsByIds({
-        accessToken: credentials.accessToken,
+        accessToken,
         contactIds,
         properties: [...HUBSPOT_LEAD_INTELLIGENCE_PROPERTIES],
       });
@@ -215,7 +240,7 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
 
         if (!snapshot && !contactId && lead.email) {
           const emailMatches = await searchHubSpotContactsByEmail({
-            accessToken: credentials.accessToken,
+            accessToken,
             email: lead.email,
           });
           if (emailMatches.length > 1) {

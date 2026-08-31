@@ -49,6 +49,7 @@ import {
   fetchHubSpotContactsByIds,
   searchHubSpotContactsByEmail,
 } from "@/server/services/hubspot-client";
+import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
 import { runHubSpotCmpLeadIntelligenceEnrichment } from "@/server/services/hubspot-cmp-lead-intelligence";
 import { updateLeadForWorkspace } from "@/server/services/leads";
 import { leadRecordExtras } from "@/tests/helpers/crm-fixtures";
@@ -98,6 +99,12 @@ const lead = {
 describe("HubSpot CMP lead intelligence enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.HUBSPOT_ACCESS_TOKEN;
+    vi.mocked(decodeHubSpotCredentials).mockReturnValue({
+      accessToken: "pat-test",
+      clientSecret: null,
+      portalId: "12345",
+    });
     vi.mocked(findWorkspaceById).mockResolvedValue({ id: "ws-1" } as never);
     vi.mocked(findIntegrations).mockResolvedValue([
       {
@@ -336,5 +343,21 @@ describe("HubSpot CMP lead intelligence enrichment", () => {
     expect(report.wouldChangeRecords).toBe(0);
     expect(report.skippedUnchanged).toBeGreaterThan(0);
     expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to HUBSPOT_ACCESS_TOKEN when vault decrypt fails", async () => {
+    vi.mocked(decodeHubSpotCredentials).mockImplementation(() => {
+      throw new Error("Unsupported state or unable to authenticate data");
+    });
+    process.env.HUBSPOT_ACCESS_TOKEN = "pat-from-env";
+
+    const report = await runHubSpotCmpLeadIntelligenceEnrichment({
+      workspaceId: "ws-1",
+    });
+
+    expect(report.hubspotMatches).toBe(1);
+    expect(fetchHubSpotContactsByIds).toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: "pat-from-env" }),
+    );
   });
 });
