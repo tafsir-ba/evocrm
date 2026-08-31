@@ -13,6 +13,9 @@ import {
 describe("lead intelligence contract", () => {
   it("parses HubSpot contact idempotency keys and attributes", () => {
     expect(parseHubSpotContactIdFromIdempotencyKey("hubspot:contact:99")).toBe("99");
+    expect(
+      parseHubSpotContactIdFromIdempotencyKey("hubspot:contact:99:project:6a9489ee84c29475f4dbc6c3"),
+    ).toBe("99");
     expect(parseHubSpotContactIdFromIdempotencyKey("website:form-1")).toBeNull();
     expect(
       readHubSpotContactIdFromLeadAttributes({
@@ -54,6 +57,13 @@ describe("lead intelligence contract", () => {
         incomingValue: "New",
       }),
     ).toBe("apply");
+    expect(
+      canApplyIntelligenceValue({
+        existingValue: "Finance",
+        existingProvenance: { method: "hubspot", source: "hubspot_cmp_enrichment", appliedAt: "", notes: null },
+        incomingValue: "Finance",
+      }),
+    ).toBe("skip_unchanged");
     expect(
       canApplyIntelligenceValue({
         existingValue: "Manual",
