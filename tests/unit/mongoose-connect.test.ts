@@ -4,6 +4,7 @@ vi.mock("mongoose", () => ({
   default: {
     connect: vi.fn(() => Promise.resolve({})),
     disconnect: vi.fn(() => Promise.resolve(undefined)),
+    set: vi.fn(),
   },
 }));
 
@@ -26,9 +27,10 @@ describe("connectDb", () => {
 
   it("connects without requiring optional production feature env vars", async () => {
     await expect(connectDb()).resolves.toBeDefined();
+    expect(mongoose.set).toHaveBeenCalledWith("autoIndex", false);
     expect(mongoose.connect).toHaveBeenCalledWith(
       "mongodb://localhost:27017/evocrm",
-      { bufferCommands: false },
+      { bufferCommands: false, autoIndex: false },
     );
   });
 });

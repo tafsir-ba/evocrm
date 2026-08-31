@@ -5,6 +5,15 @@ import mongoose from "mongoose";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
 
+/**
+ * Production must not auto-build schema indexes. Unique lead indexes
+ * (emailNormalized, HubSpot idempotencyKey) currently collide with
+ * duplicate migrated rows and can hang or crash the App Platform process.
+ */
+if (process.env.NODE_ENV === "production") {
+  mongoose.set("autoIndex", false);
+}
+
 type MongooseCache = {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -41,9 +50,15 @@ export async function connectDb(): Promise<typeof mongoose> {
   const { MONGODB_URI } = env;
 
   if (!cache.promise) {
+    const disableAutoIndex = env.NODE_ENV === "production";
+    if (disableAutoIndex) {
+      mongoose.set("autoIndex", false);
+    }
+
     cache.promise = mongoose
       .connect(MONGODB_URI, {
         bufferCommands: false,
+        autoIndex: !disableAutoIndex,
       })
       .then((connection) => connection)
       .catch((error: unknown) => {
