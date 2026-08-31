@@ -965,7 +965,7 @@ export function LeadsPanel({
           )}
 
           {canDelete && allPageSelected && total > leads.length && !selectAllMatching && (
-            <div className="border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
+            <div className="shrink-0 border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
               All {leads.length} leads on this page are selected.{" "}
               <button
                 type="button"
