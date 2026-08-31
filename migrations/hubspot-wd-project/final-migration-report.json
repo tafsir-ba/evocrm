@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T09:21:41.868Z",
+  "mode": "dry-run",
+  "policy": "hubspot_final_migration_v1",
+  "onlyGaps": true,
+  "limit": 100,
+  "totals": {
+    "scanned": 100,
+    "created": 100,
+    "memberships_added": 0,
+    "preexisting": 0,
+    "deduped_linked": 0,
+    "legacy_general": 0,
+    "error": 0,
+    "membershipsAddedSum": 0,
+    "cmpEnsured": 0
+  },
+  "reasonCounts": {
+    "notes_mapped_single": 93,
+    "broker_mapped_single": 1,
+    "multi_project:wd_project_multi_ordered": 6
+  },
+  "errorReasons": {},
+  "sampleErrorIds": [],
+  "campaignGuard": {
+    "workspaceEnrollmentCount": 325,
+    "migratedLegacyEnrollmentCount": 0,
+    "hubspotLegacyLeadCount": 29211
+  },
+  "idChecksums": {
+    "processedThisRun": "bc9acf201f44be31ba9520344bfe7ffff563c17659627bbfa0dd0328f1299256"
+  },
+  "gates": {
+    "enrollmentsZero": true,
+    "errorsAcceptable": true
+  }
+}

@@ -172,8 +172,13 @@ async function main(): Promise<void> {
   const { listHubSpotProjectMappings } = await import(
     "../server/repositories/hubspot-project-mappings"
   );
-  const { findIntegrationById } = await import("../server/repositories/integrations");
-  const { ensureFinalMigrationOutcome, snapshotForFinalMigration } = await import(
+  const { findDictionaryItemByTypeAndKey } = await import(
+    "../server/repositories/dictionary-items"
+  );
+  const { ensureFinalMigrationOutcomeCached } = await import(
+    "../server/services/hubspot-final-migration-cached"
+  );
+  const { snapshotForFinalMigration } = await import(
     "../server/services/hubspot-final-migration"
   );
   const { ensureCmpMembershipForSnapshot } = await import(
@@ -181,6 +186,7 @@ async function main(): Promise<void> {
   );
   const { contactHasCmpProductSignal } = await import("../lib/hubspot-cmp-membership");
   type MappedProject = import("../lib/hubspot-final-migration-policy").MappedProject;
+  type FinalMigrationCache = import("../server/services/hubspot-final-migration-cached").FinalMigrationCache;
 
   const integration = await findIntegrationById(
     WD_MIGRATION_WORKSPACE_ID,
@@ -188,6 +194,18 @@ async function main(): Promise<void> {
   );
   if (!integration) throw new Error("integration_missing");
   const actorId = integration.createdBy;
+
+  const status = await findDictionaryItemByTypeAndKey(
+    WD_MIGRATION_WORKSPACE_ID,
+    "lead_status",
+    "new",
+  );
+  if (!status?.isActive) throw new Error("lead_status_new_missing");
+  const source = await findDictionaryItemByTypeAndKey(
+    WD_MIGRATION_WORKSPACE_ID,
+    "lead_source",
+    "hubspot",
+  );
 
   const roadmap = JSON.parse(
     await readFile(path.join(process.cwd(), WD_MIGRATION_ROADMAP_FILE), "utf8"),
@@ -206,6 +224,95 @@ async function main(): Promise<void> {
       reference: mapping.hubspotProjectId,
     });
   }
+
+  const db = mongoose.connection.db!;
+  const ws = new mongoose.Types.ObjectId(WD_MIGRATION_WORKSPACE_ID);
+
+  console.error("[final-migration] preloading CRM indexes…");
+  const hubspotToLead = new Map<string, string>();
+  const emailIndex = new Map<
+    string,
+    { leadId: string; nameKey: string; hubspotContactIds: string[] }
+  >();
+  const leadPrimaryProject = new Map<string, string>();
+  const leadMemberships = new Map<string, Set<string>>();
+
+  const leadCursor = db.collection("leads").find(
+    { workspaceId: ws, archivedAt: null },
+    {
+      projection: {
+        emailNormalized: 1,
+        firstName: 1,
+        lastName: 1,
+        projectId: 1,
+        attributes: 1,
+      },
+    },
+  );
+  for await (const doc of leadCursor) {
+    const leadId = doc._id.toString();
+    const projectId = doc.projectId?.toString?.() ?? String(doc.projectId);
+    leadPrimaryProject.set(leadId, projectId);
+    const attrs = (doc.attributes ?? {}) as {
+      integration?: { externalId?: string; idempotencyKey?: string };
+    };
+    const hubspotIds: string[] = [];
+    if (attrs.integration?.externalId) {
+      const id = String(attrs.integration.externalId);
+      hubspotIds.push(id);
+      if (!hubspotToLead.has(id)) hubspotToLead.set(id, leadId);
+    }
+    const key = attrs.integration?.idempotencyKey;
+    if (typeof key === "string" && key.startsWith("hubspot:contact:")) {
+      const id = key.slice("hubspot:contact:".length).split(":")[0];
+      if (id) {
+        hubspotIds.push(id);
+        if (!hubspotToLead.has(id)) hubspotToLead.set(id, leadId);
+      }
+    }
+    const firstName = typeof doc.firstName === "string" ? doc.firstName : "";
+    const lastName = typeof doc.lastName === "string" ? doc.lastName : "";
+    const nameKey = `${firstName}|${lastName}`.toLowerCase();
+    if (typeof doc.emailNormalized === "string" && doc.emailNormalized) {
+      const prev = emailIndex.get(doc.emailNormalized);
+      if (!prev) {
+        emailIndex.set(doc.emailNormalized, {
+          leadId,
+          nameKey,
+          hubspotContactIds: [...new Set(hubspotIds)],
+        });
+      } else {
+        prev.hubspotContactIds = [...new Set([...prev.hubspotContactIds, ...hubspotIds])];
+      }
+    }
+  }
+
+  const memCursor = db.collection("leadprojectmemberships").find(
+    { workspaceId: ws, archivedAt: null },
+    { projection: { leadId: 1, projectId: 1 } },
+  );
+  for await (const doc of memCursor) {
+    const leadId = doc.leadId?.toString?.() ?? String(doc.leadId);
+    const projectId = doc.projectId?.toString?.() ?? String(doc.projectId);
+    const set = leadMemberships.get(leadId) ?? new Set<string>();
+    set.add(projectId);
+    leadMemberships.set(leadId, set);
+  }
+  console.error(
+    `[final-migration] indexes hubspot=${hubspotToLead.size} email=${emailIndex.size} membershipLeads=${leadMemberships.size}`,
+  );
+
+  const cache: FinalMigrationCache = {
+    actorId,
+    statusId: status.id,
+    sourceId: source?.isActive ? source.id : undefined,
+    mappedBySlug,
+    fallbackGeneralSlugs,
+    hubspotToLead,
+    emailIndex,
+    leadMemberships,
+    leadPrimaryProject,
+  };
 
   const properties = [
     ...WD_MIGRATION_HUBSPOT_PROPERTIES,
@@ -227,47 +334,15 @@ async function main(): Promise<void> {
   }
 
   if (onlyGaps) {
-    const db = mongoose.connection.db!;
-    const ws = new mongoose.Types.ObjectId(WD_MIGRATION_WORKSPACE_ID);
-    const represented = new Set<string>();
-    const cursor = db.collection("leads").find(
-      {
-        workspaceId: ws,
-        archivedAt: null,
-        "attributes.integration.externalId": { $exists: true, $ne: null },
-      },
-      { projection: { "attributes.integration.externalId": 1 } },
-    );
-    for await (const doc of cursor) {
-      const id = (doc as { attributes?: { integration?: { externalId?: string } } })
-        .attributes?.integration?.externalId;
-      if (id) represented.add(String(id));
-    }
-    // Also collect classic keys
-    const keyCursor = db.collection("leads").find(
-      {
-        workspaceId: ws,
-        archivedAt: null,
-        "attributes.integration.idempotencyKey": { $regex: "^hubspot:contact:" },
-      },
-      { projection: { "attributes.integration.idempotencyKey": 1 } },
-    );
-    for await (const doc of keyCursor) {
-      const key = (doc as { attributes?: { integration?: { idempotencyKey?: string } } })
-        .attributes?.integration?.idempotencyKey;
-      if (typeof key === "string" && key.startsWith("hubspot:contact:")) {
-        const id = key.slice("hubspot:contact:".length).split(":")[0];
-        if (id) represented.add(id);
-      }
-    }
+    const represented = new Set(hubspotToLead.keys());
     console.error(`[final-migration] CRM hubspot-linked: ${represented.size}`);
-
-    // Gaps = not represented OR multi-project needing membership ensure
-    // Process: not represented + multi wd_project + notes_conflict candidates + CMP product without link
     contacts = contacts.filter((row) => {
       if (processedBefore.has(row.id)) return false;
       if (!represented.has(row.id)) return true;
-      const wd = (row.properties.wd_project ?? "").split(/[;,|]/).map((s) => s.trim()).filter(Boolean);
+      const wd = (row.properties.wd_project ?? "")
+        .split(/[;,|]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       return wd.length > 1;
     });
     console.error(`[final-migration] gap/multi candidates: ${contacts.length}`);
@@ -299,11 +374,9 @@ async function main(): Promise<void> {
   for (const row of contacts) {
     totals.scanned += 1;
     const snapshot = snapshotForFinalMigration(row.id, row.properties);
-    const result = await ensureFinalMigrationOutcome({
+    const result = await ensureFinalMigrationOutcomeCached({
+      cache,
       snapshot,
-      actorId,
-      mappedBySlug,
-      fallbackGeneralSlugs,
       properties: row.properties,
       persist,
     });
@@ -335,9 +408,9 @@ async function main(): Promise<void> {
       processedIds.push(row.id);
     }
 
-    if (totals.scanned % 200 === 0) {
+    if (totals.scanned % 100 === 0) {
       console.error(
-        `[final-migration] progress scanned=${totals.scanned} created=${totals.created} legacy=${totals.legacy_general} err=${totals.error}`,
+        `[final-migration] progress scanned=${totals.scanned} created=${totals.created} legacy=${totals.legacy_general} mem+=${totals.memberships_added} err=${totals.error}`,
       );
       if (persist) {
         await mkdir(path.dirname(checkpointPath), { recursive: true });
@@ -357,14 +430,10 @@ async function main(): Promise<void> {
     }
   }
 
-  // Campaign guard check on General + recently touched
-  const db = mongoose.connection.db!;
-  const ws = new mongoose.Types.ObjectId(WD_MIGRATION_WORKSPACE_ID);
   const enrollmentCount = await db.collection("campaignenrollments").countDocuments({
     workspaceId: ws,
     archivedAt: null,
   });
-  // Count enrollments on hubspot migration leads only
   const hubspotLeadIds = await db
     .collection("leads")
     .find(
