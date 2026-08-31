@@ -25,7 +25,7 @@ export default async function LeadsPage({ params }: { params: Params }) {
   const permissions = access.context.membership.role.permissions;
 
   return (
-    <PageContainer>
+    <PageContainer className="flex min-h-0 flex-1 flex-col">
       <ProjectFilterSuspense>
         <LeadsPanel
           workspaceSlug={workspaceSlug}

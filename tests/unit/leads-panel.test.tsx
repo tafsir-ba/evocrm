@@ -161,6 +161,28 @@ describe("LeadsPanel table", () => {
     expect(screen.getAllByRole("link", { name: "Open François Côté" }).length).toBeGreaterThan(0);
   });
 
+  it("scrolls lead rows inside the table so pagination stays pinned", async () => {
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
+
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+
+    const scroller = screen.getByTestId("leads-table-scroll");
+    const nextPage = screen.getByRole("button", { name: "Next page" });
+
+    expect(scroller).toHaveClass("overflow-auto");
+    expect(scroller).toHaveClass("min-h-0");
+    expect(scroller).toHaveClass("flex-1");
+    expect(scroller.contains(nextPage)).toBe(false);
+  });
+
   it("reveals contact channels from the compact icon popover", async () => {
     const user = userEvent.setup();
     render(

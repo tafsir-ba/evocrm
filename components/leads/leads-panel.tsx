@@ -594,9 +594,10 @@ export function LeadsPanel({
   }
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         density="compact"
+        className="shrink-0"
         title="Leads"
         meta={
           !loading ? (
@@ -629,7 +630,7 @@ export function LeadsPanel({
         <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
       )}
 
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
         <div className="flex-1 min-w-[200px] max-w-md">
           <Input
             placeholder="Search leads by name, email or phone…"
@@ -765,7 +766,7 @@ export function LeadsPanel({
       </div>
 
       {showMoreFilters ? (
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
@@ -938,9 +939,9 @@ export function LeadsPanel({
           }
         />
       ) : (
-        <div className="bg-white border border-[var(--color-line)] rounded-xl overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-white">
           {canDelete && selectedCount > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
               <p className="text-[12.5px] text-[var(--color-ink-soft)]">
                 <span className="font-medium text-[var(--color-ink)]">
                   {selectedCount.toLocaleString()}
@@ -964,7 +965,7 @@ export function LeadsPanel({
           )}
 
           {canDelete && allPageSelected && total > leads.length && !selectAllMatching && (
-            <div className="border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
+            <div className="shrink-0 border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
               All {leads.length} leads on this page are selected.{" "}
               <button
                 type="button"
@@ -1002,7 +1003,7 @@ export function LeadsPanel({
             onRestore={(leadId, leadName) => void handleRestore(leadId, leadName)}
           />
 
-          <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-[var(--color-line)] bg-[var(--color-canvas)]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
               Showing{" "}
               <span className="text-[var(--color-ink)] font-medium">
@@ -1038,6 +1039,6 @@ export function LeadsPanel({
         </div>
       )}
 
-    </>
+    </div>
   );
 }
