@@ -13,6 +13,7 @@ import {
   canPersistWrites,
   existingLeadFromRecord,
   hubspotContactIdempotencyKey,
+  resolveMigrationLeadNames,
   snapshotFromHubSpotProperties,
   type GvPilotRecordOutcome,
   type GvPilotUnexpectedReason,
@@ -340,39 +341,43 @@ export async function runHubSpotWdProjectMigration(input: {
       WD_MIGRATION_WORKSPACE_ID,
       manifest.idChecksum,
     );
-    if (already) {
+    if (already?.status === "completed") {
       throw new Error("execute_run_already_exists");
     }
-    const run = await createHubSpotMigrationRun({
-      workspaceId: WD_MIGRATION_WORKSPACE_ID,
-      integrationId: WD_MIGRATION_INTEGRATION_ID,
-      portalId: WD_MIGRATION_PORTAL_ID,
-      destinationProjectId: manifest.destinationProjectId,
-      destinationReference: manifest.destinationReference,
-      manifestName: manifest.name,
-      manifestChecksum: manifest.idChecksum,
-      hubspotContactIds: manifest.hubspotContactIds,
-      mode: "execute",
-      status: "running",
-      abortThreshold: WD_MIGRATION_ABORT_THRESHOLD,
-      actorId: context.actorId,
-      sideEffectGuard: { ...WD_MIGRATION_SIDE_EFFECT_GUARD },
-    });
-    runId = run.id;
-    await createAuditLog({
-      workspaceId: WD_MIGRATION_WORKSPACE_ID,
-      actorId: context.actorId,
-      action: "hubspot_migration_run.started",
-      entityType: "hubspot_migration_run",
-      entityId: run.id,
-      after: {
+    if (already?.status === "running") {
+      runId = already.id;
+    } else {
+      const run = await createHubSpotMigrationRun({
+        workspaceId: WD_MIGRATION_WORKSPACE_ID,
+        integrationId: WD_MIGRATION_INTEGRATION_ID,
+        portalId: WD_MIGRATION_PORTAL_ID,
+        destinationProjectId: manifest.destinationProjectId,
+        destinationReference: manifest.destinationReference,
         manifestName: manifest.name,
         manifestChecksum: manifest.idChecksum,
-        size: manifest.size,
-        slug: manifest.slug,
-        destinationProjectId: manifest.destinationProjectId,
-      },
-    });
+        hubspotContactIds: manifest.hubspotContactIds,
+        mode: "execute",
+        status: "running",
+        abortThreshold: WD_MIGRATION_ABORT_THRESHOLD,
+        actorId: context.actorId,
+        sideEffectGuard: { ...WD_MIGRATION_SIDE_EFFECT_GUARD },
+      });
+      runId = run.id;
+      await createAuditLog({
+        workspaceId: WD_MIGRATION_WORKSPACE_ID,
+        actorId: context.actorId,
+        action: "hubspot_migration_run.started",
+        entityType: "hubspot_migration_run",
+        entityId: run.id,
+        after: {
+          manifestName: manifest.name,
+          manifestChecksum: manifest.idChecksum,
+          size: manifest.size,
+          slug: manifest.slug,
+          destinationProjectId: manifest.destinationProjectId,
+        },
+      });
+    }
   }
 
   let statusId: string | null = null;
@@ -518,6 +523,7 @@ export async function runHubSpotWdProjectMigration(input: {
     }
 
     try {
+      const names = resolveMigrationLeadNames(snapshot);
       const result = await createLeadForWorkspace(
         WD_MIGRATION_WORKSPACE_ID,
         context.actorId,
@@ -525,8 +531,8 @@ export async function runHubSpotWdProjectMigration(input: {
           projectId: manifest.destinationProjectId,
           statusId: statusId!,
           sourceId: sourceId ?? undefined,
-          firstName: snapshot.firstName,
-          lastName: snapshot.lastName,
+          firstName: names.firstName,
+          lastName: names.lastName,
           email: snapshot.emailNormalized ?? undefined,
           phone: snapshot.hasPhone
             ? (raw.properties.phone ?? raw.properties.mobilephone ?? undefined) ?? undefined

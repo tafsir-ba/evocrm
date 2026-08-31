@@ -1,0 +1,33 @@
+{
+  "name": "nameless-osmose-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9444afa822ceedf6f7b57a",
+  "destinationReference": "OSMOSE",
+  "slug": "osmose",
+  "sourceHubSpotProjectId": "osmose",
+  "size": 2,
+  "selection": {
+    "pool": "nameless_email_reclassification",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "product_vs_wd_conflict",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "42170",
+    "42404"
+  ],
+  "idChecksum": "fceca97efa3ae278e7f1c8f613788927d273f2611e0e9d160c7abf86c25e862d"
+}

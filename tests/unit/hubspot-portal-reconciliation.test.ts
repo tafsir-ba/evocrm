@@ -19,8 +19,8 @@ function snap(partial: Partial<GvPilotContactSnapshot> & { hubspotContactId: str
 }
 
 describe("classifyPortalContact", () => {
-  const migratable = new Set(["portesdulac", "arbora"]);
-  const fallback = new Set(["evohome", "CMP"]);
+  const migratable = new Set(["portesdulac", "arbora", "CMP"]);
+  const fallback = new Set(["evohome"]);
 
   it("marks hubspot id matches as migrated", () => {
     const existing: GvPilotExistingLead[] = [
@@ -70,6 +70,46 @@ describe("classifyPortalContact", () => {
     ).toBe("no_project_signal");
   });
 
+  it("attributes blank wd + product CMP to still_to_migrate CMP", () => {
+    expect(
+      classifyPortalContact({
+        snapshot: snap({
+          hubspotContactId: "2b",
+          projectValues: [],
+          productValues: ["CMP"],
+          emailNormalized: "cmp-new@example.com",
+        }),
+        existing: [],
+        fallbackGeneralSlugs: fallback,
+        migratableSlugs: migratable,
+      }),
+    ).toEqual({
+      bucket: "still_to_migrate",
+      reason: "product_field:CMP",
+      attributableSlug: "CMP",
+    });
+  });
+
+  it("does not route product vs wd conflict to General", () => {
+    expect(
+      classifyPortalContact({
+        snapshot: snap({
+          hubspotContactId: "2c",
+          projectValues: ["portesdulac"],
+          productValues: ["CMP"],
+          emailNormalized: null,
+        }),
+        existing: [],
+        fallbackGeneralSlugs: fallback,
+        migratableSlugs: migratable,
+      }),
+    ).toEqual({
+      bucket: "multi_or_identity_exception",
+      reason: "product_vs_wd_conflict",
+      attributableSlug: null,
+    });
+  });
+
   it("routes clean single-project NEW to still_to_migrate", () => {
     expect(
       classifyPortalContact({
@@ -77,6 +117,28 @@ describe("classifyPortalContact", () => {
           hubspotContactId: "3",
           projectValues: ["portesdulac"],
           emailNormalized: "new@example.com",
+        }),
+        existing: [],
+        fallbackGeneralSlugs: fallback,
+        migratableSlugs: migratable,
+      }),
+    ).toEqual({
+      bucket: "still_to_migrate",
+      reason: "new_write_eligible",
+      attributableSlug: "portesdulac",
+    });
+  });
+
+  it("routes email-bearing nameless single-project NEW to still_to_migrate", () => {
+    expect(
+      classifyPortalContact({
+        snapshot: snap({
+          hubspotContactId: "6",
+          projectValues: ["portesdulac"],
+          firstName: "",
+          lastName: "",
+          emailNormalized: "nameless@example.com",
+          nameKey: "",
         }),
         existing: [],
         fallbackGeneralSlugs: fallback,

@@ -25,7 +25,11 @@
     "import:project-companies": "npx tsx scripts/import-project-companies.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "reconcile:hubspot-portal": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-portal-reconciliation.ts"
+    "reconcile:hubspot-portal": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-portal-reconciliation.ts",
+    "measure:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-measure.ts",
+    "select:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-select.ts",
+    "migrate:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-migrate.ts",
+    "recon:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-recon.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",

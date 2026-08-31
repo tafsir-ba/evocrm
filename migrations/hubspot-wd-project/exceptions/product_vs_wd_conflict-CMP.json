@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "name": "product_vs_wd_conflict:CMP",
+  "bucket": "product_vs_wd_conflict:CMP",
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": null,
+  "destinationReference": null,
+  "rule": {
+    "hubspotProperty": "product_intersted_in",
+    "hubspotValue": "CMP",
+    "when": "explicit_wd_project_other_than_CMP",
+    "routeAmbiguityToGeneral": false
+  },
+  "size": 15,
+  "hubspotContactIds": [
+    "58151",
+    "149701",
+    "268101",
+    "318701",
+    "583751",
+    "623701",
+    "826001",
+    "905451",
+    "1327660",
+    "1327670",
+    "1328588",
+    "1375553",
+    "1375826",
+    "1375853",
+    "1377524"
+  ],
+  "note": "Product interested in=CMP with conflicting explicit wd_project; held out of CMP migration wave. IDs only."
+}

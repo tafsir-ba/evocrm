@@ -18,6 +18,7 @@ import {
   hubspotContactIdempotencyKey,
   parseExecuteArgs,
   parseGvPilotManifest,
+  resolveMigrationLeadNames,
   selectPilotBatchIds,
   shouldAbortRun,
   snapshotFromHubSpotProperties,
@@ -91,8 +92,18 @@ describe("hubspot GV pilot eligibility", () => {
     ).toContain("broker_only");
 
     expect(
-      evaluateGvPilotEligibility(contact({ firstName: "", nameKey: "|lovelace" }), []).exclusions,
+      evaluateGvPilotEligibility(
+        contact({ firstName: "", lastName: "", emailNormalized: null, hasPhone: false, nameKey: "" }),
+        [],
+      ).exclusions,
     ).toContain("missing_name");
+
+    expect(
+      evaluateGvPilotEligibility(
+        contact({ firstName: "", lastName: "", emailNormalized: "buyer@example.com", nameKey: "" }),
+        [],
+      ).exclusions,
+    ).not.toContain("missing_name");
   });
 
   it("treats notes with extra values as a conflict and leaves CMP / non-GV excluded", () => {
@@ -111,6 +122,32 @@ describe("hubspot GV pilot eligibility", () => {
     expect(
       evaluateGvPilotEligibility(contact({ projectValues: ["k2"], notesValues: [] }), []).exclusions,
     ).toContain("not_gv_project");
+  });
+});
+
+describe("resolveMigrationLeadNames", () => {
+  it("preserves complete HubSpot names", () => {
+    expect(
+      resolveMigrationLeadNames({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        emailNormalized: "ada@example.com",
+      }),
+    ).toEqual({ firstName: "Ada", lastName: "Lovelace", reclassifiedFromEmail: false });
+  });
+
+  it("derives names from email local-part when HubSpot names are blank", () => {
+    expect(
+      resolveMigrationLeadNames({
+        firstName: "",
+        lastName: "",
+        emailNormalized: "maxime.duval@example.com",
+      }),
+    ).toEqual({
+      firstName: "Maxime",
+      lastName: "Duval",
+      reclassifiedFromEmail: true,
+    });
   });
 });
 

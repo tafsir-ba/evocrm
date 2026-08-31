@@ -150,6 +150,51 @@ export function pilotNameKey(firstName: string, lastName: string): string {
   return first || last ? `${first}|${last}` : "";
 }
 
+export function hasCompletePilotName(firstName: string, lastName: string): boolean {
+  return Boolean(normalizePilotNamePart(firstName) && normalizePilotNamePart(lastName));
+}
+
+/** Nameless on HubSpot but carrying a normalised email — approved for migration reclassification. */
+export function isEmailBearingNameless(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): boolean {
+  return !hasCompletePilotName(contact.firstName, contact.lastName) && Boolean(contact.emailNormalized);
+}
+
+/** Resolve CRM-safe names; never overwrites complete HubSpot names. */
+export function resolveMigrationLeadNames(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): { firstName: string; lastName: string; reclassifiedFromEmail: boolean } {
+  const first = String(contact.firstName ?? "").trim();
+  const last = String(contact.lastName ?? "").trim();
+  if (hasCompletePilotName(first, last)) {
+    return { firstName: first, lastName: last, reclassifiedFromEmail: false };
+  }
+  if (contact.emailNormalized) {
+    const local = contact.emailNormalized.split("@")[0] ?? "";
+    const tokens = local
+      .split(/[._+\-]+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+    const titleCase = (value: string) =>
+      value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value;
+    if (tokens.length >= 2) {
+      return {
+        firstName: titleCase(tokens[0]!),
+        lastName: tokens.slice(1).map(titleCase).join(" "),
+        reclassifiedFromEmail: true,
+      };
+    }
+    const fallback = titleCase(local) || "Contact";
+    return { firstName: fallback, lastName: "Contact", reclassifiedFromEmail: true };
+  }
+  return {
+    firstName: first || "Contact",
+    lastName: last || "Contact",
+    reclassifiedFromEmail: false,
+  };
+}
+
 export function evaluateGvPilotEligibility(
   contact: GvPilotContactSnapshot,
   existing: GvPilotExistingLead[],
@@ -180,7 +225,7 @@ export function evaluateGvPilotEligibility(
   if (inNotes && !inProject) {
     exclusions.push("notes_only");
   }
-  if (!normalizePilotNamePart(contact.firstName) || !normalizePilotNamePart(contact.lastName)) {
+  if (!hasCompletePilotName(contact.firstName, contact.lastName) && !contact.emailNormalized) {
     exclusions.push("missing_name");
   }
   if (!contact.emailNormalized && !contact.hasPhone) {

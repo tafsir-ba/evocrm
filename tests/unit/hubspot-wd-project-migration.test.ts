@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checksumContactIds } from "@/lib/hubspot-gv-pilot";
+import { checksumContactIds, resolveMigrationLeadNames } from "@/lib/hubspot-gv-pilot";
 import {
   WD_MIGRATION_GENERAL_PROJECT_ID,
   WD_MIGRATION_GV_PROJECT_ID,
@@ -72,11 +72,15 @@ describe("wd_project migration eligibility", () => {
       ).exclusions,
     ).toContain("broker_only");
     expect(
-      evaluateWdProjectEligibility(contact({ firstName: "" }), [], "leparcdescrets").exclusions,
+      evaluateWdProjectEligibility(
+        contact({ firstName: "", emailNormalized: null, hasPhone: false }),
+        [],
+        "leparcdescrets",
+      ).exclusions,
     ).toContain("missing_name");
     expect(
       evaluateWdProjectEligibility(
-        contact(),
+        contact({ firstName: "", lastName: "" }),
         [{ emailNormalized: "ada@example.com", nameKey: "ada|lovelace", hubspotContactIds: [] }],
         "leparcdescrets",
       ).cohort,
@@ -88,6 +92,68 @@ describe("wd_project migration eligibility", () => {
         "leparcdescrets",
       ).exclusions,
     ).toContain("identity_conflict");
+  });
+
+  it("reclassifies email-bearing nameless contacts as write-eligible", () => {
+    const result = evaluateWdProjectEligibility(
+      contact({ firstName: "", lastName: "", emailNormalized: "buyer@example.com" }),
+      [],
+      "leparcdescrets",
+    );
+    expect(result.writeEligible).toBe(true);
+    expect(result.exclusions).not.toContain("missing_name");
+  });
+
+  it("attributes blank wd_project + product_intersted_in=CMP to CMP", () => {
+    const result = evaluateWdProjectEligibility(
+      contact({
+        projectValues: [],
+        notesValues: [],
+        productValues: ["CMP"],
+      }),
+      [],
+      "CMP",
+    );
+    expect(result.writeEligible).toBe(true);
+    expect(result.exclusions).not.toContain("cmp_product");
+  });
+
+  it("keeps CMP product as an exclusion for non-CMP project waves", () => {
+    expect(
+      evaluateWdProjectEligibility(
+        contact({ productValues: ["CMP"] }),
+        [],
+        "leparcdescrets",
+      ).exclusions,
+    ).toContain("cmp_product");
+  });
+
+  it("buckets product=CMP with conflicting explicit wd_project", () => {
+    const result = evaluateWdProjectEligibility(
+      contact({
+        projectValues: ["portesdulac"],
+        notesValues: [],
+        productValues: ["CMP"],
+      }),
+      [],
+      "CMP",
+    );
+    expect(result.writeEligible).toBe(false);
+    expect(result.exclusions).toContain("product_vs_wd_conflict");
+  });
+
+  it("accepts sole wd_project=CMP with CMP product", () => {
+    expect(
+      evaluateWdProjectEligibility(
+        contact({
+          projectValues: ["CMP"],
+          notesValues: [],
+          productValues: ["CMP"],
+        }),
+        [],
+        "CMP",
+      ).writeEligible,
+    ).toBe(true);
   });
 });
 

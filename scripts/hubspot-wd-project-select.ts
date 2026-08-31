@@ -71,12 +71,14 @@ async function hubspotSearchPage(input: {
   slug: string;
   properties: string[];
   after?: string;
+  operator?: "CONTAINS_TOKEN" | "EQ";
 }): Promise<{
   total: number;
   results: Array<{ id: string; properties: Record<string, string | null> }>;
   after?: string;
 }> {
   let lastError: unknown = null;
+  const operator = input.operator ?? "CONTAINS_TOKEN";
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const response = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
       method: "POST",
@@ -91,7 +93,7 @@ async function hubspotSearchPage(input: {
             filters: [
               {
                 propertyName: input.propertyName,
-                operator: "CONTAINS_TOKEN",
+                operator,
                 value: input.slug,
               },
             ],
@@ -139,16 +141,19 @@ async function main(): Promise<void> {
   const slug = readArg(argv, "slug");
   const destinationProjectId = readArg(argv, "destination");
   const destinationReference = readArg(argv, "reference");
-  const manifestName = readArg(argv, "manifest") || `${slug}-batch-01`;
+  const manifestNameRaw = readArg(argv, "manifest") || `${slug}-batch-01`;
+  const manifestName = manifestNameRaw.toLowerCase();
   if (!slug || !destinationProjectId || !destinationReference) {
     throw new Error("usage: --slug --destination --reference [--manifest]");
   }
 
   const {
+    WD_CMP_SLUG,
     WD_MIGRATION_EXCEPTION_DIR,
     WD_MIGRATION_FORBIDDEN_SLUG,
     WD_MIGRATION_HUBSPOT_PROPERTIES,
     WD_MIGRATION_MANIFEST_DIR,
+    WD_MIGRATION_MAX_BATCH,
     WD_MIGRATION_PORTAL_ID,
     WD_MIGRATION_WORKSPACE_ID,
     assertExplicitMappedDestination,
@@ -199,17 +204,34 @@ async function main(): Promise<void> {
 
   const snapshotsById = new Map<string, ReturnType<typeof snapshotFromHubSpotProperties>>();
   let searchTotal = 0;
-  for (const propertyName of ["wd_project", "hs_content_membership_notes", "wd_broker_assigned"]) {
+  const searchSpecs: Array<{
+    propertyName: string;
+    operator: "CONTAINS_TOKEN" | "EQ";
+    countAsPrimary?: boolean;
+  }> = [
+    { propertyName: "wd_project", operator: "CONTAINS_TOKEN", countAsPrimary: slug !== WD_CMP_SLUG },
+    { propertyName: "hs_content_membership_notes", operator: "CONTAINS_TOKEN" },
+    { propertyName: "wd_broker_assigned", operator: "CONTAINS_TOKEN" },
+  ];
+  if (slug === WD_CMP_SLUG) {
+    searchSpecs.unshift({
+      propertyName: "product_intersted_in",
+      operator: "EQ",
+      countAsPrimary: true,
+    });
+  }
+  for (const spec of searchSpecs) {
     let after: string | undefined;
     do {
       const page = await hubspotSearchPage({
         accessToken: token,
-        propertyName,
+        propertyName: spec.propertyName,
         slug,
         properties: [...WD_MIGRATION_HUBSPOT_PROPERTIES],
         after,
+        operator: spec.operator,
       });
-      if (propertyName === "wd_project") {
+      if (spec.countAsPrimary) {
         searchTotal = page.total;
       }
       for (const result of page.results) {
@@ -235,6 +257,7 @@ async function main(): Promise<void> {
 
   const cohortCounts = {
     in_wd_project: 0,
+    product_attributed: 0,
     single_project: 0,
     multi_project: 0,
     notes_only: 0,
@@ -247,6 +270,7 @@ async function main(): Promise<void> {
     notes_conflict: 0,
     missing_email_and_phone: 0,
     cmp_product: 0,
+    product_vs_wd_conflict: 0,
   };
   const newIds: string[] = [];
   for (const snapshot of snapshots) {
@@ -260,6 +284,14 @@ async function main(): Promise<void> {
       }
     }
     const eligibility = evaluateWdProjectEligibility(snapshot, existingLeads, slug);
+    if (
+      eligibility.writeEligible &&
+      !inProject &&
+      snapshot.productValues.includes(slug) &&
+      snapshot.projectValues.length === 0
+    ) {
+      cohortCounts.product_attributed += 1;
+    }
     for (const reason of eligibility.exclusions) {
       if (reason in cohortCounts) {
         cohortCounts[reason as keyof typeof cohortCounts] += 1;
@@ -285,41 +317,55 @@ async function main(): Promise<void> {
     `${JSON.stringify(exceptions, null, 2)}\n`,
   );
 
-  let idChecksum: string | null = null;
+  const manifests: Array<{ name: string; size: number; idChecksum: string }> = [];
   if (selected.length > 0) {
-    const manifest = {
-      name: manifestName,
-      version: 1 as const,
-      portalId: WD_MIGRATION_PORTAL_ID,
-      workspaceId: WD_MIGRATION_WORKSPACE_ID,
-      destinationProjectId,
-      destinationReference,
-      slug,
-      sourceHubSpotProjectId: slug,
-      size: selected.length,
-      selection: {
-        pool: "new_write_eligible" as const,
-        sort: "hubspot_contact_id_asc" as const,
-        exclude: [
-          "email_match",
-          "hubspot_id_match",
-          "identity_conflict",
-          "multi_project",
-          "broker_only",
-          "missing_name",
-          "notes_conflict",
-          "notes_only",
-          "no_project_signal",
-          "cmp_product",
-          "missing_email_and_phone",
-        ],
-      },
-      hubspotContactIds: selected,
-      idChecksum: checksumContactIds(selected),
-    };
-    assertManifestHasNoPii(manifest);
-    await writeFile(path.join(dir, `${manifestName}.json`), `${JSON.stringify(manifest, null, 2)}\n`);
-    idChecksum = manifest.idChecksum;
+    const batchCount = Math.ceil(selected.length / WD_MIGRATION_MAX_BATCH);
+    for (let batchIndex = 0; batchIndex < batchCount; batchIndex += 1) {
+      const start = batchIndex * WD_MIGRATION_MAX_BATCH;
+      const batchIds = selected.slice(start, start + WD_MIGRATION_MAX_BATCH);
+      const batchName =
+        batchCount === 1
+          ? manifestName
+          : `${slug}-batch-${String(batchIndex + 1).padStart(2, "0")}`;
+      const manifest = {
+        name: batchName,
+        version: 1 as const,
+        portalId: WD_MIGRATION_PORTAL_ID,
+        workspaceId: WD_MIGRATION_WORKSPACE_ID,
+        destinationProjectId,
+        destinationReference,
+        slug,
+        sourceHubSpotProjectId: slug,
+        size: batchIds.length,
+        selection: {
+          pool: "new_write_eligible" as const,
+          sort: "hubspot_contact_id_asc" as const,
+          exclude: [
+            "email_match",
+            "hubspot_id_match",
+            "identity_conflict",
+            "multi_project",
+            "broker_only",
+            "missing_name",
+            "notes_conflict",
+            "notes_only",
+            "no_project_signal",
+            "cmp_product",
+            "product_vs_wd_conflict",
+            "missing_email_and_phone",
+          ],
+        },
+        hubspotContactIds: batchIds,
+        idChecksum: checksumContactIds(batchIds),
+      };
+      assertManifestHasNoPii(manifest);
+      await writeFile(path.join(dir, `${batchName}.json`), `${JSON.stringify(manifest, null, 2)}\n`);
+      manifests.push({
+        name: batchName,
+        size: batchIds.length,
+        idChecksum: manifest.idChecksum,
+      });
+    }
   }
 
   console.log(
@@ -334,9 +380,10 @@ async function main(): Promise<void> {
         cohortCounts,
         exceptionCounts: exceptions.counts,
         exceptionCount: exceptions.records.length,
-        manifestName: selected.length > 0 ? manifestName : null,
+        manifests,
+        manifestName: manifests[0]?.name ?? null,
         manifestSize: selected.length,
-        idChecksum,
+        idChecksum: manifests.length === 1 ? manifests[0]!.idChecksum : null,
       },
       null,
       2,

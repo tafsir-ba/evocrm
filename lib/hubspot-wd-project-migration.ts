@@ -18,6 +18,7 @@ import {
   normalizePilotNamePart,
   parseExecuteArgs,
   resolveManifestFileName,
+  hasCompletePilotName,
   type GvPilotContactSnapshot,
   type GvPilotExistingLead,
 } from "@/lib/hubspot-gv-pilot";
@@ -80,8 +81,59 @@ export const WD_MIGRATION_EXCLUSION_REASONS = [
   "not_target_project",
   "destination_forbidden",
   "cmp_product",
+  "product_vs_wd_conflict",
   "no_project_signal",
 ] as const;
+
+/** Durable HubSpot product-field → CRM project attribution (never General). */
+export const WD_PRODUCT_FIELD_ATTRIBUTION_RULES = [
+  {
+    hubspotProperty: "product_intersted_in",
+    hubspotValue: "CMP",
+    destinationSlug: "CMP",
+    when: "wd_project_absent_or_blank",
+    conflictBucket: "product_vs_wd_conflict:CMP",
+    routeAmbiguityToGeneral: false,
+  },
+] as const;
+
+export const WD_CMP_PRODUCT_VALUE = "CMP";
+export const WD_CMP_SLUG = "CMP";
+
+/**
+ * Resolve explicit product_intersted_in → project attribution when wd_project
+ * is absent/blank. Returns null when the rule does not apply. Never suggests General.
+ */
+export function resolveProductFieldProjectAttribution(input: {
+  productValues: string[];
+  projectValues: string[];
+}): { slug: string; rule: (typeof WD_PRODUCT_FIELD_ATTRIBUTION_RULES)[number] } | null {
+  const projects = [...new Set(input.projectValues.filter(Boolean))];
+  for (const rule of WD_PRODUCT_FIELD_ATTRIBUTION_RULES) {
+    if (!input.productValues.includes(rule.hubspotValue)) {
+      continue;
+    }
+    if (rule.routeAmbiguityToGeneral) {
+      continue;
+    }
+    if (projects.length === 0) {
+      return { slug: rule.destinationSlug, rule };
+    }
+  }
+  return null;
+}
+
+export function hasProductVsWdConflict(input: {
+  productValues: string[];
+  projectValues: string[];
+  destinationSlug?: string;
+}): boolean {
+  const destinationSlug = input.destinationSlug ?? WD_CMP_SLUG;
+  if (!input.productValues.includes(WD_CMP_PRODUCT_VALUE)) {
+    return false;
+  }
+  return input.projectValues.some((value) => value && value !== destinationSlug);
+}
 
 export type WdMigrationExclusionReason = (typeof WD_MIGRATION_EXCLUSION_REASONS)[number];
 
@@ -119,20 +171,42 @@ export function evaluateWdProjectEligibility(
   const projects = new Set(contact.projectValues);
   const notes = new Set(contact.notesValues);
   const brokers = new Set(contact.brokerPrefixes);
-  const inProject = projects.has(slug);
+  const hasCmpProduct = contact.productValues.includes(WD_CMP_PRODUCT_VALUE);
+  const productAttributed =
+    slug === WD_CMP_SLUG &&
+    projects.size === 0 &&
+    hasCmpProduct &&
+    resolveProductFieldProjectAttribution({
+      productValues: contact.productValues,
+      projectValues: contact.projectValues,
+    })?.slug === WD_CMP_SLUG;
+  const inProject = projects.has(slug) || productAttributed;
   const inNotes = notes.has(slug);
   const inBroker = brokers.has(slug);
 
-  if (contact.productValues.includes("CMP")) {
+  // CMP product is an exclusion for other project waves; for the CMP destination
+  // it is the attribution signal (blank wd) or compatible (sole wd_project=CMP).
+  if (hasCmpProduct && slug !== WD_CMP_SLUG) {
     exclusions.push("cmp_product");
+  }
+  if (
+    slug === WD_CMP_SLUG &&
+    hasProductVsWdConflict({
+      productValues: contact.productValues,
+      projectValues: contact.projectValues,
+      destinationSlug: WD_CMP_SLUG,
+    })
+  ) {
+    exclusions.push("product_vs_wd_conflict");
   }
   if (!inProject) {
     exclusions.push("not_target_project");
   }
-  if (inProject && projects.size > 1) {
+  if (projects.has(slug) && projects.size > 1) {
     exclusions.push("multi_project");
   }
-  if (inProject && notes.size > 0 && !(notes.size === 1 && inNotes)) {
+  // Notes conflict only when an explicit wd_project token is present.
+  if (projects.has(slug) && notes.size > 0 && !(notes.size === 1 && inNotes)) {
     exclusions.push("notes_conflict");
   }
   if (inBroker && !inProject && !inNotes) {
@@ -141,7 +215,7 @@ export function evaluateWdProjectEligibility(
   if (inNotes && !inProject) {
     exclusions.push("notes_only");
   }
-  if (!normalizePilotNamePart(contact.firstName) || !normalizePilotNamePart(contact.lastName)) {
+  if (!hasCompletePilotName(contact.firstName, contact.lastName) && !contact.emailNormalized) {
     exclusions.push("missing_name");
   }
   if (!contact.emailNormalized && !contact.hasPhone) {
@@ -278,7 +352,7 @@ export function parseWdProjectManifest(raw: unknown): WdProjectMigrationManifest
     throw new Error("manifest_selection_invalid");
   }
   const selectionRecord = selection as Record<string, unknown>;
-  if (selectionRecord.pool !== "new_write_eligible") {
+  if (selectionRecord.pool !== "new_write_eligible" && selectionRecord.pool !== "nameless_email_reclassification") {
     throw new Error("manifest_pool_invalid");
   }
   if (selectionRecord.sort !== "hubspot_contact_id_asc") {
@@ -398,6 +472,7 @@ export const EXCEPTION_REASON_PRIORITY = [
   "identity_conflict",
   "hubspot_id_match",
   "email_match",
+  "product_vs_wd_conflict",
   "multi_project",
   "missing_name",
   "broker_only",
@@ -498,11 +573,25 @@ export type RoadmapProjectRow = {
   wd_project: number;
 };
 
+export type FieldToProjectRule = {
+  hubspotProperty: string;
+  hubspotValue: string;
+  destinationSlug: string;
+  destinationReference: string;
+  when: string;
+  conflictWhen: string;
+  conflictBucket: string;
+  routeAmbiguityToGeneral: false;
+  status: string;
+  notes?: string;
+};
+
 export type MasterProjectRoadmap = {
   create_then_map: string[];
   map_existing: string[];
   no_contacts_skip: string[];
   fallback_general: string[];
+  field_to_project_rules?: FieldToProjectRule[];
   rows: RoadmapProjectRow[];
 };
 
@@ -635,6 +724,19 @@ export function classifyPortalContact(input: {
     };
   }
 
+  if (
+    hasProductVsWdConflict({
+      productValues: snapshot.productValues,
+      projectValues: projects,
+    })
+  ) {
+    return {
+      bucket: "multi_or_identity_exception",
+      reason: "product_vs_wd_conflict",
+      attributableSlug: null,
+    };
+  }
+
   if (projects.length > 1) {
     return {
       bucket: "multi_or_identity_exception",
@@ -644,6 +746,29 @@ export function classifyPortalContact(input: {
   }
 
   if (projects.length === 0) {
+    const productAttr = resolveProductFieldProjectAttribution({
+      productValues: snapshot.productValues,
+      projectValues: projects,
+    });
+    if (productAttr && migratableSlugs.has(productAttr.slug)) {
+      const eligibility = evaluateWdProjectEligibility(snapshot, existing, productAttr.slug);
+      if (eligibility.writeEligible) {
+        return {
+          bucket: "still_to_migrate",
+          reason: `product_field:${productAttr.slug}`,
+          attributableSlug: productAttr.slug,
+        };
+      }
+      const reason =
+        primaryExceptionReason(
+          eligibility.exclusions.filter((item) => item !== "not_target_project"),
+        ) ?? "excluded";
+      return {
+        bucket: "excluded",
+        reason,
+        attributableSlug: null,
+      };
+    }
     return {
       bucket: "no_project_signal",
       reason: snapshot.notesValues.length > 0
@@ -661,6 +786,13 @@ export function classifyPortalContact(input: {
     return {
       bucket: "multi_or_identity_exception",
       reason: "notes_conflict",
+      attributableSlug: null,
+    };
+  }
+  if (eligibility.exclusions.includes("product_vs_wd_conflict")) {
+    return {
+      bucket: "multi_or_identity_exception",
+      reason: "product_vs_wd_conflict",
       attributableSlug: null,
     };
   }
