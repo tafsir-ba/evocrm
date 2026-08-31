@@ -11,12 +11,16 @@ import {
   crmValueRequiresOverwrite,
   isSafeToAutoApplySuggestion,
   citeOnlyRetrievedUrls,
+  crmOwnedMarketContext,
+  enrichmentMarketHints,
   enrichmentPersonQueryName,
   enrichmentSearchQueries,
   filterEnrichmentHitsForPerson,
   isLeadEnrichmentFieldKey,
   isPlausibleJobTitle,
   mergeEnrichmentHits,
+  shouldContinueEnrichmentSearch,
+  suggestedLocationConflictsWithMarket,
   mergeWebEnrichmentAttributes,
   readWebEnrichmentAttributes,
   sanitizeEnrichmentText,
@@ -53,6 +57,7 @@ import {
   isSearchConfigured,
   liveEnrichmentProviders,
   type EnrichmentProviders,
+  type SynthesizeResult,
 } from "@/server/services/lead-enrichment-providers";
 import { findCompaniesByIds } from "@/server/repositories/companies";
 import { syncSystemRolePermissionsForWorkspace } from "@/server/services/roles";
@@ -300,7 +305,8 @@ export async function startLeadEnrichment(input: {
     const retrievedAt = new Date().toISOString();
     let hits: { url: string; title: string; snippet: string; retrievedAt: string }[] = [];
     let provider = capability.demoMode ? "demo_fixture" : "none";
-    let synthesis;
+    let marketHints: string[] = [];
+    let synthesis: SynthesizeResult;
 
     if (capability.demoMode) {
       const fixture = getLeadEnrichmentDemoFixture({ fullName, email });
@@ -313,8 +319,20 @@ export async function startLeadEnrichment(input: {
         model: "demo-fixture",
       };
     } else {
+      const workspace = await findWorkspaceById(input.workspaceId);
+      const searchContext = crmOwnedMarketContext({
+        phone: lead.phone ?? lead.phoneNormalized,
+        city: lead.city,
+        stateRegion: lead.stateRegion,
+        country: lead.country,
+        defaultCurrency: workspace?.defaultCurrency ?? null,
+        cityOrigin: lead.intelligenceProvenance.city?.method,
+        stateRegionOrigin: lead.intelligenceProvenance.stateRegion?.method,
+        countryOrigin: lead.intelligenceProvenance.country?.method,
+      });
+      marketHints = enrichmentMarketHints(searchContext);
       const providers = input.providers ?? liveEnrichmentProviders;
-      const queries = enrichmentSearchQueries(fullName, email);
+      const queries = enrichmentSearchQueries(fullName, email, searchContext);
       const hitGroups: Array<typeof hits> = [];
       for (const query of queries) {
         const search = await providers.search(query, allowedSources);
@@ -323,8 +341,9 @@ export async function startLeadEnrichment(input: {
         hits = filterEnrichmentHitsForPerson(
           mergeEnrichmentHits(hitGroups),
           enrichmentPersonQueryName(fullName, email),
+          marketHints,
         );
-        if (hits.length >= 4) {
+        if (!shouldContinueEnrichmentSearch(hits, marketHints)) {
           break;
         }
       }
@@ -349,7 +368,20 @@ export async function startLeadEnrichment(input: {
         known: current.values,
         allowedSources,
         hits,
+        marketHints,
       });
+    }
+
+    if (
+      synthesis.identityMatch === "unique" &&
+      suggestedLocationConflictsWithMarket(synthesis.suggestions, marketHints)
+    ) {
+      synthesis = {
+        ...synthesis,
+        identityMatch: "ambiguous",
+        identityRationale:
+          "Search found someone with this name in a different country than this lead’s phone or market. A broker would treat that as two people — confirm before applying.",
+      };
     }
 
     if (synthesis.identityMatch !== "unique") {

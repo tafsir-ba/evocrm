@@ -229,7 +229,202 @@ export function enrichmentPersonQueryName(fullName: string, email: string): stri
   return name;
 }
 
-export function enrichmentSearchQueries(fullName: string, email: string): string[] {
+export type EnrichmentSearchContext = {
+  phone?: string | null;
+  city?: string | null;
+  stateRegion?: string | null;
+  country?: string | null;
+  defaultCurrency?: string | null;
+};
+
+const PEOPLE_DATA_VENDOR_HOSTS = [
+  "rocketreach.co",
+  "zoominfo.com",
+  "apollo.io",
+  "lusha.com",
+  "signalhire.com",
+  "contactout.com",
+  "hunter.io",
+  "clearbit.com",
+  "beenverified.com",
+];
+
+const PEOPLE_AGGREGATOR_HOSTS = ["theorg.com", "crunchbase.com", "owler.com"];
+
+const MARKET_LOCATION_ALIASES: Record<string, string> = {
+  switzerland: "switzerland",
+  suisse: "switzerland",
+  schweiz: "switzerland",
+  swiss: "switzerland",
+  lausanne: "switzerland",
+  geneva: "switzerland",
+  genève: "switzerland",
+  zurich: "switzerland",
+  zürich: "switzerland",
+  bern: "switzerland",
+  berne: "switzerland",
+  basel: "switzerland",
+  lugano: "switzerland",
+  canada: "canada",
+  canadien: "canada",
+  canadienne: "canada",
+  montreal: "canada",
+  montréal: "canada",
+  quebec: "canada",
+  québec: "canada",
+  toronto: "canada",
+  france: "france",
+  paris: "france",
+  "united states": "united states",
+  usa: "united states",
+  "united kingdom": "united kingdom",
+  uk: "united kingdom",
+  london: "united kingdom",
+};
+
+function hostnameOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function hostMatches(host: string, listed: string[]): boolean {
+  return listed.some((item) => host === item || host.endsWith(`.${item}`));
+}
+
+export function isPeopleDataVendorUrl(url: string): boolean {
+  const host = hostnameOf(url);
+  return host ? hostMatches(host, PEOPLE_DATA_VENDOR_HOSTS) : false;
+}
+
+export function isPeopleAggregatorUrl(url: string): boolean {
+  const host = hostnameOf(url);
+  return host ? hostMatches(host, PEOPLE_AGGREGATOR_HOSTS) : false;
+}
+
+export function isLinkedInProfileUrl(url: string): boolean {
+  const host = hostnameOf(url);
+  if (!host || !host.includes("linkedin.")) {
+    return false;
+  }
+  try {
+    return /\/in\//i.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function isPreferredProfessionalUrl(url: string): boolean {
+  if (isPeopleDataVendorUrl(url) || isPeopleAggregatorUrl(url) || isLowQualityEnrichmentUrl(url)) {
+    return false;
+  }
+  return isHttpsUrl(url);
+}
+
+export function looksLikeSwissPhone(phone: string | null | undefined): boolean {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (!digits) {
+    return false;
+  }
+  if (digits.startsWith("0041")) {
+    return digits.length >= 13;
+  }
+  if (digits.startsWith("41") && digits.length >= 11) {
+    return true;
+  }
+  // National format: 076 316 24 33 / 021 …
+  return digits.length === 10 && /^0[1-9]/.test(digits);
+}
+
+export function enrichmentMarketHints(context: EnrichmentSearchContext): string[] {
+  const hints: string[] = [];
+  const push = (value?: string | null) => {
+    const trimmed = value?.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (!hints.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+      hints.push(trimmed);
+    }
+  };
+  push(context.city);
+  push(context.stateRegion);
+  push(context.country);
+  if (looksLikeSwissPhone(context.phone)) {
+    push("Switzerland");
+    push("Suisse");
+  } else if (context.defaultCurrency === "CHF" && !context.country?.trim()) {
+    push("Switzerland");
+  }
+  return hints;
+}
+
+export function enrichmentPrimaryMarketLabel(context: EnrichmentSearchContext): string | null {
+  const city = context.city?.trim();
+  if (city) {
+    return city;
+  }
+  const country = context.country?.trim();
+  if (country) {
+    return country;
+  }
+  if (looksLikeSwissPhone(context.phone) || context.defaultCurrency === "CHF") {
+    return "Switzerland";
+  }
+  return null;
+}
+
+export function canonicalMarketCountry(text: string): string | null {
+  const hay = text.toLowerCase();
+  let matched: string | null = null;
+  let matchedLength = 0;
+  for (const [alias, country] of Object.entries(MARKET_LOCATION_ALIASES)) {
+    if (hay.includes(alias) && alias.length > matchedLength) {
+      matched = country;
+      matchedLength = alias.length;
+    }
+  }
+  return matched;
+}
+
+export function marketsMentionedInText(text: string): string[] {
+  const hay = text.toLowerCase();
+  const found = new Set<string>();
+  for (const [alias, country] of Object.entries(MARKET_LOCATION_ALIASES)) {
+    if (hay.includes(alias)) {
+      found.add(country);
+    }
+  }
+  return [...found];
+}
+
+export function hitMatchesMarket(
+  hit: { url: string; title: string; snippet?: string },
+  hints: string[],
+): boolean {
+  if (hints.length === 0) {
+    return true;
+  }
+  const hay = `${hit.title} ${hit.url} ${hit.snippet ?? ""}`;
+  if (hints.some((hint) => hay.toLowerCase().includes(hint.toLowerCase()))) {
+    return true;
+  }
+  const hintCountries = new Set(
+    hints.map((hint) => canonicalMarketCountry(hint)).filter((value): value is string => Boolean(value)),
+  );
+  if (hintCountries.size === 0) {
+    return false;
+  }
+  return marketsMentionedInText(hay).some((country) => hintCountries.has(country));
+}
+
+export function enrichmentSearchQueries(
+  fullName: string,
+  email: string,
+  context: EnrichmentSearchContext = {},
+): string[] {
   const name = enrichmentPersonQueryName(fullName, email);
   const address = email.trim();
   const queries: string[] = [];
@@ -243,7 +438,81 @@ export function enrichmentSearchQueries(fullName: string, email: string): string
   if (domain && !GENERIC_EMAIL_DOMAINS.has(domain)) {
     queries.push(`"${name}" ${domain}`);
   }
+  if (name && !name.includes("@")) {
+    queries.push(`"${name}" LinkedIn`);
+    const market = enrichmentPrimaryMarketLabel(context);
+    if (market) {
+      queries.push(`"${name}" ${market}`);
+    }
+  }
   return [...new Set(queries)];
+}
+
+export function shouldContinueEnrichmentSearch(
+  hits: Array<{ url: string; title: string; snippet: string; retrievedAt: string }>,
+  marketHints: string[] = [],
+): boolean {
+  const preferred = hits.filter((hit) => isPreferredProfessionalUrl(hit.url));
+  if (marketHints.length > 0) {
+    return !preferred.some((hit) => hitMatchesMarket(hit, marketHints));
+  }
+  return preferred.length < 2;
+}
+
+export function rankEnrichmentHits<
+  T extends { url: string; title: string; snippet?: string },
+>(hits: T[], marketHints: string[] = []): T[] {
+  return [...hits].sort((left, right) => {
+    const score = (hit: T) => {
+      let value = 0;
+      if (isLinkedInProfileUrl(hit.url)) value += 50;
+      else if (isPreferredProfessionalUrl(hit.url)) value += 25;
+      if (isPeopleAggregatorUrl(hit.url)) value -= 15;
+      if (isPeopleDataVendorUrl(hit.url)) value -= 40;
+      if (marketHints.length > 0 && hitMatchesMarket(hit, marketHints)) value += 20;
+      return value;
+    };
+    return score(right) - score(left);
+  });
+}
+
+export function crmOwnedMarketContext(input: {
+  phone?: string | null;
+  city?: string | null;
+  stateRegion?: string | null;
+  country?: string | null;
+  defaultCurrency?: string | null;
+  cityOrigin?: string | null;
+  stateRegionOrigin?: string | null;
+  countryOrigin?: string | null;
+}): EnrichmentSearchContext {
+  const fromEnrichment = (origin?: string | null) => origin === "enrichment";
+  return {
+    phone: input.phone ?? null,
+    city: fromEnrichment(input.cityOrigin) ? null : input.city ?? null,
+    stateRegion: fromEnrichment(input.stateRegionOrigin) ? null : input.stateRegion ?? null,
+    country: fromEnrichment(input.countryOrigin) ? null : input.country ?? null,
+    defaultCurrency: input.defaultCurrency ?? null,
+  };
+}
+
+export function suggestedLocationConflictsWithMarket(
+  suggestions: Array<{ fieldKey: string; value: string }>,
+  marketHints: string[],
+): boolean {
+  const marketCountries = new Set(
+    marketHints.map((hint) => canonicalMarketCountry(hint)).filter((value): value is string => Boolean(value)),
+  );
+  if (marketCountries.size === 0) {
+    return false;
+  }
+  const suggested = [suggestions.find((row) => row.fieldKey === "country")?.value, suggestions.find((row) => row.fieldKey === "city")?.value]
+    .map((value) => (value ? canonicalMarketCountry(value) : null))
+    .filter((value): value is string => Boolean(value));
+  if (suggested.length === 0) {
+    return false;
+  }
+  return suggested.every((country) => !marketCountries.has(country));
 }
 
 export function personNameTokens(fullName: string): string[] {
@@ -255,6 +524,9 @@ export function personNameTokens(fullName: string): string[] {
 }
 
 export function isLowQualityEnrichmentUrl(url: string): boolean {
+  if (isPeopleDataVendorUrl(url)) {
+    return true;
+  }
   try {
     const parsed = new URL(url);
     const hay = `${parsed.hostname}${parsed.pathname}`.toLowerCase();
@@ -319,10 +591,12 @@ export function mergeEnrichmentHits(
 export function filterEnrichmentHitsForPerson(
   hits: Array<{ url: string; title: string; snippet: string; retrievedAt: string }>,
   fullName: string,
+  marketHints: string[] = [],
 ): Array<{ url: string; title: string; snippet: string; retrievedAt: string }> {
-  return hits.filter(
+  const filtered = hits.filter(
     (hit) => !isLowQualityEnrichmentUrl(hit.url) && hitMentionsPerson(hit, fullName),
   );
+  return rankEnrichmentHits(filtered, marketHints);
 }
 
 /** Citations must come from retrieved search hits, not model-invented URLs. */

@@ -15,6 +15,7 @@ export type SynthesizeInput = {
   known: Record<string, string | null>;
   allowedSources: LeadEnrichmentAllowedSource[];
   hits: LeadEnrichmentSearchHit[];
+  marketHints?: string[];
 };
 
 export type SynthesizeSuggestion = {
@@ -143,7 +144,7 @@ async function searchOpenAiWeb(
     return { hits: [], extraText: "" };
   }
   const model = enrichmentOpenAiModel();
-  const input = `Find public professional pages for ${query}. Prefer company sites, professional directories, news, and registries. Return employers, job titles, locations, and https URLs. Do not invent sources.`;
+  const input = `Search the public web like a person googling ${query}. Prefer LinkedIn public profiles, employer/team pages, news, and registries over contact-data vendors or org-chart scrapers. Return employers, job titles, locations, and https URLs. Do not invent sources.`;
   const retrievedAt = new Date().toISOString();
 
   async function post(body: Record<string, unknown>): Promise<Response> {
@@ -213,11 +214,16 @@ export async function defaultSynthesize(input: SynthesizeInput): Promise<Synthes
   const sources = input.hits
     .map((hit, index) => `${index + 1}. ${hit.title} — ${hit.url}\n${hit.snippet}`)
     .join("\n\n");
+  const market =
+    input.marketHints && input.marketHints.length > 0
+      ? `Lead market clues (phone / CRM location / workspace): ${input.marketHints.join(", ")}. Prefer the person in that market. If results describe people in different countries (for example Lausanne vs Montréal), identityMatch must be ambiguous unless only one person matches the market.`
+      : "If results describe more than one professional with this name, identityMatch must be ambiguous.";
   const prompt = `You are an internal CRM research assistant. Extract every public professional/business fact that the search results support. Be thorough, not timid. Do not invent facts, URLs, or numbers.
 
 Lead: ${input.fullName} <${input.email}>
 Already known: ${JSON.stringify(input.known)}
 Allowed sources: ${allowedSourceHint(input.allowedSources)}
+${market}
 
 Search results:
 ${sources || "(none)"}
@@ -230,9 +236,9 @@ Return JSON:
   "summary": {"text":"cited summary of public professional facts","citationUrls":["https://..."]}
 }
 
-Identity: unique when the results describe one professional matching this name. A distinctive name (three parts or a hyphenated surname) can be unique even if the email is not printed on the page. Use work-email domain as extra corroboration when present. Ambiguous when several people match. None when nothing corroborates the person.
+Identity: unique when the results describe one professional matching this name in the lead’s market. A distinctive name (three parts or a hyphenated surname) can be unique even if the email is not printed on the page. Use work-email domain as extra corroboration when present. Ambiguous when several people match, or when the only hits are a different country than the lead’s phone/market. None when nothing corroborates the person.
 
-Fill every field the sources support: employer, short job title (role only, e.g. Counsel — never a sentence or “employee of the …”), industry, city, region, country, public profile/company URL, contact clues. Prefer current or recent pages over 10+ year-old reports.
+Fill every field the sources support: employer, short job title (role only, e.g. Counsel — never a sentence or “employee of the …”), industry, city, region, country, public profile/company URL, contact clues. Prefer LinkedIn and employer pages over org-chart scrapers. Prefer current or recent pages over 10+ year-old reports.
 
 Never extract income, wealth, credit, property ownership, health, home address, or anything not on the results. Every suggestion needs an https URL copied from the results. Confidence is source-quality, not truth, and must stay ≤ 85.`;
 

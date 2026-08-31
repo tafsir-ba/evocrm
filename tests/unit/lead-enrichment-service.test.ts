@@ -526,6 +526,90 @@ describe("lead enrichment service", () => {
     expect(updateLead).not.toHaveBeenCalled();
   });
 
+  it("does not apply a foreign-country profile when the lead’s phone is Swiss", async () => {
+    vi.mocked(getEnv).mockImplementation(
+      () =>
+        ({
+          OPENAI_API_KEY: "sk-test",
+          TAVILY_API_KEY: undefined,
+          BRAVE_SEARCH_API_KEY: undefined,
+          LEAD_ENRICHMENT_DEMO: undefined,
+          OPENAI_ENRICHMENT_MODEL: undefined,
+        }) as never,
+    );
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      ...workspace,
+      defaultCurrency: "CHF",
+      leadEnrichment: { ...workspace.leadEnrichment, demoMode: false },
+    } as never);
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "philippe.nougaret@gmail.com",
+        firstName: "philippe.nougaret@gmail.com",
+        lastName: "",
+        email: "philippe.nougaret@gmail.com",
+        phone: "0763162433",
+        phoneNormalized: "0763162433",
+      }),
+    );
+
+    const canadaHit = {
+      url: "https://theorg.com/org/caisse-de-depot-et-placement-du-quebec/org-chart/philippe-nougaret",
+      title: "Philippe Nougaret — CDPQ",
+      snippet: "Vice President, Global Enterprise Risk, Montréal, Canada",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+
+    const run = await startLeadEnrichment({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      providers: {
+        search: async () => ({ hits: [canadaHit], provider: "tavily" }),
+        synthesize: async () => ({
+          identityMatch: "unique",
+          identityRationale: "One org-chart profile",
+          model: "gpt-test",
+          suggestions: [
+            {
+              fieldKey: "companyName",
+              value: "Caisse de dépôt et placement du Québec",
+              confidencePercent: 85,
+              rationale: "theorg",
+              sourceUrls: [canadaHit.url],
+            },
+            {
+              fieldKey: "jobTitle",
+              value: "Vice President, Global Enterprise Risk",
+              confidencePercent: 85,
+              rationale: "theorg",
+              sourceUrls: [canadaHit.url],
+            },
+            {
+              fieldKey: "city",
+              value: "Montréal",
+              confidencePercent: 85,
+              rationale: "theorg",
+              sourceUrls: [canadaHit.url],
+            },
+            {
+              fieldKey: "country",
+              value: "Canada",
+              confidencePercent: 85,
+              rationale: "theorg",
+              sourceUrls: [canadaHit.url],
+            },
+          ],
+          summary: { text: "CDPQ VP in Montréal", citationUrls: [canadaHit.url] },
+        }),
+      },
+    });
+
+    expect(run.status).toBe("ambiguous");
+    expect(run.identityRationale).toMatch(/different country/i);
+    expect(updateLead).not.toHaveBeenCalled();
+  });
+
   it("revokes by restoring accepted fields without wiping the audit trail", async () => {
     const suggestion = {
       id: "sug-job",

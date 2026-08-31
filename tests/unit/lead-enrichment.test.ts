@@ -9,6 +9,12 @@ import {
   isUniqueEnrichmentReveal,
   citeOnlyRetrievedUrls,
   enrichmentSearchQueries,
+  crmOwnedMarketContext,
+  enrichmentMarketHints,
+  looksLikeSwissPhone,
+  rankEnrichmentHits,
+  shouldContinueEnrichmentSearch,
+  suggestedLocationConflictsWithMarket,
   filterEnrichmentHitsForPerson,
   isPlausibleJobTitle,
   originLabel,
@@ -195,21 +201,96 @@ describe("lead enrichment contract", () => {
     ).toBe(false);
   });
 
-  it("searches the distinctive name, then email, then work domain", () => {
+  it("searches the distinctive name, then email, then work domain, LinkedIn, and market", () => {
     expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@evo-home.ch")).toEqual([
       '"Alisa Scarlett-Buchanan"',
       '"Alisa Scarlett-Buchanan" "alisa@evo-home.ch"',
       '"Alisa Scarlett-Buchanan" evo-home.ch',
+      '"Alisa Scarlett-Buchanan" LinkedIn',
     ]);
     expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@gmail.com")).toEqual([
       '"Alisa Scarlett-Buchanan"',
       '"Alisa Scarlett-Buchanan" "alisa@gmail.com"',
+      '"Alisa Scarlett-Buchanan" LinkedIn',
+    ]);
+    expect(
+      enrichmentSearchQueries("philippe.nougaret@gmail.com", "philippe.nougaret@gmail.com", {
+        phone: "0763162433",
+      }),
+    ).toEqual([
+      '"philippe nougaret"',
+      '"philippe nougaret" "philippe.nougaret@gmail.com"',
+      '"philippe nougaret" LinkedIn',
+      '"philippe nougaret" Switzerland',
     ]);
     expect(enrichmentSearchQueries("radu@neho.ch", "radu@neho.ch")).toEqual([
       '"radu"',
       '"radu" "radu@neho.ch"',
       '"radu" neho.ch',
+      '"radu" LinkedIn',
     ]);
+  });
+
+  it("uses Swiss mobile and CHF as market clues, and ignores enrichment-written city", () => {
+    expect(looksLikeSwissPhone("0763162433")).toBe(true);
+    expect(looksLikeSwissPhone("+41763162433")).toBe(true);
+    expect(enrichmentMarketHints({ phone: "0763162433" })).toEqual(
+      expect.arrayContaining(["Switzerland", "Suisse"]),
+    );
+    expect(
+      crmOwnedMarketContext({
+        phone: "0763162433",
+        city: "Montréal",
+        country: "Canada",
+        cityOrigin: "enrichment",
+        countryOrigin: "enrichment",
+        defaultCurrency: "CHF",
+      }),
+    ).toEqual({
+      phone: "0763162433",
+      city: null,
+      stateRegion: null,
+      country: null,
+      defaultCurrency: "CHF",
+    });
+    expect(
+      suggestedLocationConflictsWithMarket(
+        [
+          { fieldKey: "city", value: "Montréal" },
+          { fieldKey: "country", value: "Canada" },
+        ],
+        ["Switzerland", "Suisse"],
+      ),
+    ).toBe(true);
+    expect(
+      suggestedLocationConflictsWithMarket(
+        [
+          { fieldKey: "city", value: "Lausanne" },
+          { fieldKey: "country", value: "Switzerland" },
+        ],
+        ["Switzerland"],
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps searching until LinkedIn or employer pages appear, and ranks them first", () => {
+    const theorg = {
+      url: "https://theorg.com/org/caisse-de-depot-et-placement-du-quebec/org-chart/philippe-nougaret",
+      title: "Philippe Nougaret",
+      snippet: "Vice President, Montréal",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+    const linkedin = {
+      url: "https://www.linkedin.com/in/philippe-nougaret",
+      title: "Philippe Nougaret - CPW – Nestlé",
+      snippet: "Regional Marketing Director Europe, Lausanne",
+      retrievedAt: "2026-08-31T12:00:00.000Z",
+    };
+    expect(shouldContinueEnrichmentSearch([theorg], ["Switzerland"])).toBe(true);
+    expect(shouldContinueEnrichmentSearch([linkedin, theorg], ["Switzerland"])).toBe(false);
+    expect(
+      rankEnrichmentHits([theorg, linkedin], ["Switzerland"]).map((hit) => hit.url),
+    ).toEqual([linkedin.url, theorg.url]);
   });
 
   it("rejects sentence-like job titles and trap citations", () => {
@@ -224,6 +305,12 @@ describe("lead enrichment contract", () => {
             url: "https://www.jsimlo.sk/trap/index.php/function.html",
             title: "function",
             snippet: "",
+            retrievedAt: "2026-08-31T12:00:00.000Z",
+          },
+          {
+            url: "https://rocketreach.co/alisa-scarlett-buchanan-email",
+            title: "Alisa Scarlett-Buchanan Email",
+            snippet: "Contact data",
             retrievedAt: "2026-08-31T12:00:00.000Z",
           },
           {
