@@ -93,7 +93,10 @@ async function hubspotListIds(accessToken: string): Promise<string[]> {
         await sleep(500 * 2 ** attempt);
         continue;
       }
-      page = (await response.json()) as typeof page;
+      page = (await response.json()) as {
+        results?: Array<{ id: string }>;
+        paging?: { next?: { after?: string } };
+      };
       break;
     }
     if (!page) throw lastError instanceof Error ? lastError : new Error("hubspot_list_failed");
@@ -245,7 +248,10 @@ async function main(): Promise<void> {
         await sleep(500 * 2 ** attempt);
         continue;
       }
-      page = (await response.json()) as typeof page;
+      page = (await response.json()) as {
+        results?: Array<{ id: string; properties?: { email?: string | null } }>;
+        paging?: { next?: { after?: string } };
+      };
       break;
     }
     if (!page) break;

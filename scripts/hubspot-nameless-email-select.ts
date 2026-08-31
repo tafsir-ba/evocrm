@@ -275,7 +275,7 @@ async function main(): Promise<void> {
     assertExplicitMappedDestination({
       slug,
       destinationProjectId: project.id,
-      destinationReference: project.reference,
+      destinationReference: project.reference ?? "",
       mapping: {
         hubspotProjectId: mapping.hubspotProjectId,
         status: mapping.status,
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
         portalId: WD_MIGRATION_PORTAL_ID,
         workspaceId: WD_MIGRATION_WORKSPACE_ID,
         destinationProjectId: project.id,
-        destinationReference: project.reference,
+        destinationReference: project.reference ?? "",
         slug,
         sourceHubSpotProjectId: slug,
         size: batchIds.length,
@@ -332,7 +332,7 @@ async function main(): Promise<void> {
         name: batchName,
         size: batchIds.length,
         destinationProjectId: project.id,
-        destinationReference: project.reference,
+        destinationReference: project.reference ?? "",
         idChecksum: manifest.idChecksum,
       });
     }

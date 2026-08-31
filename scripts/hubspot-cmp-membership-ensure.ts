@@ -103,7 +103,11 @@ async function hubspotSearchAllEq(input: {
         await sleep(500 * 2 ** attempt);
         continue;
       }
-      page = (await response.json()) as typeof page;
+      page = (await response.json()) as {
+        total?: number;
+        results?: Array<{ id?: string; properties?: Record<string, string | null | undefined> }>;
+        paging?: { next?: { after?: string } };
+      };
       break;
     }
     if (!page) throw new Error("hubspot_cmp_search_failed");
