@@ -124,6 +124,20 @@
       "notes": "Owner override: every HubSpot contact with Product interested in=CMP must have EvoHome CMP membership. Conflict/multi no longer holds out of CMP — ADD membership without deleting/reassigning other project leads. Never route ambiguity to General. Campaign defaultExcluded preserved."
     }
   ],
+  "generalFallbackPolicy": {
+    "status": "active_hard_gate",
+    "rule": "evo_home_general_last_resort_only",
+    "allowedWhen": "exhaustive attribution finds zero mapped/reconcilable project destinations",
+    "forbiddenWhen": [
+      "ambiguous_or_conflicting_mapped_signals",
+      "missing_fields_that_can_still_be_enriched_into_a_mapped_project",
+      "processing_convenience",
+      "incomplete_review_without_triedRules"
+    ],
+    "validation": "assertGeneralFallbackAllowed — mappedSlugs must be empty; triedRules required; reason allowlisted; destination must be EvoHome General",
+    "ongoingSync": "hubspot-lead-capture refuses integration defaultProject=General",
+    "evidenceStoredOnLead": "attributes.hubspotMigration.attributionEvidence + decisionReason + legacyArchive"
+  },
   "end_line_roadmap": "migrations/hubspot-wd-project/end-line-roadmap.json",
   "nameless_email_reclassification": {
     "status": "active",

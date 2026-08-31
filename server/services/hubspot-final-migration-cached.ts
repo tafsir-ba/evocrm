@@ -330,6 +330,7 @@ export async function ensureFinalMigrationOutcomeCached(input: {
       assertGeneralFallbackAllowed({
         evidence: decision.evidence,
         reason: decision.reason,
+        destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
       });
       const created = await createLead(WD_MIGRATION_GENERAL_PROJECT_ID, {
         reason: decision.reason,

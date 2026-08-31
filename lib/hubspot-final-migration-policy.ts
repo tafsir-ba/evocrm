@@ -130,26 +130,66 @@ function unique(values: string[]): string[] {
 }
 
 /**
- * Hard gate: General only when exhaustive attribution found zero mapped projects.
+ * Allowed General fallback reason prefixes (last-resort only).
+ * Ambiguous/conflicting mapped signals must NEVER appear here — they keep
+ * ordered memberships instead. Convenience / incomplete review is rejected.
+ */
+export const GENERAL_FALLBACK_REASON_PREFIXES = [
+  "fallback_general:",
+  "no_project_signal:",
+  "forbidden_destination:",
+  "unmapped_project:",
+  "missing_email_and_phone:",
+  "identity_conflict:no_mapped_destination",
+  "legacy_general:",
+] as const;
+
+export function isGeneralFallbackReasonAllowed(reason: string): boolean {
+  return GENERAL_FALLBACK_REASON_PREFIXES.some((prefix) => reason.startsWith(prefix));
+}
+
+/**
+ * Hard validation gate for EvoHome General Database writes.
+ * General is last-resort only after exhaustive attribution finds zero mapped
+ * project destinations. Rejects ambiguity, convenience, and incomplete review.
  */
 export function assertGeneralFallbackAllowed(input: {
   evidence: AttributionEvidence;
   reason: string;
+  /** Destination project id when known — must be General when writing. */
+  destinationProjectId?: string;
 }): void {
+  if (
+    input.destinationProjectId &&
+    input.destinationProjectId !== WD_MIGRATION_GENERAL_PROJECT_ID
+  ) {
+    throw new Error(
+      `general_fallback_forbidden:destination_not_general:${input.destinationProjectId}`,
+    );
+  }
   if (input.evidence.mappedSlugs.length > 0) {
     throw new Error(`general_fallback_forbidden:mapped_project_exists:${input.reason}`);
   }
-  if (!input.reason.startsWith("legacy_general:") && !input.reason.startsWith("fallback_general:")) {
-    if (
-      !input.reason.startsWith("no_project_signal:") &&
-      !input.reason.startsWith("forbidden_destination:") &&
-      !input.reason.startsWith("unmapped_project:") &&
-      !input.reason.startsWith("missing_email_and_phone:") &&
-      !input.reason.startsWith("identity_conflict:")
-    ) {
-      throw new Error(`general_fallback_forbidden:invalid_reason:${input.reason}`);
-    }
+  if (!input.evidence.triedRules.length) {
+    throw new Error(`general_fallback_forbidden:missing_tried_rules:${input.reason}`);
   }
+  // Competing mapped signals are never routed here; reject reasons that imply it.
+  if (
+    input.reason.includes("multi_project:") ||
+    input.reason.includes("notes_conflict:") ||
+    input.reason.includes("product_vs_wd_conflict:") ||
+    input.reason.includes("ambiguous_mapped")
+  ) {
+    throw new Error(`general_fallback_forbidden:ambiguous_or_conflict:${input.reason}`);
+  }
+  if (!isGeneralFallbackReasonAllowed(input.reason)) {
+    throw new Error(`general_fallback_forbidden:invalid_reason:${input.reason}`);
+  }
+}
+
+/** True when a HubSpot capture/migration write targets General. */
+export function isEvoHomeGeneralProjectId(projectId: string): boolean {
+  return projectId === WD_MIGRATION_GENERAL_PROJECT_ID;
 }
 
 export function planOrderedMemberships(input: {
@@ -355,11 +395,19 @@ export function decideFinalMigrationOutcome(input: {
   if (evidence.fallbackGeneralSlugs.length > 0 && evidence.mappedSlugs.length === 0) {
     const slug = evidence.fallbackGeneralSlugs[0]!;
     const reason = `fallback_general:${slug}`;
-    assertGeneralFallbackAllowed({ evidence, reason });
+    const nextEvidence = {
+      ...evidence,
+      triedRules: [...evidence.triedRules, "fallback_general_last_resort"],
+    };
+    assertGeneralFallbackAllowed({
+      evidence: nextEvidence,
+      reason,
+      destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+    });
     return {
       action: "legacy_general",
       reason,
-      evidence: { ...evidence, triedRules: [...evidence.triedRules, "fallback_general_last_resort"] },
+      evidence: nextEvidence,
       allowMissingContact: true,
       generalProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
     };
@@ -367,11 +415,19 @@ export function decideFinalMigrationOutcome(input: {
 
   if (evidence.forbiddenSlugs.length > 0 && evidence.mappedSlugs.length === 0) {
     const reason = `forbidden_destination:${evidence.forbiddenSlugs[0]}`;
-    assertGeneralFallbackAllowed({ evidence, reason });
+    const nextEvidence = {
+      ...evidence,
+      triedRules: [...evidence.triedRules, "forbidden_to_general_legacy"],
+    };
+    assertGeneralFallbackAllowed({
+      evidence: nextEvidence,
+      reason,
+      destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+    });
     return {
       action: "legacy_general",
       reason,
-      evidence: { ...evidence, triedRules: [...evidence.triedRules, "forbidden_to_general_legacy"] },
+      evidence: nextEvidence,
       allowMissingContact: true,
       generalProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
     };
@@ -379,11 +435,19 @@ export function decideFinalMigrationOutcome(input: {
 
   if (evidence.unmappedSlugs.length > 0 && evidence.mappedSlugs.length === 0) {
     const reason = `unmapped_project:${evidence.unmappedSlugs[0]}`;
-    assertGeneralFallbackAllowed({ evidence, reason });
+    const nextEvidence = {
+      ...evidence,
+      triedRules: [...evidence.triedRules, "unmapped_to_general_legacy"],
+    };
+    assertGeneralFallbackAllowed({
+      evidence: nextEvidence,
+      reason,
+      destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+    });
     return {
       action: "legacy_general",
       reason,
-      evidence: { ...evidence, triedRules: [...evidence.triedRules, "unmapped_to_general_legacy"] },
+      evidence: nextEvidence,
       allowMissingContact: true,
       generalProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
     };
@@ -393,17 +457,20 @@ export function decideFinalMigrationOutcome(input: {
     ? "missing_email_and_phone:no_project_signal"
     : identityConflict
       ? "identity_conflict:no_mapped_destination"
-      : attribution.ambiguousCompeting
-        ? "no_project_signal:ambiguous_unmapped"
-        : "no_project_signal:exhaustive_no_destination";
-  assertGeneralFallbackAllowed({ evidence, reason });
+      : "no_project_signal:exhaustive_no_destination";
+  const exhaustiveEvidence = {
+    ...evidence,
+    triedRules: [...evidence.triedRules, "general_last_resort_exhaustive"],
+  };
+  assertGeneralFallbackAllowed({
+    evidence: exhaustiveEvidence,
+    reason,
+    destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+  });
   return {
     action: "legacy_general",
     reason,
-    evidence: {
-      ...evidence,
-      triedRules: [...evidence.triedRules, "general_last_resort_exhaustive"],
-    },
+    evidence: exhaustiveEvidence,
     allowMissingContact: true,
     generalProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
   };

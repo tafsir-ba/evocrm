@@ -466,6 +466,7 @@ export async function ensureFinalMigrationOutcome(input: {
       assertGeneralFallbackAllowed({
         evidence: decision.evidence,
         reason: decision.reason,
+        destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
       });
       if (decision.generalProjectId !== WD_MIGRATION_GENERAL_PROJECT_ID) {
         throw new Error("legacy_general_project_mismatch");

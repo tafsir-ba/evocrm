@@ -132,15 +132,57 @@ describe("hubspot-final-migration-policy", () => {
           notesSlugs: [],
           brokerSlugs: [],
           productValues: [],
-          triedRules: [],
+          triedRules: ["wd_project_single"],
           mappedSlugs: ["cressy"],
           unmappedSlugs: [],
           fallbackGeneralSlugs: [],
           forbiddenSlugs: [],
         },
         reason: "no_project_signal:exhaustive_no_destination",
+        destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
       }),
-    ).toThrow(/general_fallback_forbidden/);
+    ).toThrow(/general_fallback_forbidden:mapped_project_exists/);
+  });
+
+  it("blocks General for multi_project / conflict reasons", () => {
+    const emptyMapped = {
+      wdProjectSlugs: ["a", "b"],
+      notesSlugs: [],
+      brokerSlugs: [],
+      productValues: [],
+      triedRules: ["wd_project_multi_ordered"],
+      mappedSlugs: [] as string[],
+      unmappedSlugs: ["a", "b"],
+      fallbackGeneralSlugs: [] as string[],
+      forbiddenSlugs: [] as string[],
+    };
+    expect(() =>
+      assertGeneralFallbackAllowed({
+        evidence: emptyMapped,
+        reason: "multi_project:wd_project_multi_ordered",
+        destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+      }),
+    ).toThrow(/ambiguous_or_conflict/);
+  });
+
+  it("blocks General without triedRules (incomplete review)", () => {
+    expect(() =>
+      assertGeneralFallbackAllowed({
+        evidence: {
+          wdProjectSlugs: [],
+          notesSlugs: [],
+          brokerSlugs: [],
+          productValues: [],
+          triedRules: [],
+          mappedSlugs: [],
+          unmappedSlugs: [],
+          fallbackGeneralSlugs: [],
+          forbiddenSlugs: [],
+        },
+        reason: "no_project_signal:exhaustive_no_destination",
+        destinationProjectId: WD_MIGRATION_GENERAL_PROJECT_ID,
+      }),
+    ).toThrow(/missing_tried_rules/);
   });
 
   it("creates legacy General for exhaustive no-project", () => {
@@ -157,7 +199,24 @@ describe("hubspot-final-migration-policy", () => {
     expect(decision.action).toBe("legacy_general");
     if (decision.action === "legacy_general") {
       expect(decision.reason).toBe("no_project_signal:exhaustive_no_destination");
+      expect(decision.evidence.triedRules.length).toBeGreaterThan(0);
     }
+  });
+
+  it("never routes multi-project mapped contacts to General", () => {
+    const snapshot = snap({
+      hubspotContactId: "7",
+      emailNormalized: "multi@example.com",
+      projectValues: ["cressy", "delejette"],
+    });
+    const decision = decideFinalMigrationOutcome({
+      snapshot,
+      existing: [],
+      mappedBySlug: mapped,
+      fallbackGeneralSlugs: fallback,
+    });
+    expect(decision.action).toBe("ensure_memberships");
+    expect(decision.action).not.toBe("legacy_general");
   });
 
   it("omits email on identity conflict membership create", () => {

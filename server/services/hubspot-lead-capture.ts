@@ -23,6 +23,10 @@ import {
 } from "@/server/services/integration-logs";
 import { buildMigratedCampaignGuardAttributes } from "@/lib/campaign-enrollment-guard";
 import { planHubSpotCmpLeadIntelligence } from "@/lib/hubspot-cmp-lead-intelligence";
+import {
+  isEvoHomeGeneralProjectId,
+} from "@/lib/hubspot-final-migration-policy";
+import { WD_MIGRATION_GENERAL_PROJECT_ID } from "@/lib/hubspot-wd-project-migration";
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   createLeadForWorkspace,
@@ -58,13 +62,33 @@ async function resolveHubSpotDefaultProjectId(
       );
     }
 
+    // Ongoing sync must never silently land on EvoHome General. Historical
+    // legacy_general writes go through assertGeneralFallbackAllowed only.
+    if (
+      isEvoHomeGeneralProjectId(project.id) ||
+      project.id === WD_MIGRATION_GENERAL_PROJECT_ID ||
+      project.reference === "EVO-GENERAL"
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "HubSpot integration default project cannot be EvoHome General Database. General is last-resort migration fallback only.",
+      );
+    }
+
     return project.id;
   }
 
   const projects = await findProjects(workspaceId, { includeArchived: false });
 
   if (projects.length === 1) {
-    return projects[0].id;
+    const only = projects[0]!;
+    if (isEvoHomeGeneralProjectId(only.id) || only.reference === "EVO-GENERAL") {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "HubSpot integration default project cannot be EvoHome General Database.",
+      );
+    }
+    return only.id;
   }
 
   throw new AppError(
