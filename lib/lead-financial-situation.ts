@@ -1,4 +1,4 @@
-import { isHttpsUrl } from "@/lib/lead-enrichment";
+import { inferOccupationalRole, isHttpsUrl } from "@/lib/lead-enrichment";
 
 export const FINANCIAL_EMPLOYMENT_TYPES = [
   "employed",
@@ -163,27 +163,48 @@ export function parseOccupationalEstimatePayload(parsed: unknown): {
   };
 }
 
-export function hasOccupationalEstimateInputs(lead: {
+export type OccupationalEstimateLead = {
   jobTitle?: string | null;
+  industry?: string | null;
+  companyName?: string | null;
+  professionalProfileUrl?: string | null;
   city?: string | null;
   stateRegion?: string | null;
   country?: string | null;
-}): boolean {
-  const jobTitle = lead.jobTitle?.trim();
-  const location = [lead.city, lead.stateRegion, lead.country]
+};
+
+export function resolveOccupationalJobTitle(
+  lead: OccupationalEstimateLead,
+): { jobTitle: string; inferred: boolean } | null {
+  const existing = lead.jobTitle?.trim();
+  if (existing) {
+    return { jobTitle: existing, inferred: false };
+  }
+  const inferred = inferOccupationalRole({
+    industry: lead.industry,
+    companyName: lead.companyName,
+    professionalProfileUrl: lead.professionalProfileUrl,
+  });
+  if (!inferred?.jobTitle) {
+    return null;
+  }
+  return { jobTitle: inferred.jobTitle, inferred: true };
+}
+
+export function occupationalEstimateLocation(lead: OccupationalEstimateLead): string {
+  return [lead.city, lead.stateRegion, lead.country]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(", ");
-  return Boolean(jobTitle && location);
 }
 
-export function shouldRequestMarketEstimateAfterEnrichment(input: {
-  uniqueReveal: boolean;
-  jobTitle?: string | null;
-  city?: string | null;
-  stateRegion?: string | null;
-  country?: string | null;
-}): boolean {
+export function hasOccupationalEstimateInputs(lead: OccupationalEstimateLead): boolean {
+  return Boolean(resolveOccupationalJobTitle(lead) && occupationalEstimateLocation(lead));
+}
+
+export function shouldRequestMarketEstimateAfterEnrichment(
+  input: OccupationalEstimateLead & { uniqueReveal: boolean },
+): boolean {
   return input.uniqueReveal && hasOccupationalEstimateInputs(input);
 }
 

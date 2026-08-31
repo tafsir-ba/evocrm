@@ -286,6 +286,8 @@ Identity: unique when the results describe one professional matching this name i
 
 Fill every field the sources support: employer, short job title (role only, e.g. Counsel — never a sentence or “employee of the …”), industry, city, region, country, public profile/company URL, contact clues. Prefer LinkedIn and employer pages over org-chart scrapers. Prefer current or recent pages over 10+ year-old reports.
 
+If a source is a bar / avocat directory (odage.ch, ordre des avocats, barreau, law society) or the employer is clearly a law firm (Associé-e-s, avocats, attorneys, law firm), you must fill jobTitle (Avocat or Attorney) and industry (Legal). Do not leave those empty when the occupation is obvious from the listing.
+
 Never extract income, wealth, credit, property ownership, health, home address, or anything not on the results. Every suggestion needs an https URL copied from the results. Confidence is source-quality, not truth, and must stay ≤ 85.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {

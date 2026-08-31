@@ -18,6 +18,7 @@ import {
   filterEnrichmentHitsForPerson,
   isLeadEnrichmentFieldKey,
   isPlausibleJobTitle,
+  mergeInferredOccupationalSuggestions,
   mergeEnrichmentHits,
   preferHitsInProjectMarket,
   shouldContinueEnrichmentSearch,
@@ -430,7 +431,14 @@ export async function startLeadEnrichment(input: {
     }
 
     const suggestions = buildSuggestions({
-      synthesis,
+      synthesis: {
+        ...synthesis,
+        suggestions: mergeInferredOccupationalSuggestions({
+          suggestions: synthesis.suggestions,
+          hits,
+          known: current.values,
+        }),
+      },
       current,
       retrievedAt,
       searchProvider: provider,

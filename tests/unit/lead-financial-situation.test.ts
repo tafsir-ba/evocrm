@@ -47,6 +47,7 @@ describe("occupational working figures", () => {
     expect(inferEmploymentTypeFromJobTitle("Founder")).toBe("self_employed");
     expect(inferEmploymentTypeFromJobTitle("Managing Director")).toBe("company_director");
     expect(inferEmploymentTypeFromJobTitle("CTO")).toBe("employed");
+    expect(inferEmploymentTypeFromJobTitle("Avocat")).toBe("employed");
     expect(inferEmploymentTypeFromJobTitle("Head of Sales")).toBe("employed");
     expect(inferEmploymentTypeFromJobTitle("Retired teacher")).toBe("retired");
   });

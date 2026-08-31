@@ -45,7 +45,10 @@ import {
   type LeadEnrichmentSuggestion,
 } from "@/lib/lead-enrichment";
 import type { LeadFieldProvenanceMethod } from "@/lib/lead-intelligence";
-import { shouldRequestMarketEstimateAfterEnrichment } from "@/lib/lead-financial-situation";
+import {
+  hasOccupationalEstimateInputs,
+  shouldRequestMarketEstimateAfterEnrichment,
+} from "@/lib/lead-financial-situation";
 import type { EnrichmentAppliedRun } from "@/components/leads/lead-enrichment-modal";
 import {
   LeadProjectMemberships,
@@ -275,6 +278,9 @@ export function LeadDetailPanel({
         !shouldRequestMarketEstimateAfterEnrichment({
           uniqueReveal: true,
           jobTitle: nextLead.jobTitle,
+          industry: nextLead.industry,
+          companyName: nextLead.company?.name,
+          professionalProfileUrl: nextLead.professionalProfileUrl,
           city: nextLead.city,
           stateRegion: nextLead.stateRegion,
           country: nextLead.country,
@@ -1204,8 +1210,15 @@ export function LeadDetailPanel({
                           Requesting labelled occupational estimate (job and location only)…
                         </p>
                       ) : canFinancialRead &&
-                        lead.jobTitle &&
-                        (lead.city || lead.stateRegion || lead.country) ? (
+                        hasOccupationalEstimateInputs({
+                          jobTitle: lead.jobTitle,
+                          industry: lead.industry,
+                          companyName: lead.company?.name,
+                          professionalProfileUrl: lead.professionalProfileUrl,
+                          city: lead.city,
+                          stateRegion: lead.stateRegion,
+                          country: lead.country,
+                        }) ? (
                         <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
                           Optional occupational estimate can pre-fill working figures on the
                           Financial situation tab so a broker can gauge affordability. Human-declared

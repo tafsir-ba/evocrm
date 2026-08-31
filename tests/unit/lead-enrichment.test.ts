@@ -21,7 +21,9 @@ import {
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
   filterEnrichmentHitsForPerson,
+  inferOccupationalRole,
   isPlausibleJobTitle,
+  mergeInferredOccupationalSuggestions,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
@@ -29,6 +31,8 @@ import { getLeadEnrichmentDemoFixture, DEMO_AMBIGUOUS_EMAIL, DEMO_UNIQUE_EMAIL }
 import {
   parseOccupationalEstimatePayload,
   parseOccupationalWageRange,
+  hasOccupationalEstimateInputs,
+  resolveOccupationalJobTitle,
   shouldRequestMarketEstimateAfterEnrichment,
 } from "@/lib/lead-financial-situation";
 
@@ -178,7 +182,7 @@ describe("lead enrichment contract", () => {
     expect(isUniqueEnrichmentReveal({ status: "failed", identityMatch: "none" })).toBe(false);
   });
 
-  it("requests a labelled occupational estimate only after a unique reveal with job and location", () => {
+  it("requests a labelled occupational estimate after a unique reveal with a role and location", () => {
     expect(
       shouldRequestMarketEstimateAfterEnrichment({
         uniqueReveal: true,
@@ -204,6 +208,94 @@ describe("lead enrichment contract", () => {
         country: "Switzerland",
       }),
     ).toBe(false);
+    expect(
+      shouldRequestMarketEstimateAfterEnrichment({
+        uniqueReveal: true,
+        jobTitle: null,
+        companyName: "Renold & Associé·e·s",
+        professionalProfileUrl:
+          "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+        city: "Genève",
+        country: "Suisse",
+      }),
+    ).toBe(true);
+    expect(
+      hasOccupationalEstimateInputs({
+        jobTitle: null,
+        companyName: "Acme Widgets",
+        city: "Genève",
+        country: "Suisse",
+      }),
+    ).toBe(false);
+  });
+
+  it("infers avocat / legal from a Geneva bar listing and law-firm name", () => {
+    const inferred = inferOccupationalRole({
+      companyName: "Renold & Associé·e·s",
+      professionalProfileUrl:
+        "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+      hits: [
+        {
+          url: "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+          title: "Angélique Almeida Da Silva - Ordre des avocats de Genève",
+          snippet: "Membre de l’Ordre des avocats de Genève",
+        },
+      ],
+    });
+    expect(inferred).toMatchObject({
+      jobTitle: "Avocat",
+      industry: "Legal",
+    });
+    expect(inferred?.sourceUrls).toContain(
+      "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+    );
+    expect(isPlausibleJobTitle("Avocat")).toBe(true);
+    expect(
+      resolveOccupationalJobTitle({
+        companyName: "Renold & Associé·e·s",
+        city: "Genève",
+        country: "Suisse",
+      }),
+    ).toEqual({ jobTitle: "Avocat", inferred: true });
+  });
+
+  it("fills missing job title and industry suggestions from bar-directory hits", () => {
+    const merged = mergeInferredOccupationalSuggestions({
+      suggestions: [
+        {
+          fieldKey: "companyName",
+          value: "Renold & Associé·e·s",
+          confidencePercent: 85,
+          rationale: "Employer page",
+          sourceUrls: ["https://renlaw.ch/angelique-da-silva"],
+        },
+        {
+          fieldKey: "professionalProfileUrl",
+          value: "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+          confidencePercent: 85,
+          rationale: "Geneva bar directory",
+          sourceUrls: [
+            "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+          ],
+        },
+      ],
+      hits: [
+        {
+          url: "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+          title: "Angélique Almeida Da Silva",
+          snippet: "Avocate à Genève",
+        },
+      ],
+    });
+    expect(merged.find((row) => row.fieldKey === "jobTitle")).toMatchObject({
+      value: "Avocat",
+      sourceUrls: [
+        "https://odage.ch/fr/annuaire-des-membres/angelique-almeida-da-silva",
+      ],
+    });
+    expect(merged.find((row) => row.fieldKey === "industry")).toMatchObject({
+      value: "Legal",
+    });
   });
 
   it("searches the distinctive name, then email, then work domain, LinkedIn, and market", () => {
