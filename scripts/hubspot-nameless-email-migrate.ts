@@ -52,6 +52,7 @@ async function main(): Promise<void> {
     if (progress.completed.includes(manifestName)) {
       continue;
     }
+    console.log(JSON.stringify({ event: "manifest_start", manifest: manifestName, at: new Date().toISOString() }));
     const result = spawnSync(
       "npm",
       ["run", "migrate:hubspot-wd-project", "--", "--execute", "--confirm-write", `--manifest=${manifestName}`],
