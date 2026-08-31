@@ -16,6 +16,7 @@ describe("hubspot-sync-cron-worker", () => {
     vi.stubEnv("NEXTAUTH_URL", "https://crm.evo-home.ch");
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
     vi.stubEnv("HUBSPOT_ONGOING_SYNC_RECONCILE", "true");
+    vi.stubEnv("HUBSPOT_NOTES_SYNC_RECONCILE", "");
 
     vi.stubGlobal(
       "fetch",
@@ -36,6 +37,7 @@ describe("hubspot-sync-cron-worker", () => {
 
   it("does not start by default even in production", () => {
     vi.stubEnv("HUBSPOT_ONGOING_SYNC_RECONCILE", "");
+    vi.stubEnv("HUBSPOT_NOTES_SYNC_RECONCILE", "");
     expect(shouldStartInternalHubSpotSyncCron()).toBe(false);
   });
 
@@ -51,5 +53,25 @@ describe("hubspot-sync-cron-worker", () => {
         }),
       );
     });
+  });
+
+  it("starts for notes reconcile without the lead reconcile flag and posts the notes cron", async () => {
+    vi.stubEnv("HUBSPOT_ONGOING_SYNC_RECONCILE", "");
+    vi.stubEnv("HUBSPOT_NOTES_SYNC_RECONCILE", "true");
+    expect(shouldStartInternalHubSpotSyncCron()).toBe(true);
+    startInternalHubSpotSyncCronWorker();
+    await vi.waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "https://crm.evo-home.ch/api/cron/hubspot/notes",
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer test-cron-secret" },
+        }),
+      );
+    });
+    expect(fetch).not.toHaveBeenCalledWith(
+      "https://crm.evo-home.ch/api/cron/hubspot/reconcile",
+      expect.anything(),
+    );
   });
 });
