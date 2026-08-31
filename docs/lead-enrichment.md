@@ -11,7 +11,7 @@ Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KE
 5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value” on the profile.
 6. On a unique match the dialog shows a brief “Profile filled” beat and **closes onto the lead**. Enriched fields pulse once. Each value has a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
 7. **What we know** is a cited summary stored on the lead. It is not a campaign, drip, status change, or outbound message.
-8. If the operator has `lead:financial_update` and the profile now has job title plus city/region/country, Enrich also requests a labelled **occupational pay estimate** (typical pay for this role and market, e.g. a CTO at a company like Neho in Switzerland). It is never mixed with declared income and is not this person’s finances. Snippet wage bands are preferred; if search has no numbers, a capped OpenAI occupational range is stored. Agents without financial permission still get the profile + summary only.
+8. If the operator has `lead:financial_update` and the profile now has job title plus city/region/country, Enrich also requests a labelled **occupational pay estimate** (typical pay for this role and market, e.g. a CTO at a company like Neho in Switzerland). That estimate **pre-fills working figures** on the financial tab (annual income = range midpoint, employment type from the job title, discussion budget ≈ 6× midpoint, source `occupational_estimate`) so a broker can gauge affordability and whether to pitch. Declared-by-lead / document / advisor values are not overwritten. Deposit and financing stay empty. This is not a credit or mortgage application. Snippet wage bands are preferred; if search has no numbers, a capped OpenAI occupational range is stored. Agents without financial permission still get the profile + summary only.
 
 Ambiguous identity → run status `ambiguous`, **no suggestions**, no profile write; the dialog stays open with the reason. Missing verifiable source → confidence capped; high confidence is rejected.
 
@@ -51,11 +51,11 @@ Manual / import / website / API values are never overwritten without `overwriteA
 
 ### `LeadFinancialSituation` (`lead_financial_situations`)
 
-Separate collection. **Never** filled by public-web enrichment.
+Separate collection. Public-web Enrich does **not** scrape personal finances. After a unique match it may request an **occupational** pay band (job + location + similar-company context) and pre-fill **working figures** for the broker.
 
-Manual fields: declared annual income/revenue, employment type, available deposit/equity, target budget/purchase price, financing need, existing commitments, affordability notes, currency, source, as-of date, confidence, assessor notes.
+Working / manual fields: annual income/revenue, employment type, available deposit/equity, target budget/purchase price, financing need, existing commitments, affordability notes, currency, source (`declared_by_lead` \| `advisor` \| `document` \| `occupational_estimate` \| `other`), as-of date, confidence, assessor notes.
 
-Optional **occupational pay estimate** (job + location + similar-company context, not the person): range, methodology, sources, confidence, human-reviewed flag. Stored separately from declared figures. Enrich may request it after a unique match for operators with financial update permission. Must never drive credit, mortgage, pricing, housing, or eligibility decisions.
+Occupational estimate payload (range, methodology, sources, confidence, reviewed flag) is also stored. Prefill uses the range midpoint as annual income and ~6× that as a discussion budget. Human-entered sources are never overwritten. Must never drive automated credit, mortgage, pricing, housing, or eligibility decisions.
 
 History in `revisions[]`. Soft-delete `deletedAt`. Export via GET.
 

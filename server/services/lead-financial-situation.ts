@@ -321,6 +321,7 @@ export async function markMarketIncomeReviewed(input: {
     actorId: input.actorId,
     currency: existing.currency,
     estimate,
+    prefillWorkingFigures: false,
   });
 }
 

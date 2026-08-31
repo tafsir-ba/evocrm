@@ -1207,10 +1207,9 @@ export function LeadDetailPanel({
                         lead.jobTitle &&
                         (lead.city || lead.stateRegion || lead.country) ? (
                         <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
-                          Optional occupational market-income estimate is labelled separately on
-                          the Financial situation tab. It is never mixed with declared figures and
-                          must not be used for automated credit, mortgage, pricing, or eligibility
-                          decisions.
+                          Optional occupational estimate can pre-fill working figures on the
+                          Financial situation tab so a broker can gauge affordability. Human-declared
+                          numbers are left alone. Not an automated credit or mortgage decision.
                         </p>
                       ) : null}
                       {integrationAttrs && (

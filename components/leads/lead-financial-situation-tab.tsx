@@ -126,16 +126,23 @@ export function LeadFinancialSituationTab({
   return (
     <div className="px-5 pb-5 space-y-4">
       <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-        Sensitive internal commercial/mortgage discovery. Not public-web enrichment. No automatic
-        credit, mortgage, pricing, or eligibility decision.
+        Internal working figures so a broker can gauge affordability and whether a pitch is worth
+        the time. Not a credit or mortgage application. No automatic eligibility decision. Overwrite
+        with real numbers when the lead declares them.
       </p>
       {error ? <p className="text-[13px] text-[var(--color-danger-fg)]">{error}</p> : null}
       <p className="text-[13px] font-semibold text-[var(--color-ink)]">
-        Declared figures (user-entered)
+        Affordability / pitch range
       </p>
+      {form.source === "occupational_estimate" ? (
+        <p className="rounded-md bg-[var(--color-enrich-bg)]/50 px-2.5 py-1.5 text-[12.5px] text-[var(--color-enrich-fg)]">
+          Pre-filled from an occupational estimate. Treat as a working figure and replace if the
+          lead gives real numbers.
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="fin-income">Declared annual income / revenue</Label>
+          <Label htmlFor="fin-income">Annual income / revenue</Label>
           <Input
             id="fin-income"
             type="number"
@@ -314,13 +321,14 @@ export function LeadFinancialSituationTab({
 
       <div className="rounded-lg border border-dashed border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/30 p-3 space-y-2">
         <p className="text-[13px] font-semibold text-[var(--color-enrich-fg)]">
-          AI occupational estimate — not a declared figure
+          Occupational estimate — working figure for the pitch
         </p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
           Typical pay for this role and market (for example a CTO at a company like Neho in
-          Switzerland). Not this person’s income. Enrich requests it after a unique match when
-          job title and location are on the profile. It never writes into declared income.
+          Switzerland). Enrich requests it after a unique match when job title and location are on
+          the profile. It fills income, employment type, and a discussion budget, and sets source
+          to Occupational estimate. Declared-by-lead, document, or advisor values are left alone.
         </p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">

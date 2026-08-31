@@ -22,6 +22,7 @@ export const FINANCIAL_SITUATION_SOURCES = [
   "declared_by_lead",
   "advisor",
   "document",
+  "occupational_estimate",
   "other",
 ] as const;
 
@@ -31,14 +32,26 @@ export const FINANCIAL_SITUATION_SOURCE_LABELS: Record<FinancialSituationSource,
   declared_by_lead: "Declared by lead",
   advisor: "Advisor / agent",
   document: "Supporting document",
+  occupational_estimate: "Occupational estimate",
   other: "Other",
 };
+
+export const HUMAN_FINANCIAL_SITUATION_SOURCES = [
+  "declared_by_lead",
+  "advisor",
+  "document",
+] as const;
+
+export type HumanFinancialSituationSource = (typeof HUMAN_FINANCIAL_SITUATION_SOURCES)[number];
+
+/** Rough discussion budget so a broker can see if a pitch is worth the time. Not a loan amount. */
+export const OCCUPATIONAL_DISCUSSION_BUDGET_MULTIPLE = 6;
 
 export const FINANCIAL_CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
 export type FinancialConfidenceLevel = (typeof FINANCIAL_CONFIDENCE_LEVELS)[number];
 
 export const MARKET_INCOME_DISCLAIMER =
-  "Occupational estimate only: typical pay for this role and market (for example a CTO at a company like Neho in Switzerland). Not this person’s income, bank data, or a credit/mortgage decision.";
+  "Occupational working figure: typical pay for this role and market (for example a CTO at a company like Neho in Switzerland). For a broker to gauge affordability and whether to pitch. Not this person’s declared income, bank data, or a credit/mortgage decision. Replace if the lead gives real numbers.";
 
 export type LeadFinancialSituationSnapshot = {
   declaredAnnualIncome: number | null;
@@ -188,5 +201,109 @@ export function emptyFinancialSnapshot(currency: string): LeadFinancialSituation
     asOfDate: null,
     confidence: null,
     assessorNotes: null,
+  };
+}
+
+export function isHumanEnteredFinancialSource(
+  source: FinancialSituationSource | null | undefined,
+): boolean {
+  return (
+    source === "declared_by_lead" || source === "advisor" || source === "document"
+  );
+}
+
+export function inferEmploymentTypeFromJobTitle(jobTitle: string): FinancialEmploymentType {
+  const title = jobTitle.toLowerCase();
+  if (/\b(retired|retrait[ée]|pensioner)\b/.test(title)) {
+    return "retired";
+  }
+  const ownerLike =
+    /\b(owner|founder|co-?founder|proprietor|self[- ]employed|freelance(?:r)?|independent|sole trader)\b/.test(
+      title,
+    );
+  const directorLike =
+    /\b(company director|managing director|geschäftsführer|g[ée]rant|ceo|chief executive|president|pr[ée]sident)\b/.test(
+      title,
+    );
+  if (ownerLike) {
+    return directorLike ? "company_director" : "self_employed";
+  }
+  if (directorLike || /\bdirector\b/.test(title)) {
+    return "company_director";
+  }
+  return "employed";
+}
+
+export function occupationalEstimateMidpoint(
+  estimate: Pick<MarketIncomeEstimate, "rangeMin" | "rangeMax">,
+): number | null {
+  const min = estimate.rangeMin;
+  const max = estimate.rangeMax;
+  const values = [min, max].filter((value): value is number => value != null && Number.isFinite(value));
+  if (values.length === 0) {
+    return null;
+  }
+  const raw = values.length === 2 ? (values[0]! + values[1]!) / 2 : values[0]!;
+  return Math.round(raw / 1000) * 1000;
+}
+
+export function confidenceFromOccupationalPercent(
+  confidencePercent: number,
+): FinancialConfidenceLevel {
+  return confidencePercent < 40 ? "low" : "medium";
+}
+
+function formatWorkingMoney(value: number): string {
+  return value.toLocaleString("de-CH");
+}
+
+export function workingFiguresFromOccupationalEstimate(
+  estimate: MarketIncomeEstimate,
+): Partial<LeadFinancialSituationSnapshot> | null {
+  const midpoint = occupationalEstimateMidpoint(estimate);
+  if (midpoint == null) {
+    return null;
+  }
+  const rangeMin = estimate.rangeMin;
+  const rangeMax = estimate.rangeMax;
+  const rangeLabel =
+    rangeMin != null && rangeMax != null
+      ? `${formatWorkingMoney(rangeMin)}–${formatWorkingMoney(rangeMax)} ${estimate.currency}`
+      : `${formatWorkingMoney(midpoint)} ${estimate.currency}`;
+  const discussionBudget = midpoint * OCCUPATIONAL_DISCUSSION_BUDGET_MULTIPLE;
+  const asOfDate = estimate.retrievedAt.slice(0, 10);
+  return {
+    declaredAnnualIncome: midpoint,
+    employmentType: inferEmploymentTypeFromJobTitle(estimate.jobTitleUsed),
+    targetPurchasePrice: discussionBudget,
+    affordabilityNotes: `Working figure for pitch. Typical ${estimate.jobTitleUsed} pay in ${estimate.locationUsed}: ${rangeLabel} (midpoint ${formatWorkingMoney(midpoint)} used as annual income). Discussion budget is about ${OCCUPATIONAL_DISCUSSION_BUDGET_MULTIPLE}× that midpoint (${formatWorkingMoney(discussionBudget)} ${estimate.currency}). Replace these fields if the lead declares real numbers.`,
+    currency: estimate.currency,
+    source: "occupational_estimate",
+    asOfDate: /^\d{4}-\d{2}-\d{2}$/.test(asOfDate) ? asOfDate : null,
+    confidence: confidenceFromOccupationalPercent(estimate.confidencePercent),
+  };
+}
+
+export function applyOccupationalEstimateToSnapshot(input: {
+  snapshot: LeadFinancialSituationSnapshot;
+  estimate: MarketIncomeEstimate;
+}): { snapshot: LeadFinancialSituationSnapshot; applied: boolean } {
+  if (isHumanEnteredFinancialSource(input.snapshot.source)) {
+    return { snapshot: input.snapshot, applied: false };
+  }
+  const working = workingFiguresFromOccupationalEstimate(input.estimate);
+  if (!working) {
+    return { snapshot: input.snapshot, applied: false };
+  }
+  return {
+    applied: true,
+    snapshot: {
+      ...input.snapshot,
+      ...working,
+      availableDepositEquity: input.snapshot.availableDepositEquity,
+      financingNeed: input.snapshot.financingNeed,
+      existingCommitments: input.snapshot.existingCommitments,
+      assessorNotes: input.snapshot.assessorNotes,
+    },
   };
 }

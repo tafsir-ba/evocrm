@@ -4,7 +4,10 @@ import type {
   LeadFinancialSituationSnapshot,
   MarketIncomeEstimate,
 } from "@/lib/lead-financial-situation";
-import { emptyFinancialSnapshot } from "@/lib/lead-financial-situation";
+import {
+  applyOccupationalEstimateToSnapshot,
+  emptyFinancialSnapshot,
+} from "@/lib/lead-financial-situation";
 import { connectDb } from "@/server/db/mongoose";
 import { LeadFinancialSituationModel } from "@/models/lead-financial-situation";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
@@ -141,9 +144,10 @@ export async function saveMarketIncomeEstimate(input: {
   actorId: string;
   currency: string;
   estimate: MarketIncomeEstimate;
+  prefillWorkingFigures?: boolean;
 }): Promise<LeadFinancialSituationRecord> {
   const existing = await findFinancialSituationForLead(input.workspaceId, input.leadId);
-  const snapshot = existing
+  const current = existing
     ? {
         declaredAnnualIncome: existing.declaredAnnualIncome,
         employmentType: existing.employmentType,
@@ -159,18 +163,29 @@ export async function saveMarketIncomeEstimate(input: {
         assessorNotes: existing.assessorNotes,
       }
     : emptyFinancialSnapshot(input.currency);
+  const next =
+    input.prefillWorkingFigures === false
+      ? { snapshot: current, applied: false }
+      : applyOccupationalEstimateToSnapshot({ snapshot: current, estimate: input.estimate });
   return upsertFinancialSituation({
     workspaceId: input.workspaceId,
     leadId: input.leadId,
     actorId: input.actorId,
-    snapshot,
+    snapshot: next.snapshot,
     marketIncomeEstimate: input.estimate,
     revision: {
       at: new Date().toISOString(),
       actorId: input.actorId,
-      action: "market_income_estimate",
-      before: { marketIncomeEstimate: existing?.marketIncomeEstimate ?? null },
-      after: { marketIncomeEstimate: input.estimate },
+      action: next.applied ? "market_income_estimate_prefill" : "market_income_estimate",
+      before: {
+        marketIncomeEstimate: existing?.marketIncomeEstimate ?? null,
+        snapshot: current,
+      },
+      after: {
+        marketIncomeEstimate: input.estimate,
+        snapshot: next.snapshot,
+        workingFiguresApplied: next.applied,
+      },
     },
   });
 }
