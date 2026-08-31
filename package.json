@@ -36,6 +36,8 @@
     "summary:hubspot-email-name-policy": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-email-name-policy-summary.ts",
     "reconcile:hubspot-cmp-cohort": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-cmp-cohort-reconcile.ts",
     "ensure:hubspot-cmp-membership": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-cmp-membership-ensure.ts",
+    "migrate:hubspot-final": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-final-migration-execute.ts",
+    "reconcile:hubspot-final-ledger": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-final-ledger.ts",
     "recon:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-recon.ts"
   },
   "dependencies": {

@@ -64,11 +64,28 @@ async function main(): Promise<void> {
     }
     if (!apply) {
       console.log("[migrate:hubspot-multi-project] held cohort dry-run only; no writes.");
+      console.log(
+        "Delegate: npm run migrate:hubspot-final -- --dry-run (gap/multi candidates)",
+      );
       return;
     }
-    throw new Error(
-      "Held cohort apply is reserved for the dedicated HubSpot multi-project task.",
+    // Dedicated HubSpot final-migration task: native ordered memberships + durable outcomes.
+    const { spawnSync } = await import("node:child_process");
+    const result = spawnSync(
+      "npm",
+      ["run", "migrate:hubspot-final", "--", "--execute", "--confirm-write"],
+      {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          EVOHOME_APPLY_HELD_HUBSPOT_MULTI_PROJECT: "1",
+        },
+      },
     );
+    if (result.status !== 0) {
+      throw new Error(`held_cohort_final_migration_failed:${result.status}`);
+    }
+    return;
   }
 
   const planFile = readArg("plan-file");
