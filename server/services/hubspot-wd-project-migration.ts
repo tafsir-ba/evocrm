@@ -303,6 +303,12 @@ export async function runHubSpotWdProjectMigration(input: {
 
   const persist = canPersistWrites(args);
   const persistWrites = persist.ok;
+  if (persistWrites) {
+    const { assertLeadDuplicateWriteGate } = await import(
+      "@/server/services/lead-duplicate-reconciliation"
+    );
+    await assertLeadDuplicateWriteGate();
+  }
   if (!persistWrites) {
     const mongoose = await import("mongoose");
     mongoose.set("autoIndex", false);
