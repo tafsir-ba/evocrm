@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T13:37:28.488Z",
+  "portal": {
+    "hubspotDistinctSourceIds": 38368,
+    "accounted": 38368,
+    "unexplained": 0,
+    "idChecksum": "56f91af4890e0e20ba62ffef6393ceed845a664766833b4f7657f50e310ab6df"
+  },
+  "exclusiveOutcomes": {
+    "lead_with_hubspot_id": 38368,
+    "email_deduped_linked": 0,
+    "email_deduped_unlinked": 0,
+    "missing_unresolved": 0,
+    "unexplained": 0
+  },
+  "reasonCounts": {
+    "project_lead_with_hubspot_id": 35985,
+    "legacy_or_general_with_hubspot_id": 2383
+  },
+  "crm": {
+    "legacyArchiveLeadCount": 2383,
+    "multiMembershipLeadCount": 2161,
+    "hubspotLinkedLeadDistinctIds": 38379
+  },
+  "campaignGuard": {
+    "migratedLegacyEnrollmentCount": 0
+  },
+  "gates": {
+    "exclusiveAccounted": true,
+    "unexplainedZero": true,
+    "unresolvedZero": true,
+    "enrollmentsZero": true,
+    "complete": true
+  },
+  "notes": "Business target ~38,366; live HubSpot list size is authoritative. email_deduped_unlinked still counts as durable CRM representation."
+}

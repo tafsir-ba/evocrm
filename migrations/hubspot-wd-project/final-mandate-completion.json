@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T13:58:00.273Z",
+  "integrityGate": "GREEN_511abfc_merged",
+  "liveHubSpotDistinctSourceIds": 38368,
+  "businessTargetAbout": 38366,
+  "exclusivePortalBuckets": {
+    "migrated": 38368,
+    "preexisting_deduped": 0,
+    "still_to_migrate": 0,
+    "multi_or_identity_exception": 0,
+    "no_project_signal": 0,
+    "excluded": 0
+  },
+  "finalLedger": {
+    "lead_with_hubspot_id": 38368,
+    "email_deduped_linked": 0,
+    "email_deduped_unlinked": 0,
+    "missing_unresolved": 0,
+    "unexplained": 0
+  },
+  "finalMigrationWave": {
+    "scanned": 7041,
+    "created": 5006,
+    "memberships_added": 8,
+    "preexisting": 0,
+    "deduped_linked": 294,
+    "legacy_general": 1733,
+    "error": 0,
+    "membershipsAddedSum": 2647,
+    "cmpEnsured": 0
+  },
+  "cmpEnsure": {
+    "scanned": 8316,
+    "created": 0,
+    "preexisting": 8316,
+    "parked": 0,
+    "error": 0,
+    "createdPrimary": 0,
+    "createdAdditional": 0
+  },
+  "cmpCampaignGuard": {
+    "cmpLeadCount": 8346,
+    "guarded": 8346,
+    "enrollmentCount": 0
+  },
+  "portalCampaignGuard": {
+    "migratedLeadCount": 38368,
+    "unguardedDefaultExcluded": 0,
+    "enrollmentCount": 294,
+    "legacyAutoEnrollmentCount": 0,
+    "note": "enrollmentCount = rule_based_auto_enrollment on HubSpot-inbound leads; legacyAutoEnrollmentCount scopes to hubspot_legacy_migration / final_migration policy leads."
+  },
+  "gates": {
+    "portal": {
+      "exactAccounted": true,
+      "noDuplicateScanIds": true,
+      "campaignGuardIntact": true
+    },
+    "ledger": {
+      "exclusiveAccounted": true,
+      "unexplainedZero": true,
+      "unresolvedZero": true,
+      "enrollmentsZero": true,
+      "complete": true
+    },
+    "finalMigration": {
+      "enrollmentsZero": true,
+      "errorsAcceptable": true
+    },
+    "cmp": {
+      "enrollmentsZero": true,
+      "allGuarded": true,
+      "errorsZero": true
+    }
+  },
+  "multiMembershipLeadCount": 2161,
+  "legacyArchiveLeadCount": 2383,
+  "notes": [
+    "Live HubSpot list size is authoritative (38368).",
+    "General used only via assertGeneralFallbackAllowed last-resort path.",
+    "legacyAutoEnrollmentCount=0 on migration-policy leads; no automatic dripping from final migration creates."
+  ]
+}

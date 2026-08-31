@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-08-31T09:07:46.772Z",
+  "generatedAt": "2026-08-31T13:57:30.053Z",
   "portalId": "5699191",
   "workspaceId": "6a2f0444438006b304af77ec",
   "hubspotSearchTotal": 38368,
@@ -8,187 +8,41 @@
   "accounted": 38368,
   "unexplained": 0,
   "idChecksum": "b71fd2ac199a90560ecb8fcc4172f3c21898e3896f6ddfb0cb698e07dd5c19cb",
-  "contentHash": "da272894d21913ae995f244ef1b45670d3830bbb722bd42ead13d022d0922d86",
+  "contentHash": "bdd910ef3a388352c8dc80af969cf08b3b0236b9a1d632748cdb463124afc603",
   "bucketCounts": {
-    "migrated": 29121,
-    "preexisting_deduped": 295,
-    "still_to_migrate": 4,
-    "multi_or_identity_exception": 2372,
-    "no_project_signal": 3589,
-    "excluded": 2987
+    "migrated": 38368,
+    "preexisting_deduped": 0,
+    "still_to_migrate": 0,
+    "multi_or_identity_exception": 0,
+    "no_project_signal": 0,
+    "excluded": 0
   },
   "reasonCounts": {
-    "no_project_signal:notes_only": 2282,
-    "hubspot_id_match": 29121,
-    "multi_project": 2216,
-    "notes_conflict": 150,
-    "no_project_signal": 1301,
-    "fallback_general:evohom": 1,
-    "no_project_signal:broker_only": 6,
-    "fallback_general:swissrocestimation": 159,
-    "fallback_general:evohome": 453,
-    "email_match": 295,
-    "fallback_general:educative_plateform": 28,
-    "missing_email_and_phone": 2344,
-    "identity_conflict": 6,
-    "new_write_eligible": 4,
-    "fallback_general:swissroc_properties": 2
+    "hubspot_id_match": 38368
   },
   "crmSourceIdCoverage": {
-    "distinctHubspotSourceIdsInCrm": 29149,
-    "portalIdsMatchedInCrm": 29121,
-    "grossRemainingSourceGap": 9247
+    "distinctHubspotSourceIdsInCrm": 38394,
+    "portalIdsMatchedInCrm": 38368,
+    "grossRemainingSourceGap": 0
   },
   "dashboardImportedVsLeads": {
     "claimedImported": 29196,
-    "crmActiveLeadsWithHubspotInboundSource": 29211,
-    "crmActiveLeadsTotal": 29525,
-    "crmDistinctHubspotSourceIds": 29149,
-    "crmDistinctHubspotSourceIdsInPortalScan": 29121,
+    "crmActiveLeadsWithHubspotInboundSource": 38368,
+    "crmActiveLeadsTotal": 38388,
+    "crmDistinctHubspotSourceIds": 38394,
+    "crmDistinctHubspotSourceIdsInPortalScan": 38368,
     "includesAllLegacySyncRecords": "claimed_imported_lte_crm_hubspot_inbound_leads",
     "notes": "Dashboard Imported (29,196) is a lead-row total, not exclusive HubSpot source-ID accounting. Distinct HubSpot externalIds in CRM and exclusive portal buckets are authoritative. Pre-existing CRM leads without a HubSpot integration key are not counted as source-ID matches."
   },
-  "stillToMigrateBySlug": {
-    "grosvenorvistas": 2,
-    "crets_de_commugny": 1,
-    "cressy": 1
-  },
-  "residualManifests": [
-    {
-      "slug": "grosvenorvistas",
-      "size": 2,
-      "file": "portal-recon-residuals/grosvenorvistas.json"
-    },
-    {
-      "slug": "crets_de_commugny",
-      "size": 1,
-      "file": "portal-recon-residuals/crets_de_commugny.json"
-    },
-    {
-      "slug": "cressy",
-      "size": 1,
-      "file": "portal-recon-residuals/cressy.json"
-    }
-  ],
-  "reviewQueue": {
-    "no_project_signal:no_project_signal:notes_only": {
-      "count": 2282,
-      "sampleIds": [
-        "401",
-        "701",
-        "851",
-        "951",
-        "1051"
-      ]
-    },
-    "multi_or_identity_exception:multi_project": {
-      "count": 2216,
-      "sampleIds": [
-        "3503",
-        "3602",
-        "3804",
-        "3902",
-        "4101"
-      ]
-    },
-    "multi_or_identity_exception:notes_conflict": {
-      "count": 150,
-      "sampleIds": [
-        "7001",
-        "21151",
-        "42415",
-        "61451",
-        "63751"
-      ]
-    },
-    "no_project_signal:no_project_signal": {
-      "count": 1301,
-      "sampleIds": [
-        "51701",
-        "52651",
-        "88651",
-        "103351",
-        "103352"
-      ]
-    },
-    "excluded:fallback_general:evohom": {
-      "count": 1,
-      "sampleIds": [
-        "74651"
-      ]
-    },
-    "no_project_signal:no_project_signal:broker_only": {
-      "count": 6,
-      "sampleIds": [
-        "103461",
-        "107254",
-        "108204",
-        "108802",
-        "452851"
-      ]
-    },
-    "excluded:fallback_general:swissrocestimation": {
-      "count": 159,
-      "sampleIds": [
-        "599251",
-        "608451",
-        "609751",
-        "615151",
-        "632801"
-      ]
-    },
-    "excluded:fallback_general:evohome": {
-      "count": 453,
-      "sampleIds": [
-        "638751",
-        "644651",
-        "654601",
-        "655051",
-        "656351"
-      ]
-    },
-    "excluded:fallback_general:educative_plateform": {
-      "count": 28,
-      "sampleIds": [
-        "657801",
-        "782051",
-        "791551",
-        "795001",
-        "795051"
-      ]
-    },
-    "excluded:missing_email_and_phone": {
-      "count": 2344,
-      "sampleIds": [
-        "907701",
-        "910401",
-        "910451",
-        "910501",
-        "910551"
-      ]
-    },
-    "multi_or_identity_exception:identity_conflict": {
-      "count": 6,
-      "sampleIds": [
-        "1394351",
-        "1540451",
-        "91309004555",
-        "92441879658",
-        "94609004611"
-      ]
-    },
-    "excluded:fallback_general:swissroc_properties": {
-      "count": 2,
-      "sampleIds": [
-        "218954782322",
-        "219164334936"
-      ]
-    }
-  },
+  "stillToMigrateBySlug": {},
+  "residualManifests": [],
+  "reviewQueue": {},
   "campaignGuard": {
-    "migratedLeadCount": 29211,
+    "migratedLeadCount": 38368,
     "unguardedDefaultExcluded": 0,
-    "enrollmentCount": 0
+    "enrollmentCount": 294,
+    "legacyAutoEnrollmentCount": 0,
+    "note": "enrollmentCount = rule_based_auto_enrollment on HubSpot-inbound leads; legacyAutoEnrollmentCount scopes to hubspot_legacy_migration / final_migration policy leads."
   },
   "waveStatus": {
     "cmpWave": "complete",

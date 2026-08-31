@@ -29,7 +29,6 @@ import {
 import { AppError } from "@/server/errors";
 import { createMembership } from "@/server/repositories/lead-project-memberships";
 import { createLeadForWorkspace } from "@/server/services/leads";
-import { updateLead } from "@/server/repositories/leads";
 import type { FinalMigrationResult } from "@/server/services/hubspot-final-migration";
 
 export type FinalMigrationCache = {
@@ -204,21 +203,34 @@ export async function ensureFinalMigrationOutcomeCached(input: {
       }
       let linked = false;
       if (decision.backfillHubspotId && !cache.hubspotToLead.has(contactId)) {
-        await updateLead(WD_MIGRATION_WORKSPACE_ID, row.leadId, {
-          attributes: {
-            integration: {
-              integrationId: WD_MIGRATION_INTEGRATION_ID,
-              externalId: contactId,
-              idempotencyKey: classicIdempotencyKey(contactId),
-              inboundSource: "hubspot-wd-project",
+        // Link HubSpot ID only — do NOT overwrite attributes or apply legacy
+        // campaign guards onto preexisting CRM leads (they may already be enrolled).
+        const mongoose = (await import("mongoose")).default;
+        await mongoose.connection.db!.collection("leads").updateOne(
+          { _id: new mongoose.Types.ObjectId(row.leadId) },
+          {
+            $set: {
+              "attributes.integration.externalId": contactId,
+              "attributes.integration.integrationId": WD_MIGRATION_INTEGRATION_ID,
+              "attributes.hubspotMigration.hubspotIdBackfilled": true,
+              "attributes.hubspotMigration.sourceLinkageOnly": true,
             },
-            hubspotMigration: {
-              hubspotIdBackfilled: true,
-              policy: "hubspot_final_migration_v1",
-            },
-            ...buildMigratedCampaignGuardAttributes(),
+            $setOnInsert: {},
           },
-        });
+        );
+        // Ensure idempotency key exists without clobbering a different key.
+        await mongoose.connection.db!.collection("leads").updateOne(
+          {
+            _id: new mongoose.Types.ObjectId(row.leadId),
+            "attributes.integration.idempotencyKey": { $exists: false },
+          },
+          {
+            $set: {
+              "attributes.integration.idempotencyKey": classicIdempotencyKey(contactId),
+              "attributes.integration.inboundSource": "hubspot-wd-project",
+            },
+          },
+        );
         cache.hubspotToLead.set(contactId, row.leadId);
         row.hubspotContactIds = [...new Set([...row.hubspotContactIds, contactId])];
         linked = true;

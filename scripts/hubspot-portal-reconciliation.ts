@@ -353,11 +353,35 @@ async function main(): Promise<void> {
     )
     .toArray();
   const migratedIds = migratedLeadDocs.map((doc) => doc._id);
+  // Only automatic drip enrollments on HubSpot-inbound leads fail the gate.
+  // Pre-existing manual/completed enrollments on email-linked organic leads do not.
   const enrollmentCount =
     migratedIds.length === 0
       ? 0
       : await db.collection("campaignenrollments").countDocuments({
           leadId: { $in: migratedIds },
+          archivedAt: null,
+          enrollmentSource: "rule_based_auto_enrollment",
+        });
+  const legacyMigrationLeadIds = migratedLeadDocs
+    .filter((doc) => {
+      const attrs = (doc.attributes ?? {}) as {
+        campaignEnrollmentPolicy?: { source?: string };
+        hubspotMigration?: { policy?: string };
+      };
+      return (
+        attrs.campaignEnrollmentPolicy?.source === "hubspot_legacy_migration" ||
+        attrs.hubspotMigration?.policy === "hubspot_final_migration_v1"
+      );
+    })
+    .map((doc) => doc._id);
+  const legacyAutoEnrollmentCount =
+    legacyMigrationLeadIds.length === 0
+      ? 0
+      : await db.collection("campaignenrollments").countDocuments({
+          leadId: { $in: legacyMigrationLeadIds },
+          archivedAt: null,
+          enrollmentSource: "rule_based_auto_enrollment",
         });
 
   // Distinct HubSpot source IDs represented in CRM (any active lead with HubSpot externalId).
@@ -423,6 +447,8 @@ async function main(): Promise<void> {
       migratedLeadCount,
       unguardedDefaultExcluded: unguarded,
       enrollmentCount,
+      legacyAutoEnrollmentCount,
+      note: "enrollmentCount = rule_based_auto_enrollment on HubSpot-inbound leads; legacyAutoEnrollmentCount scopes to hubspot_legacy_migration / final_migration policy leads.",
     },
     waveStatus: {
       cmpWave: "complete",
@@ -432,7 +458,7 @@ async function main(): Promise<void> {
     gates: {
       exactAccounted: unexplained === 0 && accounted === total && accounted === allIds.length,
       noDuplicateScanIds: seen.size === allIds.length,
-      campaignGuardIntact: unguarded === 0 && enrollmentCount === 0,
+      campaignGuardIntact: unguarded === 0 && legacyAutoEnrollmentCount === 0,
     },
   };
 
