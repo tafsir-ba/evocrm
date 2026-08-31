@@ -1,0 +1,803 @@
+{
+  "mode": "dry-run",
+  "persisted": false,
+  "persistReason": "dry_run",
+  "cmpLeadsScanned": 8346,
+  "hubspotMatches": 8346,
+  "unmatchedContacts": 0,
+  "unmatchedMissingId": 0,
+  "unmatchedNotFound": 0,
+  "unmatchedAmbiguousEmail": 0,
+  "errors": 0,
+  "valuesAvailable": {
+    "industry": 8255,
+    "jobTitle": 8281,
+    "stateRegion": 1512,
+    "companyId": 130
+  },
+  "wouldChangeRecords": 5979,
+  "wouldChangeFields": {
+    "industry": 5916,
+    "jobTitle": 5938,
+    "stateRegion": 1512,
+    "companyId": 130
+  },
+  "filledRecords": 0,
+  "filledFields": {
+    "industry": 0,
+    "jobTitle": 0,
+    "stateRegion": 0,
+    "companyId": 0
+  },
+  "skippedUnchanged": 4682,
+  "skippedPreserved": 0,
+  "enrollCampaigns": false,
+  "mutateLeadProject": false,
+  "mutateLeadStatus": false,
+  "mutateConsent": false,
+  "samples": [
+    {
+      "leadId": "6a953ed1e7bf90f01e4a29dd",
+      "contactId": "583751",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "jobTitle",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a953ed3e7bf90f01e4a29ee",
+      "contactId": "623701",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a953ed5e7bf90f01e4a29ff",
+      "contactId": "826001",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "jobTitle",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a953ed7e7bf90f01e4a2a14",
+      "contactId": "905451",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543c47ecca5ef774597aa",
+      "contactId": "1327660",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543c67ecca5ef774597bb",
+      "contactId": "1327670",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543c77ecca5ef774597cc",
+      "contactId": "1328588",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543cc7ecca5ef774597ff",
+      "contactId": "1375853",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543c97ecca5ef774597dd",
+      "contactId": "1375553",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543cd7ecca5ef77459810",
+      "contactId": "1377524",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a9543ca7ecca5ef774597ee",
+      "contactId": "1375826",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b166f324f7d20040caa",
+      "contactId": "81520",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b176f324f7d20040cb7",
+      "contactId": "82401",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b186f324f7d20040cc4",
+      "contactId": "107403",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b196f324f7d20040cd1",
+      "contactId": "108703",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1a6f324f7d20040cde",
+      "contactId": "891351",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1a6f324f7d20040ceb",
+      "contactId": "891401",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "jobTitle",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1b6f324f7d20040cf7",
+      "contactId": "894201",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1c6f324f7d20040d04",
+      "contactId": "896301",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "jobTitle",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1d6f324f7d20040d11",
+      "contactId": "898201",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "stateRegion"
+      ],
+      "skipped": [
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1e6f324f7d20040d1e",
+      "contactId": "902001",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b1f6f324f7d20040d2b",
+      "contactId": "903951",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b206f324f7d20040d38",
+      "contactId": "904351",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b206f324f7d20040d45",
+      "contactId": "904751",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b216f324f7d20040d51",
+      "contactId": "905651",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b226f324f7d20040d5e",
+      "contactId": "907751",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b236f324f7d20040d6b",
+      "contactId": "908001",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "jobTitle",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b266f324f7d20040d90",
+      "contactId": "910251",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b266f324f7d20040d9c",
+      "contactId": "910301",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b276f324f7d20040da8",
+      "contactId": "911101",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b286f324f7d20040db5",
+      "contactId": "911201",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b296f324f7d20040dc1",
+      "contactId": "926951",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b2a6f324f7d20040dce",
+      "contactId": "936101",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b2b6f324f7d20040ddb",
+      "contactId": "940651",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b2d6f324f7d20040e00",
+      "contactId": "950101",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b2e6f324f7d20040e0d",
+      "contactId": "951801",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b2f6f324f7d20040e1a",
+      "contactId": "978901",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b306f324f7d20040e26",
+      "contactId": "1026401",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "industry",
+        "jobTitle",
+        "companyId"
+      ],
+      "skipped": [
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b306f324f7d20040e32",
+      "contactId": "1028251",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    },
+    {
+      "leadId": "6a948b316f324f7d20040e3f",
+      "contactId": "1028351",
+      "matchMethod": "hubspot_contact_id",
+      "applied": [
+        "jobTitle"
+      ],
+      "skipped": [
+        {
+          "field": "industry",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "stateRegion",
+          "reason": "skip_blank_incoming"
+        },
+        {
+          "field": "companyId",
+          "reason": "skip_blank_incoming"
+        }
+      ]
+    }
+  ]
+}
