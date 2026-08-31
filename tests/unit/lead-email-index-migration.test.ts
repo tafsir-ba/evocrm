@@ -1,22 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/server/db/mongoose", () => ({
-  connectDb: vi.fn(),
+vi.mock("@/server/services/lead-duplicate-reconciliation", () => ({
+  ensureLeadUniqueIndexes: vi.fn(),
 }));
 
-vi.mock("@/models/lead", () => ({
-  LeadModel: {
-    collection: {
-      indexes: vi.fn(),
-      dropIndex: vi.fn(),
-    },
-    syncIndexes: vi.fn(),
-  },
-}));
-
-import { LeadModel } from "@/models/lead";
+import { ensureLeadUniqueIndexes } from "@/server/services/lead-duplicate-reconciliation";
 import {
-  LEGACY_LEAD_EMAIL_UNIQUE_INDEX,
   PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX,
   migrateLeadEmailUniqueIndex,
 } from "@/server/services/lead-email-index-migration";
@@ -26,32 +15,36 @@ describe("lead email index migration", () => {
     vi.clearAllMocks();
   });
 
-  it("drops legacy index and syncs when target is missing", async () => {
-    vi.mocked(LeadModel.collection.indexes)
-      .mockResolvedValueOnce([{ name: LEGACY_LEAD_EMAIL_UNIQUE_INDEX }] as never)
-      .mockResolvedValueOnce([
-        { name: PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX },
-      ] as never);
+  it("delegates to unique-index ensure after duplicate reconciliation", async () => {
+    vi.mocked(ensureLeadUniqueIndexes).mockResolvedValue({
+      dryRun: false,
+      legacyIndexDropped: true,
+      emailIndexEnsured: true,
+      idempotencyIndexEnsured: true,
+      indexesAfter: [PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX],
+    });
 
     const result = await migrateLeadEmailUniqueIndex({ dryRun: false });
 
-    expect(LeadModel.collection.dropIndex).toHaveBeenCalledWith(LEGACY_LEAD_EMAIL_UNIQUE_INDEX);
-    expect(LeadModel.syncIndexes).toHaveBeenCalled();
+    expect(ensureLeadUniqueIndexes).toHaveBeenCalledWith({ dryRun: false });
     expect(result.legacyIndexDropped).toBe(true);
     expect(result.targetIndexEnsured).toBe(true);
   });
 
-  it("does not mutate indexes in dry-run mode", async () => {
-    vi.mocked(LeadModel.collection.indexes).mockResolvedValue([
-      { name: LEGACY_LEAD_EMAIL_UNIQUE_INDEX },
-    ] as never);
+  it("does not claim indexes were created in dry-run", async () => {
+    vi.mocked(ensureLeadUniqueIndexes).mockResolvedValue({
+      dryRun: true,
+      legacyIndexDropped: false,
+      emailIndexEnsured: false,
+      idempotencyIndexEnsured: false,
+      indexesAfter: [],
+    });
 
     const result = await migrateLeadEmailUniqueIndex({ dryRun: true });
 
-    expect(LeadModel.collection.dropIndex).not.toHaveBeenCalled();
-    expect(LeadModel.syncIndexes).not.toHaveBeenCalled();
+    expect(ensureLeadUniqueIndexes).toHaveBeenCalledWith({ dryRun: true });
     expect(result.dryRun).toBe(true);
-    expect(result.legacyIndexPresent).toBe(true);
     expect(result.legacyIndexDropped).toBe(false);
+    expect(result.targetIndexEnsured).toBe(false);
   });
 });

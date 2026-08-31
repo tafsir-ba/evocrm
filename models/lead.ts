@@ -88,8 +88,9 @@ leadSchema.index(
   { workspaceId: 1, projectId: 1, emailNormalized: 1 },
   {
     unique: true,
+    name: "workspaceId_1_projectId_1_emailNormalized_1",
     partialFilterExpression: {
-      emailNormalized: { $type: "string", $ne: "" },
+      emailNormalized: { $type: "string" },
       archivedAt: null,
     },
   },
@@ -102,8 +103,9 @@ leadSchema.index(
   },
   {
     unique: true,
+    name: "workspaceId_1_attributes.integration.integrationId_1_attributes.integration.idempotencyKey_1",
     partialFilterExpression: {
-      "attributes.integration.idempotencyKey": { $type: "string", $ne: "" },
+      "attributes.integration.idempotencyKey": { $type: "string" },
       archivedAt: null,
     },
   },

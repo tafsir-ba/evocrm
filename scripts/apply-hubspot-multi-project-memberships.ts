@@ -94,6 +94,12 @@ async function main(): Promise<void> {
   }
 
   const parsed = JSON.parse(await readFile(planFile, "utf8")) as PlanFile;
+  if (apply) {
+    const { assertLeadDuplicateWriteGate } = await import(
+      "../server/services/lead-duplicate-reconciliation"
+    );
+    await assertLeadDuplicateWriteGate();
+  }
   let applied = 0;
   for (const lead of parsed.leads) {
     const planned = planHubSpotMultiProjectMemberships({

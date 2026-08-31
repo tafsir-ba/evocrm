@@ -2,8 +2,8 @@ import "server-only";
 
 import mongoose from "mongoose";
 
-import { summarizeProjectInboundDemand } from "@/lib/inbound-received-at";
-import type { InboundReceivedBasis } from "@/lib/inbound-received-at";
+import { foldLeadIntoInboundDemand } from "@/lib/inbound-received-at";
+import type { InboundReceivedBasis, ResolvedInboundReceivedAt } from "@/lib/inbound-received-at";
 import type { LeadIntelligenceProvenance } from "@/lib/lead-intelligence";
 import { countAttachedCampaignsByProject } from "@/lib/project-attached-campaigns";
 import {
@@ -177,10 +177,58 @@ function emptyProjectCounts(): ProjectListCounts {
   };
 }
 
+const INBOUND_DEMAND_CURSOR_BATCH = 2000;
+
+type InboundDemandLeadDocument = {
+  projectId?: mongoose.Types.ObjectId;
+  createdAt?: Date;
+  attributes?: Record<string, unknown>;
+  intelligenceProvenance?: LeadIntelligenceProvenance;
+};
+
+/**
+ * Fold genuine inbound dates per project without buffering every lead.
+ * The Projects browser previously `.lean()`'d all workspace leads (~12MB /
+ * 30k+ docs) then classified them synchronously, which can block the event
+ * loop and OOM a small App Platform instance (health checks → 503/504).
+ */
+async function loadGenuineInboundByProject(
+  workspaceObjectId: mongoose.Types.ObjectId,
+  projectObjectIds: mongoose.Types.ObjectId[],
+): Promise<Map<string, ResolvedInboundReceivedAt>> {
+  const latest = new Map<string, ResolvedInboundReceivedAt>();
+  const cursor = LeadModel.find({
+    workspaceId: workspaceObjectId,
+    projectId: { $in: projectObjectIds },
+    archivedAt: null,
+  })
+    .select({
+      projectId: 1,
+      createdAt: 1,
+      "attributes.integration": 1,
+      "attributes.campaignEnrollmentPolicy": 1,
+      "attributes.import": 1,
+      intelligenceProvenance: 1,
+    })
+    .lean<InboundDemandLeadDocument>()
+    .cursor({ batchSize: INBOUND_DEMAND_CURSOR_BATCH });
+
+  for await (const lead of cursor) {
+    foldLeadIntoInboundDemand(latest, {
+      projectId: lead.projectId?.toString() ?? null,
+      createdAt: lead.createdAt ?? null,
+      attributes: lead.attributes ?? {},
+      intelligenceProvenance: lead.intelligenceProvenance ?? {},
+    });
+  }
+
+  return latest;
+}
+
 async function loadProjectCounts(
   workspaceId: string,
   projectIds: string[],
-  options: { inventory?: boolean } = {},
+  options: { inventory?: boolean; inboundDemand?: boolean } = {},
 ): Promise<Map<string, ProjectListCounts>> {
   const counts = new Map<string, ProjectListCounts>();
 
@@ -193,8 +241,9 @@ async function loadProjectCounts(
   const projectObjectIds = projectIds.map((id) => new mongoose.Types.ObjectId(id));
 
   const includeInventory = options.inventory !== false;
+  const includeInboundDemand = options.inboundDemand !== false;
 
-  const [leadCounts, propertyCounts, opportunityCounts, attachedCampaigns, activityDates, inboundLeads] =
+  const [leadCounts, propertyCounts, opportunityCounts, attachedCampaigns, activityDates, inboundByProject] =
     await Promise.all([
       LeadModel.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
         {
@@ -252,34 +301,15 @@ async function loadProjectCounts(
             { $group: { _id: "$projectId", lastActivityAt: { $max: "$updatedAt" } } },
           ])
         : Promise.resolve([]),
-      LeadModel.find({
-        workspaceId: workspaceObjectId,
-        projectId: { $in: projectObjectIds },
-        archivedAt: null,
-      })
-        .select({ projectId: 1, createdAt: 1, attributes: 1, intelligenceProvenance: 1 })
-        .lean<
-          Array<{
-            projectId?: mongoose.Types.ObjectId;
-            createdAt?: Date;
-            attributes?: Record<string, unknown>;
-            intelligenceProvenance?: LeadIntelligenceProvenance;
-          }>
-        >(),
+      includeInboundDemand
+        ? loadGenuineInboundByProject(workspaceObjectId, projectObjectIds)
+        : Promise.resolve(new Map<string, ResolvedInboundReceivedAt>()),
     ]);
 
   for (const projectId of projectIds) {
     counts.set(projectId, emptyProjectCounts());
   }
 
-  const inboundByProject = summarizeProjectInboundDemand(
-    inboundLeads.map((lead) => ({
-      projectId: lead.projectId?.toString() ?? null,
-      createdAt: lead.createdAt ?? null,
-      attributes: lead.attributes ?? {},
-      intelligenceProvenance: lead.intelligenceProvenance ?? {},
-    })),
-  );
   for (const [projectId, inbound] of inboundByProject) {
     const existing = counts.get(projectId);
     if (existing) {
@@ -405,7 +435,7 @@ export async function findProjectsPage(
   const inventoryMap = await loadProjectCounts(
     workspaceId,
     pageResult.projects.map((project) => project.id),
-    { inventory: true },
+    { inventory: true, inboundDemand: false },
   );
 
   return {

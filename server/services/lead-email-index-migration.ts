@@ -1,11 +1,17 @@
 import "server-only";
 
-import { LeadModel } from "@/models/lead";
-import { connectDb } from "@/server/db/mongoose";
+import {
+  LEAD_IDEMPOTENCY_UNIQUE_INDEX,
+  LEGACY_LEAD_EMAIL_UNIQUE_INDEX,
+  PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX,
+} from "@/lib/lead-duplicate-reconciliation";
+import { ensureLeadUniqueIndexes } from "@/server/services/lead-duplicate-reconciliation";
 
-export const LEGACY_LEAD_EMAIL_UNIQUE_INDEX = "workspaceId_1_emailNormalized_1";
-export const PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX =
-  "workspaceId_1_projectId_1_emailNormalized_1";
+export {
+  LEAD_IDEMPOTENCY_UNIQUE_INDEX,
+  LEGACY_LEAD_EMAIL_UNIQUE_INDEX,
+  PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX,
+};
 
 export type LeadEmailIndexMigrationResult = {
   dryRun: boolean;
@@ -20,42 +26,15 @@ export async function migrateLeadEmailUniqueIndex(
   options: { dryRun?: boolean } = {},
 ): Promise<LeadEmailIndexMigrationResult> {
   const dryRun = options.dryRun ?? false;
-  await connectDb();
-
-  const collection = LeadModel.collection;
-  const existing = await collection.indexes();
-  const indexNames = existing.map((index) => index.name).filter(Boolean) as string[];
-
-  const legacyIndexPresent = indexNames.includes(LEGACY_LEAD_EMAIL_UNIQUE_INDEX);
-  const targetIndexPresentBefore = indexNames.includes(
-    PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX,
-  );
-
-  let legacyIndexDropped = false;
-  let targetIndexEnsured = targetIndexPresentBefore;
-
-  if (legacyIndexPresent) {
-    if (!dryRun) {
-      await collection.dropIndex(LEGACY_LEAD_EMAIL_UNIQUE_INDEX);
-      legacyIndexDropped = true;
-    }
-  }
-
-  if (!targetIndexPresentBefore && !dryRun) {
-    await LeadModel.syncIndexes();
-    targetIndexEnsured = true;
-  }
-
-  const indexesAfter = dryRun
-    ? indexNames
-    : ((await collection.indexes()).map((index) => index.name).filter(Boolean) as string[]);
+  const result = await ensureLeadUniqueIndexes({ dryRun });
+  const before = result.indexesAfter;
 
   return {
     dryRun,
-    legacyIndexPresent,
-    legacyIndexDropped,
-    targetIndexPresentBefore,
-    targetIndexEnsured: dryRun ? targetIndexPresentBefore : targetIndexEnsured,
-    indexesAfter,
+    legacyIndexPresent: before.includes(LEGACY_LEAD_EMAIL_UNIQUE_INDEX) && !result.legacyIndexDropped,
+    legacyIndexDropped: result.legacyIndexDropped,
+    targetIndexPresentBefore: before.includes(PROJECT_SCOPED_LEAD_EMAIL_UNIQUE_INDEX),
+    targetIndexEnsured: result.emailIndexEnsured && result.idempotencyIndexEnsured,
+    indexesAfter: result.indexesAfter,
   };
 }

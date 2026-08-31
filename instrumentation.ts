@@ -3,6 +3,10 @@ export async function register() {
     return;
   }
 
+  // Load the DB helper first so production autoIndex is disabled before
+  // cron or the first request compiles Mongoose models.
+  await import("./server/db/mongoose");
+
   const { startInternalCampaignCronWorker } = await import(
     "./server/campaign-cron-worker"
   );
