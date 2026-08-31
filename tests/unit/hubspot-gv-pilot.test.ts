@@ -18,7 +18,8 @@ import {
   hubspotContactIdempotencyKey,
   parseExecuteArgs,
   parseGvPilotManifest,
-  resolveMigrationLeadNames,
+  resolveMigrationLeadIdentity,
+  buildMigrationNameAttributes,
   selectPilotBatchIds,
   shouldAbortRun,
   snapshotFromHubSpotProperties,
@@ -125,28 +126,51 @@ describe("hubspot GV pilot eligibility", () => {
   });
 });
 
-describe("resolveMigrationLeadNames", () => {
+describe("resolveMigrationLeadIdentity", () => {
   it("preserves complete HubSpot names", () => {
     expect(
-      resolveMigrationLeadNames({
+      resolveMigrationLeadIdentity({
         firstName: "Ada",
         lastName: "Lovelace",
         emailNormalized: "ada@example.com",
       }),
-    ).toEqual({ firstName: "Ada", lastName: "Lovelace", reclassifiedFromEmail: false });
+    ).toEqual({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      nameMissing: false,
+      needsEnrichment: false,
+      displayLabel: null,
+    });
   });
 
-  it("derives names from email local-part when HubSpot names are blank", () => {
+  it("does not invent names from email when HubSpot names are blank", () => {
     expect(
-      resolveMigrationLeadNames({
+      resolveMigrationLeadIdentity({
         firstName: "",
         lastName: "",
         emailNormalized: "maxime.duval@example.com",
       }),
     ).toEqual({
-      firstName: "Maxime",
-      lastName: "Duval",
-      reclassifiedFromEmail: true,
+      firstName: "",
+      lastName: "",
+      nameMissing: true,
+      needsEnrichment: true,
+      displayLabel: "maxime.duval@example.com",
+    });
+  });
+
+  it("builds nameMissing attributes without PII beyond displayLabel email", () => {
+    const identity = resolveMigrationLeadIdentity({
+      firstName: "",
+      lastName: "",
+      emailNormalized: "buyer@example.com",
+    });
+    expect(buildMigrationNameAttributes(identity)).toEqual({
+      hubspotMigration: {
+        nameMissing: true,
+        needsEnrichment: true,
+        displayLabel: "buyer@example.com",
+      },
     });
   });
 });

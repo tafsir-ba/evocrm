@@ -30,7 +30,8 @@ import {
   parseExecuteArgs,
   parseGvPilotManifest,
   resolveManifestFileName,
-  resolveMigrationLeadNames,
+  buildMigrationNameAttributes,
+  resolveMigrationLeadIdentity,
   shouldAbortRun,
   snapshotFromHubSpotProperties,
   type GvPilotLiveWriteGate,
@@ -451,7 +452,7 @@ export async function runHubSpotGvPilot(input: {
     }
 
     try {
-      const names = resolveMigrationLeadNames(snapshot);
+      const identity = resolveMigrationLeadIdentity(snapshot);
       const result = await createLeadForWorkspace(
         GV_PILOT_WORKSPACE_ID,
         context.actorId,
@@ -459,8 +460,8 @@ export async function runHubSpotGvPilot(input: {
           projectId: GV_PILOT_PROJECT_ID,
           statusId: statusId!,
           sourceId: sourceId ?? undefined,
-          firstName: names.firstName,
-          lastName: names.lastName,
+          firstName: identity.firstName,
+          lastName: identity.lastName,
           email: snapshot.emailNormalized ?? undefined,
           phone: snapshot.hasPhone
             ? (raw.properties.phone ?? raw.properties.mobilephone ?? undefined) ?? undefined
@@ -474,9 +475,13 @@ export async function runHubSpotGvPilot(input: {
               inboundSource: GV_PILOT_INBOUND_SOURCE,
             },
             ...buildMigratedCampaignGuardAttributes(),
+            ...buildMigrationNameAttributes(identity),
           },
         },
-        { triggerAutomation: false },
+        {
+          triggerAutomation: false,
+          displayFullName: identity.displayLabel ?? undefined,
+        },
       );
 
       if (result.lead.projectId === GV_PILOT_GENERAL_PROJECT_ID) {

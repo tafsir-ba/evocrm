@@ -13,7 +13,8 @@ import {
   canPersistWrites,
   existingLeadFromRecord,
   hubspotContactIdempotencyKey,
-  resolveMigrationLeadNames,
+  buildMigrationNameAttributes,
+  resolveMigrationLeadIdentity,
   snapshotFromHubSpotProperties,
   type GvPilotRecordOutcome,
   type GvPilotUnexpectedReason,
@@ -523,7 +524,7 @@ export async function runHubSpotWdProjectMigration(input: {
     }
 
     try {
-      const names = resolveMigrationLeadNames(snapshot);
+      const identity = resolveMigrationLeadIdentity(snapshot);
       const result = await createLeadForWorkspace(
         WD_MIGRATION_WORKSPACE_ID,
         context.actorId,
@@ -531,8 +532,8 @@ export async function runHubSpotWdProjectMigration(input: {
           projectId: manifest.destinationProjectId,
           statusId: statusId!,
           sourceId: sourceId ?? undefined,
-          firstName: names.firstName,
-          lastName: names.lastName,
+          firstName: identity.firstName,
+          lastName: identity.lastName,
           email: snapshot.emailNormalized ?? undefined,
           phone: snapshot.hasPhone
             ? (raw.properties.phone ?? raw.properties.mobilephone ?? undefined) ?? undefined
@@ -546,9 +547,13 @@ export async function runHubSpotWdProjectMigration(input: {
               inboundSource: WD_MIGRATION_INBOUND_SOURCE,
             },
             ...buildMigratedCampaignGuardAttributes(),
+            ...buildMigrationNameAttributes(identity),
           },
         },
-        { triggerAutomation: false },
+        {
+          triggerAutomation: false,
+          displayFullName: identity.displayLabel ?? undefined,
+        },
       );
 
       if (result.lead.projectId === WD_MIGRATION_GENERAL_PROJECT_ID) {
@@ -693,6 +698,12 @@ export async function runHubSpotWdProjectMigration(input: {
         }
       }
       unexpected += 1;
+      const failDetail =
+        error instanceof AppError
+          ? `${error.code}:${error.message}`
+          : error instanceof Error
+            ? error.message
+            : "unknown";
       records.push({
         hubspotContactId: contactId,
         idempotencyKey,
@@ -703,7 +714,7 @@ export async function runHubSpotWdProjectMigration(input: {
         leadId: null,
       });
       aborted = true;
-      abortReason = duplicate ? "create_duplicate_unexpected" : "create_failed";
+      abortReason = duplicate ? "create_duplicate_unexpected" : `create_failed:${failDetail.slice(0, 120)}`;
     }
   }
 

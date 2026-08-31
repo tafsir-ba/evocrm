@@ -26,7 +26,39 @@ function parseJsonFromOutput(output: string): Record<string, unknown> {
   if (start < 0) {
     throw new Error("command_output_not_json");
   }
-  return JSON.parse(output.slice(start)) as Record<string, unknown>;
+  const slice = output.slice(start);
+  try {
+    return JSON.parse(slice) as Record<string, unknown>;
+  } catch {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let index = 0; index < slice.length; index += 1) {
+      const ch = slice[index]!;
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (ch === "\\") {
+          escape = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{") depth += 1;
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          return JSON.parse(slice.slice(0, index + 1)) as Record<string, unknown>;
+        }
+      }
+    }
+    throw new Error("command_output_not_json");
+  }
 }
 
 async function main(): Promise<void> {
@@ -44,7 +76,12 @@ async function main(): Promise<void> {
 
   const entries = (await readdir(dir))
     .filter((name) => name.startsWith("nameless-") && name.endsWith(".json"))
-    .filter((name) => !name.includes("cohort") && !name.includes("progress"))
+    .filter(
+      (name) =>
+        !name.includes("cohort") &&
+        !name.includes("progress") &&
+        !name.includes("-recon"),
+    )
     .sort();
 
   for (const file of entries) {
@@ -54,8 +91,14 @@ async function main(): Promise<void> {
     }
     console.log(JSON.stringify({ event: "manifest_start", manifest: manifestName, at: new Date().toISOString() }));
     const result = spawnSync(
-      "npm",
-      ["run", "migrate:hubspot-wd-project", "--", "--execute", "--confirm-write", `--manifest=${manifestName}`],
+      "npx",
+      [
+        "tsx",
+        "scripts/hubspot-wd-project-migrate.ts",
+        "--execute",
+        "--confirm-write",
+        `--manifest=${manifestName}`,
+      ],
       {
         cwd: process.cwd(),
         encoding: "utf8",
@@ -69,11 +112,38 @@ async function main(): Promise<void> {
     try {
       report = parseJsonFromOutput(combined);
     } catch {
+      if (combined.includes("execute_run_already_exists")) {
+        progress.completed.push(manifestName);
+        await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+        console.log(
+          JSON.stringify({
+            ok: true,
+            manifest: manifestName,
+            skippedReason: "execute_run_already_exists",
+            completedCount: progress.completed.length,
+          }),
+        );
+        continue;
+      }
       progress.failed.push({ manifest: manifestName, reason: "output_parse_failed" });
       await mkdir(dir, { recursive: true });
       await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
       console.error(JSON.stringify({ ok: false, stoppedOn: manifestName, reason: "output_parse_failed" }));
       process.exit(1);
+    }
+
+    if (report.error === "execute_run_already_exists") {
+      progress.completed.push(manifestName);
+      await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
+      console.log(
+        JSON.stringify({
+          ok: true,
+          manifest: manifestName,
+          skippedReason: "execute_run_already_exists",
+          completedCount: progress.completed.length,
+        }),
+      );
+      continue;
     }
 
     const aborted = Boolean(report.aborted);

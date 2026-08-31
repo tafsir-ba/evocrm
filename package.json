@@ -29,6 +29,8 @@
     "measure:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-measure.ts",
     "select:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-select.ts",
     "migrate:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-migrate.ts",
+    "reconcile:hubspot-email-name-policy": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-email-name-policy-reconcile.ts",
+    "summary:hubspot-email-name-policy": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-email-name-policy-summary.ts",
     "recon:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-recon.ts"
   },
   "dependencies": {

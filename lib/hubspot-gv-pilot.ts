@@ -161,37 +161,75 @@ export function isEmailBearingNameless(
   return !hasCompletePilotName(contact.firstName, contact.lastName) && Boolean(contact.emailNormalized);
 }
 
-/** Resolve CRM-safe names; never overwrites complete HubSpot names. */
-export function resolveMigrationLeadNames(
+export type MigrationLeadIdentity = {
+  firstName: string;
+  lastName: string;
+  nameMissing: boolean;
+  needsEnrichment: boolean;
+  /** Safe UI label from the normalised email; never an invented person name. */
+  displayLabel: string | null;
+};
+
+/**
+ * Resolve CRM identity for migrated leads. Never invents a person name from email.
+ * Email-bearing nameless contacts keep blank first/last with nameMissing + needsEnrichment.
+ */
+export function resolveMigrationLeadIdentity(
   contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
-): { firstName: string; lastName: string; reclassifiedFromEmail: boolean } {
+): MigrationLeadIdentity {
   const first = String(contact.firstName ?? "").trim();
   const last = String(contact.lastName ?? "").trim();
   if (hasCompletePilotName(first, last)) {
-    return { firstName: first, lastName: last, reclassifiedFromEmail: false };
+    return {
+      firstName: first,
+      lastName: last,
+      nameMissing: false,
+      needsEnrichment: false,
+      displayLabel: null,
+    };
   }
   if (contact.emailNormalized) {
-    const local = contact.emailNormalized.split("@")[0] ?? "";
-    const tokens = local
-      .split(/[._+\-]+/)
-      .map((token) => token.trim())
-      .filter(Boolean);
-    const titleCase = (value: string) =>
-      value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value;
-    if (tokens.length >= 2) {
-      return {
-        firstName: titleCase(tokens[0]!),
-        lastName: tokens.slice(1).map(titleCase).join(" "),
-        reclassifiedFromEmail: true,
-      };
-    }
-    const fallback = titleCase(local) || "Contact";
-    return { firstName: fallback, lastName: "Contact", reclassifiedFromEmail: true };
+    return {
+      firstName: "",
+      lastName: "",
+      nameMissing: true,
+      needsEnrichment: true,
+      displayLabel: contact.emailNormalized,
+    };
   }
   return {
-    firstName: first || "Contact",
-    lastName: last || "Contact",
-    reclassifiedFromEmail: false,
+    firstName: first,
+    lastName: last,
+    nameMissing: true,
+    needsEnrichment: true,
+    displayLabel: null,
+  };
+}
+
+/** @deprecated Use resolveMigrationLeadIdentity — never invents names from email. */
+export function resolveMigrationLeadNames(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): { firstName: string; lastName: string; reclassifiedFromEmail: boolean } {
+  const identity = resolveMigrationLeadIdentity(contact);
+  return {
+    firstName: identity.firstName,
+    lastName: identity.lastName,
+    reclassifiedFromEmail: identity.nameMissing && Boolean(identity.displayLabel),
+  };
+}
+
+export function buildMigrationNameAttributes(
+  identity: MigrationLeadIdentity,
+): Record<string, unknown> {
+  if (!identity.nameMissing) {
+    return {};
+  }
+  return {
+    hubspotMigration: {
+      nameMissing: true,
+      needsEnrichment: true,
+      ...(identity.displayLabel ? { displayLabel: identity.displayLabel } : {}),
+    },
   };
 }
 

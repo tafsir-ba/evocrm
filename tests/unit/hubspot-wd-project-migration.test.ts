@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checksumContactIds, resolveMigrationLeadNames } from "@/lib/hubspot-gv-pilot";
+import { checksumContactIds } from "@/lib/hubspot-gv-pilot";
 import {
   WD_MIGRATION_GENERAL_PROJECT_ID,
   WD_MIGRATION_GV_PROJECT_ID,

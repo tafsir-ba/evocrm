@@ -114,11 +114,16 @@
   ],
   "nameless_email_reclassification": {
     "status": "active",
-    "when": "firstname_or_lastname_blank_and_email_present",
-    "writeNamesFrom": "resolveMigrationLeadNames(email_local_part)",
-    "preserveCompleteHubSpotNames": true,
+    "when": "firstname_or_lastname_blank_and_valid_email_present",
+    "doNotInventNames": true,
+    "displayLabelFrom": "normalized_email_when_ui_requires",
+    "leadFlags": {
+      "nameMissing": true,
+      "needsEnrichment": true
+    },
+    "excludeOnlyWhen": "missing_name_without_valid_email",
     "routeAmbiguityToGeneral": false,
-    "notes": "Approved reclassification: email-bearing nameless HubSpot contacts are write-eligible; CRM names derived from email local-part only when HubSpot names are incomplete. Future CMP enrichment uses HubSpot field mapping when general lead intelligence field is available — never overwrite manual CRM data."
+    "notes": "Approved policy: valid normalised email is sufficient; blank HubSpot names must not exclude. CRM stores blank first/last with nameMissing + needsEnrichment; displayLabel is the normalised email only when UI requires a label. No-project contacts held under no_project_signal — never excluded solely for missing name. Future CMP enrichment uses HubSpot field mapping when general lead intelligence field is available — never overwrite manual CRM data."
   },
   "rows": [
     {

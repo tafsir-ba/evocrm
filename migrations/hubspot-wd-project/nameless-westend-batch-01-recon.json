@@ -1,0 +1,60 @@
+{
+  "batch": "nameless-westend-batch-01",
+  "mode": "execute",
+  "created": 7,
+  "skipped": 0,
+  "preExisting": 0,
+  "updated": 0,
+  "conflict": 0,
+  "unexpected": 0,
+  "aborted": false,
+  "destinationProjectId": "6a945f9490d996b7b542a50d",
+  "destinationLeadCount": 564,
+  "enrollmentCount": 0,
+  "campaignGuard": {
+    "createdLeadsGuarded": 7,
+    "automaticallyEnrollable": 0,
+    "enrollmentCount": 0
+  },
+  "generalProjectTouched": false,
+  "wrongDestination": 0,
+  "idMapCount": 7,
+  "manifestSize": 7,
+  "sourceToDestination": [
+    {
+      "hubspotContactId": "1013554",
+      "leadId": "6a95183288eaa60d455753dc",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1013603",
+      "leadId": "6a95183288eaa60d455753fa",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1013703",
+      "leadId": "6a95183388eaa60d45575411",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1014352",
+      "leadId": "6a95183488eaa60d45575422",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1014854",
+      "leadId": "6a95183588eaa60d4557542e",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1015159",
+      "leadId": "6a95183688eaa60d4557543a",
+      "outcome": "created"
+    },
+    {
+      "hubspotContactId": "1015606",
+      "leadId": "6a95183688eaa60d45575446",
+      "outcome": "created"
+    }
+  ]
+}
