@@ -25,6 +25,7 @@ import {
   createLeadForWorkspace,
   normalizeLeadEmail,
 } from "@/server/services/leads";
+import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   findProjectById,
   findProjectByReference,
@@ -352,21 +353,39 @@ export async function captureWebsiteLead(
   let result;
 
   try {
-    result = await createLeadForWorkspace(workspaceId, integration.createdBy, {
-      projectId,
-      statusId,
-      sourceId: sourceId ?? undefined,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      email: input.email,
-      phone: input.phone,
-      budgetMin: input.budgetMin,
-      budgetMax: input.budgetMax,
-      preferredAreas: input.preferredAreas,
-      notes: input.message,
-      emailConsentStatus: input.emailConsentStatus,
-      attributes,
-    });
+    const resolvedCompany = await resolveOrCreateCompanyByName(
+      workspaceId,
+      integration.createdBy,
+      input.companyName,
+    );
+
+    result = await createLeadForWorkspace(
+      workspaceId,
+      integration.createdBy,
+      {
+        projectId,
+        statusId,
+        sourceId: sourceId ?? undefined,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone,
+        budgetMin: input.budgetMin,
+        budgetMax: input.budgetMax,
+        preferredAreas: input.preferredAreas,
+        notes: input.message,
+        emailConsentStatus: input.emailConsentStatus,
+        attributes,
+        industry: input.industry,
+        jobTitle: input.jobTitle,
+        stateRegion: input.stateRegion,
+        companyId: resolvedCompany?.company.id,
+      },
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
+    );
   } catch (error) {
     if (error instanceof AppError && error.code === "CONFLICT") {
       if (idempotencyKey) {

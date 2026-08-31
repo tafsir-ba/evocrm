@@ -27,6 +27,7 @@ import {
   splitFullName,
 } from "@/server/imports/import-normalizers";
 import { createLeadForWorkspace } from "@/server/services/leads";
+import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import { AppError } from "@/server/errors";
 
 const LEAD_FIELDS: ImportFieldConfig[] = [
@@ -181,6 +182,37 @@ const LEAD_FIELDS: ImportFieldConfig[] = [
     aliases: ["email consent", "consent"],
     type: "string",
   },
+  {
+    key: "industry",
+    label: "Industry",
+    aliases: ["industry", "sector"],
+    type: "string",
+  },
+  {
+    key: "jobTitle",
+    label: "Job Title",
+    aliases: ["job title", "title", "jobtitle", "position", "role"],
+    type: "string",
+  },
+  {
+    key: "stateRegion",
+    label: "State / Region",
+    aliases: ["state", "region", "state/region", "state region", "province", "canton"],
+    type: "string",
+  },
+  {
+    key: "companyName",
+    label: "Associated Company",
+    aliases: [
+      "company",
+      "company name",
+      "associated company",
+      "organisation",
+      "organization",
+      "employer",
+    ],
+    type: "string",
+  },
 ];
 
 async function buildLeadCreateInput(
@@ -287,6 +319,25 @@ async function buildLeadCreateInput(
     input.tags = resolveTagIds(context.tagLookup, input.tags);
   }
 
+  const companyName =
+    typeof input.companyName === "string"
+      ? input.companyName
+      : typeof input.company === "string"
+        ? input.company
+        : "";
+  delete input.companyName;
+  delete input.company;
+  if (companyName.trim()) {
+    const resolved = await resolveOrCreateCompanyByName(
+      context.workspaceId,
+      context.actorId,
+      companyName,
+    );
+    if (resolved) {
+      input.companyId = resolved.company.id;
+    }
+  }
+
   if (input.createdAt !== undefined && input.createdAt !== "") {
     const parsedCreatedAt = parseOptionalDate(input.createdAt);
     if (!parsedCreatedAt) {
@@ -329,6 +380,8 @@ export const leadImportConfig: ImportEntityConfig = {
       leadInput,
       {
         triggerAutomation: Boolean(context.triggerAutomationForImportedLeads),
+        intelligenceMethod: "import",
+        intelligenceSource: "lead_import",
       },
     );
 

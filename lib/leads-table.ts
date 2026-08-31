@@ -35,6 +35,14 @@ export type LeadTableActivityEvent = {
   at: string | Date;
 };
 
+export function formatLeadRoleLine(input: {
+  jobTitle?: string | null;
+  company?: { name: string } | null;
+}): string | null {
+  const parts = [input.jobTitle?.trim(), input.company?.name?.trim()].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function formatProjectMembershipCell(input: {
   primaryName?: string | null;
   secondaryCount?: number;

@@ -96,4 +96,31 @@ describe("lead validation", () => {
     const list = leadListQuerySchema.safeParse({ companyId: "507f1f77bcf86cd7994390aa" });
     expect(list.success).toBe(true);
   });
+
+  it("accepts optional lead intelligence fields on create, update, and list", () => {
+    const create = createLeadApiInputSchema.safeParse({
+      projectId: "507f1f77bcf86cd799439012",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "507f1f77bcf86cd799439011",
+      industry: "Finance",
+      jobTitle: "Analyst",
+      stateRegion: "Geneva",
+    });
+    expect(create.success).toBe(true);
+
+    const update = updateLeadInputSchema.safeParse({
+      industry: "Hospitality",
+      jobTitle: null,
+      stateRegion: "Vaud",
+    });
+    expect(update.success).toBe(true);
+
+    const list = leadListQuerySchema.safeParse({
+      industry: "Finance",
+      jobTitle: "Analyst",
+      stateRegion: "Geneva",
+    });
+    expect(list.success).toBe(true);
+  });
 });

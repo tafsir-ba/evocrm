@@ -45,7 +45,11 @@ describe("lead import automation", () => {
         firstName: "John",
         lastName: "Smith",
       }),
-      { triggerAutomation: false },
+      {
+        triggerAutomation: false,
+        intelligenceMethod: "import",
+        intelligenceSource: "lead_import",
+      },
     );
   });
 
@@ -77,7 +81,11 @@ describe("lead import automation", () => {
         firstName: "John",
         lastName: "Smith",
       }),
-      { triggerAutomation: true },
+      {
+        triggerAutomation: true,
+        intelligenceMethod: "import",
+        intelligenceSource: "lead_import",
+      },
     );
   });
 });

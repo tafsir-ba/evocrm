@@ -17,6 +17,29 @@ export async function listCompaniesForWorkspace(
   return findCompanies(workspaceId, filter);
 }
 
+export async function findCompanyByNameForWorkspace(
+  workspaceId: string,
+  name: string | null | undefined,
+): Promise<CompanyRecord | null> {
+  const trimmed = name?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return findActiveCompanyByNormalizedName(workspaceId, normalizeCompanyNameKey(trimmed));
+}
+
+export async function resolveOrCreateCompanyByName(
+  workspaceId: string,
+  actorId: string,
+  name: string | null | undefined,
+): Promise<{ company: CompanyRecord; created: boolean } | null> {
+  const trimmed = name?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return createCompanyForWorkspace(workspaceId, actorId, { name: trimmed });
+}
+
 export async function createCompanyForWorkspace(
   workspaceId: string,
   actorId: string,

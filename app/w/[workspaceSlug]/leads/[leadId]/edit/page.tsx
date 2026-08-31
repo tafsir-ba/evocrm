@@ -63,6 +63,11 @@ export default async function EditLeadPage({ params }: { params: Params }) {
     notes: lead.notes ?? "",
     tagIds: lead.tags,
     assignedTo: lead.assignedUser?.id ?? "",
+    companyId: lead.companyId ?? "",
+    companyName: lead.company?.name,
+    industry: lead.industry ?? "",
+    jobTitle: lead.jobTitle ?? "",
+    stateRegion: lead.stateRegion ?? "",
   };
 
   return (

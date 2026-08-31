@@ -38,6 +38,15 @@ describe("import header matcher", () => {
     expect(suggestion).toBe("email");
   });
 
+  it("suggests lead intelligence field mappings", () => {
+    expect(suggestFieldForHeader("Industry", leadImportConfig.fields)).toBe("industry");
+    expect(suggestFieldForHeader("Job Title", leadImportConfig.fields)).toBe("jobTitle");
+    expect(suggestFieldForHeader("State / Region", leadImportConfig.fields)).toBe("stateRegion");
+    expect(suggestFieldForHeader("Associated Company", leadImportConfig.fields)).toBe(
+      "companyName",
+    );
+  });
+
   it("suggests lead created date mapping", () => {
     const suggestion = suggestFieldForHeader("Create Date", leadImportConfig.fields);
     expect(suggestion).toBe("createdAt");

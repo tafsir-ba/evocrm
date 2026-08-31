@@ -56,6 +56,10 @@ This document matches current backend behavior (`allowProjectOverride` defaults 
 | `utm` | Stored under `attributes.integration.utm` |
 | `propertyReference` | Stored in attributes (not auto-linked to Property) |
 | `source` | Free-text inbound source label |
+| `industry` | Optional. Stored on the lead; provenance `website`. |
+| `jobTitle` | Optional. Stored on the lead; provenance `website`. |
+| `stateRegion` | Optional state / region. |
+| `companyName` | Optional. Resolved or created as a Company, then stored as `companyId`. |
 
 ### Project routing fields
 

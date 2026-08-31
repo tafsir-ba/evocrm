@@ -47,6 +47,10 @@ const sampleLead = {
     { id: "t2", name: "Genève", color: "#1D4ED8" },
     { id: "t3", name: "Chalet", color: "#0F766E" },
   ],
+  company: { id: "507f1f77bcf86cd799439061", name: "EvoHome SA" },
+  jobTitle: "Buyer",
+  industry: "Hospitality",
+  stateRegion: "Geneva",
   assignedUser: {
     id: members[0].userId,
     name: members[0].name,
@@ -93,6 +97,9 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
     if (url.includes("/members")) {
       return jsonResponse({ data: { members } });
     }
+    if (url.includes("/companies")) {
+      return jsonResponse({ data: { companies: [] } });
+    }
     if (url.includes("/leads/") && init?.method === "PATCH") {
       return jsonResponse({ data: { lead: sampleLead } });
     }
@@ -127,6 +134,7 @@ describe("LeadsPanel table", () => {
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
     expect(screen.getByRole("columnheader", { name: "Lead" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Company" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
@@ -135,6 +143,7 @@ describe("LeadsPanel table", () => {
     expect(screen.getByRole("columnheader", { name: "Next" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Urgency" })).toBeInTheDocument();
 
+    expect(screen.getAllByText("EvoHome SA").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Les Terrasses").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Site web").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nouveau").length).toBeGreaterThan(0);

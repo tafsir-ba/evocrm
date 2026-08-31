@@ -10,6 +10,7 @@ import type {
   TransactionIntent,
   UsagePurpose,
 } from "@/lib/lead-preferences";
+import type { LeadIntelligenceProvenance } from "@/lib/lead-intelligence";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 import { toObjectIdString } from "@/server/utils/mongo-id";
 
@@ -52,6 +53,10 @@ export type LeadRecord = {
   propertyTypeInterests: PropertyTypeInterest[];
   transactionIntent: TransactionIntent | null;
   usagePurpose: UsagePurpose | null;
+  industry: string | null;
+  jobTitle: string | null;
+  stateRegion: string | null;
+  intelligenceProvenance: LeadIntelligenceProvenance;
   notes: string | null;
   tags: string[];
   attributes: Record<string, unknown>;
@@ -93,6 +98,12 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
       []) as PropertyTypeInterest[],
     transactionIntent: (document.transactionIntent as TransactionIntent | null) ?? null,
     usagePurpose: (document.usagePurpose as UsagePurpose | null) ?? null,
+    industry: document.industry ?? null,
+    jobTitle: document.jobTitle ?? null,
+    stateRegion: document.stateRegion ?? null,
+    intelligenceProvenance:
+      ((document as LeadDocument & { intelligenceProvenance?: LeadIntelligenceProvenance })
+        .intelligenceProvenance as LeadIntelligenceProvenance | undefined) ?? {},
     notes: document.notes ?? null,
     tags: (document.tags ?? []).map((tagId) => tagId.toString()),
     attributes: (document.attributes as Record<string, unknown>) ?? {},
@@ -122,6 +133,9 @@ export type LeadListFilter = {
   propertyTypeInterest?: PropertyTypeInterest;
   transactionIntent?: TransactionIntent;
   usagePurpose?: UsagePurpose;
+  industry?: string;
+  jobTitle?: string;
+  stateRegion?: string;
   integrationId?: string;
   utmCampaign?: string;
   createdFrom?: Date;
@@ -170,6 +184,24 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   }
   if (filter.usagePurpose) {
     query.usagePurpose = filter.usagePurpose;
+  }
+  if (filter.industry?.trim()) {
+    query.industry = new RegExp(
+      filter.industry.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      "i",
+    );
+  }
+  if (filter.jobTitle?.trim()) {
+    query.jobTitle = new RegExp(
+      filter.jobTitle.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      "i",
+    );
+  }
+  if (filter.stateRegion?.trim()) {
+    query.stateRegion = new RegExp(
+      filter.stateRegion.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      "i",
+    );
   }
   if (filter.integrationId) {
     query["attributes.integration.integrationId"] = filter.integrationId;
@@ -248,6 +280,9 @@ function buildSearchOr(search: string | undefined): Array<Record<string, unknown
     { fullName: regex },
     { email: regex },
     { phone: regex },
+    { industry: regex },
+    { jobTitle: regex },
+    { stateRegion: regex },
   ];
 }
 
@@ -334,6 +369,24 @@ export async function findLeadsByCompanyIds(
   )
     .sort({ fullName: 1 })
     .limit(options.limit ?? 50)
+    .lean<LeadDocument[]>();
+
+  return documents.map(toLeadRecord);
+}
+
+export async function findLeadsWithHubSpotContactIdempotency(
+  workspaceId: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<LeadRecord[]> {
+  await connectDb();
+
+  const documents = await LeadModel.find(
+    withWorkspaceScope(workspaceId, {
+      ...(options.includeArchived ? {} : { archivedAt: null }),
+      "attributes.integration.idempotencyKey": { $regex: /^hubspot:contact:/ },
+    }),
+  )
+    .sort({ createdAt: 1 })
     .lean<LeadDocument[]>();
 
   return documents.map(toLeadRecord);
@@ -558,6 +611,10 @@ export async function createLead(input: {
   createdBy: string;
   createdAt?: Date;
   companyId?: string | null;
+  industry?: string | null;
+  jobTitle?: string | null;
+  stateRegion?: string | null;
+  intelligenceProvenance?: LeadIntelligenceProvenance;
 }): Promise<LeadRecord> {
   await connectDb();
   try {
@@ -583,6 +640,10 @@ export async function createLead(input: {
       propertyTypeInterests: input.propertyTypeInterests ?? [],
       transactionIntent: input.transactionIntent ?? null,
       usagePurpose: input.usagePurpose ?? null,
+      industry: input.industry ?? null,
+      jobTitle: input.jobTitle ?? null,
+      stateRegion: input.stateRegion ?? null,
+      intelligenceProvenance: input.intelligenceProvenance ?? {},
       notes: input.notes ?? null,
       tags: input.tags ?? [],
       attributes: input.attributes ?? {},
@@ -630,6 +691,10 @@ export async function updateLead(
     propertyTypeInterests: PropertyTypeInterest[];
     transactionIntent: TransactionIntent | null;
     usagePurpose: UsagePurpose | null;
+    industry: string | null;
+    jobTitle: string | null;
+    stateRegion: string | null;
+    intelligenceProvenance: LeadIntelligenceProvenance;
     notes: string | null;
     tags: string[];
     attributes: Record<string, unknown>;

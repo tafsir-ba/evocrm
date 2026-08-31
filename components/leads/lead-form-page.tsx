@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  CompanySelector,
+  type CompanySelectorCompany,
+} from "@/components/domain/company-selector";
 import { EnumChipSelector } from "@/components/domain/enum-chip-selector";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import {
@@ -56,6 +60,11 @@ export type LeadFormInitialValues = {
   notes: string;
   tagIds: string[];
   assignedTo: string;
+  companyId: string;
+  companyName?: string;
+  industry: string;
+  jobTitle: string;
+  stateRegion: string;
 };
 
 type LeadFormPageProps = {
@@ -86,6 +95,10 @@ const emptyForm: LeadFormInitialValues = {
   notes: "",
   tagIds: [],
   assignedTo: "",
+  companyId: "",
+  industry: "",
+  jobTitle: "",
+  stateRegion: "",
 };
 
 const propertyTypeOptions = PROPERTY_TYPE_INTERESTS.map((value) => ({
@@ -109,6 +122,8 @@ export function LeadFormPage({
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
+  const [companies, setCompanies] = useState<CompanySelectorCompany[]>([]);
+  const [creatingCompany, setCreatingCompany] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [formWarning, setFormWarning] = useState<string | null>(null);
@@ -149,12 +164,14 @@ export function LeadFormPage({
         }
       });
 
-      const [statusResult, sourceResult, tagsResult, membersResult] = await Promise.all([
-        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_status`),
-        loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_source`),
-        loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
-        loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
-      ]);
+      const [statusResult, sourceResult, tagsResult, membersResult, companiesResult] =
+        await Promise.all([
+          loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_status`),
+          loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_source`),
+          loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
+          loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
+          loadJson<{ companies: CompanySelectorCompany[] }>(`${apiBase}/companies`),
+        ]);
 
       await projectsPromise;
 
@@ -170,10 +187,22 @@ export function LeadFormPage({
       if (membersResult.ok) {
         setMembers(membersResult.data?.members ?? []);
       }
+      if (companiesResult.ok) {
+        const loaded = companiesResult.data?.companies ?? [];
+        const selectedId = initialValues?.companyId;
+        const selectedName = initialValues?.companyName;
+        setCompanies(
+          selectedId && selectedName && !loaded.some((company) => company.id === selectedId)
+            ? [...loaded, { id: selectedId, name: selectedName }]
+            : loaded,
+        );
+      } else if (initialValues?.companyId && initialValues.companyName) {
+        setCompanies([{ id: initialValues.companyId, name: initialValues.companyName }]);
+      }
     } finally {
       setLoadingOptions(false);
     }
-  }, [apiBase]);
+  }, [apiBase, initialValues?.companyId, initialValues?.companyName]);
 
   useEffect(() => {
     void loadOptions();
@@ -207,6 +236,35 @@ export function LeadFormPage({
       setForm((current) => ({ ...current, projectId: preferredProjectId }));
     }
   }, [form.projectId, isEdit, projects, scopedProjectId]);
+
+  async function createCompany(name: string): Promise<CompanySelectorCompany | null> {
+    setCreatingCompany(true);
+    setFormError(null);
+    try {
+      const response = await fetch(`${apiBase}/companies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? "Failed to create company.");
+      }
+      const company = payload.data.company as CompanySelectorCompany;
+      setCompanies((current) => {
+        if (current.some((item) => item.id === company.id)) {
+          return current;
+        }
+        return [...current, company].sort((left, right) => left.name.localeCompare(right.name));
+      });
+      return company;
+    } catch (createError) {
+      setFormError(createError instanceof Error ? createError.message : "Failed to create company.");
+      return null;
+    } finally {
+      setCreatingCompany(false);
+    }
+  }
 
   function toggleTag(tagId: string) {
     setForm((current) => ({
@@ -264,6 +322,10 @@ export function LeadFormPage({
       notes: form.notes.trim() || (isEdit ? null : undefined),
       tags: form.tagIds,
       assignedTo: form.assignedTo || (isEdit ? null : undefined),
+      companyId: form.companyId || (isEdit ? null : undefined),
+      industry: form.industry.trim() || (isEdit ? null : undefined),
+      jobTitle: form.jobTitle.trim() || (isEdit ? null : undefined),
+      stateRegion: form.stateRegion.trim() || (isEdit ? null : undefined),
     };
 
     try {
@@ -386,6 +448,56 @@ export function LeadFormPage({
             value={form.phone}
             onChange={(event) =>
               setForm((current) => ({ ...current, phone: event.target.value }))
+            }
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="companyId">Associated company</Label>
+          <CompanySelector
+            id="companyId"
+            companies={companies}
+            selectedCompanyId={form.companyId || null}
+            onChange={(companyId) =>
+              setForm((current) => ({ ...current, companyId: companyId ?? "" }))
+            }
+            onCreate={createCompany}
+            creating={creatingCompany}
+            disabled={loadingOptions}
+            placeholder="Select or create a company"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="jobTitle">Job title</Label>
+            <Input
+              id="jobTitle"
+              value={form.jobTitle}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, jobTitle: event.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="industry">Industry</Label>
+            <Input
+              id="industry"
+              value={form.industry}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, industry: event.target.value }))
+              }
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="stateRegion">State / region</Label>
+          <Input
+            id="stateRegion"
+            value={form.stateRegion}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, stateRegion: event.target.value }))
             }
           />
         </div>

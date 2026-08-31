@@ -314,6 +314,11 @@ Demand-side record (buyer/inquirer).
 | `budgetMin` | |
 | `budgetMax` | |
 | `preferredAreas[]` | |
+| `companyId` | Optional associated Company (FK). Not a project company link. |
+| `industry` | Optional lead intelligence |
+| `jobTitle` | Optional lead intelligence |
+| `stateRegion` | Optional state / region string |
+| `intelligenceProvenance` | Per-field map: `method` (`manual` \| `hubspot` \| `import` \| `website` \| `api`), `source`, `appliedAt`, `notes` |
 | `notes` | |
 | `tags[]` | Tag IDs |
 | `attributes` | Flexible key-value bag |

@@ -22,6 +22,8 @@ import {
   writeIntegrationLog,
 } from "@/server/services/integration-logs";
 import { buildMigratedCampaignGuardAttributes } from "@/lib/campaign-enrollment-guard";
+import { planHubSpotCmpLeadIntelligence } from "@/lib/hubspot-cmp-lead-intelligence";
+import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   createLeadForWorkspace,
   normalizeLeadEmail,
@@ -229,9 +231,27 @@ async function captureHubSpotContactAsLead(input: {
 
   const statusId = await resolveDefaultLeadStatusId(workspaceId);
   const sourceId = await resolveHubSpotLeadSourceId(workspaceId);
+  const resolvedCompany = await resolveOrCreateCompanyByName(
+    workspaceId,
+    input.integration.createdBy,
+    contact.properties.company,
+  );
+  const intelligence = planHubSpotCmpLeadIntelligence({
+    snapshot: {
+      contactId: contact.id,
+      properties: contact.properties,
+    },
+    existing: {
+      industry: null,
+      jobTitle: null,
+      stateRegion: null,
+      companyId: null,
+    },
+    resolvedCompanyId: resolvedCompany?.company.id ?? null,
+    requireCmpProduct: false,
+  });
+
   const noteParts = [
-    contact.properties.company ? `Company: ${contact.properties.company}` : null,
-    contact.properties.jobtitle ? `Title: ${contact.properties.jobtitle}` : null,
     contact.properties.city || contact.properties.country
       ? `Location: ${[contact.properties.city, contact.properties.country].filter(Boolean).join(", ")}`
       : null,
@@ -247,6 +267,10 @@ async function captureHubSpotContactAsLead(input: {
     email: contact.email ?? undefined,
     phone: contact.phone ?? undefined,
     notes: noteParts.length > 0 ? noteParts.join("\n") : undefined,
+    industry: intelligence.values.industry,
+    jobTitle: intelligence.values.jobTitle,
+    stateRegion: intelligence.values.stateRegion,
+    companyId: intelligence.values.companyId ?? undefined,
     emailConsentStatus: "unknown" as const,
     attributes: {
       integration: {
@@ -268,7 +292,11 @@ async function captureHubSpotContactAsLead(input: {
       workspaceId,
       input.integration.createdBy,
       leadInput,
-      { triggerAutomation: false },
+      {
+        triggerAutomation: false,
+        intelligenceMethod: "hubspot",
+        intelligenceSource: "hubspot_lead_capture",
+      },
     );
   } catch (error) {
     if (error instanceof AppError && error.code === "CONFLICT") {

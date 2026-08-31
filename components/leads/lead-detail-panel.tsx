@@ -76,6 +76,10 @@ type LeadDetail = {
   assignedUser: { id: string; name: string | null; email: string } | null;
   statusId: string;
   sourceId: string | null;
+  company?: { id: string; name: string } | null;
+  industry?: string | null;
+  jobTitle?: string | null;
+  stateRegion?: string | null;
   attributes?: Record<string, unknown> | null;
   emailConsentStatus?: "unknown" | "subscribed" | "unsubscribed" | null;
 };
@@ -435,6 +439,12 @@ export function LeadDetailPanel({
             <Row icon={<IconPhone size={14} />} label="Phone">
               {lead.phone ?? "—"}
             </Row>
+            <Row icon={<IconMapPin size={14} />} label="Company">
+              {lead.company?.name ?? "—"}
+            </Row>
+            <Row icon={<IconMapPin size={14} />} label="Job title">
+              {lead.jobTitle ?? "—"}
+            </Row>
             <Row icon={<IconMapPin size={14} />} label="Preferred areas">
               {lead.preferredAreas.length > 0 ? lead.preferredAreas.join(", ") : "—"}
             </Row>
@@ -504,6 +514,8 @@ export function LeadDetailPanel({
                         }
                       />
                       <Info label="Source" value={lead.source?.label ?? "—"} />
+                      <Info label="Industry" value={lead.industry ?? "—"} />
+                      <Info label="State / region" value={lead.stateRegion ?? "—"} />
                       <div className="md:col-span-2">
                         <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
                           Projects

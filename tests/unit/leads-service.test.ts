@@ -43,6 +43,10 @@ vi.mock("@/server/repositories/projects", () => ({
   findProjectById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/companies", () => ({
+  findCompaniesByIds: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/activities", () => ({
   findLeadActivitySummaries: vi.fn(),
 }));
@@ -59,6 +63,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
 import { findProjectById } from "@/server/repositories/projects";
+import { findCompaniesByIds } from "@/server/repositories/companies";
 import {
   archiveLead,
   createLead,
@@ -150,6 +155,7 @@ describe("lead service", () => {
       id: "mem-1",
     } as never);
     vi.mocked(findLeadIdsForProjectMembership).mockResolvedValue([]);
+    vi.mocked(findCompaniesByIds).mockResolvedValue([]);
     vi.mocked(findProjectById).mockResolvedValue({
       id: "project-1",
       workspaceId: "ws-1",
@@ -495,6 +501,85 @@ describe("lead service", () => {
         fullName: "Jane Smith",
       }),
     );
+  });
+
+  it("stamps intelligence provenance on create and skips restamp when values are unchanged", async () => {
+    vi.mocked(createLead).mockResolvedValue({
+      ...baseLead,
+      industry: "Finance",
+      jobTitle: "Analyst",
+    });
+
+    await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
+      firstName: "John",
+      lastName: "Smith",
+      statusId: "status-1",
+      industry: "Finance",
+      jobTitle: "Analyst",
+    });
+
+    expect(createLead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        industry: "Finance",
+        jobTitle: "Analyst",
+        intelligenceProvenance: expect.objectContaining({
+          industry: expect.objectContaining({ method: "manual", source: "lead_create" }),
+          jobTitle: expect.objectContaining({ method: "manual", source: "lead_create" }),
+        }),
+      }),
+    );
+
+    vi.mocked(findLeadById).mockResolvedValue({
+      ...baseLead,
+      industry: "Finance",
+      jobTitle: "Analyst",
+      intelligenceProvenance: {
+        industry: {
+          method: "hubspot",
+          source: "hubspot_cmp_enrichment",
+          appliedAt: "2026-08-01T00:00:00.000Z",
+          notes: null,
+        },
+      },
+    });
+    vi.mocked(updateLead).mockResolvedValue({
+      ...baseLead,
+      industry: "Finance",
+    });
+
+    await updateLeadForWorkspace("ws-1", "lead-1", "user-1", {
+      industry: "Finance",
+    });
+
+    expect(updateLead).toHaveBeenCalledWith(
+      "ws-1",
+      "lead-1",
+      expect.objectContaining({
+        industry: "Finance",
+        intelligenceProvenance: expect.objectContaining({
+          industry: expect.objectContaining({ method: "hubspot" }),
+        }),
+      }),
+    );
+  });
+
+  it("does not enroll campaigns when lead update sets triggerAutomation false", async () => {
+    vi.mocked(findLeadById).mockResolvedValue(baseLead);
+    vi.mocked(updateLead).mockResolvedValue({
+      ...baseLead,
+      industry: "Finance",
+    });
+
+    await updateLeadForWorkspace(
+      "ws-1",
+      "lead-1",
+      "user-1",
+      { industry: "Finance" },
+      { triggerAutomation: false, intelligenceMethod: "hubspot" },
+    );
+
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
   it("archives lead by setting archivedAt", async () => {

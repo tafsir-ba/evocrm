@@ -56,6 +56,10 @@ type LeadListItem = {
   }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
+  company?: { id: string; name: string } | null;
+  industry?: string | null;
+  jobTitle?: string | null;
+  stateRegion?: string | null;
   lastActivity?: { id: string; title: string; at: string | Date } | null;
   nextAction?: { id: string; title: string; at: string | Date } | null;
 };
@@ -108,6 +112,11 @@ export function LeadsPanel({
   const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState("");
   const [transactionIntentFilter, setTransactionIntentFilter] = useState("");
   const [usagePurposeFilter, setUsagePurposeFilter] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("");
+  const [jobTitleFilter, setJobTitleFilter] = useState("");
+  const [stateRegionFilter, setStateRegionFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
@@ -130,22 +139,31 @@ export function LeadsPanel({
     setWebsiteOptionsWarning(null);
 
     try {
-      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes] = await Promise.all([
-        fetch(`${apiBase}/dictionary-items?type=lead_status`),
-        fetch(`${apiBase}/dictionary-items?type=lead_source`),
-        fetch(`${apiBase}/tags?entityType=lead`),
-        fetch(`${apiBase}/integrations?type=website`),
-        fetch(`${apiBase}/members`),
-      ]);
-
-      const [statusPayload, sourcePayload, tagsPayload, integrationsPayload, membersPayload] =
+      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes, companiesRes] =
         await Promise.all([
-          statusRes.json(),
-          sourceRes.json(),
-          tagsRes.json(),
-          integrationsRes.json(),
-          membersRes.json(),
+          fetch(`${apiBase}/dictionary-items?type=lead_status`),
+          fetch(`${apiBase}/dictionary-items?type=lead_source`),
+          fetch(`${apiBase}/tags?entityType=lead`),
+          fetch(`${apiBase}/integrations?type=website`),
+          fetch(`${apiBase}/members`),
+          fetch(`${apiBase}/companies`),
         ]);
+
+      const [
+        statusPayload,
+        sourcePayload,
+        tagsPayload,
+        integrationsPayload,
+        membersPayload,
+        companiesPayload,
+      ] = await Promise.all([
+        statusRes.json(),
+        sourceRes.json(),
+        tagsRes.json(),
+        integrationsRes.json(),
+        membersRes.json(),
+        companiesRes.json(),
+      ]);
 
       if (statusRes.ok) {
         setStatuses(statusPayload.data.items as DictionaryItem[]);
@@ -177,6 +195,14 @@ export function LeadsPanel({
         setMembers((membersPayload?.data?.members as LeadTableMember[] | undefined) ?? []);
       } else {
         setMembers([]);
+      }
+      if (companiesRes.ok) {
+        setCompanies(
+          ((companiesPayload?.data?.companies as Array<{ id: string; name: string }> | undefined) ??
+            []) as Array<{ id: string; name: string }>,
+        );
+      } else {
+        setCompanies([]);
       }
     } catch {
       setWebsiteOptionsWarning("Could not load some lead filter options.");
@@ -227,6 +253,10 @@ export function LeadsPanel({
     utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    industryFilter,
+    jobTitleFilter,
+    stateRegionFilter,
+    companyFilter,
     projectId,
     includeAssociated,
     showArchived,
@@ -265,6 +295,10 @@ export function LeadsPanel({
     utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    industryFilter,
+    jobTitleFilter,
+    stateRegionFilter,
+    companyFilter,
     showArchived,
     createdFromParam,
     createdToParam,
@@ -335,6 +369,18 @@ export function LeadsPanel({
     }
     if (usagePurposeFilter) {
       filters.usagePurpose = usagePurposeFilter;
+    }
+    if (industryFilter.trim()) {
+      filters.industry = industryFilter.trim();
+    }
+    if (jobTitleFilter.trim()) {
+      filters.jobTitle = jobTitleFilter.trim();
+    }
+    if (stateRegionFilter.trim()) {
+      filters.stateRegion = stateRegionFilter.trim();
+    }
+    if (companyFilter) {
+      filters.companyId = companyFilter;
     }
     if (projectId) {
       filters.projectId = projectId;
@@ -697,7 +743,11 @@ export function LeadsPanel({
           utmCampaignFilter ||
           propertyTypeInterestFilter ||
           transactionIntentFilter ||
-          usagePurposeFilter
+          usagePurposeFilter ||
+          industryFilter ||
+          jobTitleFilter ||
+          stateRegionFilter ||
+          companyFilter
             ? " · on"
             : ""}
         </button>
@@ -801,6 +851,56 @@ export function LeadsPanel({
             </option>
           ))}
         </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[160px]"
+          aria-label="Filter by company"
+          value={companyFilter}
+          onChange={(event) => {
+            setPage(1);
+            setCompanyFilter(event.target.value);
+          }}
+        >
+          <option value="">All companies</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </Select>
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="Industry"
+          aria-label="Filter by industry"
+          value={industryFilter}
+          onChange={(event) => {
+            setPage(1);
+            setIndustryFilter(event.target.value);
+          }}
+        />
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="Job title"
+          aria-label="Filter by job title"
+          value={jobTitleFilter}
+          onChange={(event) => {
+            setPage(1);
+            setJobTitleFilter(event.target.value);
+          }}
+        />
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="State / region"
+          aria-label="Filter by state or region"
+          value={stateRegionFilter}
+          onChange={(event) => {
+            setPage(1);
+            setStateRegionFilter(event.target.value);
+          }}
+        />
       </div>
       ) : null}
 
