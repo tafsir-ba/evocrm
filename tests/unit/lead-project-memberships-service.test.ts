@@ -290,10 +290,70 @@ describe("lead project membership service", () => {
       }),
     ).rejects.toThrow("write failed");
 
-    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-1", { isPrimary: false });
-    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-2", { isPrimary: true });
-    expect(updateMembership).toHaveBeenCalledWith("ws-1", "mem-1", { isPrimary: true });
+    expect(updateMembership.mock.calls.map(([, id, input]) => [id, input])).toEqual([
+      ["mem-1", { isPrimary: false }],
+      ["mem-2", { isPrimary: true }],
+      ["mem-2", { isPrimary: false }],
+      ["mem-1", { isPrimary: true }],
+    ]);
     expect(updateLead).not.toHaveBeenCalled();
+  });
+
+  it("demotes the failed target before restoring the previous primary when project sync fails", async () => {
+    vi.mocked(findMembershipById).mockResolvedValue(secondaryMembership);
+    vi.mocked(findMembershipsForLead).mockResolvedValue([
+      primaryMembership,
+      secondaryMembership,
+    ]);
+    vi.mocked(updateLead).mockRejectedValueOnce(new Error("email conflict"));
+
+    await expect(
+      setLeadProjectMembershipPrimary({
+        workspaceId: "ws-1",
+        leadId: "lead-1",
+        membershipId: "mem-2",
+        actorId: "user-1",
+      }),
+    ).rejects.toThrow("email conflict");
+
+    expect(updateMembership.mock.calls.map(([, id, input]) => [id, input])).toEqual([
+      ["mem-1", { isPrimary: false }],
+      ["mem-2", { isPrimary: true }],
+      ["mem-2", { isPrimary: false }],
+      ["mem-1", { isPrimary: true }],
+    ]);
+    expect(archiveMembership).not.toHaveBeenCalled();
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
+  });
+
+  it("archives a first primary membership if Lead.projectId sync fails", async () => {
+    const orphanLead = { ...lead, projectId: null };
+    const createdPrimary = {
+      ...primaryMembership,
+      id: "mem-new",
+      projectId: "project-2",
+      source: "manual" as const,
+    };
+    vi.mocked(findLeadById).mockResolvedValue(orphanLead as never);
+    vi.mocked(findMembershipsForLead).mockResolvedValue([]);
+    vi.mocked(createMembership).mockResolvedValue(createdPrimary);
+    vi.mocked(updateLead).mockRejectedValueOnce(new Error("sync failed"));
+
+    await expect(
+      addLeadProjectMembership({
+        workspaceId: "ws-1",
+        leadId: "lead-1",
+        actorId: "user-1",
+        projectId: "project-2",
+      }),
+    ).rejects.toThrow("sync failed");
+
+    expect(archiveMembership).toHaveBeenCalledWith("ws-1", "mem-new");
+    expect(updateMembership).not.toHaveBeenCalledWith("ws-1", "mem-new", {
+      isPrimary: false,
+    });
+    expect(createAuditLog).not.toHaveBeenCalled();
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
   it("prevents removing the last or current primary membership", async () => {

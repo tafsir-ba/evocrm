@@ -115,6 +115,22 @@ async function syncLeadPrimaryProject(
   await updateLead(workspaceId, lead.id, { projectId: primaryProjectId });
 }
 
+async function rollbackFailedPrimaryAssignment(input: {
+  workspaceId: string;
+  failedMembershipId: string;
+  previousPrimaryId?: string;
+  removeFailedMembership?: boolean;
+}): Promise<void> {
+  if (input.removeFailedMembership) {
+    await archiveMembership(input.workspaceId, input.failedMembershipId);
+    return;
+  }
+  await updateMembership(input.workspaceId, input.failedMembershipId, { isPrimary: false });
+  if (input.previousPrimaryId) {
+    await updateMembership(input.workspaceId, input.previousPrimaryId, { isPrimary: true });
+  }
+}
+
 async function nextSourceOrder(
   memberships: LeadProjectMembershipRecord[],
 ): Promise<number> {
@@ -280,11 +296,13 @@ export async function addLeadProjectMembership(input: {
     try {
       await syncLeadPrimaryProject(input.workspaceId, lead, input.projectId);
     } catch (error) {
-      await updateMembership(input.workspaceId, created.id, { isPrimary: false });
       const currentPrimary = memberships.find((item) => item.isPrimary);
-      if (currentPrimary) {
-        await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: true });
-      }
+      await rollbackFailedPrimaryAssignment({
+        workspaceId: input.workspaceId,
+        failedMembershipId: created.id,
+        previousPrimaryId: currentPrimary?.id,
+        removeFailedMembership: !currentPrimary,
+      });
       throw error;
     }
   }
@@ -335,10 +353,11 @@ export async function setLeadProjectMembershipPrimary(input: {
     await updateMembership(input.workspaceId, target.id, { isPrimary: true });
     await syncLeadPrimaryProject(input.workspaceId, lead, target.projectId);
   } catch (error) {
-    if (currentPrimary) {
-      await updateMembership(input.workspaceId, currentPrimary.id, { isPrimary: true });
-    }
-    await updateMembership(input.workspaceId, target.id, { isPrimary: false });
+    await rollbackFailedPrimaryAssignment({
+      workspaceId: input.workspaceId,
+      failedMembershipId: target.id,
+      previousPrimaryId: currentPrimary?.id,
+    });
     throw error;
   }
 
