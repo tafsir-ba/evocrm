@@ -10,7 +10,8 @@ import {
 describe("permission allowlist", () => {
   it("accepts approved permission keys", () => {
     expect(isValidPermission("dashboard:read")).toBe(true);
-    expect(isValidPermission("lead:update")).toBe(true);
+    expect(isValidPermission("lead:enrich")).toBe(true);
+    expect(isValidPermission("lead:financial_read")).toBe(true);
   });
 
   it("rejects unknown permission keys", () => {

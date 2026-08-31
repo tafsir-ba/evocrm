@@ -20,6 +20,8 @@ describe("default role permission sets", () => {
     expect(ownerPermissions).toContain("billing:manage");
     expect(ownerPermissions).toContain("roles:manage");
     expect(ownerPermissions).toContain("campaign:delete");
+    expect(ownerPermissions).toContain("lead:enrich");
+    expect(ownerPermissions).toContain("lead:financial_read");
     expect(ownerPermissions).toContain("lead:delete");
   });
 
@@ -41,7 +43,8 @@ describe("default role permission sets", () => {
 
   it("gives agent operational read/write without archive/manage", () => {
     const agentPermissions = getDefaultRolePermissions("agent");
-    expect(agentPermissions).toContain("lead:update");
+    expect(agentPermissions).toContain("lead:enrich");
+    expect(agentPermissions).not.toContain("lead:financial_read");
     expect(agentPermissions).not.toContain("lead:archive");
     expect(agentPermissions).not.toContain("users:manage");
   });
@@ -49,6 +52,8 @@ describe("default role permission sets", () => {
   it("gives viewer read-only permissions", () => {
     const viewerPermissions = getDefaultRolePermissions("viewer");
     expect(viewerPermissions).toContain("lead:read");
+    expect(viewerPermissions).not.toContain("lead:enrich");
+    expect(viewerPermissions).not.toContain("lead:financial_read");
     expect(viewerPermissions).not.toContain("lead:create");
     expect(viewerPermissions).not.toContain("settings:update");
   });

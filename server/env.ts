@@ -48,6 +48,13 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: optionalNonEmptyString,
   STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optionalNonEmptyString,
+
+  // Optional — Lead enrichment (disabled until key + workspace toggle)
+  OPENAI_API_KEY: optionalNonEmptyString,
+  OPENAI_ENRICHMENT_MODEL: optionalNonEmptyString,
+  TAVILY_API_KEY: optionalNonEmptyString,
+  BRAVE_SEARCH_API_KEY: optionalNonEmptyString,
+  LEAD_ENRICHMENT_DEMO: optionalNonEmptyString,
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -57,6 +57,9 @@ export type LeadRecord = {
   industry: string | null;
   jobTitle: string | null;
   stateRegion: string | null;
+  city?: string | null;
+  country?: string | null;
+  professionalProfileUrl?: string | null;
   intelligenceProvenance: LeadIntelligenceProvenance;
   notes: string | null;
   tags: string[];
@@ -102,6 +105,11 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
     industry: document.industry ?? null,
     jobTitle: document.jobTitle ?? null,
     stateRegion: document.stateRegion ?? null,
+    city: (document as LeadDocument & { city?: string | null }).city ?? null,
+    country: (document as LeadDocument & { country?: string | null }).country ?? null,
+    professionalProfileUrl:
+      (document as LeadDocument & { professionalProfileUrl?: string | null })
+        .professionalProfileUrl ?? null,
     intelligenceProvenance:
       ((document as LeadDocument & { intelligenceProvenance?: LeadIntelligenceProvenance })
         .intelligenceProvenance as LeadIntelligenceProvenance | undefined) ?? {},
@@ -668,6 +676,9 @@ export async function createLead(input: {
   industry?: string | null;
   jobTitle?: string | null;
   stateRegion?: string | null;
+  city?: string | null;
+  country?: string | null;
+  professionalProfileUrl?: string | null;
   intelligenceProvenance?: LeadIntelligenceProvenance;
 }): Promise<LeadRecord> {
   await connectDb();
@@ -697,6 +708,9 @@ export async function createLead(input: {
       industry: input.industry ?? null,
       jobTitle: input.jobTitle ?? null,
       stateRegion: input.stateRegion ?? null,
+      city: input.city ?? null,
+      country: input.country ?? null,
+      professionalProfileUrl: input.professionalProfileUrl ?? null,
       intelligenceProvenance: input.intelligenceProvenance ?? {},
       notes: input.notes ?? null,
       tags: input.tags ?? [],
@@ -748,6 +762,9 @@ export async function updateLead(
     industry: string | null;
     jobTitle: string | null;
     stateRegion: string | null;
+    city: string | null;
+    country: string | null;
+    professionalProfileUrl: string | null;
     intelligenceProvenance: LeadIntelligenceProvenance;
     notes: string | null;
     tags: string[];

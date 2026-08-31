@@ -128,6 +128,9 @@ export const leadRecordExtras = {
   industry: null,
   jobTitle: null,
   stateRegion: null,
+  city: null,
+  country: null,
+  professionalProfileUrl: null,
   intelligenceProvenance: {},
 };
 
@@ -158,6 +161,9 @@ export function buildTestLeadRecord(overrides: Partial<LeadRecord> = {}): LeadRe
     industry: null,
     jobTitle: null,
     stateRegion: null,
+    city: null,
+    country: null,
+    professionalProfileUrl: null,
     intelligenceProvenance: {},
     notes: null,
     tags: [],

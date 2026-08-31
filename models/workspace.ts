@@ -7,6 +7,13 @@ const workspaceSchema = new Schema(
     type: { type: String, required: true, default: "agency" },
     timezone: { type: String, required: true, default: "UTC" },
     defaultCurrency: { type: String, required: true, default: "USD" },
+    leadEnrichment: {
+      enabled: { type: Boolean, default: false },
+      demoMode: { type: Boolean, default: false },
+      retentionDays: { type: Number, default: 180 },
+      legalReviewAcknowledgedAt: { type: Date, default: null },
+      legalReviewAcknowledgedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

@@ -9,6 +9,14 @@ export { ProjectModel, type ProjectDocument } from "./project";
 export { CompanyModel, type CompanyDocument } from "./company";
 export { LeadModel, type LeadDocument } from "./lead";
 export {
+  LeadEnrichmentRunModel,
+  type LeadEnrichmentRunDocument,
+} from "./lead-enrichment-run";
+export {
+  LeadFinancialSituationModel,
+  type LeadFinancialSituationDocument,
+} from "./lead-financial-situation";
+export {
   LeadProjectMembershipModel,
   type LeadProjectMembershipDocument,
 } from "./lead-project-membership";

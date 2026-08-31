@@ -4,6 +4,14 @@ import { AppError } from "@/server/errors";
 import { connectDb } from "@/server/db/mongoose";
 import { WorkspaceModel, type WorkspaceDocument } from "@/models/workspace";
 
+export type WorkspaceLeadEnrichmentSettings = {
+  enabled: boolean;
+  demoMode: boolean;
+  retentionDays: number;
+  legalReviewAcknowledgedAt: Date | null;
+  legalReviewAcknowledgedBy: string | null;
+};
+
 export type WorkspaceRecord = {
   id: string;
   name: string;
@@ -11,10 +19,50 @@ export type WorkspaceRecord = {
   type: string;
   timezone: string;
   defaultCurrency: string;
+  leadEnrichment?: WorkspaceLeadEnrichmentSettings;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
 };
+
+function defaultLeadEnrichmentSettings(): WorkspaceLeadEnrichmentSettings {
+  return {
+    enabled: false,
+    demoMode: false,
+    retentionDays: 180,
+    legalReviewAcknowledgedAt: null,
+    legalReviewAcknowledgedBy: null,
+  };
+}
+
+function readLeadEnrichmentSettings(
+  document: WorkspaceDocument,
+): WorkspaceLeadEnrichmentSettings {
+  const raw = (
+    document as WorkspaceDocument & {
+      leadEnrichment?: Partial<WorkspaceLeadEnrichmentSettings> & {
+        legalReviewAcknowledgedAt?: Date | null;
+        legalReviewAcknowledgedBy?: { toString(): string } | null;
+      };
+    }
+  ).leadEnrichment;
+  const defaults = defaultLeadEnrichmentSettings();
+  if (!raw) {
+    return defaults;
+  }
+  return {
+    enabled: raw.enabled === true,
+    demoMode: raw.demoMode === true,
+    retentionDays:
+      typeof raw.retentionDays === "number" && raw.retentionDays > 0
+        ? raw.retentionDays
+        : defaults.retentionDays,
+    legalReviewAcknowledgedAt: raw.legalReviewAcknowledgedAt ?? null,
+    legalReviewAcknowledgedBy: raw.legalReviewAcknowledgedBy
+      ? String(raw.legalReviewAcknowledgedBy)
+      : null,
+  };
+}
 
 function toWorkspaceRecord(document: WorkspaceDocument): WorkspaceRecord {
   return {
@@ -24,6 +72,7 @@ function toWorkspaceRecord(document: WorkspaceDocument): WorkspaceRecord {
     type: document.type,
     timezone: document.timezone,
     defaultCurrency: document.defaultCurrency,
+    leadEnrichment: readLeadEnrichmentSettings(document),
     createdBy: document.createdBy.toString(),
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
@@ -79,12 +128,40 @@ export async function createWorkspace(input: {
 
 export async function updateWorkspace(
   workspaceId: string,
-  input: Partial<Pick<WorkspaceRecord, "name" | "type" | "timezone" | "defaultCurrency">>,
+  input: Partial<
+    Pick<WorkspaceRecord, "name" | "type" | "timezone" | "defaultCurrency">
+  > & {
+    leadEnrichment?: Partial<WorkspaceLeadEnrichmentSettings>;
+  },
 ): Promise<WorkspaceRecord> {
   await connectDb();
+  const $set: Record<string, unknown> = {};
+  if (input.name !== undefined) $set.name = input.name;
+  if (input.type !== undefined) $set.type = input.type;
+  if (input.timezone !== undefined) $set.timezone = input.timezone;
+  if (input.defaultCurrency !== undefined) $set.defaultCurrency = input.defaultCurrency;
+  if (input.leadEnrichment) {
+    if (input.leadEnrichment.enabled !== undefined) {
+      $set["leadEnrichment.enabled"] = input.leadEnrichment.enabled;
+    }
+    if (input.leadEnrichment.demoMode !== undefined) {
+      $set["leadEnrichment.demoMode"] = input.leadEnrichment.demoMode;
+    }
+    if (input.leadEnrichment.retentionDays !== undefined) {
+      $set["leadEnrichment.retentionDays"] = input.leadEnrichment.retentionDays;
+    }
+    if (input.leadEnrichment.legalReviewAcknowledgedAt !== undefined) {
+      $set["leadEnrichment.legalReviewAcknowledgedAt"] =
+        input.leadEnrichment.legalReviewAcknowledgedAt;
+    }
+    if (input.leadEnrichment.legalReviewAcknowledgedBy !== undefined) {
+      $set["leadEnrichment.legalReviewAcknowledgedBy"] =
+        input.leadEnrichment.legalReviewAcknowledgedBy;
+    }
+  }
   const document = await WorkspaceModel.findByIdAndUpdate(
     workspaceId,
-    { $set: input },
+    { $set },
     { new: true, runValidators: true },
   ).lean<WorkspaceDocument>();
 

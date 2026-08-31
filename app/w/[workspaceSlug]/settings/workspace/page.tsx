@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WorkspaceSettingsPanel } from "@/components/settings/workspace-settings-panel";
+import { LeadEnrichmentSettingsPanel } from "@/components/settings/lead-enrichment-settings-panel";
 import { PageContainer, PageHeader } from "@/components/layout/page-header";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
@@ -51,6 +52,12 @@ export default async function SettingsWorkspacePage({
         canUpdate={canUpdate}
         canDelete={canDelete}
       />
+      <div className="mt-4">
+        <LeadEnrichmentSettingsPanel
+          workspaceSlug={workspaceSlug}
+          canUpdate={canUpdate}
+        />
+      </div>
     </PageContainer>
   );
 }

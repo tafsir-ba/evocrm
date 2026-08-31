@@ -6,7 +6,8 @@ export type StatusTone =
   | "success"
   | "warn"
   | "danger"
-  | "muted";
+  | "muted"
+  | "enrich";
 
 const TONES: Record<StatusTone, string> = {
   neutral:
@@ -19,6 +20,8 @@ const TONES: Record<StatusTone, string> = {
     "bg-[var(--color-danger-bg)] text-[var(--color-danger-fg)] border-[var(--color-danger-border)]",
   muted:
     "bg-[var(--color-muted)] text-[var(--color-ink-muted)] border-[var(--color-line)]",
+  enrich:
+    "bg-[var(--color-enrich-bg)] text-[var(--color-enrich-fg)] border-[var(--color-enrich-border)]",
 };
 
 export function Badge({

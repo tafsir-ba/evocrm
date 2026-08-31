@@ -185,6 +185,15 @@ POST   /api/workspaces/[workspaceSlug]/leads
 GET    /api/workspaces/[workspaceSlug]/leads/[leadId]
 PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]
 DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]          # archive (soft)
+GET    /api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment
+DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment/[runId]/decisions
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment/[runId]/revert
+GET    /api/workspaces/[workspaceSlug]/leads/[leadId]/financial-situation
+PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]/financial-situation
+DELETE /api/workspaces/[workspaceSlug]/leads/[leadId]/financial-situation
+POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/financial-situation/market-estimate
 GET    /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships
 POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships
 PATCH  /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/[membershipId]
@@ -198,10 +207,17 @@ POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/reorde
 | POST create | `lead:create` |
 | PATCH update | `lead:update` |
 | DELETE archive | `lead:archive` |
-| GET project memberships | `lead:read` |
+| GET enrichment | `lead:enrich` or `lead:read` |
+| POST enrichment / decisions / revert | `lead:enrich` |
+| DELETE enrichment | `lead:enrich_revoke` |
+| GET financial situation | `lead:financial_read` |
+| PATCH financial / market-estimate | `lead:financial_update` |
+| DELETE financial | `lead:financial_delete` |
 | POST/PATCH/DELETE/reorder memberships | `lead:update` |
 
 **GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `acquisition` (`genuine_inbound` \| `legacy_import`), `includeArchived`, `projectId`, `includeAssociated`, `companyId`, `industry`, `jobTitle`, `stateRegion`. `projectId` matches the **primary** project by default. `includeAssociated=true` includes leads associated with that project through any membership. List/detail items include `project` (primary), `projectMemberships`, `secondaryProjects`, `company`, `industry`, `jobTitle`, and `stateRegion`.
+
+**Manual web enrichment** is feature-flagged (`Workspace.leadEnrichment.enabled` + `OPENAI_API_KEY`). It never writes lead fields until the user accepts proposals. Accept uses repository `updateLead` (no campaign auto-enrollment). Ambiguous identity returns no suggestions. Financial situation is a separate collection and is never filled from public-web search. Contract: `/docs/lead-enrichment.md`.
 
 **Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and `companyId` (Company FK). Clients do not send provenance. The service stamps `intelligenceProvenance` only when a value actually changes. HubSpot CMP enrichment fills blank or HubSpot-owned values only and never enrolls campaigns (`triggerAutomation: false`). Manual CRM values are preserved. Shared contract: `lib/lead-intelligence.ts` / `lib/hubspot-cmp-lead-intelligence.ts`.
 

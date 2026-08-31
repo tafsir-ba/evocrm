@@ -48,6 +48,12 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `lead:read` | View leads |
 | `lead:update` | Edit leads |
 | `lead:archive` | Archive leads |
+| `lead:delete` | Permanently delete leads |
+| `lead:enrich` | Run and review public-web lead enrichment |
+| `lead:enrich_revoke` | Delete / revoke enrichment data |
+| `lead:financial_read` | View financial situation (restricted) |
+| `lead:financial_update` | Edit financial situation |
+| `lead:financial_delete` | Delete financial situation data |
 
 ### Properties
 

@@ -318,7 +318,10 @@ Demand-side record (buyer/inquirer).
 | `industry` | Optional lead intelligence |
 | `jobTitle` | Optional lead intelligence |
 | `stateRegion` | Optional state / region string |
-| `intelligenceProvenance` | Per-field map: `method` (`manual` \| `hubspot` \| `import` \| `website` \| `api`), `source`, `appliedAt`, `notes` |
+| `city` | Optional city (may be accepted from enrichment) |
+| `country` | Optional country |
+| `professionalProfileUrl` | Optional public professional profile / website |
+| `intelligenceProvenance` | Per-field map: `method` (`manual` \| `hubspot` \| `import` \| `website` \| `api` \| `enrichment`), `source`, `appliedAt`, `notes` |
 | `notes` | |
 | `tags[]` | Tag IDs |
 | `attributes` | Flexible key-value bag |
@@ -335,7 +338,9 @@ Demand-side record (buyer/inquirer).
 
 **Lead timestamps:** `createdAt` is CRM created/imported time. Original inbound uses `attributes.integration.receivedAt` or HubSpot `sourceCreatedAt`. Project Active ≤30 days / Stale >30 days / Unknown uses the newest genuine original inbound date, never CRM import `createdAt` or last activity.
 
-**Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and associated `companyId` (Company FK, not a project company link). `intelligenceProvenance` records how each field was last written. HubSpot CMP enrichment may fill blank or HubSpot-owned values only; manual CRM values are preserved. Enrichment never enrolls campaigns.
+**Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and associated `companyId` (Company FK, not a project company link). `intelligenceProvenance` records how each field was last written. HubSpot CMP enrichment may fill blank or HubSpot-owned values only; manual CRM values are preserved. Manual public-web enrichment (`method: enrichment`) is never automatic, never overwrites CRM-entered values silently, and never enrolls campaigns.
+
+See `/docs/lead-enrichment.md` for the enrichment review flow, financial situation tab, and inclusion/exclusion policy.
 
 **Project memberships:** A lead may belong to multiple projects through `LeadProjectMembership`. Exactly one membership is primary. `Lead.projectId` is the denormalized primary project (list/filter/search default, email uniqueness, campaign matching). Secondary memberships never create campaign or drip enrollment.
 

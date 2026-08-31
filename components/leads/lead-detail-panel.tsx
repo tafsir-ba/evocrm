@@ -33,8 +33,14 @@ import {
   IconMail,
   IconMapPin,
   IconPhone,
+  IconSparkles,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import { FieldOriginBadge } from "@/components/leads/field-origin-badge";
+import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
+import { LeadFinancialSituationTab } from "@/components/leads/lead-financial-situation-tab";
+import { readWebEnrichmentAttributes } from "@/lib/lead-enrichment";
+import type { LeadFieldProvenanceMethod } from "@/lib/lead-intelligence";
 import {
   LeadProjectMemberships,
   type LeadProjectMembershipItem,
@@ -80,6 +86,12 @@ type LeadDetail = {
   industry?: string | null;
   jobTitle?: string | null;
   stateRegion?: string | null;
+  city?: string | null;
+  country?: string | null;
+  professionalProfileUrl?: string | null;
+  intelligenceProvenance?: Partial<
+    Record<string, { method: LeadFieldProvenanceMethod } | null>
+  >;
   attributes?: Record<string, unknown> | null;
   emailConsentStatus?: "unknown" | "subscribed" | "unsubscribed" | null;
 };
@@ -100,6 +112,10 @@ type LeadDetailPanelProps = {
   canReadDocuments: boolean;
   canCreateDocument: boolean;
   canArchiveDocument: boolean;
+  canEnrich: boolean;
+  canFinancialRead: boolean;
+  canFinancialUpdate: boolean;
+  canFinancialDelete: boolean;
 };
 
 export function LeadDetailPanel({
@@ -118,6 +134,10 @@ export function LeadDetailPanel({
   canReadDocuments,
   canCreateDocument,
   canArchiveDocument,
+  canEnrich,
+  canFinancialRead,
+  canFinancialUpdate,
+  canFinancialDelete,
 }: LeadDetailPanelProps) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +149,7 @@ export function LeadDetailPanel({
   const [projects, setProjects] = useState<LeadProjectOption[]>([]);
   const [memberships, setMemberships] = useState<LeadProjectMembershipItem[]>([]);
   const [membershipError, setMembershipError] = useState<string | null>(null);
+  const [enrichOpen, setEnrichOpen] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
@@ -357,6 +378,7 @@ export function LeadDetailPanel({
     .toUpperCase();
 
   const integrationAttrs = readLeadIntegrationAttributes(lead.attributes);
+  const enrichmentOverlay = readWebEnrichmentAttributes(lead.attributes);
   const websiteName = integrationAttrs?.integrationId
     ? (integrationNames[integrationAttrs.integrationId] ?? integrationAttrs.integrationId)
     : null;
@@ -385,6 +407,15 @@ export function LeadDetailPanel({
         }`}
         actions={
           <>
+            {canEnrich && !lead.archivedAt && (
+              <Button
+                variant="outline"
+                leadingIcon={<IconSparkles size={14} />}
+                onClick={() => setEnrichOpen(true)}
+              >
+                Enrich
+              </Button>
+            )}
             {canUpdate && !lead.archivedAt && (
               <Link href={workspacePath(workspaceSlug, "leads", leadId, "edit")}>
                 <Button variant="secondary">Edit</Button>
@@ -440,10 +471,16 @@ export function LeadDetailPanel({
               {lead.phone ?? "—"}
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Company">
-              {lead.company?.name ?? "—"}
+              <span className="inline-flex items-center gap-1.5">
+                {lead.company?.name ?? "—"}
+                <FieldOriginBadge method={lead.intelligenceProvenance?.companyId?.method} />
+              </span>
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Job title">
-              {lead.jobTitle ?? "—"}
+              <span className="inline-flex items-center gap-1.5">
+                {lead.jobTitle ?? "—"}
+                <FieldOriginBadge method={lead.intelligenceProvenance?.jobTitle?.method} />
+              </span>
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Preferred areas">
               {lead.preferredAreas.length > 0 ? lead.preferredAreas.join(", ") : "—"}
@@ -514,8 +551,10 @@ export function LeadDetailPanel({
                         }
                       />
                       <Info label="Source" value={lead.source?.label ?? "—"} />
-                      <Info label="Industry" value={lead.industry ?? "—"} />
-                      <Info label="State / region" value={lead.stateRegion ?? "—"} />
+                      <Info label="Industry" value={lead.industry ?? "—"} origin={lead.intelligenceProvenance?.industry?.method} />
+                      <Info label="State / region" value={lead.stateRegion ?? "—"} origin={lead.intelligenceProvenance?.stateRegion?.method} />
+                      <Info label="City" value={lead.city ?? enrichmentOverlay.city ?? "—"} origin={lead.intelligenceProvenance?.city?.method} />
+                      <Info label="Country" value={lead.country ?? enrichmentOverlay.country ?? "—"} origin={lead.intelligenceProvenance?.country?.method} />
                       <div className="md:col-span-2">
                         <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
                           Projects
@@ -642,6 +681,16 @@ export function LeadDetailPanel({
                           lead.usagePurpose ? labelUsagePurpose(lead.usagePurpose) : "—"
                         }
                       />
+                      {enrichmentOverlay.summary?.text ? (
+                        <div className="md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3">
+                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
+                            Enrichment summary
+                          </p>
+                          <p className="text-[13px] text-[var(--color-ink-soft)] whitespace-pre-wrap">
+                            {enrichmentOverlay.summary.text}
+                          </p>
+                        </div>
+                      ) : null}
                       {integrationAttrs && (
                         <>
                           <div className="md:col-span-2 border-t border-[var(--color-line)] pt-4">
@@ -709,6 +758,22 @@ export function LeadDetailPanel({
                     />
                   ),
                 },
+                ...(canFinancialRead
+                  ? [
+                      {
+                        key: "financial",
+                        label: "Financial situation",
+                        content: (
+                          <LeadFinancialSituationTab
+                            workspaceSlug={workspaceSlug}
+                            leadId={leadId}
+                            canUpdate={canFinancialUpdate && !lead.archivedAt}
+                            canDelete={canFinancialDelete && !lead.archivedAt}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   key: "notes",
                   label: "Notes",
@@ -743,6 +808,14 @@ export function LeadDetailPanel({
         </div>
       </div>
 
+      <LeadEnrichmentModal
+        open={enrichOpen}
+        onClose={() => setEnrichOpen(false)}
+        workspaceSlug={workspaceSlug}
+        leadId={leadId}
+        lead={lead}
+        onApplied={() => void loadLead()}
+      />
     </>
   );
 }
@@ -769,13 +842,24 @@ function Row({
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({
+  label,
+  value,
+  origin,
+}: {
+  label: string;
+  value: string;
+  origin?: LeadFieldProvenanceMethod | "unknown" | null;
+}) {
   return (
     <div>
       <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
         {label}
       </p>
-      <p className="text-[13.5px] text-[var(--color-ink)]">{value}</p>
+      <p className="text-[13.5px] text-[var(--color-ink)] inline-flex items-center gap-1.5 flex-wrap">
+        {value}
+        <FieldOriginBadge method={origin} />
+      </p>
     </div>
   );
 }

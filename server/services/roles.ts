@@ -50,6 +50,26 @@ export async function seedDefaultRolesForWorkspace(
   return roles;
 }
 
+export async function syncSystemRolePermissionsForWorkspace(
+  workspaceId: string,
+): Promise<void> {
+  for (const definition of DEFAULT_ROLE_DEFINITIONS) {
+    const existing = await findRoleByWorkspaceAndKey(workspaceId, definition.key);
+    if (!existing) {
+      continue;
+    }
+    const missing = definition.permissions.filter(
+      (key) => !existing.permissions.includes(key),
+    );
+    if (missing.length === 0) {
+      continue;
+    }
+    await updateRole(existing.id, workspaceId, {
+      permissions: [...existing.permissions, ...missing],
+    });
+  }
+}
+
 export async function findOwnerRole(workspaceId: string): Promise<RoleRecord | null> {
   return findRoleByWorkspaceAndKey(workspaceId, "owner");
 }
@@ -81,6 +101,11 @@ const PERMISSION_LABELS: Record<string, string> = {
   "lead:update": "Edit leads",
   "lead:archive": "Archive leads",
   "lead:delete": "Permanently delete leads",
+  "lead:enrich": "Run and review public-web lead enrichment",
+  "lead:enrich_revoke": "Delete / revoke enrichment data",
+  "lead:financial_read": "View financial situation",
+  "lead:financial_update": "Edit financial situation",
+  "lead:financial_delete": "Delete financial situation data",
   "property:create": "Create properties",
   "property:read": "View properties",
   "property:update": "Edit properties",
@@ -146,6 +171,7 @@ async function toRoleListItem(
 export async function listRolesForWorkspace(
   workspaceId: string,
 ): Promise<RoleListItem[]> {
+  await syncSystemRolePermissionsForWorkspace(workspaceId);
   const roles = await findRolesForWorkspace(workspaceId);
   return Promise.all(roles.map((role) => toRoleListItem(role, workspaceId)));
 }

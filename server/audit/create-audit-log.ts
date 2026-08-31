@@ -31,7 +31,9 @@ export type AuditEntityType =
   | "hubspot_migration_run"
   | "project_grant"
   | "project_invitation"
-  | "lead_project_membership";
+  | "lead_project_membership"
+  | "lead_enrichment_run"
+  | "lead_financial_situation";
 
 export type CreateAuditLogInput = {
   workspaceId: string;

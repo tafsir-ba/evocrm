@@ -20,6 +20,7 @@ export const LEAD_FIELD_PROVENANCE_METHODS = [
   "import",
   "website",
   "api",
+  "enrichment",
 ] as const;
 
 export type LeadFieldProvenanceMethod = (typeof LEAD_FIELD_PROVENANCE_METHODS)[number];
@@ -31,8 +32,17 @@ export type LeadFieldProvenance = {
   notes: string | null;
 };
 
+export const LEAD_PROVENANCE_TRACKED_FIELDS = [
+  ...LEAD_INTELLIGENCE_FIELDS,
+  "city",
+  "country",
+  "professionalProfileUrl",
+] as const;
+
+export type LeadProvenanceTrackedField = (typeof LEAD_PROVENANCE_TRACKED_FIELDS)[number];
+
 export type LeadIntelligenceProvenance = Partial<
-  Record<LeadIntelligenceField, LeadFieldProvenance | null>
+  Record<LeadProvenanceTrackedField, LeadFieldProvenance | null>
 >;
 
 export type LeadIntelligenceValues = {
@@ -122,7 +132,7 @@ export type IntelligenceApplyDecision =
 
 /**
  * HubSpot/import enrichment may fill blanks or refresh HubSpot-owned values.
- * Manual, website, import, and API values are preserved.
+ * Manual, website, import, API, and user-accepted web-enrichment values are preserved.
  */
 export function canApplyIntelligenceValue(input: {
   existingValue: string | null | undefined;

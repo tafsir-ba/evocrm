@@ -49,7 +49,7 @@ export default async function SettingsPage({ params }: { params: Params }) {
     {
       key: "workspace",
       label: "Workspace",
-      desc: "Name, locale, currency and branding",
+      desc: "Name, locale, currency, branding and lead enrichment",
       Icon: IconBuilding,
       href: "workspace",
       visible: true,

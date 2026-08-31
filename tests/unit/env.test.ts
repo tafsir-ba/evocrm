@@ -27,6 +27,7 @@ describe("parseEnv", () => {
     expect(env.NEXTAUTH_SECRET).toBeUndefined();
     expect(env.RESEND_API_KEY).toBeUndefined();
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBeUndefined();
   });
 
   it("parses optional variables when provided", () => {
