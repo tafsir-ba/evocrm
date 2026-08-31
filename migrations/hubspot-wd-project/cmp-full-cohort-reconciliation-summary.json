@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-31T08:36:54.500Z",
+  "generatedAt": "2026-08-31T09:08:34.228Z",
   "portalId": "5699191",
   "workspaceId": "6a2f0444438006b304af77ec",
   "destinationProjectId": "6a9489ee84c29475f4dbc6c3",
@@ -16,10 +16,10 @@
     "expectedDelta": 1
   },
   "bucketCounts": {
-    "migrated_to_cmp": 5962,
+    "migrated_to_cmp": 5977,
     "migrated_elsewhere_in_crm": 0,
     "preexisting_deduped": 0,
-    "product_vs_wd_conflict_held": 15,
+    "product_vs_wd_conflict_held": 0,
     "multi_project_held": 0,
     "missing_or_invalid_contact": 2339,
     "still_to_migrate_cmp": 0,
@@ -28,13 +28,12 @@
     "unexplained": 0
   },
   "reasonCounts": {
-    "product_vs_wd_conflict": 15,
-    "hubspot_id_on_cmp": 5962,
+    "hubspot_id_on_cmp": 5977,
     "missing_email_and_phone": 2339
   },
   "crmSnapshot": {
-    "cmpLeadCount": 5987,
-    "cmpGuarded": 5987,
+    "cmpLeadCount": 6002,
+    "cmpGuarded": 6002,
     "cmpEnrollmentCount": 0,
     "generalLeadsWithHubspotKey": 0,
     "note": "cmpLeadCount can exceed migrated_to_cmp when CRM holds CMP leads whose HubSpot product_intersted_in is no longer EQ CMP, or when non-product CMP attributions were migrated."

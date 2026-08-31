@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-31T08:38:27.195Z",
+  "generatedAt": "2026-08-31T09:08:45.649Z",
   "portalId": "5699191",
   "workspaceId": "6a2f0444438006b304af77ec",
   "sources": {
@@ -15,38 +15,35 @@
   },
   "currentState": {
     "hubspotDistinctSourceIds": 38368,
-    "priorBusinessExpectation": 38366,
-    "portalDeltaVsExpectation": 2,
-    "crmDistinctHubspotSourceIds": 29119,
-    "portalIdsMatchedInCrmByHubspotId": 29106,
-    "crmActiveLeadsWithHubspotInboundSource": 29196,
+    "portalIdsMatchedInCrmByHubspotId": 29121,
+    "crmDistinctHubspotSourceIds": 29149,
+    "crmActiveLeadsWithHubspotInboundSource": 29211,
     "dashboardImported": 29196,
-    "dashboardImportedMeaning": "Lead-row count with HubSpot inbound source — not exclusive source-ID accounting",
-    "grossRemainingSourceGap": 9262,
+    "grossRemainingSourceGap": 9247,
     "unexplained": 0,
     "campaignEnrollmentsOnMigrated": 0
   },
   "exclusivePortalBuckets": {
-    "migrated_hubspot_id_match": 29106,
-    "preexisting_deduped_email_match": 295,
-    "still_to_migrate_residual": 4,
-    "multi_or_identity_exception_held": 2387,
-    "no_project_signal_held": 3589,
-    "explicit_exclusions": 2987,
+    "migrated": 29121,
+    "preexisting_deduped": 295,
+    "still_to_migrate": 4,
+    "multi_or_identity_exception": 2372,
+    "no_project_signal": 3589,
+    "excluded": 2987,
     "errors_retry": 0,
     "unexplained": 0,
     "sum": 38368
   },
   "cmpProductCohort": {
-    "status": "complete_for_live_hubspot_eq_search",
+    "status": "complete_membership_policy",
     "businessExpectationAbout": 8317,
     "liveHubSpotEqDistinct": 8316,
     "expectedDelta": 1,
     "exclusiveBuckets": {
-      "migrated_to_cmp": 5962,
+      "migrated_to_cmp": 5977,
       "migrated_elsewhere_in_crm": 0,
       "preexisting_deduped": 0,
-      "product_vs_wd_conflict_held": 15,
+      "product_vs_wd_conflict_held": 0,
       "multi_project_held": 0,
       "missing_or_invalid_contact": 2339,
       "still_to_migrate_cmp": 0,
@@ -56,8 +53,17 @@
     },
     "safelyResolved": 8316,
     "unresolved": 0,
-    "crmCmpLeadCount": 5987,
-    "notes": "CMP complete for live product_intersted_in=EQ CMP cohort (8,316). Business ~8,317 delta=1 (contact absent/changed in HubSpot). CRM CMP project lead count (5,987) is not the exclusive product cohort total — includes leads no longer EQ CMP and nameless CMP adds. missing_or_invalid_contact (2,339) are held with explicit reason, not migrated."
+    "crmCmpLeadCount": 6002,
+    "ensureWave": {
+      "scanned": 8316,
+      "created": 7,
+      "preexisting": 5970,
+      "parked": 2339,
+      "error": 0,
+      "createdPrimary": 0,
+      "createdAdditional": 7
+    },
+    "notes": "Owner override: every product=CMP contact requires CMP membership. Conflict/multi add additional membership without reassigning. Parked only missing_email_and_phone."
   },
   "remainingDistinctSourceIdsBySafeRoute": {
     "totalRemainingNotHubspotIdMatched": 9262,
@@ -124,10 +130,21 @@
   "orderedMigrationWaves": [
     {
       "order": 1,
-      "name": "cmp_product_attribution",
-      "status": "complete_for_live_eq_cohort",
+      "name": "cmp_product_membership",
+      "status": "complete_membership_policy",
       "scope": "product_intersted_in=CMP",
-      "outcome": "8,316 exclusive IDs accounted; 5,962 on CMP; 15 conflict held; 2,339 missing contact held"
+      "outcome": {
+        "migrated_to_cmp": 5977,
+        "migrated_elsewhere_in_crm": 0,
+        "preexisting_deduped": 0,
+        "product_vs_wd_conflict_held": 0,
+        "multi_project_held": 0,
+        "missing_or_invalid_contact": 2339,
+        "still_to_migrate_cmp": 0,
+        "other_excluded_held": 0,
+        "errors_retry": 0,
+        "unexplained": 0
+      }
     },
     {
       "order": 2,

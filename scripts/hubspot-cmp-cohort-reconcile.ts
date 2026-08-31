@@ -232,7 +232,10 @@ async function main(): Promise<void> {
     };
     allExisting.push(existing);
     for (const id of hubspotContactIds) {
-      byHubspotId.set(String(id), existing);
+      const existingEntry = byHubspotId.get(String(id));
+      if (!existingEntry || existing.projectId === CMP_PROJECT_ID) {
+        byHubspotId.set(String(id), existing);
+      }
     }
     if (emailNormalized) {
       const list = byEmail.get(emailNormalized) ?? [];
@@ -286,85 +289,65 @@ async function main(): Promise<void> {
     const projects = [...new Set(snapshot.projectValues)];
 
     const byId = byHubspotId.get(row.id);
-    if (byId) {
-      if (byId.projectId === CMP_PROJECT_ID) {
-        buckets.migrated_to_cmp.push(row.id);
-        reasonById[row.id] = "hubspot_id_on_cmp";
-        continue;
-      }
-      buckets.migrated_elsewhere_in_crm.push(row.id);
-      reasonById[row.id] =
-        byId.projectId === WD_MIGRATION_GENERAL_PROJECT_ID
-          ? "hubspot_id_on_general"
-          : "hubspot_id_on_other_project";
+    if (byId?.projectId === CMP_PROJECT_ID) {
+      buckets.migrated_to_cmp.push(row.id);
+      reasonById[row.id] = "hubspot_id_on_cmp";
       continue;
     }
 
-    if (hasProductVsWdConflict({ productValues: snapshot.productValues, projectValues: projects })) {
-      buckets.product_vs_wd_conflict_held.push(row.id);
-      reasonById[row.id] = "product_vs_wd_conflict";
+    const emailOnCmp =
+      snapshot.emailNormalized &&
+      (byEmail.get(snapshot.emailNormalized) ?? []).some((lead) => lead.projectId === CMP_PROJECT_ID);
+    if (emailOnCmp) {
+      buckets.migrated_to_cmp.push(row.id);
+      reasonById[row.id] = "email_on_cmp";
       continue;
     }
 
-    if (projects.length > 1) {
-      buckets.multi_project_held.push(row.id);
-      reasonById[row.id] = "multi_project";
-      continue;
-    }
-
-    const existingForEligibility = allExisting.map((lead) => ({
-      emailNormalized: lead.emailNormalized,
-      nameKey: lead.nameKey,
-      hubspotContactIds: lead.hubspotContactIds,
-    }));
-    const eligibility = evaluateWdProjectEligibility(snapshot, existingForEligibility, WD_CMP_SLUG);
-
-    if (eligibility.exclusions.includes("email_match") && !eligibility.exclusions.includes("identity_conflict")) {
-      buckets.preexisting_deduped.push(row.id);
-      reasonById[row.id] = "email_match";
-      continue;
-    }
-    if (eligibility.exclusions.includes("identity_conflict")) {
-      buckets.other_excluded_held.push(row.id);
-      reasonById[row.id] = "identity_conflict";
-      continue;
-    }
-    if (eligibility.exclusions.includes("missing_email_and_phone")) {
+    if (!snapshot.emailNormalized && !snapshot.hasPhone) {
       buckets.missing_or_invalid_contact.push(row.id);
       reasonById[row.id] = "missing_email_and_phone";
       continue;
     }
-    if (eligibility.exclusions.includes("missing_name")) {
-      buckets.missing_or_invalid_contact.push(row.id);
-      reasonById[row.id] = "missing_name_no_email";
-      continue;
-    }
-    if (eligibility.exclusions.includes("notes_conflict")) {
-      buckets.other_excluded_held.push(row.id);
-      reasonById[row.id] = "notes_conflict";
-      continue;
-    }
-    if (eligibility.exclusions.includes("broker_only") || eligibility.exclusions.includes("notes_only")) {
-      buckets.other_excluded_held.push(row.id);
-      reasonById[row.id] = eligibility.exclusions.find(
-        (item) => item === "broker_only" || item === "notes_only",
-      )!;
-      continue;
-    }
-    if (eligibility.writeEligible) {
+
+    // Owner override: conflict/multi/other attribution no longer parks out of CMP.
+    // Outstanding eligible contacts need CMP membership added (primary or additional).
+    if (byId && byId.projectId !== CMP_PROJECT_ID) {
       buckets.still_to_migrate_cmp.push(row.id);
-      reasonById[row.id] = "new_write_eligible";
+      reasonById[row.id] =
+        byId.projectId === WD_MIGRATION_GENERAL_PROJECT_ID
+          ? "needs_additional_cmp_membership_from_general"
+          : "needs_additional_cmp_membership";
       continue;
     }
-    if (eligibility.exclusions.includes("not_target_project")) {
-      // CMP product with blank wd should be attributable; if still not_target, hold.
-      buckets.other_excluded_held.push(row.id);
-      reasonById[row.id] = "not_target_project";
-      continue;
+
+    if (snapshot.emailNormalized) {
+      const emailMatches = byEmail.get(snapshot.emailNormalized) ?? [];
+      const nonCmpEmail = emailMatches.filter((lead) => lead.projectId !== CMP_PROJECT_ID);
+      if (nonCmpEmail.length > 0) {
+        const identityConflict = nonCmpEmail.some(
+          (lead) => lead.nameKey && snapshot.nameKey && lead.nameKey !== snapshot.nameKey,
+        );
+        if (identityConflict) {
+          buckets.other_excluded_held.push(row.id);
+          reasonById[row.id] = "identity_conflict";
+          continue;
+        }
+        buckets.still_to_migrate_cmp.push(row.id);
+        reasonById[row.id] = "needs_additional_cmp_membership_email_elsewhere";
+        continue;
+      }
     }
-    const primary = eligibility.exclusions[0] ?? "excluded";
-    buckets.other_excluded_held.push(row.id);
-    reasonById[row.id] = primary;
+
+    buckets.still_to_migrate_cmp.push(row.id);
+    reasonById[row.id] = hasProductVsWdConflict({
+      productValues: snapshot.productValues,
+      projectValues: projects,
+    })
+      ? "needs_cmp_membership_despite_wd_conflict"
+      : projects.length > 1
+        ? "needs_cmp_membership_despite_multi_project"
+        : "needs_cmp_membership";
   }
 
   const sortIds = (ids: string[]) => [...ids].sort((a, b) => Number(a) - Number(b));

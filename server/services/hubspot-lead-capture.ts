@@ -97,6 +97,27 @@ async function resolveHubSpotLeadSourceId(workspaceId: string): Promise<string |
 
 const HUBSPOT_WEBHOOK_AUTH_ERROR = "Invalid HubSpot webhook.";
 
+async function ensureCmpMembershipIfNeeded(input: {
+  workspaceId: string;
+  actorId: string;
+  contactId: string;
+  properties: Record<string, string | null>;
+}): Promise<void> {
+  const product = String(input.properties.product_intersted_in ?? "");
+  if (!product.split(/[;|]/).map((part) => part.trim()).includes("CMP")) {
+    return;
+  }
+  const { ensureCmpMembershipFromHubSpotProperties } = await import(
+    "@/server/services/hubspot-cmp-membership"
+  );
+  await ensureCmpMembershipFromHubSpotProperties({
+    contactId: input.contactId,
+    properties: input.properties,
+    actorId: input.actorId,
+    persist: true,
+  });
+}
+
 export async function resolveHubSpotIntegrationFromPortalId(
   portalId: string,
 ): Promise<IntegrationRecord> {
@@ -164,6 +185,21 @@ async function captureHubSpotContactAsLead(input: {
       entityId: existingByKey.id,
     });
 
+    try {
+      const contactForCmp = await fetchHubSpotContact({
+        accessToken: credentials.accessToken,
+        contactId: input.contactId,
+      });
+      await ensureCmpMembershipIfNeeded({
+        workspaceId,
+        actorId: input.integration.createdBy,
+        contactId: input.contactId,
+        properties: contactForCmp.properties,
+      });
+    } catch {
+      // Membership ensure is best-effort on duplicate path; do not fail capture.
+    }
+
     return { leadId: existingByKey.id, duplicate: true };
   }
 
@@ -222,6 +258,17 @@ async function captureHubSpotContactAsLead(input: {
         entityType: "lead",
         entityId: existingByEmail.id,
       });
+
+      try {
+        await ensureCmpMembershipIfNeeded({
+          workspaceId,
+          actorId: input.integration.createdBy,
+          contactId: contact.id,
+          properties: contact.properties,
+        });
+      } catch {
+        // best-effort
+      }
 
       return { leadId: existingByEmail.id, duplicate: true };
     }
@@ -398,6 +445,17 @@ async function captureHubSpotContactAsLead(input: {
       hubspotContactId: contact.id,
     },
   });
+
+  try {
+    await ensureCmpMembershipIfNeeded({
+      workspaceId,
+      actorId: input.integration.createdBy,
+      contactId: contact.id,
+      properties: contact.properties,
+    });
+  } catch {
+    // CMP membership ensure must not fail primary capture.
+  }
 
   return { leadId: result.lead.id, duplicate: false };
 }

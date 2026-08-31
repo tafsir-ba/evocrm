@@ -196,6 +196,10 @@ export async function fetchHubSpotContact(input: {
         "message",
         "notes_last_contacted",
         "createdate",
+        "product_intersted_in",
+        "wd_project",
+        "hs_content_membership_notes",
+        "wd_broker_assigned",
       ].join(","),
     },
   });

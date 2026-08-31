@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-08-31T08:34:03.241Z",
+  "generatedAt": "2026-08-31T09:07:46.772Z",
   "portalId": "5699191",
   "workspaceId": "6a2f0444438006b304af77ec",
   "hubspotSearchTotal": 38368,
@@ -8,22 +8,21 @@
   "accounted": 38368,
   "unexplained": 0,
   "idChecksum": "b71fd2ac199a90560ecb8fcc4172f3c21898e3896f6ddfb0cb698e07dd5c19cb",
-  "contentHash": "7b67cc7363543ccf9d5e960f7013f8804b2f63f465898fc12dbf289a2e6926ec",
+  "contentHash": "da272894d21913ae995f244ef1b45670d3830bbb722bd42ead13d022d0922d86",
   "bucketCounts": {
-    "migrated": 29106,
+    "migrated": 29121,
     "preexisting_deduped": 295,
     "still_to_migrate": 4,
-    "multi_or_identity_exception": 2387,
+    "multi_or_identity_exception": 2372,
     "no_project_signal": 3589,
     "excluded": 2987
   },
   "reasonCounts": {
     "no_project_signal:notes_only": 2282,
-    "hubspot_id_match": 29106,
+    "hubspot_id_match": 29121,
     "multi_project": 2216,
     "notes_conflict": 150,
     "no_project_signal": 1301,
-    "product_vs_wd_conflict": 15,
     "fallback_general:evohom": 1,
     "no_project_signal:broker_only": 6,
     "fallback_general:swissrocestimation": 159,
@@ -36,16 +35,16 @@
     "fallback_general:swissroc_properties": 2
   },
   "crmSourceIdCoverage": {
-    "distinctHubspotSourceIdsInCrm": 29119,
-    "portalIdsMatchedInCrm": 29106,
-    "grossRemainingSourceGap": 9262
+    "distinctHubspotSourceIdsInCrm": 29149,
+    "portalIdsMatchedInCrm": 29121,
+    "grossRemainingSourceGap": 9247
   },
   "dashboardImportedVsLeads": {
     "claimedImported": 29196,
-    "crmActiveLeadsWithHubspotInboundSource": 29196,
-    "crmActiveLeadsTotal": 29510,
-    "crmDistinctHubspotSourceIds": 29119,
-    "crmDistinctHubspotSourceIdsInPortalScan": 29106,
+    "crmActiveLeadsWithHubspotInboundSource": 29211,
+    "crmActiveLeadsTotal": 29525,
+    "crmDistinctHubspotSourceIds": 29149,
+    "crmDistinctHubspotSourceIdsInPortalScan": 29121,
     "includesAllLegacySyncRecords": "claimed_imported_lte_crm_hubspot_inbound_leads",
     "notes": "Dashboard Imported (29,196) is a lead-row total, not exclusive HubSpot source-ID accounting. Distinct HubSpot externalIds in CRM and exclusive portal buckets are authoritative. Pre-existing CRM leads without a HubSpot integration key are not counted as source-ID matches."
   },
@@ -110,16 +109,6 @@
         "88651",
         "103351",
         "103352"
-      ]
-    },
-    "multi_or_identity_exception:product_vs_wd_conflict": {
-      "count": 15,
-      "sampleIds": [
-        "58151",
-        "149701",
-        "268101",
-        "318701",
-        "583751"
       ]
     },
     "excluded:fallback_general:evohom": {
@@ -197,7 +186,7 @@
     }
   },
   "campaignGuard": {
-    "migratedLeadCount": 29196,
+    "migratedLeadCount": 29211,
     "unguardedDefaultExcluded": 0,
     "enrollmentCount": 0
   },

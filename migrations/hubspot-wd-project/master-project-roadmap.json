@@ -108,11 +108,20 @@
       "conflictWhen": "explicit_wd_project_other_than_destination",
       "conflictBucket": "product_vs_wd_conflict:CMP",
       "routeAmbiguityToGeneral": false,
-      "status": "complete_for_live_eq_cohort",
+      "status": "active_membership_override",
       "liveCohortDistinct": 8316,
       "businessExpectationAbout": 8317,
       "reconciliation": "migrations/hubspot-wd-project/cmp-full-cohort-reconciliation-summary.json",
-      "notes": "Priority CMP wave: Product interested in=CMP is explicit attribution when wd_project is blank. Live HubSpot EQ cohort fully accounted exclusively (migrated / conflict held / missing contact). Never route ambiguity to EvoHome General."
+      "membershipPolicy": {
+        "rule": "every_product_intersted_in_cmp_requires_cmp_project_membership",
+        "supersedesConflictHold": true,
+        "primaryWhen": "cmp_only_signal_and_no_other_hubspot_lead",
+        "additionalWhen": "other_explicit_wd_project_or_multi_or_existing_lead_elsewhere",
+        "preserveFirstJoinedPrimary": true,
+        "idempotency": "hubspot:contact:{id} or hubspot:contact:{id}:project:{CMP_PROJECT_ID}",
+        "ongoingSync": "hubspot-lead-capture ensures CMP membership when product_intersted_in includes CMP"
+      },
+      "notes": "Owner override: every HubSpot contact with Product interested in=CMP must have EvoHome CMP membership. Conflict/multi no longer holds out of CMP — ADD membership without deleting/reassigning other project leads. Never route ambiguity to General. Campaign defaultExcluded preserved."
     }
   ],
   "end_line_roadmap": "migrations/hubspot-wd-project/end-line-roadmap.json",
