@@ -68,7 +68,8 @@ describe("financial situation API", () => {
     const response = await GET(new Request("http://localhost/api"), ctx);
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.data.disclaimer).toContain("never be used");
+    expect(body.data.disclaimer).toMatch(/occupational estimate/i);
+    expect(body.data.disclaimer).toMatch(/not this person/i);
     expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:financial_read");
   });
 

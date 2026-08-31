@@ -318,8 +318,9 @@ export function LeadFinancialSituationTab({
         </p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-          Enrich requests this after a unique match when job title and location are on the
-          profile. It never writes into declared income, deposit, or budget fields.
+          Typical pay for this role and market (for example a CTO at a company like Neho in
+          Switzerland). Not this person’s income. Enrich requests it after a unique match when
+          job title and location are on the profile. It never writes into declared income.
         </p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">

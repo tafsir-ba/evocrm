@@ -38,7 +38,7 @@ export const FINANCIAL_CONFIDENCE_LEVELS = ["low", "medium", "high"] as const;
 export type FinancialConfidenceLevel = (typeof FINANCIAL_CONFIDENCE_LEVELS)[number];
 
 export const MARKET_INCOME_DISCLAIMER =
-  "Market-income estimates are occupational ranges for human review only. They must never be used to make or recommend an automated credit, mortgage, pricing, housing, or eligibility decision.";
+  "Occupational estimate only: typical pay for this role and market (for example a CTO at a company like Neho in Switzerland). Not this person’s income, bank data, or a credit/mortgage decision.";
 
 export type LeadFinancialSituationSnapshot = {
   declaredAnnualIncome: number | null;
@@ -74,6 +74,24 @@ export type MarketIncomeEstimate = {
   disclaimer: string;
 };
 
+export function extractOccupationalWageNumbers(text: string): number[] {
+  const compact = text.replace(/[’']/g, "").replace(/,/g, " ");
+  const out: number[] = [];
+  for (const match of compact.matchAll(/(\d+(?:\.\d+)?)\s*[kK]\b/g)) {
+    const value = Math.round(Number(match[1]) * 1000);
+    if (value >= 10_000 && value <= 10_000_000) {
+      out.push(value);
+    }
+  }
+  for (const match of compact.matchAll(/\b(\d{2,3}(?:\s\d{3}){1,2}|\d{5,7})\b/g)) {
+    const value = Number(match[1]!.replace(/\s/g, ""));
+    if (value >= 10_000 && value <= 10_000_000) {
+      out.push(value);
+    }
+  }
+  return out;
+}
+
 export function parseOccupationalWageRange(
   hits: Array<{ url: string; title: string; snippet: string }>,
 ): { rangeMin: number; rangeMax: number; sources: Array<{ url: string; title: string }> } | null {
@@ -83,12 +101,8 @@ export function parseOccupationalWageRange(
     if (!isHttpsUrl(hit.url)) {
       continue;
     }
-    const found = `${hit.title} ${hit.snippet}`
-      .replace(/,/g, "")
-      .match(/\d{4,7}/g)
-      ?.map(Number)
-      .filter((value) => value >= 10_000 && value <= 10_000_000);
-    if (!found || found.length === 0) {
+    const found = extractOccupationalWageNumbers(`${hit.title} ${hit.snippet}`);
+    if (found.length === 0) {
       continue;
     }
     numbers.push(...found);
@@ -102,6 +116,37 @@ export function parseOccupationalWageRange(
     rangeMin: numbers[0]!,
     rangeMax: numbers[numbers.length - 1]!,
     sources,
+  };
+}
+
+export function parseOccupationalEstimatePayload(parsed: unknown): {
+  rangeMin: number;
+  rangeMax: number;
+  methodology: string;
+  confidencePercent: number;
+} | null {
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const row = parsed as Record<string, unknown>;
+  const rangeMin = Number(row.rangeMin);
+  const rangeMax = Number(row.rangeMax);
+  if (!Number.isFinite(rangeMin) || !Number.isFinite(rangeMax)) {
+    return null;
+  }
+  if (rangeMin < 10_000 || rangeMax > 10_000_000 || rangeMax < rangeMin) {
+    return null;
+  }
+  const confidence = Math.min(55, Math.max(20, Math.round(Number(row.confidencePercent) || 35)));
+  const methodology =
+    typeof row.methodology === "string" && row.methodology.trim()
+      ? row.methodology.trim()
+      : "Occupational market estimate for this role and location. Not this person’s income.";
+  return {
+    rangeMin: Math.round(rangeMin),
+    rangeMax: Math.round(rangeMax),
+    methodology,
+    confidencePercent: confidence,
   };
 }
 

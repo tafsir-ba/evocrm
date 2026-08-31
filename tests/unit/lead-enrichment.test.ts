@@ -16,6 +16,7 @@ import {
 } from "@/lib/lead-enrichment";
 import { getLeadEnrichmentDemoFixture, DEMO_AMBIGUOUS_EMAIL, DEMO_UNIQUE_EMAIL } from "@/tests/fixtures/lead-enrichment-demo";
 import {
+  parseOccupationalEstimatePayload,
   parseOccupationalWageRange,
   shouldRequestMarketEstimateAfterEnrichment,
 } from "@/lib/lead-financial-situation";
@@ -129,6 +130,32 @@ describe("lead enrichment contract", () => {
         { url: "https://stats.example/wages", title: "No numbers", snippet: "See PDF." },
       ]),
     ).toBeNull();
+    expect(
+      parseOccupationalWageRange([
+        {
+          url: "https://stats.example/wages",
+          title: "Swiss CTO pay",
+          snippet: "Typical band 180k to 260k CHF.",
+        },
+      ]),
+    ).toEqual({
+      rangeMin: 180000,
+      rangeMax: 260000,
+      sources: [{ url: "https://stats.example/wages", title: "Swiss CTO pay" }],
+    });
+    expect(
+      parseOccupationalEstimatePayload({
+        rangeMin: 160000,
+        rangeMax: 240000,
+        confidencePercent: 90,
+        methodology: "Swiss tech CTO band",
+      }),
+    ).toEqual({
+      rangeMin: 160000,
+      rangeMax: 240000,
+      confidencePercent: 55,
+      methodology: "Swiss tech CTO band",
+    });
   });
 
   it("treats unique accepted/reviewing runs as a one-click profile reveal", () => {

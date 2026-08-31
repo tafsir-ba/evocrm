@@ -4,12 +4,14 @@ import {
   MARKET_INCOME_DISCLAIMER,
   emptyFinancialSnapshot,
   hasOccupationalEstimateInputs,
+  parseOccupationalEstimatePayload,
   parseOccupationalWageRange,
   type LeadFinancialSituationSnapshot,
   type MarketIncomeEstimate,
 } from "@/lib/lead-financial-situation";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findLeadById } from "@/server/repositories/leads";
 import {
   findFinancialSituationForLead,
@@ -19,7 +21,11 @@ import {
   type LeadFinancialSituationRecord,
 } from "@/server/repositories/lead-financial-situation";
 import { getLeadEnrichmentCapability } from "@/server/services/lead-enrichment";
-import { liveEnrichmentProviders } from "@/server/services/lead-enrichment-providers";
+import {
+  enrichmentOpenAiModel,
+  liveEnrichmentProviders,
+} from "@/server/services/lead-enrichment-providers";
+import { getEnv } from "@/server/env";
 
 export async function getFinancialSituationForLead(
   workspaceId: string,
@@ -129,12 +135,16 @@ export async function requestMarketIncomeEstimate(input: {
     );
   }
   const location = [lead.city, lead.stateRegion, lead.country].filter(Boolean).join(", ");
+  const companies = lead.companyId
+    ? await findCompaniesByIds(input.workspaceId, [lead.companyId])
+    : [];
+  const companyName = companies[0]?.name?.trim() || null;
 
   let sources: Array<{ url: string; title: string }> = [];
   let rangeMin: number | null = null;
   let rangeMax: number | null = null;
   let methodology =
-    "Occupational public wage-band search for the job title and location only. Not a personal income finding. Numbers are taken from retrieved https snippets, not invented.";
+    "Occupational estimate: typical pay for this role and market, not this person’s income.";
   let confidencePercent = 40;
   let provider = "demo_fixture";
   let model = "none";
@@ -153,23 +163,42 @@ export async function requestMarketIncomeEstimate(input: {
       },
     ];
   } else {
+    const likeCompany = companyName ? ` at a company like ${companyName}` : "";
     const search = await liveEnrichmentProviders.search(
-      `typical salary range "${jobTitle}" ${location} occupational statistics`,
+      `typical annual salary compensation range "${jobTitle}"${likeCompany} ${location}`,
       ["news_press", "professional_registry"],
     );
     provider = search.provider;
     const parsed = parseOccupationalWageRange(search.hits);
-    if (!parsed) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "No cited occupational wage range was found for this job and location. No estimate was stored.",
-      );
+    if (parsed) {
+      rangeMin = parsed.rangeMin;
+      rangeMax = parsed.rangeMax;
+      sources = parsed.sources;
+      confidencePercent = Math.min(40 + parsed.sources.length * 5, 60);
+      methodology = `${methodology} Numbers taken from ${parsed.sources.length} retrieved public snippet(s).`;
+    } else {
+      const synthesized = await synthesizeOccupationalWageEstimate({
+        jobTitle,
+        location,
+        companyName,
+        currency: input.defaultCurrency,
+      });
+      if (!synthesized) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Could not form an occupational pay estimate for this role and location.",
+        );
+      }
+      rangeMin = synthesized.rangeMin;
+      rangeMax = synthesized.rangeMax;
+      confidencePercent = synthesized.confidencePercent;
+      methodology = `${synthesized.methodology} Labelled occupational estimate only — not this person’s income.`;
+      model = enrichmentOpenAiModel();
+      sources = search.hits
+        .filter((hit) => hit.url.startsWith("https://"))
+        .slice(0, 4)
+        .map((hit) => ({ url: hit.url, title: hit.title }));
     }
-    rangeMin = parsed.rangeMin;
-    rangeMax = parsed.rangeMax;
-    sources = parsed.sources;
-    confidencePercent = Math.min(40 + parsed.sources.length * 5, 60);
-    methodology = `${methodology} Retrieved ${parsed.sources.length} cited source(s).`;
   }
 
   const estimate: MarketIncomeEstimate = {
@@ -212,6 +241,63 @@ export async function requestMarketIncomeEstimate(input: {
     },
   });
   return record;
+}
+
+async function synthesizeOccupationalWageEstimate(input: {
+  jobTitle: string;
+  location: string;
+  companyName: string | null;
+  currency: string;
+}): Promise<{
+  rangeMin: number;
+  rangeMax: number;
+  methodology: string;
+  confidencePercent: number;
+} | null> {
+  const key = getEnv().OPENAI_API_KEY;
+  if (!key) {
+    return null;
+  }
+  const model = enrichmentOpenAiModel();
+  const company = input.companyName ? ` at a company like ${input.companyName}` : "";
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You estimate typical occupational pay bands for internal CRM research. Never claim this is a specific person’s income.",
+        },
+        {
+          role: "user",
+          content: `What is a typical annual compensation range in ${input.currency} for a "${input.jobTitle}"${company} in ${input.location}? This is an occupational market estimate, not personal finances.
+
+Return JSON only:
+{"rangeMin":number,"rangeMax":number,"confidencePercent":20-55,"methodology":"short string"}`,
+        },
+      ],
+    }),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = payload.choices?.[0]?.message?.content ?? "{}";
+  try {
+    return parseOccupationalEstimatePayload(JSON.parse(content) as unknown);
+  } catch {
+    return null;
+  }
 }
 
 export async function markMarketIncomeReviewed(input: {
