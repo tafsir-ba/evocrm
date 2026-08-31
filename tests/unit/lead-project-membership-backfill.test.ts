@@ -14,7 +14,6 @@ vi.mock("@/server/repositories/lead-project-memberships", () => ({
   createMembership: vi.fn(),
   ensureLeadProjectMembershipIndexes: vi.fn(),
   findLeadIdsMissingMembership: vi.fn(),
-  findMembershipByLeadAndProject: vi.fn(),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({
@@ -27,7 +26,6 @@ import {
   createMembership,
   ensureLeadProjectMembershipIndexes,
   findLeadIdsMissingMembership,
-  findMembershipByLeadAndProject,
 } from "@/server/repositories/lead-project-memberships";
 import { backfillLeadProjectMemberships } from "@/server/services/lead-project-membership-backfill";
 
@@ -47,7 +45,6 @@ describe("lead project membership backfill", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(findLeadIdsMissingMembership).mockResolvedValue(["lead-1"]);
-    vi.mocked(findMembershipByLeadAndProject).mockResolvedValue(null);
     vi.mocked(createMembership).mockResolvedValue({ id: "mem-1" } as never);
   });
 
@@ -86,7 +83,6 @@ describe("lead project membership backfill", () => {
       }),
     );
 
-    vi.mocked(findMembershipByLeadAndProject).mockResolvedValue({ id: "mem-1" } as never);
     vi.mocked(findLeadIdsMissingMembership).mockResolvedValue([]);
     mockFindPage([
       {

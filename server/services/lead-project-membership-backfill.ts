@@ -12,7 +12,6 @@ import {
   createMembership,
   ensureLeadProjectMembershipIndexes,
   findLeadIdsMissingMembership,
-  findMembershipByLeadAndProject,
 } from "@/server/repositories/lead-project-memberships";
 import { planBackfillMembershipsForLead } from "@/server/services/lead-project-memberships";
 import { toObjectIdString } from "@/server/utils/mongo-id";
@@ -130,8 +129,7 @@ export async function backfillLeadProjectMemberships(options: {
       }
 
       const plan = planned.memberships[0] as NormalizedMembershipPlan;
-      const already = await findMembershipByLeadAndProject(workspaceId, leadId, plan.projectId);
-      if (already || !missing.has(leadId)) {
+      if (!missing.has(leadId)) {
         result.idempotentHits += 1;
         continue;
       }
@@ -163,6 +161,9 @@ export async function backfillLeadProjectMemberships(options: {
     }
 
     afterId = documents[documents.length - 1]!._id.toString();
+    console.log(
+      `[migrate:lead-project-memberships] page scanned=${result.scanned} created=${result.created} skipped=${result.skipped} missingProject=${result.missingProject} idempotentHits=${result.idempotentHits}`,
+    );
     if (documents.length < BACKFILL_PAGE_SIZE) {
       break;
     }
