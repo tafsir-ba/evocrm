@@ -11,6 +11,7 @@ import type {
   UsagePurpose,
 } from "@/lib/lead-preferences";
 import type { LeadIntelligenceProvenance } from "@/lib/lead-intelligence";
+import { withLeadAcquisitionFilter } from "@/lib/inbound-acquisition";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 import { toObjectIdString } from "@/server/utils/mongo-id";
 
@@ -140,6 +141,7 @@ export type LeadListFilter = {
   utmCampaign?: string;
   createdFrom?: Date;
   createdTo?: Date;
+  acquisition?: "genuine_inbound" | "legacy_import";
   excludeIds?: string[];
   leadIds?: string[];
   page?: number;
@@ -245,7 +247,7 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
     query.$or = searchOr;
   }
 
-  return query;
+  return withLeadAcquisitionFilter(query, filter.acquisition);
 }
 
 function buildProjectScope(filter: LeadListFilter): {

@@ -29,6 +29,7 @@ import {
 import { createLeadForWorkspace } from "@/server/services/leads";
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import { AppError } from "@/server/errors";
+import { buildCsvImportAttributes } from "@/lib/inbound-acquisition";
 
 const LEAD_FIELDS: ImportFieldConfig[] = [
   {
@@ -377,7 +378,13 @@ export const leadImportConfig: ImportEntityConfig = {
     const result = await createLeadForWorkspace(
       context.workspaceId,
       context.actorId,
-      leadInput,
+      {
+        ...leadInput,
+        attributes: {
+          ...(leadInput.attributes ?? {}),
+          ...buildCsvImportAttributes(),
+        },
+      },
       {
         triggerAutomation: Boolean(context.triggerAutomationForImportedLeads),
         intelligenceMethod: "import",

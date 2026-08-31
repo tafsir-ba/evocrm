@@ -192,6 +192,7 @@ describe("hubspot lead capture webhook", () => {
             inboundSource: "hubspot",
             idempotencyKey: "hubspot:contact:99",
             sourceCreatedAt: "2024-01-01T00:00:00.000Z",
+            productInterestedIn: "CMP",
           }),
           campaignEnrollmentPolicy: {
             defaultExcluded: true,

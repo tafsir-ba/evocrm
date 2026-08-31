@@ -1016,6 +1016,7 @@ function buildBulkDeleteLeadFilter(
     utmCampaign: filters.utmCampaign,
     createdFrom: filters.createdFrom,
     createdTo: filters.createdTo,
+    acquisition: filters.acquisition,
     excludeIds: input.excludeLeadIds,
   };
 }

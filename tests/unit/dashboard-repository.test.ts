@@ -36,6 +36,7 @@ import { OpportunityModel } from "@/models/opportunity";
 import { PropertyModel } from "@/models/property";
 import {
   countOpportunitiesByStatusIds,
+  countLeadsCreatedInRange,
   groupLeadsBySource,
   groupOpportunitiesByStatus,
   groupPropertiesByStatus,
@@ -78,14 +79,32 @@ describe("dashboard repository", () => {
     expect(LeadModel.aggregate).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
-          $match: {
+          $match: expect.objectContaining({
             workspaceId: new Types.ObjectId(WORKSPACE_ID),
             projectId: new Types.ObjectId(TEST_PROJECT_ID),
             archivedAt: null,
             createdAt: { $gte: from, $lte: to },
-          },
+            $nor: [expect.objectContaining({ $or: expect.any(Array) })],
+          }),
         }),
       ]),
+    );
+  });
+
+  it("counts genuine inbound leads without blending HubSpot import createdAt", async () => {
+    vi.mocked(LeadModel.countDocuments).mockResolvedValue(12);
+    const from = new Date("2026-08-01T00:00:00.000Z");
+    const to = new Date("2026-08-31T23:59:59.999Z");
+
+    const genuine = await countLeadsCreatedInRange(WORKSPACE_ID, from, to);
+    expect(genuine).toBe(12);
+    expect(LeadModel.countDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: new Types.ObjectId(WORKSPACE_ID),
+        archivedAt: null,
+        createdAt: { $gte: from, $lte: to },
+        $nor: [expect.objectContaining({ $or: expect.any(Array) })],
+      }),
     );
   });
 

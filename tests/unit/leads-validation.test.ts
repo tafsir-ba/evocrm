@@ -120,7 +120,14 @@ describe("lead validation", () => {
       industry: "Finance",
       jobTitle: "Analyst",
       stateRegion: "Geneva",
+      acquisition: "genuine_inbound",
     });
     expect(list.success).toBe(true);
+  });
+
+  it("accepts genuine vs imported acquisition filters on list", () => {
+    expect(leadListQuerySchema.safeParse({ acquisition: "genuine_inbound" }).success).toBe(true);
+    expect(leadListQuerySchema.safeParse({ acquisition: "legacy_import" }).success).toBe(true);
+    expect(leadListQuerySchema.safeParse({ acquisition: "all" }).success).toBe(false);
   });
 });

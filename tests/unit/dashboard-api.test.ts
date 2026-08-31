@@ -48,6 +48,7 @@ const sampleSummary = {
   },
   metrics: {
     newLeads: 0,
+    importedLeads: 0,
     activeOpportunities: 0,
     wonOpportunities: 0,
     lostOpportunities: 0,
@@ -55,6 +56,14 @@ const sampleSummary = {
     wonValue: [],
     activitiesDueToday: 0,
     overdueActivities: 0,
+  },
+  cmpReconciliation: {
+    sourceCohortCount: 0,
+    membershipCount: 0,
+    overlapCount: 0,
+    sourceOnlyCount: 0,
+    membershipOnlyCount: 0,
+    cmpProjects: [],
   },
 };
 

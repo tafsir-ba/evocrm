@@ -2,9 +2,17 @@ import "server-only";
 
 import { Types } from "mongoose";
 
+import {
+  cmpSourceCohortMongoFilter,
+  isCmpCrmProjectIdentity,
+  withLeadAcquisitionFilter,
+  type LeadAcquisitionKind,
+} from "@/lib/inbound-acquisition";
 import { ActivityModel } from "@/models/activity";
 import { LeadModel } from "@/models/lead";
+import { LeadProjectMembershipModel } from "@/models/lead-project-membership";
 import { OpportunityModel } from "@/models/opportunity";
+import { ProjectModel } from "@/models/project";
 import { PropertyModel } from "@/models/property";
 import { connectDb } from "@/server/db/mongoose";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
@@ -47,18 +55,31 @@ export async function countLeadsCreatedInRange(
   from: Date,
   to: Date,
   projectId?: string,
+  acquisition: LeadAcquisitionKind | "all" = "genuine_inbound",
 ): Promise<number> {
   await connectDb();
   return LeadModel.countDocuments(
-    withOptionalProjectScope(
-      workspaceId,
-      {
-        archivedAt: null,
-        createdAt: { $gte: from, $lte: to },
-      },
-      projectId,
+    withLeadAcquisitionFilter(
+      withOptionalProjectScope(
+        workspaceId,
+        {
+          archivedAt: null,
+          createdAt: { $gte: from, $lte: to },
+        },
+        projectId,
+      ),
+      acquisition,
     ),
   );
+}
+
+export async function countLegacyImportedLeadsCreatedInRange(
+  workspaceId: string,
+  from: Date,
+  to: Date,
+  projectId?: string,
+): Promise<number> {
+  return countLeadsCreatedInRange(workspaceId, from, to, projectId, "legacy_import");
 }
 
 export async function countOpportunitiesByStatusIds(
@@ -246,18 +267,22 @@ export async function groupLeadsBySource(
   from: Date,
   to: Date,
   projectId?: string,
+  acquisition: LeadAcquisitionKind | "all" = "genuine_inbound",
 ): Promise<GroupCount[]> {
   await connectDb();
 
   const results = await LeadModel.aggregate<GroupCount>([
     {
-      $match: withOptionalProjectScope(
-        workspaceId,
-        {
-          archivedAt: null,
-          createdAt: { $gte: from, $lte: to },
-        },
-        projectId,
+      $match: withLeadAcquisitionFilter(
+        withOptionalProjectScope(
+          workspaceId,
+          {
+            archivedAt: null,
+            createdAt: { $gte: from, $lte: to },
+          },
+          projectId,
+        ),
+        acquisition,
       ),
     },
     {
@@ -371,4 +396,115 @@ export async function groupOpportunitiesByStatus(
   ]);
 
   return results;
+}
+
+export type CmpReconciliationProject = {
+  id: string;
+  name: string;
+  reference: string | null;
+  membershipCount: number;
+};
+
+export type CmpReconciliationResult = {
+  sourceCohortCount: number;
+  membershipCount: number;
+  overlapCount: number;
+  sourceOnlyCount: number;
+  membershipOnlyCount: number;
+  cmpProjects: CmpReconciliationProject[];
+};
+
+function toIdSet(ids: Array<Types.ObjectId | string>): Set<string> {
+  return new Set(ids.map((id) => id.toString()));
+}
+
+export async function getCmpReconciliation(
+  workspaceId: string,
+  projectId?: string,
+): Promise<CmpReconciliationResult> {
+  await connectDb();
+  const workspaceObjectId = new Types.ObjectId(workspaceId);
+
+  const projects = await ProjectModel.find({
+    workspaceId: workspaceObjectId,
+    archivedAt: null,
+  })
+    .select({ name: 1, reference: 1 })
+    .lean<Array<{ _id: Types.ObjectId; name?: string; reference?: string | null }>>();
+
+  const cmpProjects = projects.filter((project) =>
+    isCmpCrmProjectIdentity(project.name ?? null, project.reference ?? null),
+  );
+  const scopedCmpProjects = projectId
+    ? cmpProjects.filter((project) => project._id.toString() === projectId)
+    : cmpProjects;
+  const cmpProjectIds = scopedCmpProjects.map((project) => project._id);
+
+  const sourceMatch = withOptionalProjectScope(
+    workspaceId,
+    {
+      archivedAt: null,
+      ...cmpSourceCohortMongoFilter(),
+    },
+    projectId,
+  );
+
+  const sourceIds = toIdSet(await LeadModel.distinct("_id", sourceMatch));
+
+  const [membershipLeadIds, primaryLeadIds] =
+    cmpProjectIds.length === 0
+      ? [[] as Types.ObjectId[], [] as Types.ObjectId[]]
+      : await Promise.all([
+          LeadProjectMembershipModel.distinct("leadId", {
+            workspaceId: workspaceObjectId,
+            projectId: { $in: cmpProjectIds },
+            archivedAt: null,
+          }),
+          LeadModel.distinct("_id", {
+            workspaceId: workspaceObjectId,
+            projectId: { $in: cmpProjectIds },
+            archivedAt: null,
+          }),
+        ]);
+
+  const membershipIds = toIdSet([...membershipLeadIds, ...primaryLeadIds]);
+
+  let overlapCount = 0;
+  for (const id of sourceIds) {
+    if (membershipIds.has(id)) {
+      overlapCount += 1;
+    }
+  }
+
+  const membershipCounts = await Promise.all(
+    scopedCmpProjects.map(async (project) => {
+      const [fromMemberships, fromPrimary] = await Promise.all([
+        LeadProjectMembershipModel.distinct("leadId", {
+          workspaceId: workspaceObjectId,
+          projectId: project._id,
+          archivedAt: null,
+        }),
+        LeadModel.distinct("_id", {
+          workspaceId: workspaceObjectId,
+          projectId: project._id,
+          archivedAt: null,
+        }),
+      ]);
+      return {
+        id: project._id.toString(),
+        name: project.name ?? "CMP",
+        reference: project.reference ?? null,
+        membershipCount: toIdSet([...fromMemberships, ...fromPrimary]).size,
+      };
+    }),
+  );
+
+  return {
+    sourceCohortCount: sourceIds.size,
+    membershipCount: membershipIds.size,
+    overlapCount,
+    sourceOnlyCount: sourceIds.size - overlapCount,
+    membershipOnlyCount: membershipIds.size - overlapCount,
+    cmpProjects: membershipCounts,
+  };
 }

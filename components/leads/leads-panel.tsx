@@ -92,6 +92,7 @@ export function LeadsPanel({
   const assignedToParam = searchParams.get("assignedTo") ?? "";
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
+  const acquisitionParam = searchParams.get("acquisition");
   const projectId = useWorkspaceProjectFilter();
   const [includeAssociated, setIncludeAssociated] = useState(false);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
@@ -262,6 +263,7 @@ export function LeadsPanel({
     showArchived,
     createdFromParam,
     createdToParam,
+    acquisitionParam,
   ]);
 
   useEffect(() => {
@@ -302,6 +304,7 @@ export function LeadsPanel({
     showArchived,
     createdFromParam,
     createdToParam,
+    acquisitionParam,
   ]);
 
   const selectedCount = useMemo(() => {
@@ -351,6 +354,9 @@ export function LeadsPanel({
     }
     if (createdToParam) {
       filters.createdTo = createdToParam;
+    }
+    if (acquisitionParam === "genuine_inbound" || acquisitionParam === "legacy_import") {
+      filters.acquisition = acquisitionParam;
     }
     if (tagFilter) {
       filters.tagId = tagFilter;
@@ -713,7 +719,11 @@ export function LeadsPanel({
         </Select>
         {createdFromParam || createdToParam ? (
           <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)]">
-            Created in linked period
+            {acquisitionParam === "legacy_import"
+              ? "Imported in linked period"
+              : acquisitionParam === "genuine_inbound"
+                ? "Genuine inbound in linked period"
+                : "Created in linked period"}
             <button
               type="button"
               className="font-medium text-[var(--color-brand-700)] hover:underline"
@@ -721,6 +731,7 @@ export function LeadsPanel({
                 const next = new URLSearchParams(searchParams.toString());
                 next.delete("createdFrom");
                 next.delete("createdTo");
+                next.delete("acquisition");
                 const qs = next.toString();
                 router.replace(
                   `${workspacePath(workspaceSlug, "leads")}${qs ? `?${qs}` : ""}`,

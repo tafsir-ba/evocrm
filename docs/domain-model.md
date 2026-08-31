@@ -333,6 +333,8 @@ Demand-side record (buyer/inquirer).
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
 
+**Lead timestamps:** `createdAt` is CRM created/imported time. Original inbound uses `attributes.integration.receivedAt` or HubSpot `sourceCreatedAt`. Project Active ≤30 days / Stale >30 days / Unknown uses the newest genuine original inbound date, never CRM import `createdAt` or last activity.
+
 **Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and associated `companyId` (Company FK, not a project company link). `intelligenceProvenance` records how each field was last written. HubSpot CMP enrichment may fill blank or HubSpot-owned values only; manual CRM values are preserved. Enrichment never enrolls campaigns.
 
 **Project memberships:** A lead may belong to multiple projects through `LeadProjectMembership`. Exactly one membership is primary. `Lead.projectId` is the denormalized primary project (list/filter/search default, email uniqueness, campaign matching). Secondary memberships never create campaign or drip enrollment.
@@ -497,12 +499,14 @@ Dashboard is read-only aggregation over existing entities — no new persisted m
 
 | Metric | Source entities | Behavior |
 |--------|-----------------|----------|
-| New leads | Lead | `createdAt` in date range; archived excluded |
+| New leads | Lead | Genuine inbound with CRM `createdAt` in date range; archived and legacy/migration/CSV imports excluded |
+| Imported leads | Lead | Legacy HubSpot GV/WD migrations and CSV imports with CRM `createdAt` in range; never mixed into new inbound |
 | Active opportunities | Opportunity + `opportunity_status` | `behavior = open`; not date-bounded |
 | Won / lost opportunities | Opportunity + `opportunity_status` | `terminal_won` / `terminal_lost` + close timestamps in date range |
 | Active pipeline / won value | Opportunity | Sum `value` grouped by `currency`; open or won only |
 | Activities due today / overdue | Activity + `activity_status` | Pending behavior; due today uses `Workspace.timezone` |
-| Leads by source | Lead + `lead_source` | Date-bounded grouping |
+| Leads by source | Lead + `lead_source` | Date-bounded grouping of genuine inbound only |
+| CMP source vs membership | Lead + LeadProjectMembership + Project | HubSpot CMP product cohort versus CRM CMP project membership; explainable, no enrollment |
 | Properties by status | Property + `property_status` | Current inventory snapshot |
 | Opportunities by stage | Opportunity + `opportunity_status` | Dictionary order; all non-archived |
 

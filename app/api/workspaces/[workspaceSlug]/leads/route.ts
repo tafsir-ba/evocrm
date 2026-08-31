@@ -58,6 +58,7 @@ export async function GET(request: Request, context: RouteContext) {
       utmCampaign: query.utmCampaign,
       createdFrom: query.createdFrom,
       createdTo: query.createdTo,
+      acquisition: query.acquisition,
     });
 
     return paginatedResponse(

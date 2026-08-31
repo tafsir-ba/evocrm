@@ -44,6 +44,12 @@ describe("lead import automation", () => {
       expect.objectContaining({
         firstName: "John",
         lastName: "Smith",
+        attributes: expect.objectContaining({
+          import: expect.objectContaining({
+            kind: "csv",
+            source: "lead_import",
+          }),
+        }),
       }),
       {
         triggerAutomation: false,
@@ -80,6 +86,9 @@ describe("lead import automation", () => {
       expect.objectContaining({
         firstName: "John",
         lastName: "Smith",
+        attributes: expect.objectContaining({
+          import: expect.objectContaining({ kind: "csv" }),
+        }),
       }),
       {
         triggerAutomation: true,

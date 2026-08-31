@@ -98,6 +98,44 @@ describe("genuine inbound received-at", () => {
     expect(projectDemandStatus({ lastGenuineInboundAt: null, now }).label).toBe("Unknown");
   });
 
+  it("uses HubSpot source createdate for migrated contacts so import day does not make a project Active", () => {
+    const importedTodayWithOldSource = resolveLeadInboundReceivedAt({
+      createdAt: now,
+      attributes: {
+        integration: {
+          inboundSource: "hubspot-gv-pilot",
+          idempotencyKey: "hubspot:contact:1363451",
+          sourceCreatedAt: daysAgo(400).toISOString(),
+        },
+        campaignEnrollmentPolicy: {
+          defaultExcluded: true,
+          source: "hubspot_legacy_migration",
+        },
+      },
+    });
+    expect(importedTodayWithOldSource?.basis).toBe("source_created");
+    expect(
+      projectDemandStatus({ lastGenuineInboundAt: importedTodayWithOldSource?.at, now }).label,
+    ).toBe("Stale");
+  });
+
+  it("does not treat CSV import createdAt as inbound demand", () => {
+    expect(
+      resolveLeadInboundReceivedAt({
+        createdAt: now,
+        attributes: { import: { kind: "csv", source: "lead_import" } },
+        intelligenceProvenance: {
+          industry: {
+            method: "import",
+            source: "lead_import",
+            appliedAt: now.toISOString(),
+            notes: null,
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
   it("marks demand stale when the newest genuine inbound is older than 30 days", () => {
     expect(
       projectDemandStatus({ lastGenuineInboundAt: daysAgo(45), now }).label,

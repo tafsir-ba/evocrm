@@ -201,7 +201,7 @@ POST   /api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/reorde
 | GET project memberships | `lead:read` |
 | POST/PATCH/DELETE/reorder memberships | `lead:update` |
 
-**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `includeArchived`, `projectId`, `includeAssociated`, `companyId`, `industry`, `jobTitle`, `stateRegion`. `projectId` matches the **primary** project by default. `includeAssociated=true` includes leads associated with that project through any membership. List/detail items include `project` (primary), `projectMemberships`, `secondaryProjects`, `company`, `industry`, `jobTitle`, and `stateRegion`.
+**GET list** returns paginated `{ data: LeadListItem[], pagination }` with filters: `page`, `pageSize`, `search`, `statusId`, `sourceId`, `assignedTo`, `ownerId`, `tagId`, `integrationId`, `utmCampaign`, `createdFrom`, `createdTo`, `acquisition` (`genuine_inbound` \| `legacy_import`), `includeArchived`, `projectId`, `includeAssociated`, `companyId`, `industry`, `jobTitle`, `stateRegion`. `projectId` matches the **primary** project by default. `includeAssociated=true` includes leads associated with that project through any membership. List/detail items include `project` (primary), `projectMemberships`, `secondaryProjects`, `company`, `industry`, `jobTitle`, and `stateRegion`.
 
 **Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and `companyId` (Company FK). Clients do not send provenance. The service stamps `intelligenceProvenance` only when a value actually changes. HubSpot CMP enrichment fills blank or HubSpot-owned values only and never enrolls campaigns (`triggerAutomation: false`). Manual CRM values are preserved. Shared contract: `lib/lead-intelligence.ts` / `lib/hubspot-cmp-lead-intelligence.ts`.
 
@@ -419,10 +419,11 @@ GET    /api/workspaces/[workspaceSlug]/dashboard/properties
 
 **Default date range:** last 30 days ending now when no date params provided. `periodDays` and `dateFrom`/`dateTo` are mutually exclusive.
 
-**`GET /dashboard/summary`** returns `{ dateRange, metrics }` where `metrics` includes:
+**`GET /dashboard/summary`** returns `{ dateRange, metrics, cmpReconciliation }` where `metrics` includes:
 
 ```txt
 newLeads
+importedLeads
 activeOpportunities
 wonOpportunities
 lostOpportunities
@@ -436,7 +437,8 @@ overdueActivities
 
 | Metric | Definition |
 |--------|------------|
-| `newLeads` | Leads with `createdAt` in date range; `archivedAt: null` |
+| `newLeads` | Genuine inbound leads with CRM `createdAt` in date range; `archivedAt: null`. Excludes HubSpot GV/WD migrations and CSV imports. |
+| `importedLeads` | Legacy/migration/CSV imports with CRM `createdAt` in date range. Shown separately; never blended into `newLeads` or source mix. |
 | `activeOpportunities` | Opportunities where `opportunity_status.behavior = open`; not date-bounded |
 | `wonOpportunities` | `behavior = terminal_won` and `wonAt` (fallback `closedAt`) in date range |
 | `lostOpportunities` | `behavior = terminal_lost` and `lostAt` (fallback `closedAt`) in date range |
@@ -449,7 +451,9 @@ overdueActivities
 
 **`GET /dashboard/activities`** returns `dueToday`, `overdue`, and `upcoming` counts/lists (pending behavior; workspace timezone for due today).
 
-**`GET /dashboard/sources`** returns leads grouped by `lead_source` dictionary item for the date range; includes null/unknown bucket when needed.
+**`GET /dashboard/sources`** returns genuine inbound leads grouped by `lead_source` dictionary item for the date range; includes null/unknown bucket when needed. Legacy imports are excluded from this mix.
+
+`cmpReconciliation` on summary compares HubSpot CMP source-cohort leads with CRM CMP project membership (overlap / source-only / membership-only). Explanation only — it does not enroll campaigns.
 
 **`GET /dashboard/properties`** returns active properties grouped by `property_status` dictionary item (current state, not date-bounded).
 

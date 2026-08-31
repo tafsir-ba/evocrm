@@ -67,6 +67,7 @@ export const leadListQuerySchema = z.object({
   utmCampaign: z.string().trim().min(1).max(120).optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
+  acquisition: z.enum(["genuine_inbound", "legacy_import"]).optional(),
 });
 
 const createLeadBudgetRefinement = {
