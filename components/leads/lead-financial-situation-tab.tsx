@@ -215,6 +215,15 @@ export function LeadFinancialSituationTab({
           />
         </div>
         <div>
+          <Label htmlFor="fin-currency">Currency</Label>
+          <Input
+            id="fin-currency"
+            disabled={!canUpdate}
+            value={form.currency}
+            onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })}
+          />
+        </div>
+        <div>
           <Label htmlFor="fin-source">Source</Label>
           <Select
             id="fin-source"
@@ -300,8 +309,8 @@ export function LeadFinancialSituationTab({
         </Button>
       ) : null}
 
-      <div className="rounded-lg border border-[var(--color-line)] p-3 space-y-2">
-        <p className="text-[13px] font-semibold">Market-income estimate (optional)</p>
+      <div className="rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] p-3 space-y-2">
+        <p className="text-[13px] font-semibold">Market-income estimate (optional, not declared income)</p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">
@@ -345,18 +354,36 @@ export function LeadFinancialSituationTab({
         ) : null}
       </div>
 
-      {canDelete ? (
+      <div className="flex flex-wrap gap-2">
         <Button
-          variant="danger"
-          onClick={async () => {
-            if (!window.confirm("Delete financial situation data for this lead?")) return;
-            await fetch(api, { method: "DELETE" });
-            await load();
+          variant="secondary"
+          onClick={() => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `lead-${leadId}-financial-situation.json`;
+            link.click();
+            URL.revokeObjectURL(url);
           }}
         >
-          Delete financial data
+          Export financial data
         </Button>
-      ) : null}
+        {canDelete ? (
+          <Button
+            variant="danger"
+            onClick={async () => {
+              if (!window.confirm("Delete financial situation data for this lead?")) return;
+              await fetch(api, { method: "DELETE" });
+              await load();
+            }}
+          >
+            Delete financial data
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

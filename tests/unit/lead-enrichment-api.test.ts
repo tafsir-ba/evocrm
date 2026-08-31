@@ -59,12 +59,15 @@ describe("lead enrichment API", () => {
     const response = await POST(
       new Request("http://localhost/api", {
         method: "POST",
-        body: JSON.stringify({ allowedSources: ["company_website"] }),
+        body: JSON.stringify({}),
       }),
       ctx,
     );
     expect(response.status).toBe(200);
     expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:enrich");
+    expect(startLeadEnrichment).toHaveBeenCalledWith(
+      expect.objectContaining({ allowedSources: undefined }),
+    );
   });
 
   it("requires lead:enrich_revoke to delete enrichment data", async () => {

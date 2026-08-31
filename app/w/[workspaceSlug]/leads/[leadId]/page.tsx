@@ -45,6 +45,7 @@ export default async function LeadDetailPage({ params }: { params: Params }) {
         canCreateDocument={hasPermission(permissions, "document:create")}
         canArchiveDocument={hasPermission(permissions, "document:archive")}
         canEnrich={hasPermission(permissions, "lead:enrich")}
+        canEnrichRevoke={hasPermission(permissions, "lead:enrich_revoke")}
         canFinancialRead={hasPermission(permissions, "lead:financial_read")}
         canFinancialUpdate={hasPermission(permissions, "lead:financial_update")}
         canFinancialDelete={hasPermission(permissions, "lead:financial_delete")}

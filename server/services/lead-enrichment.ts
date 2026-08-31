@@ -9,6 +9,7 @@ import {
   clampConfidence,
   contentLooksExcluded,
   crmValueRequiresOverwrite,
+  isSafeToAutoApplySuggestion,
   isHttpsUrl,
   isLeadEnrichmentFieldKey,
   mergeWebEnrichmentAttributes,
@@ -233,7 +234,7 @@ export async function startLeadEnrichment(input: {
   workspaceId: string;
   leadId: string;
   actorId: string;
-  allowedSources: LeadEnrichmentAllowedSource[];
+  allowedSources?: LeadEnrichmentAllowedSource[];
   providers?: EnrichmentProviders;
 }): Promise<LeadEnrichmentRunRecord> {
   const capability = await getLeadEnrichmentCapability(input.workspaceId);
@@ -255,7 +256,11 @@ export async function startLeadEnrichment(input: {
       "Enrichment requires the lead’s name and email.",
     );
   }
-  const allowedSources = input.allowedSources.filter((source) =>
+  const requestedSources =
+    input.allowedSources && input.allowedSources.length > 0
+      ? input.allowedSources
+      : [...LEAD_ENRICHMENT_ALLOWED_SOURCES];
+  const allowedSources = requestedSources.filter((source) =>
     (LEAD_ENRICHMENT_ALLOWED_SOURCES as readonly string[]).includes(source),
   );
   if (allowedSources.length === 0) {
@@ -356,7 +361,7 @@ export async function startLeadEnrichment(input: {
         }
       : null;
 
-    const updated = await updateEnrichmentRun(input.workspaceId, run.id, {
+    const reviewing = await updateEnrichmentRun(input.workspaceId, run.id, {
       status: "reviewing",
       searchProvider: provider,
       aiModel: synthesis.model,
@@ -367,7 +372,31 @@ export async function startLeadEnrichment(input: {
       suggestions,
       summaryDraft,
     });
-    return updated;
+
+    const safeDecisions = suggestions
+      .filter((suggestion) =>
+        isSafeToAutoApplySuggestion({
+          currentValue: suggestion.currentValue,
+          currentOrigin: suggestion.currentOrigin,
+        }),
+      )
+      .map((suggestion) => ({
+        suggestionId: suggestion.id,
+        action: "accept" as const,
+      }));
+
+    if (safeDecisions.length === 0 && !summaryDraft) {
+      return reviewing;
+    }
+
+    return applyLeadEnrichmentDecisions({
+      workspaceId: input.workspaceId,
+      leadId: input.leadId,
+      runId: run.id,
+      actorId: input.actorId,
+      decisions: safeDecisions,
+      summaryAction: summaryDraft ? "accept" : undefined,
+    });
   } catch (error) {
     const message =
       error instanceof AppError ? error.message : "Enrichment search failed.";
@@ -386,7 +415,7 @@ export async function applyLeadEnrichmentDecisions(input: {
   actorId: string;
   decisions: Array<{
     suggestionId: string;
-    action: "accept" | "reject" | "edit";
+    action: "accept" | "reject" | "edit" | "clear";
     editedValue?: string;
     overwriteAcknowledged?: boolean;
   }>;
@@ -397,8 +426,8 @@ export async function applyLeadEnrichmentDecisions(input: {
   if (!run || run.leadId !== input.leadId) {
     throw new AppError("NOT_FOUND", "Enrichment run not found.");
   }
-  if (run.status !== "reviewing") {
-    throw new AppError("VALIDATION_ERROR", "This enrichment run is not awaiting review.");
+  if (run.status !== "reviewing" && run.status !== "accepted") {
+    throw new AppError("VALIDATION_ERROR", "This enrichment run cannot be updated.");
   }
   const lead = await findLeadById(input.workspaceId, input.leadId);
   if (!lead || lead.archivedAt) {
@@ -423,10 +452,84 @@ export async function applyLeadEnrichmentDecisions(input: {
   const stamp = buildLeadFieldProvenance({
     method: WEB_ENRICHMENT_METHOD,
     source: WEB_ENRICHMENT_SOURCE,
-    notes: "Accepted from manual public-web enrichment review.",
+    notes: "Accepted from manual public-web enrichment.",
   });
   const now = new Date().toISOString();
   const applied: string[] = [];
+  const cleared: string[] = [];
+
+  async function writeField(
+    fieldKey: LeadEnrichmentFieldKey,
+    nextValue: string | null,
+    nextProvenance: LeadFieldProvenance | null | undefined,
+  ) {
+    if (fieldKey === "companyName") {
+      if (nextValue && /^[a-fA-F0-9]{24}$/.test(nextValue)) {
+        leadPatch.companyId = nextValue;
+      } else if (nextValue) {
+        const resolved = await resolveOrCreateCompanyByName(
+          input.workspaceId,
+          input.actorId,
+          nextValue,
+        );
+        leadPatch.companyId = resolved?.company.id ?? null;
+      } else {
+        leadPatch.companyId = null;
+      }
+      provenance = mergeIntelligenceProvenance(provenance, {
+        companyId: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) {
+        provenance = { ...provenance, companyId: undefined };
+      }
+    } else if (fieldKey === "jobTitle") {
+      leadPatch.jobTitle = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        jobTitle: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) provenance = { ...provenance, jobTitle: undefined };
+    } else if (fieldKey === "industry") {
+      leadPatch.industry = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        industry: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) provenance = { ...provenance, industry: undefined };
+    } else if (fieldKey === "stateRegion") {
+      leadPatch.stateRegion = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        stateRegion: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) provenance = { ...provenance, stateRegion: undefined };
+    } else if (fieldKey === "city") {
+      leadPatch.city = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        city: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) provenance = { ...provenance, city: undefined };
+    } else if (fieldKey === "country") {
+      leadPatch.country = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        country: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) provenance = { ...provenance, country: undefined };
+    } else if (fieldKey === "professionalProfileUrl") {
+      leadPatch.professionalProfileUrl = nextValue;
+      provenance = mergeIntelligenceProvenance(provenance, {
+        professionalProfileUrl: nextProvenance ?? undefined,
+      });
+      if (nextProvenance === null) {
+        provenance = { ...provenance, professionalProfileUrl: undefined };
+      }
+    } else if (fieldKey === "preferredContactClues") {
+      attributes = mergeWebEnrichmentAttributes(attributes, {
+        preferredContactClues: nextValue,
+      });
+    } else if (fieldKey === "otherProfessional") {
+      attributes = mergeWebEnrichmentAttributes(attributes, {
+        otherProfessional: nextValue,
+      });
+    }
+  }
 
   for (const decision of input.decisions) {
     const index = suggestions.findIndex((item) => item.id === decision.suggestionId);
@@ -434,6 +537,30 @@ export async function applyLeadEnrichmentDecisions(input: {
       throw new AppError("VALIDATION_ERROR", "Unknown enrichment suggestion.");
     }
     const suggestion = suggestions[index]!;
+    if (decision.action === "clear") {
+      if (suggestion.status !== "accepted" && suggestion.status !== "edited") {
+        continue;
+      }
+      const previous =
+        suggestion.fieldKey === "companyName" &&
+        suggestion.previousValue &&
+        /^[a-fA-F0-9]{24}$/.test(suggestion.previousValue)
+          ? suggestion.previousValue
+          : (suggestion.previousValue ?? null);
+      await writeField(
+        suggestion.fieldKey,
+        previous,
+        suggestion.previousProvenance,
+      );
+      suggestions[index] = {
+        ...suggestion,
+        status: "reverted",
+        decidedBy: input.actorId,
+        decidedAt: now,
+      };
+      cleared.push(suggestion.fieldKey);
+      continue;
+    }
     if (suggestion.status !== "proposed") {
       continue;
     }
@@ -464,45 +591,7 @@ export async function applyLeadEnrichmentDecisions(input: {
       );
     }
 
-    if (suggestion.fieldKey === "companyName") {
-      const resolved = await resolveOrCreateCompanyByName(
-        input.workspaceId,
-        input.actorId,
-        nextValue,
-      );
-      if (resolved) {
-        leadPatch.companyId = resolved.company.id;
-        provenance = mergeIntelligenceProvenance(provenance, { companyId: stamp });
-      }
-    } else if (suggestion.fieldKey === "jobTitle") {
-      leadPatch.jobTitle = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, { jobTitle: stamp });
-    } else if (suggestion.fieldKey === "industry") {
-      leadPatch.industry = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, { industry: stamp });
-    } else if (suggestion.fieldKey === "stateRegion") {
-      leadPatch.stateRegion = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, { stateRegion: stamp });
-    } else if (suggestion.fieldKey === "city") {
-      leadPatch.city = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, { city: stamp });
-    } else if (suggestion.fieldKey === "country") {
-      leadPatch.country = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, { country: stamp });
-    } else if (suggestion.fieldKey === "professionalProfileUrl") {
-      leadPatch.professionalProfileUrl = nextValue;
-      provenance = mergeIntelligenceProvenance(provenance, {
-        professionalProfileUrl: stamp,
-      });
-    } else if (suggestion.fieldKey === "preferredContactClues") {
-      attributes = mergeWebEnrichmentAttributes(attributes, {
-        preferredContactClues: nextValue,
-      });
-    } else if (suggestion.fieldKey === "otherProfessional") {
-      attributes = mergeWebEnrichmentAttributes(attributes, {
-        otherProfessional: nextValue,
-      });
-    }
+    await writeField(suggestion.fieldKey, nextValue, stamp);
 
     suggestions[index] = {
       ...suggestion,
@@ -512,6 +601,7 @@ export async function applyLeadEnrichmentDecisions(input: {
         suggestion.fieldKey === "companyName"
           ? lead.companyId ?? current.values.companyName
           : current.values[suggestion.fieldKey],
+      previousProvenance: current.provenances[suggestion.fieldKey],
       overwriteAcknowledged: Boolean(decision.overwriteAcknowledged),
       decidedBy: input.actorId,
       decidedAt: now,
@@ -547,7 +637,7 @@ export async function applyLeadEnrichmentDecisions(input: {
   leadPatch.intelligenceProvenance = provenance;
   leadPatch.attributes = attributes;
 
-  if (applied.length > 0 || input.summaryAction === "accept") {
+  if (applied.length > 0 || cleared.length > 0 || input.summaryAction === "accept") {
     await updateLead(input.workspaceId, input.leadId, leadPatch);
   }
 
@@ -570,6 +660,7 @@ export async function applyLeadEnrichmentDecisions(input: {
     entityId: run.id,
     after: {
       applied,
+      cleared,
       summaryAction: input.summaryAction ?? null,
       triggerAutomation: WEB_ENRICHMENT_SIDE_EFFECT_GUARD.triggerAutomation,
     },
@@ -676,12 +767,30 @@ export async function revokeLeadEnrichment(input: {
   if (!lead) {
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
+  const runs = await listEnrichmentRunsForLead(input.workspaceId, input.leadId);
+  const appliedRuns = [...runs]
+    .filter((run) => !run.revokedAt)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  for (const run of appliedRuns) {
+    const hasApplied = run.suggestions.some(
+      (suggestion) => suggestion.status === "accepted" || suggestion.status === "edited",
+    );
+    if (hasApplied) {
+      await revertLeadEnrichmentRun({
+        workspaceId: input.workspaceId,
+        leadId: input.leadId,
+        runId: run.id,
+        actorId: input.actorId,
+      });
+    }
+  }
   const revokedRuns = await revokeEnrichmentRunsForLead(
     input.workspaceId,
     input.leadId,
     input.actorId,
   );
-  const attributes = mergeWebEnrichmentAttributes(lead.attributes, {
+  const fresh = await findLeadById(input.workspaceId, input.leadId);
+  const attributes = mergeWebEnrichmentAttributes(fresh?.attributes ?? lead.attributes, {
     preferredContactClues: null,
     otherProfessional: null,
     summary: null,

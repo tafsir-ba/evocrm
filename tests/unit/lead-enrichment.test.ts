@@ -5,6 +5,7 @@ import {
   contentLooksExcluded,
   crmValueRequiresOverwrite,
   HIGH_CONFIDENCE_THRESHOLD,
+  isSafeToAutoApplySuggestion,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
@@ -37,6 +38,10 @@ describe("lead enrichment contract", () => {
     expect(crmValueRequiresOverwrite("Director", "import")).toBe(true);
     expect(crmValueRequiresOverwrite("Director", "enrichment")).toBe(false);
     expect(crmValueRequiresOverwrite(null, "manual")).toBe(false);
+    expect(isSafeToAutoApplySuggestion({ currentValue: null, currentOrigin: null })).toBe(true);
+    expect(
+      isSafeToAutoApplySuggestion({ currentValue: "Director", currentOrigin: "manual" }),
+    ).toBe(false);
   });
 
   it("excludes health, credentials, and home-address content", () => {

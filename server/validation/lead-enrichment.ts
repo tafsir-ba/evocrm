@@ -6,7 +6,8 @@ export const startLeadEnrichmentSchema = z.object({
   allowedSources: z
     .array(z.enum(LEAD_ENRICHMENT_ALLOWED_SOURCES))
     .min(1)
-    .max(LEAD_ENRICHMENT_ALLOWED_SOURCES.length),
+    .max(LEAD_ENRICHMENT_ALLOWED_SOURCES.length)
+    .optional(),
 });
 
 export const enrichmentDecisionSchema = z.object({
@@ -14,7 +15,7 @@ export const enrichmentDecisionSchema = z.object({
     .array(
       z.object({
         suggestionId: z.string().trim().min(1).max(80),
-        action: z.enum(["accept", "reject", "edit"]),
+        action: z.enum(["accept", "reject", "edit", "clear"]),
         editedValue: z.string().trim().max(500).optional(),
         overwriteAcknowledged: z.boolean().optional(),
       }),

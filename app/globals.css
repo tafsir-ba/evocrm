@@ -164,3 +164,23 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+@keyframes enrich-orb {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(109 40 217 / 0.28);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 14px rgb(109 40 217 / 0);
+  }
+}
+
+.enrich-orb {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #ddd6fe, #7c3aed);
+  animation: enrich-orb 1.4s ease-in-out infinite;
+}

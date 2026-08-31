@@ -183,6 +183,14 @@ export function crmValueRequiresOverwrite(
   return (CRM_ENTERED_PROVENANCE_METHODS as readonly string[]).includes(currentOrigin);
 }
 
+/** Empty or previously enriched fields may be filled without an overwrite checkbox. */
+export function isSafeToAutoApplySuggestion(input: {
+  currentValue: string | null | undefined;
+  currentOrigin: LeadFieldProvenanceMethod | "unknown" | null | undefined;
+}): boolean {
+  return !crmValueRequiresOverwrite(input.currentValue, input.currentOrigin);
+}
+
 export function contentLooksExcluded(text: string): boolean {
   return EXCLUDED_CONTENT_PATTERNS.some((pattern) => pattern.test(text));
 }

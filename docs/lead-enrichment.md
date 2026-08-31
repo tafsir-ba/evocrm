@@ -5,14 +5,14 @@ Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KE
 ## Product flow
 
 1. Lead detail header **Enrich** CTA (`lead:enrich`). Hidden when the feature is off or the role cannot enrich.
-2. Review modal shows CRM-known fields (name, email, company, job title, industry, location) and lets the user pick allowed public-web source classes.
-3. Search runs **only** after the user confirms. Query is **name + email only** (no phone, address, or financials).
+2. Clicking **Enrich** starts public-web search immediately (default allowed sources: professional directories, company sites, news/press, registries). A short animated progress state is shown. There is no source-picker or per-field accept gate before results appear.
+3. Search uses the lead’s **name + email only** (no phone, address, or financials).
 4. Search-provider hits are synthesized server-side with OpenAI. The model may only cite provided results; it must not invent facts.
-5. Field-level proposals appear before any save. Each proposal has value, confidence %, rationale, source URLs, retrieval time, and model/search provenance.
-6. User accepts / rejects / edits per field. CRM-entered values require an explicit overwrite acknowledgement. Nothing is written silently.
-7. Optional **Enrichment summary** is a cited, user-reviewed note. It is not a campaign, drip, status change, or outbound message.
+5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value”.
+6. The profile shows enriched values with a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
+7. **What we know** is a cited summary stored on the lead. It is not a campaign, drip, status change, or outbound message.
 
-Ambiguous identity → run status `ambiguous`, **no suggestions**. Missing verifiable source → confidence capped; high confidence is rejected.
+Ambiguous identity → run status `ambiguous`, **no suggestions**, no profile write. Missing verifiable source → confidence capped; high confidence is rejected.
 
 ## Data model
 
@@ -46,7 +46,7 @@ Only after explicit accept, with `triggerAutomation: false`:
 - Overlay on `attributes.webEnrichment`: `preferredContactClues`, `otherProfessional`, `summary`
 - Provenance `method: "enrichment"`, `source: "manual_web_enrichment"`
 
-Manual / import / website / API values are never overwritten without `overwriteAcknowledged`.
+Manual / import / website / API values are never overwritten without `overwriteAcknowledged`. Safe empty-field suggestions are auto-applied after a unique identity match because the user initiated Enrich.
 
 ### `LeadFinancialSituation` (`lead_financial_situations`)
 
@@ -102,4 +102,4 @@ Confidence is **source-quality / identity-match**, not a truth claim. Operators 
 
 ## Side-effect guard
 
-Accept/revert uses `updateLeadForWorkspace(..., { triggerAutomation: false })`. Enrichment never changes status, consent, project membership, campaigns, or drips.
+Accept/revert/clear uses repository `updateLead` (no campaign auto-enrollment). Enrichment never changes status, consent, project membership, campaigns, or drips. Revoke restores previously accepted enrichment fields (newest run first), then marks runs revoked while keeping suggestion history for audit.

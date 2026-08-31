@@ -195,10 +195,6 @@ export async function revokeEnrichmentRunsForLead(
         status: "revoked",
         revokedAt: new Date(),
         revokedBy: actorId,
-        suggestions: [],
-        sources: [],
-        summaryDraft: null,
-        acceptedSummary: null,
       },
     },
   );

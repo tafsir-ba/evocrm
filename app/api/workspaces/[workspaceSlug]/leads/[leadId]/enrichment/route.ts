@@ -33,7 +33,14 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:enrich",
     );
-    const input = parseRequestOrThrow(startLeadEnrichmentSchema, await request.json());
+    let raw: unknown = {};
+    try {
+      const text = await request.text();
+      raw = text.trim() ? (JSON.parse(text) as unknown) : {};
+    } catch {
+      raw = {};
+    }
+    const input = parseRequestOrThrow(startLeadEnrichmentSchema, raw);
     const run = await startLeadEnrichment({
       workspaceId: workspace.id,
       leadId,

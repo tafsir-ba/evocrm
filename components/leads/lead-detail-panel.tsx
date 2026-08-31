@@ -36,10 +36,13 @@ import {
   IconSparkles,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
-import { FieldOriginBadge } from "@/components/leads/field-origin-badge";
+import { EnrichedField } from "@/components/leads/enriched-field";
 import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
 import { LeadFinancialSituationTab } from "@/components/leads/lead-financial-situation-tab";
-import { readWebEnrichmentAttributes } from "@/lib/lead-enrichment";
+import {
+  readWebEnrichmentAttributes,
+  type LeadEnrichmentSuggestion,
+} from "@/lib/lead-enrichment";
 import type { LeadFieldProvenanceMethod } from "@/lib/lead-intelligence";
 import {
   LeadProjectMemberships,
@@ -113,6 +116,7 @@ type LeadDetailPanelProps = {
   canCreateDocument: boolean;
   canArchiveDocument: boolean;
   canEnrich: boolean;
+  canEnrichRevoke: boolean;
   canFinancialRead: boolean;
   canFinancialUpdate: boolean;
   canFinancialDelete: boolean;
@@ -135,6 +139,7 @@ export function LeadDetailPanel({
   canCreateDocument,
   canArchiveDocument,
   canEnrich,
+  canEnrichRevoke,
   canFinancialRead,
   canFinancialUpdate,
   canFinancialDelete,
@@ -150,11 +155,30 @@ export function LeadDetailPanel({
   const [memberships, setMemberships] = useState<LeadProjectMembershipItem[]>([]);
   const [membershipError, setMembershipError] = useState<string | null>(null);
   const [enrichOpen, setEnrichOpen] = useState(false);
+  const [enrichmentRuns, setEnrichmentRuns] = useState<
+    Array<{
+      id: string;
+      status: string;
+      suggestions: LeadEnrichmentSuggestion[];
+      acceptedSummary: { text: string; citationUrls: string[] } | null;
+      summaryDraft: { text: string; citationUrls: string[] } | null;
+    }>
+  >([]);
+  const [enrichmentEnabled, setEnrichmentEnabled] = useState(false);
+  const [financialEstimate, setFinancialEstimate] = useState<{
+    rangeMin: number | null;
+    rangeMax: number | null;
+    currency: string;
+    confidencePercent: number;
+    disclaimer: string;
+  } | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
-  const loadLead = useCallback(async () => {
-    setLoading(true);
+  const loadLead = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true);
+    }
     setError(null);
     setForbidden(false);
     setNotFound(false);
@@ -178,12 +202,23 @@ export function LeadDetailPanel({
       const nextLead = payload.data.lead as LeadDetail;
       setLead(nextLead);
       setMemberships(nextLead.projectMemberships ?? []);
+
+      const enrichResponse = await fetch(`${apiBase}/leads/${leadId}/enrichment`);
+      if (enrichResponse.ok) {
+        const enrichPayload = await enrichResponse.json();
+        setEnrichmentEnabled(Boolean(enrichPayload.data?.capability?.enabled));
+        setEnrichmentRuns(enrichPayload.data?.runs ?? []);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
       setLoading(false);
     }
   }, [apiBase, leadId]);
+
+  const refreshLead = useCallback(() => {
+    void loadLead({ silent: true });
+  }, [loadLead]);
 
   useEffect(() => {
     void loadLead();
@@ -257,6 +292,43 @@ export function LeadDetailPanel({
     };
   }, [apiBase]);
 
+  useEffect(() => {
+    if (!canFinancialRead) {
+      setFinancialEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadEstimate() {
+      try {
+        const response = await fetch(`${apiBase}/leads/${leadId}/financial-situation`);
+        const payload = await response.json();
+        if (cancelled || !response.ok) {
+          return;
+        }
+        const estimate = payload.data?.record?.marketIncomeEstimate;
+        setFinancialEstimate(
+          estimate
+            ? {
+                rangeMin: estimate.rangeMin ?? null,
+                rangeMax: estimate.rangeMax ?? null,
+                currency: estimate.currency,
+                confidencePercent: estimate.confidencePercent,
+                disclaimer: payload.data?.disclaimer ?? "",
+              }
+            : null,
+        );
+      } catch {
+        if (!cancelled) {
+          setFinancialEstimate(null);
+        }
+      }
+    }
+    void loadEstimate();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, leadId, canFinancialRead]);
+
   async function mutateMemberships(
     path: string,
     init: RequestInit,
@@ -324,6 +396,76 @@ export function LeadDetailPanel({
       return `${min.toLocaleString()} – ${max.toLocaleString()}`;
     }
     return (min ?? max)?.toLocaleString() ?? "—";
+  }
+
+  const activeRun =
+    enrichmentRuns.find((run) => run.status === "accepted" || run.status === "reviewing") ??
+    enrichmentRuns[0] ??
+    null;
+
+  function suggestionFor(fieldKey: string) {
+    return activeRun?.suggestions.find((item) => item.fieldKey === fieldKey) ?? null;
+  }
+
+  function canClearSuggestion(suggestion: LeadEnrichmentSuggestion | null) {
+    return Boolean(
+      canEnrich &&
+        suggestion &&
+        (suggestion.status === "accepted" || suggestion.status === "edited"),
+    );
+  }
+
+  function canOverwriteSuggestion(suggestion: LeadEnrichmentSuggestion | null) {
+    return Boolean(canEnrich && suggestion && suggestion.status === "proposed");
+  }
+
+  async function clearSuggestion(suggestion: LeadEnrichmentSuggestion) {
+    if (!activeRun) return;
+    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        decisions: [{ suggestionId: suggestion.id, action: "clear" }],
+      }),
+    });
+    await loadLead({ silent: true });
+  }
+
+  async function applyOverwrite(suggestion: LeadEnrichmentSuggestion) {
+    if (!activeRun) return;
+    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        decisions: [
+          {
+            suggestionId: suggestion.id,
+            action: "accept",
+            overwriteAcknowledged: true,
+          },
+        ],
+      }),
+    });
+    await loadLead({ silent: true });
+  }
+
+  async function revertActiveRun() {
+    if (!activeRun) return;
+    if (!window.confirm("Revert this enrichment run and restore previous CRM values?")) {
+      return;
+    }
+    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/revert`, {
+      method: "POST",
+    });
+    await loadLead({ silent: true });
+  }
+
+  async function revokeEnrichment() {
+    if (!window.confirm("Delete all enrichment data for this lead?")) {
+      return;
+    }
+    await fetch(`${apiBase}/leads/${leadId}/enrichment`, { method: "DELETE" });
+    await loadLead({ silent: true });
   }
 
   if (forbidden) {
@@ -407,7 +549,7 @@ export function LeadDetailPanel({
         }`}
         actions={
           <>
-            {canEnrich && !lead.archivedAt && (
+            {canEnrich && enrichmentEnabled && !lead.archivedAt && (
               <Button
                 variant="outline"
                 leadingIcon={<IconSparkles size={14} />}
@@ -471,16 +613,38 @@ export function LeadDetailPanel({
               {lead.phone ?? "—"}
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Company">
-              <span className="inline-flex items-center gap-1.5">
-                {lead.company?.name ?? "—"}
-                <FieldOriginBadge method={lead.intelligenceProvenance?.companyId?.method} />
-              </span>
+              <EnrichedField
+                value={lead.company?.name ?? "—"}
+                origin={lead.intelligenceProvenance?.companyId?.method}
+                suggestion={suggestionFor("companyName")}
+                onClear={
+                  canClearSuggestion(suggestionFor("companyName"))
+                    ? () => void clearSuggestion(suggestionFor("companyName")!)
+                    : undefined
+                }
+                onApplyOverwrite={
+                  canOverwriteSuggestion(suggestionFor("companyName"))
+                    ? () => void applyOverwrite(suggestionFor("companyName")!)
+                    : undefined
+                }
+              />
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Job title">
-              <span className="inline-flex items-center gap-1.5">
-                {lead.jobTitle ?? "—"}
-                <FieldOriginBadge method={lead.intelligenceProvenance?.jobTitle?.method} />
-              </span>
+              <EnrichedField
+                value={lead.jobTitle ?? "—"}
+                origin={lead.intelligenceProvenance?.jobTitle?.method}
+                suggestion={suggestionFor("jobTitle")}
+                onClear={
+                  canClearSuggestion(suggestionFor("jobTitle"))
+                    ? () => void clearSuggestion(suggestionFor("jobTitle")!)
+                    : undefined
+                }
+                onApplyOverwrite={
+                  canOverwriteSuggestion(suggestionFor("jobTitle"))
+                    ? () => void applyOverwrite(suggestionFor("jobTitle")!)
+                    : undefined
+                }
+              />
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Preferred areas">
               {lead.preferredAreas.length > 0 ? lead.preferredAreas.join(", ") : "—"}
@@ -551,10 +715,95 @@ export function LeadDetailPanel({
                         }
                       />
                       <Info label="Source" value={lead.source?.label ?? "—"} />
-                      <Info label="Industry" value={lead.industry ?? "—"} origin={lead.intelligenceProvenance?.industry?.method} />
-                      <Info label="State / region" value={lead.stateRegion ?? "—"} origin={lead.intelligenceProvenance?.stateRegion?.method} />
-                      <Info label="City" value={lead.city ?? enrichmentOverlay.city ?? "—"} origin={lead.intelligenceProvenance?.city?.method} />
-                      <Info label="Country" value={lead.country ?? enrichmentOverlay.country ?? "—"} origin={lead.intelligenceProvenance?.country?.method} />
+                      <Info
+                        label="Industry"
+                        value={lead.industry ?? "—"}
+                        origin={lead.intelligenceProvenance?.industry?.method}
+                        suggestion={suggestionFor("industry")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("industry"))
+                            ? () => void clearSuggestion(suggestionFor("industry")!)
+                            : undefined
+                        }
+                        onApplyOverwrite={
+                          canOverwriteSuggestion(suggestionFor("industry"))
+                            ? () => void applyOverwrite(suggestionFor("industry")!)
+                            : undefined
+                        }
+                      />
+                      <Info
+                        label="State / region"
+                        value={lead.stateRegion ?? "—"}
+                        origin={lead.intelligenceProvenance?.stateRegion?.method}
+                        suggestion={suggestionFor("stateRegion")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("stateRegion"))
+                            ? () => void clearSuggestion(suggestionFor("stateRegion")!)
+                            : undefined
+                        }
+                        onApplyOverwrite={
+                          canOverwriteSuggestion(suggestionFor("stateRegion"))
+                            ? () => void applyOverwrite(suggestionFor("stateRegion")!)
+                            : undefined
+                        }
+                      />
+                      <Info
+                        label="City"
+                        value={lead.city ?? "—"}
+                        origin={lead.intelligenceProvenance?.city?.method}
+                        suggestion={suggestionFor("city")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("city"))
+                            ? () => void clearSuggestion(suggestionFor("city")!)
+                            : undefined
+                        }
+                        onApplyOverwrite={
+                          canOverwriteSuggestion(suggestionFor("city"))
+                            ? () => void applyOverwrite(suggestionFor("city")!)
+                            : undefined
+                        }
+                      />
+                      <Info
+                        label="Country"
+                        value={lead.country ?? "—"}
+                        origin={lead.intelligenceProvenance?.country?.method}
+                        suggestion={suggestionFor("country")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("country"))
+                            ? () => void clearSuggestion(suggestionFor("country")!)
+                            : undefined
+                        }
+                        onApplyOverwrite={
+                          canOverwriteSuggestion(suggestionFor("country"))
+                            ? () => void applyOverwrite(suggestionFor("country")!)
+                            : undefined
+                        }
+                      />
+                      <Info
+                        label="Professional profile"
+                        value={lead.professionalProfileUrl ?? "—"}
+                        origin={lead.intelligenceProvenance?.professionalProfileUrl?.method}
+                        suggestion={suggestionFor("professionalProfileUrl")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("professionalProfileUrl"))
+                            ? () =>
+                                void clearSuggestion(suggestionFor("professionalProfileUrl")!)
+                            : undefined
+                        }
+                      />
+                      <Info
+                        label="Preferred contact clues"
+                        value={enrichmentOverlay.preferredContactClues ?? lead.preferredContactMethod ?? "—"}
+                        origin={
+                          enrichmentOverlay.preferredContactClues ? "enrichment" : undefined
+                        }
+                        suggestion={suggestionFor("preferredContactClues")}
+                        onClear={
+                          canClearSuggestion(suggestionFor("preferredContactClues"))
+                            ? () => void clearSuggestion(suggestionFor("preferredContactClues")!)
+                            : undefined
+                        }
+                      />
                       <div className="md:col-span-2">
                         <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
                           Projects
@@ -681,15 +930,77 @@ export function LeadDetailPanel({
                           lead.usagePurpose ? labelUsagePurpose(lead.usagePurpose) : "—"
                         }
                       />
+                      {enrichmentOverlay.otherProfessional ? (
+                        <Info
+                          label="Other public professional information"
+                          value={enrichmentOverlay.otherProfessional}
+                          origin="enrichment"
+                          suggestion={suggestionFor("otherProfessional")}
+                          onClear={
+                          canClearSuggestion(suggestionFor("otherProfessional"))
+                              ? () => void clearSuggestion(suggestionFor("otherProfessional")!)
+                              : undefined
+                          }
+                        />
+                      ) : null}
                       {enrichmentOverlay.summary?.text ? (
                         <div className="md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3">
                           <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
-                            Enrichment summary
+                            What we know
                           </p>
                           <p className="text-[13px] text-[var(--color-ink-soft)] whitespace-pre-wrap">
                             {enrichmentOverlay.summary.text}
                           </p>
+                          {enrichmentOverlay.summary.citationUrls?.length ? (
+                            <ul className="mt-2 text-[12px] space-y-0.5">
+                              {enrichmentOverlay.summary.citationUrls.map((url) => (
+                                <li key={url}>
+                                  <a
+                                    className="text-[var(--color-brand-700)] hover:underline break-all"
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {url}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                          {canEnrich && activeRun ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button variant="ghost" onClick={() => void revertActiveRun()}>
+                                Revert this enrichment
+                              </Button>
+                              {canEnrichRevoke ? (
+                                <Button variant="ghost" onClick={() => void revokeEnrichment()}>
+                                  Delete enrichment data
+                                </Button>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
+                      ) : null}
+                      {canFinancialRead && financialEstimate ? (
+                        <div className="md:col-span-2 rounded-lg border border-[var(--color-line)] p-3">
+                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
+                            Market-income estimate (occupational, not this person)
+                          </p>
+                          <p className="text-[13.5px] text-[var(--color-ink)]">
+                            {financialEstimate.rangeMin ?? "—"} – {financialEstimate.rangeMax ?? "—"}{" "}
+                            {financialEstimate.currency} ({financialEstimate.confidencePercent}%
+                            source confidence)
+                          </p>
+                          <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                            {financialEstimate.disclaimer}
+                          </p>
+                        </div>
+                      ) : canFinancialRead && lead.jobTitle && (lead.city || lead.stateRegion) ? (
+                        <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
+                          Optional occupational market-income estimate is on the Financial situation
+                          tab. It is never used for automated credit, mortgage, pricing, or
+                          eligibility decisions.
+                        </p>
                       ) : null}
                       {integrationAttrs && (
                         <>
@@ -813,8 +1124,7 @@ export function LeadDetailPanel({
         onClose={() => setEnrichOpen(false)}
         workspaceSlug={workspaceSlug}
         leadId={leadId}
-        lead={lead}
-        onApplied={() => void loadLead()}
+        onApplied={refreshLead}
       />
     </>
   );
@@ -836,7 +1146,7 @@ function Row({
         <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-faint)] font-semibold">
           {label}
         </p>
-        <p className="text-[13px] text-[var(--color-ink)] truncate">{children}</p>
+        <div className="text-[13px] text-[var(--color-ink)]">{children}</div>
       </div>
     </div>
   );
@@ -846,20 +1156,29 @@ function Info({
   label,
   value,
   origin,
+  suggestion,
+  onClear,
+  onApplyOverwrite,
 }: {
   label: string;
   value: string;
   origin?: LeadFieldProvenanceMethod | "unknown" | null;
+  suggestion?: LeadEnrichmentSuggestion | null;
+  onClear?: () => void;
+  onApplyOverwrite?: () => void;
 }) {
   return (
     <div>
       <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
         {label}
       </p>
-      <p className="text-[13.5px] text-[var(--color-ink)] inline-flex items-center gap-1.5 flex-wrap">
-        {value}
-        <FieldOriginBadge method={origin} />
-      </p>
+      <EnrichedField
+        value={value}
+        origin={origin}
+        suggestion={suggestion}
+        onClear={onClear}
+        onApplyOverwrite={onApplyOverwrite}
+      />
     </div>
   );
 }
