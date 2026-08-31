@@ -177,7 +177,7 @@ function emptyProjectCounts(): ProjectListCounts {
   };
 }
 
-const INBOUND_DEMAND_CURSOR_BATCH = 250;
+const INBOUND_DEMAND_CURSOR_BATCH = 2000;
 
 type InboundDemandLeadDocument = {
   projectId?: mongoose.Types.ObjectId;
