@@ -31,7 +31,17 @@
     "format:check": "prettier --check .",
     "reconcile:hubspot-portal": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-portal-reconciliation.ts",
     "cutover:hubspot-ongoing": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-ongoing-sync-cutover.ts",
-    "cutover:hubspot-notes": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-notes-sync-cutover.ts"
+    "cutover:hubspot-notes": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-notes-sync-cutover.ts",
+    "measure:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-measure.ts",
+    "select:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-select.ts",
+    "migrate:hubspot-nameless-email": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-nameless-email-migrate.ts",
+    "reconcile:hubspot-email-name-policy": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-email-name-policy-reconcile.ts",
+    "summary:hubspot-email-name-policy": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-email-name-policy-summary.ts",
+    "reconcile:hubspot-cmp-cohort": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-cmp-cohort-reconcile.ts",
+    "ensure:hubspot-cmp-membership": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-cmp-membership-ensure.ts",
+    "migrate:hubspot-final": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-final-migration-execute.ts",
+    "reconcile:hubspot-final-ledger": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-final-ledger.ts",
+    "recon:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-recon.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",

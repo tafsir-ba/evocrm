@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T07:26:51.134Z",
+  "policy": "email_bearing_missing_name_reclassification_v2",
+  "migration": {
+    "manifestsCompleted": 33,
+    "created": 4557,
+    "skipped": 3,
+    "preExisting": 3,
+    "unexpected": 0,
+    "abortedRuns": 0,
+    "enrollmentCount": 0
+  },
+  "held": {
+    "no_project_signal": 2646
+  },
+  "overlaps": {
+    "eligible_vs_cmp_cohort": 0,
+    "eligible_vs_multi_queue": 216,
+    "held_vs_cmp_cohort": 0
+  },
+  "gatesPassed": true
+}

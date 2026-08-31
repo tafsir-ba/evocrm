@@ -79,6 +79,7 @@ import {
 import { decodeHubSpotCredentials } from "@/server/security/integration-credentials";
 import type { HubSpotWebhookEvent } from "@/server/utils/hubspot-webhook";
 import { processHubSpotNotesForContact } from "@/server/services/hubspot-notes-sync";
+import { ensureCmpMembershipFromHubSpotProperties } from "@/server/services/hubspot-cmp-membership";
 
 assertOngoingSyncSideEffectGuard();
 
@@ -694,6 +695,15 @@ export async function processOngoingHubSpotContact(input: {
         triggerAutomation: false,
       },
     });
+
+    await Promise.resolve(
+      ensureCmpMembershipFromHubSpotProperties({
+        contactId,
+        properties: contact.properties,
+        actorId: input.integration.createdBy,
+        persist: true,
+      }),
+    ).catch(() => undefined);
 
     await Promise.resolve(
       processHubSpotNotesForContact({

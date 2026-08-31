@@ -1,0 +1,35 @@
+{
+  "name": "nameless-bude_the_residence_frederic-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a947c8479ec7c0a71a6fcfe",
+  "destinationReference": "BUDE_THE_RESIDENCE_FREDERIC",
+  "slug": "bude_the_residence_frederic",
+  "sourceHubSpotProjectId": "bude_the_residence_frederic",
+  "size": 4,
+  "selection": {
+    "pool": "nameless_email_reclassification",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "product_vs_wd_conflict",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "861151",
+    "47560555931",
+    "64905152345",
+    "72705250936"
+  ],
+  "idChecksum": "215949d353851abe25d54f85599084b923a11d8e5f68fe252efe6b020c72e0f5"
+}

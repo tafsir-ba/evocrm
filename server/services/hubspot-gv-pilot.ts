@@ -30,6 +30,8 @@ import {
   parseExecuteArgs,
   parseGvPilotManifest,
   resolveManifestFileName,
+  buildMigrationNameAttributes,
+  resolveMigrationLeadIdentity,
   shouldAbortRun,
   snapshotFromHubSpotProperties,
   type GvPilotLiveWriteGate,
@@ -291,37 +293,41 @@ export async function runHubSpotGvPilot(input: {
       GV_PILOT_WORKSPACE_ID,
       manifest.idChecksum,
     );
-    if (already) {
+    if (already?.status === "completed") {
       throw new Error("execute_run_already_exists");
     }
-    const run = await createHubSpotMigrationRun({
-      workspaceId: GV_PILOT_WORKSPACE_ID,
-      integrationId: GV_PILOT_INTEGRATION_ID,
-      portalId: GV_PILOT_PORTAL_ID,
-      destinationProjectId: GV_PILOT_PROJECT_ID,
-      destinationReference: GV_PILOT_PROJECT_REFERENCE,
-      manifestName: manifest.name,
-      manifestChecksum: manifest.idChecksum,
-      hubspotContactIds: manifest.hubspotContactIds,
-      mode: "execute",
-      status: "running",
-      abortThreshold: GV_PILOT_ABORT_THRESHOLD,
-      actorId: context.actorId,
-      sideEffectGuard: { ...GV_PILOT_SIDE_EFFECT_GUARD },
-    });
-    runId = run.id;
-    await createAuditLog({
-      workspaceId: GV_PILOT_WORKSPACE_ID,
-      actorId: context.actorId,
-      action: "hubspot_migration_run.started",
-      entityType: "hubspot_migration_run",
-      entityId: run.id,
-      after: {
+    if (already?.status === "running") {
+      runId = already.id;
+    } else {
+      const run = await createHubSpotMigrationRun({
+        workspaceId: GV_PILOT_WORKSPACE_ID,
+        integrationId: GV_PILOT_INTEGRATION_ID,
+        portalId: GV_PILOT_PORTAL_ID,
+        destinationProjectId: GV_PILOT_PROJECT_ID,
+        destinationReference: GV_PILOT_PROJECT_REFERENCE,
         manifestName: manifest.name,
         manifestChecksum: manifest.idChecksum,
-        size: manifest.size,
-      },
-    });
+        hubspotContactIds: manifest.hubspotContactIds,
+        mode: "execute",
+        status: "running",
+        abortThreshold: GV_PILOT_ABORT_THRESHOLD,
+        actorId: context.actorId,
+        sideEffectGuard: { ...GV_PILOT_SIDE_EFFECT_GUARD },
+      });
+      runId = run.id;
+      await createAuditLog({
+        workspaceId: GV_PILOT_WORKSPACE_ID,
+        actorId: context.actorId,
+        action: "hubspot_migration_run.started",
+        entityType: "hubspot_migration_run",
+        entityId: run.id,
+        after: {
+          manifestName: manifest.name,
+          manifestChecksum: manifest.idChecksum,
+          size: manifest.size,
+        },
+      });
+    }
   }
 
   let statusId: string | null = null;
@@ -452,6 +458,7 @@ export async function runHubSpotGvPilot(input: {
     }
 
     try {
+      const identity = resolveMigrationLeadIdentity(snapshot);
       const result = await createLeadForWorkspace(
         GV_PILOT_WORKSPACE_ID,
         context.actorId,
@@ -459,8 +466,8 @@ export async function runHubSpotGvPilot(input: {
           projectId: GV_PILOT_PROJECT_ID,
           statusId: statusId!,
           sourceId: sourceId ?? undefined,
-          firstName: snapshot.firstName,
-          lastName: snapshot.lastName,
+          firstName: identity.firstName,
+          lastName: identity.lastName,
           email: snapshot.emailNormalized ?? undefined,
           phone: snapshot.hasPhone
             ? (raw.properties.phone ?? raw.properties.mobilephone ?? undefined) ?? undefined
@@ -474,9 +481,13 @@ export async function runHubSpotGvPilot(input: {
               inboundSource: GV_PILOT_INBOUND_SOURCE,
             },
             ...buildMigratedCampaignGuardAttributes(),
+            ...buildMigrationNameAttributes(identity),
           },
         },
-        { triggerAutomation: false },
+        {
+          triggerAutomation: false,
+          displayFullName: identity.displayLabel ?? undefined,
+        },
       );
 
       if (result.lead.projectId === GV_PILOT_GENERAL_PROJECT_ID) {

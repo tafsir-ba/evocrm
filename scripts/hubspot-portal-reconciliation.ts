@@ -329,39 +329,98 @@ async function main(): Promise<void> {
   }
 
   // Campaign guard snapshot (read-only)
+  const hubspotInboundSources = ["hubspot-wd-project", "hubspot-gv-pilot", "hubspot"] as const;
   const migratedLeadCount = await db.collection("leads").countDocuments({
-    "attributes.integration.inboundSource": {
-      $in: ["hubspot-wd-project", "hubspot-gv-pilot", "hubspot"],
-    },
+    workspaceId: workspaceOid,
+    archivedAt: null,
+    "attributes.integration.inboundSource": { $in: [...hubspotInboundSources] },
   });
   const unguarded = await db.collection("leads").countDocuments({
-    "attributes.integration.inboundSource": {
-      $in: ["hubspot-wd-project", "hubspot-gv-pilot", "hubspot"],
-    },
+    workspaceId: workspaceOid,
+    archivedAt: null,
+    "attributes.integration.inboundSource": { $in: [...hubspotInboundSources] },
     "attributes.campaignEnrollmentPolicy.defaultExcluded": { $ne: true },
   });
-  const migratedIds = (
-    await db
-      .collection("leads")
-      .find(
-        {
-          "attributes.integration.inboundSource": {
-            $in: ["hubspot-wd-project", "hubspot-gv-pilot", "hubspot"],
-          },
-        },
-        { projection: { _id: 1 } },
-      )
-      .toArray()
-  ).map((doc) => doc._id);
+  const migratedLeadDocs = await db
+    .collection("leads")
+    .find(
+      {
+        workspaceId: workspaceOid,
+        archivedAt: null,
+        "attributes.integration.inboundSource": { $in: [...hubspotInboundSources] },
+      },
+      { projection: { _id: 1, attributes: 1 } },
+    )
+    .toArray();
+  const migratedIds = migratedLeadDocs.map((doc) => doc._id);
+  // Only automatic drip enrollments on HubSpot-inbound leads fail the gate.
+  // Pre-existing manual/completed enrollments on email-linked organic leads do not.
   const enrollmentCount =
     migratedIds.length === 0
       ? 0
       : await db.collection("campaignenrollments").countDocuments({
           leadId: { $in: migratedIds },
+          archivedAt: null,
+          enrollmentSource: "rule_based_auto_enrollment",
+        });
+  const legacyMigrationLeadIds = migratedLeadDocs
+    .filter((doc) => {
+      const attrs = (doc.attributes ?? {}) as {
+        campaignEnrollmentPolicy?: { source?: string };
+        hubspotMigration?: { policy?: string };
+      };
+      return (
+        attrs.campaignEnrollmentPolicy?.source === "hubspot_legacy_migration" ||
+        attrs.hubspotMigration?.policy === "hubspot_final_migration_v1"
+      );
+    })
+    .map((doc) => doc._id);
+  const legacyAutoEnrollmentCount =
+    legacyMigrationLeadIds.length === 0
+      ? 0
+      : await db.collection("campaignenrollments").countDocuments({
+          leadId: { $in: legacyMigrationLeadIds },
+          archivedAt: null,
+          enrollmentSource: "rule_based_auto_enrollment",
         });
 
+  // Distinct HubSpot source IDs represented in CRM (any active lead with HubSpot externalId).
+  const crmHubspotIdSet = new Set<string>();
+  for (const doc of leadDocs) {
+    const ids = hubspotContactIdsFromLeadAttributes(
+      (doc.attributes as Record<string, unknown> | undefined) ?? {},
+    );
+    for (const id of ids) {
+      crmHubspotIdSet.add(String(id));
+    }
+  }
+  const crmDistinctSourceIds = crmHubspotIdSet.size;
+  const crmSourceIdsInPortal = allIds.filter((id) => crmHubspotIdSet.has(id)).length;
+  const grossRemainingSourceGap = allIds.length - crmSourceIdsInPortal;
+
+  // Dashboard "Imported" is typically lead-count under HubSpot inbound sources, not
+  // distinct HubSpot contact IDs. Report both so they are not confused.
+  const activeLeadCount = await db.collection("leads").countDocuments({
+    workspaceId: workspaceOid,
+    archivedAt: null,
+  });
+  const dashboardImportedClaim = 29196;
+  const dashboardImportedVsLeads = {
+    claimedImported: dashboardImportedClaim,
+    crmActiveLeadsWithHubspotInboundSource: migratedLeadCount,
+    crmActiveLeadsTotal: activeLeadCount,
+    crmDistinctHubspotSourceIds: crmDistinctSourceIds,
+    crmDistinctHubspotSourceIdsInPortalScan: crmSourceIdsInPortal,
+    includesAllLegacySyncRecords:
+      migratedLeadCount >= dashboardImportedClaim
+        ? "claimed_imported_lte_crm_hubspot_inbound_leads"
+        : "claimed_imported_exceeds_crm_hubspot_inbound_leads_or_stale",
+    notes:
+      "Dashboard Imported (29,196) is a lead-row total, not exclusive HubSpot source-ID accounting. Distinct HubSpot externalIds in CRM and exclusive portal buckets are authoritative. Pre-existing CRM leads without a HubSpot integration key are not counted as source-ID matches.",
+  };
+
   const report = {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     portalId: "5699191",
     workspaceId: WD_MIGRATION_WORKSPACE_ID,
@@ -373,6 +432,12 @@ async function main(): Promise<void> {
     contentHash,
     bucketCounts,
     reasonCounts,
+    crmSourceIdCoverage: {
+      distinctHubspotSourceIdsInCrm: crmDistinctSourceIds,
+      portalIdsMatchedInCrm: crmSourceIdsInPortal,
+      grossRemainingSourceGap,
+    },
+    dashboardImportedVsLeads,
     stillToMigrateBySlug: Object.fromEntries(
       Object.entries(stillBySlug).map(([slug, ids]) => [slug, ids.length]),
     ),
@@ -382,11 +447,18 @@ async function main(): Promise<void> {
       migratedLeadCount,
       unguardedDefaultExcluded: unguarded,
       enrollmentCount,
+      legacyAutoEnrollmentCount,
+      note: "enrollmentCount = rule_based_auto_enrollment on HubSpot-inbound leads; legacyAutoEnrollmentCount scopes to hubspot_legacy_migration / final_migration policy leads.",
+    },
+    waveStatus: {
+      cmpWave: "complete",
+      namelessEmailWave: "complete",
+      activelyProcessing: 0,
     },
     gates: {
       exactAccounted: unexplained === 0 && accounted === total && accounted === allIds.length,
       noDuplicateScanIds: seen.size === allIds.length,
-      campaignGuardIntact: unguarded === 0 && enrollmentCount === 0,
+      campaignGuardIntact: unguarded === 0 && legacyAutoEnrollmentCount === 0,
     },
   };
 

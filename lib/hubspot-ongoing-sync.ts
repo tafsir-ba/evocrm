@@ -119,6 +119,10 @@ export const HUBSPOT_ONGOING_CONTACT_PROPERTIES = [
   "utm_campaign",
   "utm_term",
   "utm_content",
+  "hs_lead_status",
+  "notes_last_contacted",
+  "hs_content_membership_notes",
+  "wd_broker_assigned",
 ] as const;
 
 export type HubSpotSyncIdentityField = "firstName" | "lastName" | "email" | "phone";

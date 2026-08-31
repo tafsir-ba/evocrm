@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T13:09:22.374Z",
+  "mode": "execute",
+  "policy": "hubspot_final_migration_v1",
+  "onlyGaps": true,
+  "limit": null,
+  "totals": {
+    "scanned": 7041,
+    "created": 5006,
+    "memberships_added": 8,
+    "preexisting": 0,
+    "deduped_linked": 294,
+    "legacy_general": 1733,
+    "error": 0,
+    "membershipsAddedSum": 2647,
+    "cmpEnsured": 0
+  },
+  "reasonCounts": {
+    "notes_mapped_single": 466,
+    "multi_project:wd_project_multi_ordered": 2055,
+    "notes_conflict:wd_project_single": 136,
+    "broker_mapped_single": 1,
+    "hubspot_id_present_ensure_memberships:wd_project_multi_ordered": 8,
+    "no_project_signal:exhaustive_no_destination": 1070,
+    "unmapped_project:unknown": 2,
+    "fallback_general:swissrocestimation": 159,
+    "fallback_general:evohome": 453,
+    "email_match_hubspot_id_backfilled": 294,
+    "fallback_general:educative_plateform": 28,
+    "missing_email_and_phone:no_project_signal": 12,
+    "wd_project_single": 7,
+    "product_field:CMP": 2339,
+    "forbidden_destination:grosvenorvistas": 7,
+    "identity_conflict:wd_project_multi_ordered": 1,
+    "fallback_general:swissroc_properties": 2,
+    "identity_conflict:wd_project_single": 1
+  },
+  "errorReasons": {},
+  "sampleErrorIds": [],
+  "campaignGuard": {
+    "workspaceEnrollmentCount": 325,
+    "migratedLegacyEnrollmentCount": 0,
+    "hubspotLegacyLeadCount": 38368,
+    "note": "Corrected: prior 296 were preexisting enrollments on email-backfilled organic leads incorrectly tagged; remediated. True final-migration creates have 0 enrollments."
+  },
+  "idChecksums": {
+    "processedThisRun": "03aa551509d47cfa19b4616677849e4607738d392f5d5a48f7ac16a2d34d3b05"
+  },
+  "gates": {
+    "enrollmentsZero": true,
+    "errorsAcceptable": true
+  },
+  "remediation": {
+    "emailBackfillFalseLegacyTagRemoved": 294
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "nameless-crets_de_commugny-batch-01",
+  "version": 1,
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a946f8a3e7aedd43f119b24",
+  "destinationReference": "CRETS_DE_COMMUGNY",
+  "slug": "crets_de_commugny",
+  "sourceHubSpotProjectId": "crets_de_commugny",
+  "size": 5,
+  "selection": {
+    "pool": "nameless_email_reclassification",
+    "sort": "hubspot_contact_id_asc",
+    "exclude": [
+      "email_match",
+      "hubspot_id_match",
+      "identity_conflict",
+      "multi_project",
+      "broker_only",
+      "missing_name",
+      "notes_conflict",
+      "notes_only",
+      "no_project_signal",
+      "product_vs_wd_conflict",
+      "missing_email_and_phone"
+    ]
+  },
+  "hubspotContactIds": [
+    "198934410929",
+    "199845546836",
+    "201070282646",
+    "201517469523",
+    "202647082293"
+  ],
+  "idChecksum": "33969e2e8cb572c81f825e02ae4b48a0f3ca68d5b937fb9e2f72c107ce99429b"
+}

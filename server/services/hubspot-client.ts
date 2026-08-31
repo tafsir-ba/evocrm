@@ -192,9 +192,7 @@ export async function fetchHubSpotContact(input: {
     accessToken: input.accessToken,
     path: `/crm/v3/objects/contacts/${encodeURIComponent(input.contactId)}`,
     searchParams: {
-      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES, "hs_lead_status", "notes_last_contacted"].join(
-        ",",
-      ),
+      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES].join(","),
     },
   });
 

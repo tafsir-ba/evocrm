@@ -93,6 +93,17 @@ vi.mock("@/server/services/hubspot-notes-sync", () => ({
   }),
 }));
 
+vi.mock("@/server/services/hubspot-cmp-membership", () => ({
+  ensureCmpMembershipFromHubSpotProperties: vi.fn().mockResolvedValue({
+    contactId: "99",
+    outcome: "preexisting",
+    reason: "already_on_cmp",
+    role: null,
+    leadId: "lead-1",
+    idempotencyKey: null,
+  }),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
@@ -119,6 +130,7 @@ import {
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import { createLeadForWorkspace, updateLeadForWorkspace } from "@/server/services/leads";
 import { applyPlannedMembershipsToLead } from "@/server/services/lead-project-memberships";
+import { ensureCmpMembershipFromHubSpotProperties } from "@/server/services/hubspot-cmp-membership";
 import {
   prepareHubSpotOngoingCutover,
   processOngoingHubSpotContact,
@@ -320,6 +332,12 @@ describe("ongoing HubSpot sync service", () => {
     );
     expect(vi.mocked(createLeadForWorkspace).mock.calls[0][2].attributes?.campaignEnrollmentPolicy).toBeUndefined();
     expect(applyPlannedMembershipsToLead).toHaveBeenCalled();
+    expect(ensureCmpMembershipFromHubSpotProperties).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactId: "99",
+        persist: true,
+      }),
+    );
   });
 
   it("treats duplicate event delivery as idempotent", async () => {

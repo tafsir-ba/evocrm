@@ -150,6 +150,89 @@ export function pilotNameKey(firstName: string, lastName: string): string {
   return first || last ? `${first}|${last}` : "";
 }
 
+export function hasCompletePilotName(firstName: string, lastName: string): boolean {
+  return Boolean(normalizePilotNamePart(firstName) && normalizePilotNamePart(lastName));
+}
+
+/** Nameless on HubSpot but carrying a normalised email — approved for migration reclassification. */
+export function isEmailBearingNameless(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): boolean {
+  return !hasCompletePilotName(contact.firstName, contact.lastName) && Boolean(contact.emailNormalized);
+}
+
+export type MigrationLeadIdentity = {
+  firstName: string;
+  lastName: string;
+  nameMissing: boolean;
+  needsEnrichment: boolean;
+  /** Safe UI label from the normalised email; never an invented person name. */
+  displayLabel: string | null;
+};
+
+/**
+ * Resolve CRM identity for migrated leads. Never invents a person name from email.
+ * Email-bearing nameless contacts keep blank first/last with nameMissing + needsEnrichment.
+ */
+export function resolveMigrationLeadIdentity(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): MigrationLeadIdentity {
+  const first = String(contact.firstName ?? "").trim();
+  const last = String(contact.lastName ?? "").trim();
+  if (hasCompletePilotName(first, last)) {
+    return {
+      firstName: first,
+      lastName: last,
+      nameMissing: false,
+      needsEnrichment: false,
+      displayLabel: null,
+    };
+  }
+  if (contact.emailNormalized) {
+    return {
+      firstName: "",
+      lastName: "",
+      nameMissing: true,
+      needsEnrichment: true,
+      displayLabel: contact.emailNormalized,
+    };
+  }
+  return {
+    firstName: first,
+    lastName: last,
+    nameMissing: true,
+    needsEnrichment: true,
+    displayLabel: null,
+  };
+}
+
+/** @deprecated Use resolveMigrationLeadIdentity — never invents names from email. */
+export function resolveMigrationLeadNames(
+  contact: Pick<GvPilotContactSnapshot, "firstName" | "lastName" | "emailNormalized">,
+): { firstName: string; lastName: string; reclassifiedFromEmail: boolean } {
+  const identity = resolveMigrationLeadIdentity(contact);
+  return {
+    firstName: identity.firstName,
+    lastName: identity.lastName,
+    reclassifiedFromEmail: identity.nameMissing && Boolean(identity.displayLabel),
+  };
+}
+
+export function buildMigrationNameAttributes(
+  identity: MigrationLeadIdentity,
+): Record<string, unknown> {
+  if (!identity.nameMissing) {
+    return {};
+  }
+  return {
+    hubspotMigration: {
+      nameMissing: true,
+      needsEnrichment: true,
+      ...(identity.displayLabel ? { displayLabel: identity.displayLabel } : {}),
+    },
+  };
+}
+
 export function evaluateGvPilotEligibility(
   contact: GvPilotContactSnapshot,
   existing: GvPilotExistingLead[],
@@ -180,7 +263,7 @@ export function evaluateGvPilotEligibility(
   if (inNotes && !inProject) {
     exclusions.push("notes_only");
   }
-  if (!normalizePilotNamePart(contact.firstName) || !normalizePilotNamePart(contact.lastName)) {
+  if (!hasCompletePilotName(contact.firstName, contact.lastName) && !contact.emailNormalized) {
     exclusions.push("missing_name");
   }
   if (!contact.emailNormalized && !contact.hasPhone) {

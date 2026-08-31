@@ -536,6 +536,8 @@ export async function createLeadForWorkspace(
   input: CreateLeadInput,
   options?: {
     triggerAutomation?: boolean;
+    /** When set (e.g. email display label for nameMissing leads), overrides derived fullName. */
+    displayFullName?: string;
     intelligenceMethod?: LeadFieldProvenanceMethod;
     intelligenceSource?: string;
   },
@@ -552,7 +554,7 @@ export async function createLeadForWorkspace(
   );
   await validateOptionalCompanyId(workspaceId, input.companyId);
 
-  const fullName = deriveFullName(input.firstName, input.lastName);
+  const fullName = options?.displayFullName ?? deriveFullName(input.firstName, input.lastName);
   const emailFields = input.email ? normalizeLeadEmail(input.email) : null;
   const phoneFields = input.phone ? normalizeLeadPhone(input.phone) : null;
 

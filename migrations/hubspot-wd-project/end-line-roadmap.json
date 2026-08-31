@@ -1,0 +1,394 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T13:58:00.273Z",
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "sources": {
+    "portalReconciliation": "migrations/hubspot-wd-project/portal-reconciliation.json",
+    "cmpFullCohortReconciliation": "migrations/hubspot-wd-project/cmp-full-cohort-reconciliation-summary.json"
+  },
+  "guards": {
+    "triggerAutomation": false,
+    "campaignEnrollmentPolicy": "defaultExcluded hubspot_legacy_migration — do not change",
+    "routeAmbiguityToGeneral": false,
+    "doNotGuessDestinations": true
+  },
+  "currentState": {
+    "hubspotDistinctSourceIds": 38368,
+    "portalIdsMatchedInCrmByHubspotId": 38368,
+    "grossRemainingSourceGap": 0,
+    "unexplained": 0,
+    "campaignEnrollmentsOnMigratedLegacyAuto": 0
+  },
+  "exclusivePortalBuckets": {
+    "migrated": 29121,
+    "preexisting_deduped": 295,
+    "still_to_migrate": 4,
+    "multi_or_identity_exception": 2372,
+    "no_project_signal": 3589,
+    "excluded": 2987,
+    "errors_retry": 0,
+    "unexplained": 0,
+    "sum": 38368
+  },
+  "cmpProductCohort": {
+    "status": "complete_membership_policy",
+    "businessExpectationAbout": 8317,
+    "liveHubSpotEqDistinct": 8316,
+    "expectedDelta": 1,
+    "exclusiveBuckets": {
+      "migrated_to_cmp": 5977,
+      "migrated_elsewhere_in_crm": 0,
+      "preexisting_deduped": 0,
+      "product_vs_wd_conflict_held": 0,
+      "multi_project_held": 0,
+      "missing_or_invalid_contact": 2339,
+      "still_to_migrate_cmp": 0,
+      "other_excluded_held": 0,
+      "errors_retry": 0,
+      "unexplained": 0
+    },
+    "safelyResolved": 8316,
+    "unresolved": 0,
+    "crmCmpLeadCount": 6002,
+    "ensureWave": {
+      "scanned": 8316,
+      "created": 7,
+      "preexisting": 5970,
+      "parked": 2339,
+      "error": 0,
+      "createdPrimary": 0,
+      "createdAdditional": 7
+    },
+    "notes": "Owner override: every product=CMP contact requires CMP membership. Conflict/multi add additional membership without reassigning. Parked only missing_email_and_phone."
+  },
+  "remainingDistinctSourceIdsBySafeRoute": {
+    "totalRemainingNotHubspotIdMatched": 9262,
+    "routes": [
+      {
+        "route": "preexisting_deduped_email_match",
+        "count": 295,
+        "action": "read_only — already represented in CRM by email; optional HubSpot ID backfill only if approved",
+        "destinationGuessAllowed": false
+      },
+      {
+        "route": "residual_single_project_write_eligible",
+        "count": 4,
+        "breakdown": {
+          "crets_de_commugny": 1,
+          "cressy": 1,
+          "grosvenorvistas_forbidden": 2
+        },
+        "action": "migrate mapped residuals only; leave GV residuals unrouted (forbidden destination)",
+        "destinationGuessAllowed": false
+      },
+      {
+        "route": "multi_project_or_identity_held",
+        "count": 2387,
+        "breakdown": {
+          "multi_project": 2216,
+          "notes_conflict": 150,
+          "product_vs_wd_conflict": 15,
+          "identity_conflict": 6
+        },
+        "action": "hold until multi-project backfill / primary-project decision rules are approved",
+        "destinationGuessAllowed": false
+      },
+      {
+        "route": "no_project_signal_held",
+        "count": 3589,
+        "breakdown": {
+          "no_project_signal": 1301,
+          "notes_only": 2282,
+          "broker_only": 6
+        },
+        "action": "hold until explicit no-project fallback policy is approved — never General by default",
+        "destinationGuessAllowed": false
+      },
+      {
+        "route": "explicit_exclusion_hold",
+        "count": 2987,
+        "breakdown": {
+          "missing_email_and_phone": 2344,
+          "fallback_general_slugs_not_routed": 643
+        },
+        "fallback_general_slug_detail": {
+          "evohome": 453,
+          "swissrocestimation": 159,
+          "educative_plateform": 28,
+          "swissroc_properties": 2,
+          "evohom": 1
+        },
+        "action": "missing contact data stays held; fallback_general slugs stay excluded until an approved destination mapping exists — do not auto-route to EvoHome General",
+        "destinationGuessAllowed": false
+      }
+    ]
+  },
+  "orderedMigrationWaves": [
+    {
+      "order": 1,
+      "name": "cmp_product_membership",
+      "status": "complete_membership_policy",
+      "scope": "product_intersted_in=CMP",
+      "outcome": {
+        "migrated_to_cmp": 5977,
+        "migrated_elsewhere_in_crm": 0,
+        "preexisting_deduped": 0,
+        "product_vs_wd_conflict_held": 0,
+        "multi_project_held": 0,
+        "missing_or_invalid_contact": 2339,
+        "still_to_migrate_cmp": 0,
+        "other_excluded_held": 0,
+        "errors_retry": 0,
+        "unexplained": 0
+      }
+    },
+    {
+      "order": 2,
+      "name": "email_bearing_nameless_reclassification",
+      "status": "complete",
+      "scope": "blank HubSpot names + valid email + attributable project",
+      "outcome": "4,557 created / 3 skipped; nameMissing+needsEnrichment; 0 enrollments"
+    },
+    {
+      "order": 3,
+      "name": "mapped_single_project_residuals",
+      "status": "ready_small",
+      "scope": "still_to_migrate residuals with explicit mapped destinations (excludes GV)",
+      "count": 2,
+      "prerequisites": [
+        "destination mapping confirmed",
+        "idempotent batch"
+      ],
+      "destinationGuessAllowed": false
+    },
+    {
+      "order": 4,
+      "name": "multi_project_resolution",
+      "status": "blocked_pending_policy",
+      "scope": "multi_project + notes_conflict + product_vs_wd_conflict (+ identity_conflict review)",
+      "count": 2387,
+      "prerequisites": [
+        "approved primary-project / split-lead policy",
+        "durable attribution mapping for conflicts",
+        "no routing to General"
+      ],
+      "destinationGuessAllowed": false
+    },
+    {
+      "order": 5,
+      "name": "fallback_general_slug_mapping",
+      "status": "blocked_pending_mapping",
+      "scope": "contacts whose only signal is a roadmap fallback_general slug",
+      "count": 643,
+      "prerequisites": [
+        "explicit create_then_map or map_existing destination per slug",
+        "business approval that destination is not EvoHome General unless explicitly required"
+      ],
+      "destinationGuessAllowed": false
+    },
+    {
+      "order": 6,
+      "name": "no_project_signal_policy",
+      "status": "blocked_pending_policy",
+      "scope": "blank wd_project / notes-only / broker-only without migratable attribution",
+      "count": 3589,
+      "prerequisites": [
+        "approved no-project fallback policy",
+        "optional HubSpot field mapping for enrichment (never overwrite manual CRM data)",
+        "never default to General"
+      ],
+      "destinationGuessAllowed": false
+    },
+    {
+      "order": 7,
+      "name": "missing_email_and_phone_enrichment",
+      "status": "blocked_pending_data",
+      "scope": "contacts lacking both email and phone",
+      "count": 2344,
+      "prerequisites": [
+        "source-system enrichment or explicit drop policy"
+      ],
+      "destinationGuessAllowed": false
+    },
+    {
+      "order": 8,
+      "name": "email_match_hubspot_id_backfill_optional",
+      "status": "optional",
+      "scope": "preexisting_deduped email matches without HubSpot externalId on lead",
+      "count": 295,
+      "prerequisites": [
+        "approved idempotent ID backfill that does not change campaign enrollment"
+      ],
+      "destinationGuessAllowed": false
+    }
+  ],
+  "prerequisites": {
+    "multi_project_backfill": {
+      "requiredForWaves": [
+        4
+      ],
+      "description": "Decide primary project or multi-lead split; persist decision; never invent a primary."
+    },
+    "attribution_mapping": {
+      "requiredForWaves": [
+        3,
+        4,
+        5
+      ],
+      "description": "Only migrate when hubspotProjectId→evoProjectId mapping status=mapped and destination is not GV/General unless explicitly approved."
+    },
+    "no_project_fallback": {
+      "requiredForWaves": [
+        6
+      ],
+      "description": "Hold under no_project_signal until an approved fallback exists. Do not route ambiguity to General."
+    },
+    "campaign_enrollment": {
+      "requiredForWaves": "all",
+      "description": "Preserve defaultExcluded / hubspot_legacy_migration. Do not change enrollment policy. Target enrollmentCount=0 for migrated cohorts."
+    }
+  },
+  "completionCriteria": {
+    "portal": [
+      "exclusive bucket sum == hubspotDistinctSourceIds",
+      "unexplained == 0",
+      "errors_retry == 0",
+      "campaign enrollments on migrated HubSpot leads == 0",
+      "unguarded defaultExcluded == 0"
+    ],
+    "cmp": [
+      "live product_intersted_in=EQ CMP distinct IDs exclusively accounted",
+      "still_to_migrate_cmp == 0",
+      "unexplained == 0",
+      "every non-migrated CMP ID has an explicit hold reason"
+    ],
+    "end_line": [
+      "grossRemainingSourceGap only contains explicitly held/optional routes",
+      "no destination guessed",
+      "no ambiguity routed to General",
+      "dashboard Imported is explained as lead-row total, not source-ID proof"
+    ]
+  },
+  "finalLedger": {
+    "version": 1,
+    "generatedAt": "2026-08-31T13:37:28.488Z",
+    "portal": {
+      "hubspotDistinctSourceIds": 38368,
+      "accounted": 38368,
+      "unexplained": 0,
+      "idChecksum": "56f91af4890e0e20ba62ffef6393ceed845a664766833b4f7657f50e310ab6df"
+    },
+    "exclusiveOutcomes": {
+      "lead_with_hubspot_id": 38368,
+      "email_deduped_linked": 0,
+      "email_deduped_unlinked": 0,
+      "missing_unresolved": 0,
+      "unexplained": 0
+    },
+    "reasonCounts": {
+      "project_lead_with_hubspot_id": 35985,
+      "legacy_or_general_with_hubspot_id": 2383
+    },
+    "crm": {
+      "legacyArchiveLeadCount": 2383,
+      "multiMembershipLeadCount": 2161,
+      "hubspotLinkedLeadDistinctIds": 38379
+    },
+    "campaignGuard": {
+      "migratedLegacyEnrollmentCount": 0
+    },
+    "gates": {
+      "exclusiveAccounted": true,
+      "unexplainedZero": true,
+      "unresolvedZero": true,
+      "enrollmentsZero": true,
+      "complete": true
+    },
+    "notes": "Business target ~38,366; live HubSpot list size is authoritative. email_deduped_unlinked still counts as durable CRM representation."
+  },
+  "completion": {
+    "version": 1,
+    "generatedAt": "2026-08-31T13:58:00.273Z",
+    "integrityGate": "GREEN_511abfc_merged",
+    "liveHubSpotDistinctSourceIds": 38368,
+    "businessTargetAbout": 38366,
+    "exclusivePortalBuckets": {
+      "migrated": 38368,
+      "preexisting_deduped": 0,
+      "still_to_migrate": 0,
+      "multi_or_identity_exception": 0,
+      "no_project_signal": 0,
+      "excluded": 0
+    },
+    "finalLedger": {
+      "lead_with_hubspot_id": 38368,
+      "email_deduped_linked": 0,
+      "email_deduped_unlinked": 0,
+      "missing_unresolved": 0,
+      "unexplained": 0
+    },
+    "finalMigrationWave": {
+      "scanned": 7041,
+      "created": 5006,
+      "memberships_added": 8,
+      "preexisting": 0,
+      "deduped_linked": 294,
+      "legacy_general": 1733,
+      "error": 0,
+      "membershipsAddedSum": 2647,
+      "cmpEnsured": 0
+    },
+    "cmpEnsure": {
+      "scanned": 8316,
+      "created": 0,
+      "preexisting": 8316,
+      "parked": 0,
+      "error": 0,
+      "createdPrimary": 0,
+      "createdAdditional": 0
+    },
+    "cmpCampaignGuard": {
+      "cmpLeadCount": 8346,
+      "guarded": 8346,
+      "enrollmentCount": 0
+    },
+    "portalCampaignGuard": {
+      "migratedLeadCount": 38368,
+      "unguardedDefaultExcluded": 0,
+      "enrollmentCount": 294,
+      "legacyAutoEnrollmentCount": 0,
+      "note": "enrollmentCount = rule_based_auto_enrollment on HubSpot-inbound leads; legacyAutoEnrollmentCount scopes to hubspot_legacy_migration / final_migration policy leads."
+    },
+    "gates": {
+      "portal": {
+        "exactAccounted": true,
+        "noDuplicateScanIds": true,
+        "campaignGuardIntact": true
+      },
+      "ledger": {
+        "exclusiveAccounted": true,
+        "unexplainedZero": true,
+        "unresolvedZero": true,
+        "enrollmentsZero": true,
+        "complete": true
+      },
+      "finalMigration": {
+        "enrollmentsZero": true,
+        "errorsAcceptable": true
+      },
+      "cmp": {
+        "enrollmentsZero": true,
+        "allGuarded": true,
+        "errorsZero": true
+      }
+    },
+    "multiMembershipLeadCount": 2161,
+    "legacyArchiveLeadCount": 2383,
+    "notes": [
+      "Live HubSpot list size is authoritative (38368).",
+      "General used only via assertGeneralFallbackAllowed last-resort path.",
+      "legacyAutoEnrollmentCount=0 on migration-policy leads; no automatic dripping from final migration creates."
+    ]
+  }
+}

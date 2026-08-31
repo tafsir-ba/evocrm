@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T13:15:19.331Z",
+  "mode": "execute",
+  "destinationProjectId": "6a9489ee84c29475f4dbc6c3",
+  "policy": "product_intersted_in_cmp_requires_cmp_membership",
+  "totals": {
+    "scanned": 8316,
+    "created": 0,
+    "preexisting": 8316,
+    "parked": 0,
+    "error": 0,
+    "createdPrimary": 0,
+    "createdAdditional": 0
+  },
+  "parkedReasons": {},
+  "errorReasons": {},
+  "campaignGuard": {
+    "cmpLeadCount": 8346,
+    "guarded": 8346,
+    "enrollmentCount": 0
+  },
+  "idChecksums": {
+    "created": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preexisting": "5ca80d091524bf1d302d07fe35a3535aced16b4e3989ca68a8617f7bbb3b09b7",
+    "parked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "error": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sampleErrorIds": [],
+  "sampleParkedIds": [],
+  "gates": {
+    "enrollmentsZero": true,
+    "allGuarded": true,
+    "errorsZero": true
+  }
+}

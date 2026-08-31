@@ -55,7 +55,8 @@ async function main(): Promise<void> {
     "../server/services/hubspot-wd-project-migration"
   );
   const report = await runHubSpotWdProjectMigration({ argv: process.argv.slice(2) });
-  console.log(JSON.stringify(report, null, 2));
+  const { records: _records, ...summary } = report;
+  console.log(JSON.stringify(summary, null, 2));
   const mongoose = await import("mongoose");
   await mongoose.default.disconnect().catch(() => undefined);
   if (report.aborted || report.unexpected > 0) {

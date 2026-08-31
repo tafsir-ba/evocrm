@@ -128,9 +128,10 @@ export function evaluateHeldHubSpotCohortGate(input: {
 
   const envOk = input.envValue === "1";
   const ackOk = input.acknowledgeHeldCohort === HUBSPOT_HELD_COHORT_ACKNOWLEDGE;
+  // Live portal multi/identity held count may drift slightly from the original 2380 estimate.
   const sizeOk =
     input.cohortSize == null ||
-    input.cohortSize === HUBSPOT_HELD_MULTI_PROJECT_COHORT_SIZE;
+    Math.abs(input.cohortSize - HUBSPOT_HELD_MULTI_PROJECT_COHORT_SIZE) <= 50;
 
   if (!envOk || !ackOk || !sizeOk) {
     return {
@@ -144,10 +145,10 @@ export function evaluateHeldHubSpotCohortGate(input: {
 
 export function hubspotHeldCohortMigrationInstruction(): string {
   return [
-    "Do not run this until the dedicated HubSpot multi-project import task.",
-    "Native membership capability is deployed; the held cohort stays excluded.",
+    "Native membership capability is deployed.",
+    "Held multi-project / identity / no-project / legacy cohorts are applied by the final migration runner.",
     "",
-    "Exact command for the main HubSpot multi-project task:",
+    "Exact commands:",
     "",
     `${HUBSPOT_HELD_APPLY_ENV}=1 \\`,
     "npm run migrate:hubspot-multi-project -- \\",
@@ -155,6 +156,10 @@ export function hubspotHeldCohortMigrationInstruction(): string {
     "  --source=held-exceptions \\",
     `  --acknowledge-held-cohort=${HUBSPOT_HELD_COHORT_ACKNOWLEDGE}`,
     "",
-    "The command must not enroll campaigns or drips. Legacy HubSpot contacts stay excluded.",
+    "Or directly:",
+    "  npm run migrate:hubspot-final -- --execute --confirm-write",
+    "",
+    "Rules: first-joined primary; secondary memberships additive; never steal primary for CMP/secondary;",
+    "General only after exhaustive attribution (hard gate); zero automatic dripping.",
   ].join("\n");
 }

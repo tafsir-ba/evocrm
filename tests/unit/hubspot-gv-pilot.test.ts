@@ -18,6 +18,8 @@ import {
   hubspotContactIdempotencyKey,
   parseExecuteArgs,
   parseGvPilotManifest,
+  resolveMigrationLeadIdentity,
+  buildMigrationNameAttributes,
   selectPilotBatchIds,
   shouldAbortRun,
   snapshotFromHubSpotProperties,
@@ -91,8 +93,18 @@ describe("hubspot GV pilot eligibility", () => {
     ).toContain("broker_only");
 
     expect(
-      evaluateGvPilotEligibility(contact({ firstName: "", nameKey: "|lovelace" }), []).exclusions,
+      evaluateGvPilotEligibility(
+        contact({ firstName: "", lastName: "", emailNormalized: null, hasPhone: false, nameKey: "" }),
+        [],
+      ).exclusions,
     ).toContain("missing_name");
+
+    expect(
+      evaluateGvPilotEligibility(
+        contact({ firstName: "", lastName: "", emailNormalized: "buyer@example.com", nameKey: "" }),
+        [],
+      ).exclusions,
+    ).not.toContain("missing_name");
   });
 
   it("treats notes with extra values as a conflict and leaves CMP / non-GV excluded", () => {
@@ -111,6 +123,55 @@ describe("hubspot GV pilot eligibility", () => {
     expect(
       evaluateGvPilotEligibility(contact({ projectValues: ["k2"], notesValues: [] }), []).exclusions,
     ).toContain("not_gv_project");
+  });
+});
+
+describe("resolveMigrationLeadIdentity", () => {
+  it("preserves complete HubSpot names", () => {
+    expect(
+      resolveMigrationLeadIdentity({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        emailNormalized: "ada@example.com",
+      }),
+    ).toEqual({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      nameMissing: false,
+      needsEnrichment: false,
+      displayLabel: null,
+    });
+  });
+
+  it("does not invent names from email when HubSpot names are blank", () => {
+    expect(
+      resolveMigrationLeadIdentity({
+        firstName: "",
+        lastName: "",
+        emailNormalized: "maxime.duval@example.com",
+      }),
+    ).toEqual({
+      firstName: "",
+      lastName: "",
+      nameMissing: true,
+      needsEnrichment: true,
+      displayLabel: "maxime.duval@example.com",
+    });
+  });
+
+  it("builds nameMissing attributes without PII beyond displayLabel email", () => {
+    const identity = resolveMigrationLeadIdentity({
+      firstName: "",
+      lastName: "",
+      emailNormalized: "buyer@example.com",
+    });
+    expect(buildMigrationNameAttributes(identity)).toEqual({
+      hubspotMigration: {
+        nameMissing: true,
+        needsEnrichment: true,
+        displayLabel: "buyer@example.com",
+      },
+    });
   });
 });
 

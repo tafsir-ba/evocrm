@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T05:48:30.139Z",
+  "gates": {
+    "manifestTotal": 5978,
+    "destinationLeadCount": 5978,
+    "createdTotal": 5957,
+    "skippedTotal": 21,
+    "accountedTotal": 5978,
+    "missingFromDestination": 0,
+    "enrollmentCount": 0,
+    "guardedCount": 5978,
+    "allGuarded": true,
+    "generalProjectTouched": false,
+    "batch02Unexpected": 0,
+    "batch02Aborted": false,
+    "conflictBucketCount": 15,
+    "gatesPassed": true
+  }
+}

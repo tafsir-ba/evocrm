@@ -77,7 +77,8 @@
     "montreux",
     "buissonniere_proximmo",
     "corsier",
-    "delejette"
+    "delejette",
+    "CMP"
   ],
   "no_contacts_skip": [
     "atria",
@@ -88,7 +89,6 @@
     "oreades"
   ],
   "fallback_general": [
-    "CMP",
     "CMP_Emailing_BE",
     "evohome",
     "swissrocestimation",
@@ -98,6 +98,60 @@
     "evosoftware",
     "dev_project"
   ],
+  "field_to_project_rules": [
+    {
+      "hubspotProperty": "product_intersted_in",
+      "hubspotValue": "CMP",
+      "destinationSlug": "CMP",
+      "destinationReference": "CMP",
+      "when": "wd_project_absent_or_blank",
+      "conflictWhen": "explicit_wd_project_other_than_destination",
+      "conflictBucket": "product_vs_wd_conflict:CMP",
+      "routeAmbiguityToGeneral": false,
+      "status": "active_membership_override",
+      "liveCohortDistinct": 8316,
+      "businessExpectationAbout": 8317,
+      "reconciliation": "migrations/hubspot-wd-project/cmp-full-cohort-reconciliation-summary.json",
+      "membershipPolicy": {
+        "rule": "every_product_intersted_in_cmp_requires_cmp_project_membership",
+        "supersedesConflictHold": true,
+        "primaryWhen": "cmp_only_signal_and_no_other_hubspot_lead",
+        "additionalWhen": "other_explicit_wd_project_or_multi_or_existing_lead_elsewhere",
+        "preserveFirstJoinedPrimary": true,
+        "idempotency": "hubspot:contact:{id} or hubspot:contact:{id}:project:{CMP_PROJECT_ID}",
+        "ongoingSync": "hubspot-lead-capture ensures CMP membership when product_intersted_in includes CMP"
+      },
+      "notes": "Owner override: every HubSpot contact with Product interested in=CMP must have EvoHome CMP membership. Conflict/multi no longer holds out of CMP — ADD membership without deleting/reassigning other project leads. Never route ambiguity to General. Campaign defaultExcluded preserved."
+    }
+  ],
+  "generalFallbackPolicy": {
+    "status": "active_hard_gate",
+    "rule": "evo_home_general_last_resort_only",
+    "allowedWhen": "exhaustive attribution finds zero mapped/reconcilable project destinations",
+    "forbiddenWhen": [
+      "ambiguous_or_conflicting_mapped_signals",
+      "missing_fields_that_can_still_be_enriched_into_a_mapped_project",
+      "processing_convenience",
+      "incomplete_review_without_triedRules"
+    ],
+    "validation": "assertGeneralFallbackAllowed — mappedSlugs must be empty; triedRules required; reason allowlisted; destination must be EvoHome General",
+    "ongoingSync": "hubspot-lead-capture refuses integration defaultProject=General",
+    "evidenceStoredOnLead": "attributes.hubspotMigration.attributionEvidence + decisionReason + legacyArchive"
+  },
+  "end_line_roadmap": "migrations/hubspot-wd-project/end-line-roadmap.json",
+  "nameless_email_reclassification": {
+    "status": "active",
+    "when": "firstname_or_lastname_blank_and_valid_email_present",
+    "doNotInventNames": true,
+    "displayLabelFrom": "normalized_email_when_ui_requires",
+    "leadFlags": {
+      "nameMissing": true,
+      "needsEnrichment": true
+    },
+    "excludeOnlyWhen": "missing_name_without_valid_email",
+    "routeAmbiguityToGeneral": false,
+    "notes": "Approved policy: valid normalised email is sufficient; blank HubSpot names must not exclude. CRM stores blank first/last with nameMissing + needsEnrichment; displayLabel is the normalised email only when UI requires a label. No-project contacts held under no_project_signal — never excluded solely for missing name. Future CMP enrichment uses HubSpot field mapping when general lead intelligence field is available — never overwrite manual CRM data."
+  },
   "rows": [
     {
       "slug": "leparcdescrets",
@@ -1157,13 +1211,15 @@
       "display_name": "CMP",
       "hubspot_label": "CMP",
       "classification": "product",
-      "status": "fallback_evo_general",
+      "status": "create_then_map",
       "wd_project": 46,
-      "union_contacts": 46,
+      "union_contacts": 8316,
       "project_multi": 0,
       "notes_only": 0,
       "broker_only": 0,
-      "reason_code": "PRODUCT_NOT_DEVELOPMENT"
+      "reason_code": "PRODUCT_FIELD_ATTRIBUTION",
+      "product_interested_in": 8316,
+      "attribution": "product_intersted_in=CMP when wd_project blank; destination CMP; conflict bucket product_vs_wd_conflict:CMP"
     },
     {
       "slug": "CMP_Emailing_BE",

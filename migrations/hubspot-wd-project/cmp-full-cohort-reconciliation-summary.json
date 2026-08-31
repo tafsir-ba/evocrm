@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-31T09:08:34.228Z",
+  "portalId": "5699191",
+  "workspaceId": "6a2f0444438006b304af77ec",
+  "destinationProjectId": "6a9489ee84c29475f4dbc6c3",
+  "destinationReference": "CMP",
+  "cohort": {
+    "property": "product_intersted_in",
+    "operator": "EQ",
+    "value": "CMP",
+    "expectedAbout": 8317,
+    "hubspotSearchTotal": 8316,
+    "distinctSourceIds": 8316,
+    "accounted": 8316,
+    "expectedDelta": 1
+  },
+  "bucketCounts": {
+    "migrated_to_cmp": 5977,
+    "migrated_elsewhere_in_crm": 0,
+    "preexisting_deduped": 0,
+    "product_vs_wd_conflict_held": 0,
+    "multi_project_held": 0,
+    "missing_or_invalid_contact": 2339,
+    "still_to_migrate_cmp": 0,
+    "other_excluded_held": 0,
+    "errors_retry": 0,
+    "unexplained": 0
+  },
+  "reasonCounts": {
+    "hubspot_id_on_cmp": 5977,
+    "missing_email_and_phone": 2339
+  },
+  "crmSnapshot": {
+    "cmpLeadCount": 6002,
+    "cmpGuarded": 6002,
+    "cmpEnrollmentCount": 0,
+    "generalLeadsWithHubspotKey": 0,
+    "note": "cmpLeadCount can exceed migrated_to_cmp when CRM holds CMP leads whose HubSpot product_intersted_in is no longer EQ CMP, or when non-product CMP attributions were migrated."
+  },
+  "resolution": {
+    "safelyResolved": 8316,
+    "unresolved": 0,
+    "cmpWaveDeclaredComplete": true,
+    "completionCriteria": "CMP declared complete only when every product_intersted_in=CMP source ID is either migrated_to_cmp or safely resolved (deduped / conflict held / multi held / missing contact / other explicit hold) with unexplained=0 and still_to_migrate_cmp=0 and errors_retry=0.",
+    "gates": {
+      "exclusiveAccounted": true,
+      "unexplainedZero": true,
+      "stillToMigrateZero": true,
+      "errorsZero": true,
+      "enrollmentsZero": true,
+      "allCmpGuarded": true,
+      "noGeneralRouting": true
+    }
+  },
+  "idChecksum": "5ca80d091524bf1d302d07fe35a3535aced16b4e3989ca68a8617f7bbb3b09b7",
+  "notes": "Exclusive buckets — no overlap. Business expectation ~8,317; live HubSpot EQ search is authoritative. Do not sum buckets with CMP project lead count."
+}
