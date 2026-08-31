@@ -235,6 +235,20 @@ export type EnrichmentSearchContext = {
   stateRegion?: string | null;
   country?: string | null;
   defaultCurrency?: string | null;
+  /** Broker-useful place from the lead’s project (e.g. Geneva for Cressy). */
+  searchPlace?: string | null;
+};
+
+export type EnrichmentProjectGeo = {
+  city?: string | null;
+  country?: string | null;
+  location?: {
+    countryName?: string | null;
+    countryCode?: string | null;
+    cantonName?: string | null;
+    cantonCode?: string | null;
+    municipality?: string | null;
+  } | null;
 };
 
 const PEOPLE_DATA_VENDOR_HOSTS = [
@@ -258,7 +272,11 @@ const MARKET_LOCATION_ALIASES: Record<string, string> = {
   swiss: "switzerland",
   lausanne: "switzerland",
   geneva: "switzerland",
+  geneve: "switzerland",
   genève: "switzerland",
+  genf: "switzerland",
+  confignon: "switzerland",
+  cressy: "switzerland",
   zurich: "switzerland",
   zürich: "switzerland",
   bern: "switzerland",
@@ -323,6 +341,58 @@ export function isPreferredProfessionalUrl(url: string): boolean {
   return isHttpsUrl(url);
 }
 
+function compactPlaceKey(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+}
+
+const GENEVA_PLACE_KEYS = new Set(["geneve", "genf", "geneva", "ge"]);
+
+export function isGenevaPlace(value: string | null | undefined): boolean {
+  return GENEVA_PLACE_KEYS.has(compactPlaceKey(value));
+}
+
+export function enrichmentPlaceFromProject(
+  project: EnrichmentProjectGeo | null | undefined,
+): {
+  city: string | null;
+  stateRegion: string | null;
+  country: string | null;
+  searchPlace: string | null;
+} {
+  if (!project) {
+    return { city: null, stateRegion: null, country: null, searchPlace: null };
+  }
+  const loc = project.location;
+  const municipality = loc?.municipality?.trim() || project.city?.trim() || null;
+  const canton = loc?.cantonName?.trim() || null;
+  const cantonCode = loc?.cantonCode?.trim().toUpperCase() || null;
+  const country =
+    loc?.countryName?.trim() ||
+    project.country?.trim() ||
+    (loc?.countryCode === "CH" ? "Switzerland" : null);
+  const geneva =
+    cantonCode === "GE" || isGenevaPlace(canton) || isGenevaPlace(municipality);
+  if (geneva) {
+    return {
+      city: "Geneva",
+      stateRegion: "Geneva",
+      country: country ?? "Switzerland",
+      searchPlace: "Geneva",
+    };
+  }
+  const searchPlace = municipality || canton || country;
+  return {
+    city: municipality,
+    stateRegion: canton,
+    country,
+    searchPlace,
+  };
+}
+
 export function looksLikeSwissPhone(phone: string | null | undefined): boolean {
   const digits = (phone ?? "").replace(/\D/g, "");
   if (!digits) {
@@ -349,9 +419,21 @@ export function enrichmentMarketHints(context: EnrichmentSearchContext): string[
       hints.push(trimmed);
     }
   };
+  push(context.searchPlace);
   push(context.city);
   push(context.stateRegion);
   push(context.country);
+  if (
+    isGenevaPlace(context.searchPlace) ||
+    isGenevaPlace(context.city) ||
+    isGenevaPlace(context.stateRegion)
+  ) {
+    push("Geneva");
+    push("Genève");
+    push("Genf");
+    push("Switzerland");
+    push("Suisse");
+  }
   if (looksLikeSwissPhone(context.phone)) {
     push("Switzerland");
     push("Suisse");
@@ -362,6 +444,10 @@ export function enrichmentMarketHints(context: EnrichmentSearchContext): string[
 }
 
 export function enrichmentPrimaryMarketLabel(context: EnrichmentSearchContext): string | null {
+  const place = context.searchPlace?.trim();
+  if (place) {
+    return place;
+  }
   const city = context.city?.trim();
   if (city) {
     return city;
@@ -427,9 +513,15 @@ export function enrichmentSearchQueries(
 ): string[] {
   const name = enrichmentPersonQueryName(fullName, email);
   const address = email.trim();
+  const place = enrichmentPrimaryMarketLabel(context);
   const queries: string[] = [];
-  if (name && !name.includes("@")) {
+  if (name && !name.includes("@") && place) {
+    queries.push(`"${name}" ${place}`);
+    queries.push(`"${name}" LinkedIn ${place}`);
+  } else if (name && !name.includes("@")) {
     queries.push(`"${name}"`);
+  }
+  if (name && !name.includes("@")) {
     queries.push(`"${name}" "${address}"`);
   } else {
     queries.push(`"${name}" "${address}"`);
@@ -440,9 +532,8 @@ export function enrichmentSearchQueries(
   }
   if (name && !name.includes("@")) {
     queries.push(`"${name}" LinkedIn`);
-    const market = enrichmentPrimaryMarketLabel(context);
-    if (market) {
-      queries.push(`"${name}" ${market}`);
+    if (place) {
+      queries.push(`"${name}"`);
     }
   }
   return [...new Set(queries)];
@@ -485,14 +576,32 @@ export function crmOwnedMarketContext(input: {
   cityOrigin?: string | null;
   stateRegionOrigin?: string | null;
   countryOrigin?: string | null;
+  project?: EnrichmentProjectGeo | null;
 }): EnrichmentSearchContext {
   const fromEnrichment = (origin?: string | null) => origin === "enrichment";
+  const projectPlace = enrichmentPlaceFromProject(input.project);
+  const city = fromEnrichment(input.cityOrigin)
+    ? projectPlace.city
+    : input.city?.trim() || projectPlace.city;
+  const stateRegion = fromEnrichment(input.stateRegionOrigin)
+    ? projectPlace.stateRegion
+    : input.stateRegion?.trim() || projectPlace.stateRegion;
+  const country = fromEnrichment(input.countryOrigin)
+    ? projectPlace.country
+    : input.country?.trim() || projectPlace.country;
   return {
     phone: input.phone ?? null,
-    city: fromEnrichment(input.cityOrigin) ? null : input.city ?? null,
-    stateRegion: fromEnrichment(input.stateRegionOrigin) ? null : input.stateRegion ?? null,
-    country: fromEnrichment(input.countryOrigin) ? null : input.country ?? null,
+    city,
+    stateRegion,
+    country,
     defaultCurrency: input.defaultCurrency ?? null,
+    searchPlace:
+      projectPlace.searchPlace ||
+      city ||
+      country ||
+      (looksLikeSwissPhone(input.phone) || input.defaultCurrency === "CHF"
+        ? "Switzerland"
+        : null),
   };
 }
 

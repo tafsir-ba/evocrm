@@ -11,6 +11,7 @@ import {
   enrichmentSearchQueries,
   crmOwnedMarketContext,
   enrichmentMarketHints,
+  enrichmentPlaceFromProject,
   looksLikeSwissPhone,
   rankEnrichmentHits,
   shouldContinueEnrichmentSearch,
@@ -218,16 +219,49 @@ describe("lead enrichment contract", () => {
         phone: "0763162433",
       }),
     ).toEqual([
-      '"philippe nougaret"',
+      '"philippe nougaret" Switzerland',
+      '"philippe nougaret" LinkedIn Switzerland',
       '"philippe nougaret" "philippe.nougaret@gmail.com"',
       '"philippe nougaret" LinkedIn',
-      '"philippe nougaret" Switzerland',
+      '"philippe nougaret"',
     ]);
     expect(enrichmentSearchQueries("radu@neho.ch", "radu@neho.ch")).toEqual([
       '"radu"',
       '"radu" "radu@neho.ch"',
       '"radu" neho.ch',
       '"radu" LinkedIn',
+    ]);
+  });
+
+  it("nails a common name to the project area, not a global search", () => {
+    expect(
+      enrichmentPlaceFromProject({
+        city: "Cressy",
+        country: "Switzerland",
+        location: {
+          countryCode: "CH",
+          countryName: "Switzerland",
+          cantonCode: "GE",
+          cantonName: "Genève",
+          municipality: "Confignon",
+        },
+      }),
+    ).toEqual({
+      city: "Geneva",
+      stateRegion: "Geneva",
+      country: "Switzerland",
+      searchPlace: "Geneva",
+    });
+    expect(
+      enrichmentSearchQueries("carmen smith", "carmen.smith2@hotmail.com", {
+        searchPlace: "Geneva",
+      }),
+    ).toEqual([
+      '"carmen smith" Geneva',
+      '"carmen smith" LinkedIn Geneva',
+      '"carmen smith" "carmen.smith2@hotmail.com"',
+      '"carmen smith" LinkedIn',
+      '"carmen smith"',
     ]);
   });
 
@@ -252,7 +286,24 @@ describe("lead enrichment contract", () => {
       stateRegion: null,
       country: null,
       defaultCurrency: "CHF",
+      searchPlace: "Switzerland",
     });
+    expect(
+      crmOwnedMarketContext({
+        phone: "0795062940",
+        city: null,
+        country: null,
+        defaultCurrency: "CHF",
+        project: {
+          location: {
+            countryCode: "CH",
+            cantonCode: "GE",
+            cantonName: "Genève",
+            municipality: "Confignon",
+          },
+        },
+      }).searchPlace,
+    ).toBe("Geneva");
     expect(
       suggestedLocationConflictsWithMarket(
         [

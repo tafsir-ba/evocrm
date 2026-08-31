@@ -23,6 +23,10 @@ vi.mock("@/server/repositories/companies", () => ({
   findCompaniesByIds: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/projects", () => ({
+  findProjectById: vi.fn(),
+}));
+
 vi.mock("@/server/services/companies", () => ({
   resolveOrCreateCompanyByName: vi.fn(),
 }));
@@ -47,6 +51,7 @@ vi.mock("@/server/env", () => ({
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { findCompaniesByIds } from "@/server/repositories/companies";
+import { findProjectById } from "@/server/repositories/projects";
 import {
   createEnrichmentRun,
   findEnrichmentRunById,
@@ -99,6 +104,7 @@ describe("lead enrichment service", () => {
     vi.mocked(newSuggestionId).mockImplementation(() => `sug-${++suggestionSeq}`);
     vi.mocked(findWorkspaceById).mockResolvedValue(workspace as never);
     vi.mocked(findCompaniesByIds).mockResolvedValue([]);
+    vi.mocked(findProjectById).mockResolvedValue(null);
     vi.mocked(resolveOrCreateCompanyByName).mockResolvedValue({
       company: { id: "co-1", name: "Example Corp" },
       created: true,
@@ -608,6 +614,107 @@ describe("lead enrichment service", () => {
     expect(run.status).toBe("ambiguous");
     expect(run.identityRationale).toMatch(/different country/i);
     expect(updateLead).not.toHaveBeenCalled();
+  });
+
+  it("searches the project area first for a common name", async () => {
+    vi.mocked(getEnv).mockImplementation(
+      () =>
+        ({
+          OPENAI_API_KEY: "sk-test",
+          TAVILY_API_KEY: undefined,
+          BRAVE_SEARCH_API_KEY: undefined,
+          LEAD_ENRICHMENT_DEMO: undefined,
+          OPENAI_ENRICHMENT_MODEL: undefined,
+        }) as never,
+    );
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      ...workspace,
+      defaultCurrency: "CHF",
+      leadEnrichment: { ...workspace.leadEnrichment, demoMode: false },
+    } as never);
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "carmen smith",
+        firstName: "carmen",
+        lastName: "smith",
+        email: "carmen.smith2@hotmail.com",
+        phone: "0795062940",
+        projectId: "proj-cressy",
+      }),
+    );
+    vi.mocked(findProjectById).mockResolvedValue({
+      id: "proj-cressy",
+      name: "Cressy",
+      reference: "CRESSY",
+      city: "Cressy",
+      country: "Switzerland",
+      location: {
+        countryCode: "CH",
+        countryName: "Switzerland",
+        cantonCode: "GE",
+        cantonName: "Genève",
+        municipality: "Confignon",
+      },
+    } as never);
+
+    const search = vi.fn(async (query: string) => ({
+      hits:
+        query.includes("Geneva")
+          ? [
+              {
+                url: "https://www.linkedin.com/in/carmen-smith-msc",
+                title: "Carmen Smith – Executive Assistant to CEO at MSC Cruises",
+                snippet: "Site Lead of Geneva · Genf, Schweiz",
+                retrievedAt: "2026-08-31T12:00:00.000Z",
+              },
+            ]
+          : [],
+      provider: "tavily",
+    }));
+
+    await startLeadEnrichment({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      providers: {
+        search,
+        synthesize: async () => ({
+          identityMatch: "unique",
+          identityRationale: "Geneva LinkedIn",
+          model: "gpt-test",
+          suggestions: [
+            {
+              fieldKey: "jobTitle",
+              value: "Executive Assistant to CEO",
+              confidencePercent: 80,
+              rationale: "LinkedIn Geneva",
+              sourceUrls: ["https://www.linkedin.com/in/carmen-smith-msc"],
+            },
+            {
+              fieldKey: "city",
+              value: "Geneva",
+              confidencePercent: 80,
+              rationale: "LinkedIn Geneva",
+              sourceUrls: ["https://www.linkedin.com/in/carmen-smith-msc"],
+            },
+            {
+              fieldKey: "country",
+              value: "Switzerland",
+              confidencePercent: 80,
+              rationale: "LinkedIn Geneva",
+              sourceUrls: ["https://www.linkedin.com/in/carmen-smith-msc"],
+            },
+          ],
+          summary: {
+            text: "EA to CEO at MSC Cruises in Geneva",
+            citationUrls: ["https://www.linkedin.com/in/carmen-smith-msc"],
+          },
+        }),
+      },
+    });
+
+    expect(search.mock.calls[0]?.[0]).toBe('"carmen smith" Geneva');
+    expect(findProjectById).toHaveBeenCalledWith("ws-1", "proj-cressy");
   });
 
   it("revokes by restoring accepted fields without wiping the audit trail", async () => {

@@ -60,6 +60,7 @@ import {
   type SynthesizeResult,
 } from "@/server/services/lead-enrichment-providers";
 import { findCompaniesByIds } from "@/server/repositories/companies";
+import { findProjectById } from "@/server/repositories/projects";
 import { syncSystemRolePermissionsForWorkspace } from "@/server/services/roles";
 
 export { isOpenAiConfigured, isSearchConfigured };
@@ -320,6 +321,9 @@ export async function startLeadEnrichment(input: {
       };
     } else {
       const workspace = await findWorkspaceById(input.workspaceId);
+      const project = lead.projectId
+        ? await findProjectById(input.workspaceId, lead.projectId)
+        : null;
       const searchContext = crmOwnedMarketContext({
         phone: lead.phone ?? lead.phoneNormalized,
         city: lead.city,
@@ -329,6 +333,13 @@ export async function startLeadEnrichment(input: {
         cityOrigin: lead.intelligenceProvenance.city?.method,
         stateRegionOrigin: lead.intelligenceProvenance.stateRegion?.method,
         countryOrigin: lead.intelligenceProvenance.country?.method,
+        project: project
+          ? {
+              city: project.city,
+              country: project.country,
+              location: project.location,
+            }
+          : null,
       });
       marketHints = enrichmentMarketHints(searchContext);
       const providers = input.providers ?? liveEnrichmentProviders;
