@@ -61,7 +61,7 @@ History in `revisions[]`. Soft-delete `deletedAt`. Export via GET.
 
 ### Workspace settings (`Workspace.leadEnrichment`)
 
-`enabled` (default **false**), `demoMode` (dry-run fixture), `retentionDays` (default 180).
+`enabled` (default **true**), `demoMode` (dry-run fixture), `retentionDays` (default 180). Turn off in Settings → Lead enrichment to hide the Enrich CTA.
 
 Env (optional, not production-required): `OPENAI_API_KEY`, `OPENAI_ENRICHMENT_MODEL`, `TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY`, `LEAD_ENRICHMENT_DEMO`.
 
@@ -99,7 +99,7 @@ DELETE /api/workspaces/:slug/leads/:id/financial-situation
 
 **Exclude:** credentials/secrets, government IDs, health data, exact home address, anyone appearing to be a minor, protected characteristics, private/social posts, unverified allegations, financial accounts, credit data, and anything not corroborated by a retrieved public URL.
 
-Confidence is **source-quality / identity-match**, not a truth claim. Operators must review before accepting. Enablement in production requires a privacy/legal sign-off recorded in Settings (acknowledgement checkbox) plus `OPENAI_API_KEY` on the server.
+Confidence is **source-quality / identity-match**, not a truth claim. Operators review badges, sources, and the summary on the profile. The workspace toggle defaults **on**; disable it in Settings to hide Enrich. Re-enabling requires the privacy/legal acknowledgement checkbox. Live search requires `OPENAI_API_KEY` on the server (demo mode otherwise uses fixtures only).
 
 ## Side-effect guard
 

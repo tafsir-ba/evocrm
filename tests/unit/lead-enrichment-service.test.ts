@@ -60,6 +60,7 @@ import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   applyLeadEnrichmentDecisions,
+  getLeadEnrichmentCapability,
   revokeLeadEnrichment,
   startLeadEnrichment,
 } from "@/server/services/lead-enrichment";
@@ -463,6 +464,13 @@ describe("lead enrichment service", () => {
         allowedSources: ["company_website"],
       }),
     ).rejects.toThrow(/turned off/i);
+  });
+
+  it("treats a missing workspace flag as enabled", async () => {
+    vi.mocked(findWorkspaceById).mockResolvedValue({ id: "ws-1" } as never);
+    const capability = await getLeadEnrichmentCapability("ws-1");
+    expect(capability.reasonDisabled).not.toMatch(/turned off/i);
+    expect(capability.reasonDisabled).toMatch(/OPENAI_API_KEY/);
   });
 
   it("revokes by restoring accepted fields without wiping the audit trail", async () => {

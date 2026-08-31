@@ -27,7 +27,7 @@ export type WorkspaceRecord = {
 
 function defaultLeadEnrichmentSettings(): WorkspaceLeadEnrichmentSettings {
   return {
-    enabled: false,
+    enabled: true,
     demoMode: false,
     retentionDays: 180,
     legalReviewAcknowledgedAt: null,
@@ -51,7 +51,7 @@ function readLeadEnrichmentSettings(
     return defaults;
   }
   return {
-    enabled: raw.enabled === true,
+    enabled: raw.enabled !== false,
     demoMode: raw.demoMode === true,
     retentionDays:
       typeof raw.retentionDays === "number" && raw.retentionDays > 0

@@ -8,7 +8,7 @@ const workspaceSchema = new Schema(
     timezone: { type: String, required: true, default: "UTC" },
     defaultCurrency: { type: String, required: true, default: "USD" },
     leadEnrichment: {
-      enabled: { type: Boolean, default: false },
+      enabled: { type: Boolean, default: true },
       demoMode: { type: Boolean, default: false },
       retentionDays: { type: Number, default: 180 },
       legalReviewAcknowledgedAt: { type: Date, default: null },

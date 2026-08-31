@@ -73,8 +73,9 @@ export function LeadEnrichmentSettingsPanel({
     <Card>
       <h2 className="text-[15px] font-semibold mb-1">Lead enrichment</h2>
       <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-4">
-        Manual public-web research only. Stays off until OPENAI_API_KEY is configured on the server
-        and this workspace toggle is enabled. Policy: docs/lead-enrichment.md.
+        Manual public-web research. Enabled for this workspace; live search still needs
+        OPENAI_API_KEY on the server. Policy: docs/lead-enrichment.md. Disable here to hide
+        Enrich. Re-enabling requires the legal/privacy acknowledgement.
       </p>
       {error ? <p className="text-[13px] text-[var(--color-danger-fg)] mb-3">{error}</p> : null}
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] mb-4">

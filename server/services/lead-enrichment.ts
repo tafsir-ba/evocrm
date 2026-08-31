@@ -173,7 +173,7 @@ export async function getLeadEnrichmentCapability(workspaceId: string): Promise<
   const openaiConfigured = isOpenAiConfigured();
   const searchConfigured = isSearchConfigured();
   const demoMode = Boolean(settings?.demoMode) || isDemoEnvEnabled();
-  const enabledFlag = settings?.enabled === true;
+  const enabledFlag = settings?.enabled !== false;
   let reasonDisabled: string | null = null;
   if (!enabledFlag) {
     reasonDisabled = "Workspace enrichment is turned off in Settings.";
@@ -837,7 +837,7 @@ export async function getLeadEnrichmentWorkspaceSettings(workspaceId: string) {
   const capability = await getLeadEnrichmentCapability(workspaceId);
   const enrichment = workspace.leadEnrichment;
   return {
-    enabled: enrichment?.enabled === true,
+    enabled: enrichment?.enabled !== false,
     demoMode: enrichment?.demoMode === true,
     retentionDays: enrichment?.retentionDays ?? 180,
     legalReviewAcknowledgedAt: enrichment?.legalReviewAcknowledgedAt
