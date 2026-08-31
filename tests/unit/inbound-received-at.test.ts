@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  foldLeadIntoInboundDemand,
   formatInboundDemandAudit,
   formatInboundDemandLine,
   projectDemandStatus,
@@ -211,6 +212,53 @@ describe("genuine inbound received-at", () => {
     expect(latest?.basis).toBe("received_at");
     expect(latest?.at.toISOString()).toBe(daysAgo(2).toISOString());
     expect(projectDemandStatus({ lastGenuineInboundAt: latest?.at, now }).label).toBe("Active");
+  });
+
+  it("folds streamed leads to the same latest inbound as the array helper", () => {
+    const leads = [
+      {
+        projectId: GROSVENOR_VISTAS_ID,
+        createdAt: now,
+        attributes: {
+          integration: {
+            inboundSource: "hubspot-gv-pilot",
+            idempotencyKey: "hubspot:contact:1363451",
+          },
+        },
+      },
+      {
+        projectId: GROSVENOR_VISTAS_ID,
+        createdAt: daysAgo(40),
+        attributes: {
+          integration: {
+            integrationId: "int-website-gv",
+            inboundSource: "landing-hero",
+            receivedAt: daysAgo(2).toISOString(),
+          },
+        },
+      },
+      {
+        projectId: "507f1f77bcf86cd799439011",
+        createdAt: daysAgo(1),
+        attributes: {
+          integration: {
+            integrationId: "int-website-other",
+            inboundSource: "landing-hero",
+            receivedAt: daysAgo(1).toISOString(),
+          },
+        },
+      },
+    ];
+
+    const folded = new Map();
+    for (const lead of leads) {
+      foldLeadIntoInboundDemand(folded, lead);
+    }
+
+    const summarized = summarizeProjectInboundDemand(leads);
+    expect(folded.get(GROSVENOR_VISTAS_ID)?.at.toISOString()).toBe(daysAgo(2).toISOString());
+    expect(folded.get(GROSVENOR_VISTAS_ID)?.basis).toBe("received_at");
+    expect(folded).toEqual(summarized);
   });
 
   it("surfaces an auditable last-inbound line", () => {

@@ -122,28 +122,33 @@ export function projectDemandStatus(input: {
   return { label: "Active", tone: "success" };
 }
 
+export function foldLeadIntoInboundDemand(
+  latest: Map<string, ResolvedInboundReceivedAt>,
+  lead: LeadInboundSnapshot,
+): void {
+  const projectId = lead.projectId?.toString();
+  if (!projectId) {
+    return;
+  }
+
+  const resolved = resolveLeadInboundReceivedAt(lead);
+  if (!resolved) {
+    return;
+  }
+
+  const current = latest.get(projectId);
+  if (!current || resolved.at.getTime() > current.at.getTime()) {
+    latest.set(projectId, resolved);
+  }
+}
+
 export function summarizeProjectInboundDemand(
   leads: LeadInboundSnapshot[],
 ): Map<string, ResolvedInboundReceivedAt> {
   const latest = new Map<string, ResolvedInboundReceivedAt>();
-
   for (const lead of leads) {
-    const projectId = lead.projectId?.toString();
-    if (!projectId) {
-      continue;
-    }
-
-    const resolved = resolveLeadInboundReceivedAt(lead);
-    if (!resolved) {
-      continue;
-    }
-
-    const current = latest.get(projectId);
-    if (!current || resolved.at.getTime() > current.at.getTime()) {
-      latest.set(projectId, resolved);
-    }
+    foldLeadIntoInboundDemand(latest, lead);
   }
-
   return latest;
 }
 
