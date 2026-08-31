@@ -486,9 +486,12 @@ export function LeadsTable({
 
   return (
     <>
-      <div className="hidden overflow-x-auto md:block">
+      <div
+        data-testid="leads-table-scroll"
+        className="hidden min-h-0 flex-1 overflow-auto overscroll-contain md:block"
+      >
         <table className="min-w-[1120px] w-full text-[12.5px] leading-none">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
               {canDelete && (
                 <th className="w-8 px-1.5 py-1">
@@ -671,7 +674,10 @@ export function LeadsTable({
         </table>
       </div>
 
-      <ul className="divide-y divide-[var(--color-line)] md:hidden">
+      <ul
+        data-testid="leads-table-scroll-mobile"
+        className="min-h-0 flex-1 divide-y divide-[var(--color-line)] overflow-auto overscroll-contain md:hidden"
+      >
         {leads.map((lead) => {
           const pending = pendingLeadId === lead.id;
           const selected = isSelectedLead(

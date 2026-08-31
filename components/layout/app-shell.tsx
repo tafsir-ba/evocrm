@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
         <main
           data-testid="workspace-main"
-          className="min-h-0 min-w-0 flex-1 overflow-auto"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
         >
           {permissionDenied ? (
             <PermissionDenied
