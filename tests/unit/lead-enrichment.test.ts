@@ -79,6 +79,12 @@ describe("lead enrichment contract", () => {
         ["https://www.example-corp.ch/team/amira-keller"],
       ),
     ).toEqual([]);
+    expect(
+      citeOnlyRetrievedUrls(
+        ["https://theorg.com/org/neho?utm_source=openai"],
+        ["https://theorg.com/org/neho/"],
+      ),
+    ).toEqual(["https://theorg.com/org/neho"]);
   });
 
   it("returns no suggestions for ambiguous demo identity", () => {
@@ -167,6 +173,10 @@ describe("lead enrichment contract", () => {
     ]);
     expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@gmail.com")).toEqual([
       '"Alisa Scarlett-Buchanan" "alisa@gmail.com"',
+    ]);
+    expect(enrichmentSearchQueries("radu@neho.ch", "radu@neho.ch")).toEqual([
+      '"radu" "radu@neho.ch"',
+      '"radu" neho.ch',
     ]);
   });
 });

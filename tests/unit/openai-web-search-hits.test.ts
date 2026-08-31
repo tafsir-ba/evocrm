@@ -49,4 +49,36 @@ describe("extractOpenAiWebSearchHits", () => {
         .hits,
     ).toEqual([]);
   });
+
+  it("strips OpenAI tracking params from retrieved citation URLs", () => {
+    const { hits } = extractOpenAiWebSearchHits(
+      {
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                annotations: [
+                  {
+                    type: "url_citation",
+                    url: "https://theorg.com/org/neho?utm_source=openai",
+                    title: "Neho",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      retrievedAt,
+    );
+    expect(hits).toEqual([
+      {
+        url: "https://theorg.com/org/neho",
+        title: "Neho",
+        snippet: "",
+        retrievedAt,
+      },
+    ]);
+  });
 });

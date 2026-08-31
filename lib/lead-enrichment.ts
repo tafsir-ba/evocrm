@@ -192,16 +192,51 @@ const GENERIC_EMAIL_DOMAINS = new Set([
   "example.org",
 ]);
 
+export function canonicalizeEnrichmentUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      return null;
+    }
+    parsed.hash = "";
+    parsed.hostname = parsed.hostname.toLowerCase();
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (
+        /^(utm_|fbclid|gclid|gclsrc|msclkid|mc_|yclid|_ga)/i.test(key) ||
+        key.toLowerCase() === "ref" ||
+        key.toLowerCase() === "si"
+      ) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    const path = parsed.pathname.replace(/\/+$/, "") || "";
+    const search = parsed.searchParams.toString();
+    return `${parsed.origin}${path}${search ? `?${search}` : ""}`;
+  } catch {
+    return null;
+  }
+}
+
 /** Name+email first. Work-email domains get a second query; consumer inboxes do not. */
-export function enrichmentSearchQueries(fullName: string, email: string): string[] {
+export function enrichmentPersonQueryName(fullName: string, email: string): string {
   const name = fullName.trim();
+  const address = email.trim();
+  if (!name || name.includes("@") || name.toLowerCase() === address.toLowerCase()) {
+    const local = address.split("@")[0] ?? "";
+    return local.replace(/[._+\-]+/g, " ").replace(/\s+/g, " ").trim() || name;
+  }
+  return name;
+}
+
+export function enrichmentSearchQueries(fullName: string, email: string): string[] {
+  const name = enrichmentPersonQueryName(fullName, email);
   const address = email.trim();
   const queries = [`"${name}" "${address}"`];
   const domain = address.split("@")[1]?.toLowerCase();
   if (domain && !GENERIC_EMAIL_DOMAINS.has(domain)) {
     queries.push(`"${name}" ${domain}`);
   }
-  return queries;
+  return [...new Set(queries)];
 }
 
 export function mergeEnrichmentHits(
@@ -213,10 +248,11 @@ export function mergeEnrichmentHits(
   >();
   for (const group of groups) {
     for (const hit of group) {
-      if (!isHttpsUrl(hit.url) || merged.has(hit.url)) {
+      const key = canonicalizeEnrichmentUrl(hit.url);
+      if (!key || merged.has(key)) {
         continue;
       }
-      merged.set(hit.url, hit);
+      merged.set(key, { ...hit, url: key });
     }
   }
   return [...merged.values()].slice(0, 12);
@@ -227,10 +263,22 @@ export function citeOnlyRetrievedUrls(
   urls: string[],
   retrievedUrls: Iterable<string>,
 ): string[] {
-  const allowed = new Set(
-    [...retrievedUrls].filter((url) => isHttpsUrl(url)),
-  );
-  return [...new Set(urls.filter((url) => allowed.has(url)))];
+  const byCanonical = new Map<string, string>();
+  for (const url of retrievedUrls) {
+    const key = canonicalizeEnrichmentUrl(url);
+    if (key && !byCanonical.has(key)) {
+      byCanonical.set(key, key);
+    }
+  }
+  const out: string[] = [];
+  for (const url of urls) {
+    const key = canonicalizeEnrichmentUrl(url);
+    const matched = key ? byCanonical.get(key) : undefined;
+    if (matched && !out.includes(matched)) {
+      out.push(matched);
+    }
+  }
+  return out;
 }
 
 export function crmValueRequiresOverwrite(

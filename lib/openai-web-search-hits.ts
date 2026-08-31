@@ -1,4 +1,4 @@
-import { isHttpsUrl, type LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
+import { canonicalizeEnrichmentUrl, isHttpsUrl, type LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
 
 function stripTrailingUrlJunk(url: string): string {
   return url.replace(/[),.;]+$/g, "");
@@ -11,8 +11,8 @@ function addHit(
   snippet: string,
   retrievedAt: string,
 ) {
-  const cleaned = stripTrailingUrlJunk(url.trim());
-  if (!isHttpsUrl(cleaned)) {
+  const cleaned = canonicalizeEnrichmentUrl(stripTrailingUrlJunk(url.trim()));
+  if (!cleaned || !isHttpsUrl(cleaned)) {
     return;
   }
   const existing = acc.get(cleaned);
