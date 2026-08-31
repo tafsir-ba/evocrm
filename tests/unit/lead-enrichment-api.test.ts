@@ -89,11 +89,20 @@ describe("lead enrichment API", () => {
     );
     vi.mocked(getLeadEnrichmentForLead).mockResolvedValue({
       capability: { enabled: false },
-      overlay: {},
-      runs: [],
+      overlay: { summary: { text: "accepted overlay" } },
+      runs: [
+        {
+          id: "run-1",
+          sources: [{ url: "https://example.com", title: "secret research" }],
+          suggestions: [{ id: "sug-1", status: "proposed", proposedValue: "Hidden" }],
+        },
+      ],
     } as never);
 
     const response = await GET(new Request("http://localhost/api"), ctx);
     expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.runs).toEqual([]);
+    expect(body.data.overlay.summary.text).toBe("accepted overlay");
   });
 });

@@ -1,3 +1,5 @@
+import { isHttpsUrl } from "@/lib/lead-enrichment";
+
 export const FINANCIAL_EMPLOYMENT_TYPES = [
   "employed",
   "self_employed",
@@ -65,11 +67,43 @@ export type MarketIncomeEstimate = {
   retrievedAt: string;
   aiModel: string;
   searchProvider: string;
+  demoMode?: boolean;
   reviewed: boolean;
   reviewedBy: string | null;
   reviewedAt: string | null;
   disclaimer: string;
 };
+
+export function parseOccupationalWageRange(
+  hits: Array<{ url: string; title: string; snippet: string }>,
+): { rangeMin: number; rangeMax: number; sources: Array<{ url: string; title: string }> } | null {
+  const numbers: number[] = [];
+  const sources: Array<{ url: string; title: string }> = [];
+  for (const hit of hits) {
+    if (!isHttpsUrl(hit.url)) {
+      continue;
+    }
+    const found = `${hit.title} ${hit.snippet}`
+      .replace(/,/g, "")
+      .match(/\d{4,7}/g)
+      ?.map(Number)
+      .filter((value) => value >= 10_000 && value <= 10_000_000);
+    if (!found || found.length === 0) {
+      continue;
+    }
+    numbers.push(...found);
+    sources.push({ url: hit.url, title: hit.title });
+  }
+  if (numbers.length < 2 || sources.length === 0) {
+    return null;
+  }
+  numbers.sort((a, b) => a - b);
+  return {
+    rangeMin: numbers[0]!,
+    rangeMax: numbers[numbers.length - 1]!,
+    sources,
+  };
+}
 
 export function emptyFinancialSnapshot(currency: string): LeadFinancialSituationSnapshot {
   return {

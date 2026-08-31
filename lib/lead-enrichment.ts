@@ -170,6 +170,17 @@ export function isHttpsUrl(value: string): boolean {
   }
 }
 
+/** Citations must come from retrieved search hits, not model-invented URLs. */
+export function citeOnlyRetrievedUrls(
+  urls: string[],
+  retrievedUrls: Iterable<string>,
+): string[] {
+  const allowed = new Set(
+    [...retrievedUrls].filter((url) => isHttpsUrl(url)),
+  );
+  return [...new Set(urls.filter((url) => allowed.has(url)))];
+}
+
 export function crmValueRequiresOverwrite(
   currentValue: string | null | undefined,
   currentOrigin: LeadFieldProvenanceMethod | "unknown" | null | undefined,

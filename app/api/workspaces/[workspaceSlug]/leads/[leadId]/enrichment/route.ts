@@ -6,6 +6,7 @@ import {
 } from "@/server/services/lead-enrichment";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { startLeadEnrichmentSchema } from "@/server/validation/lead-enrichment";
+import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
@@ -15,11 +16,18 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, [
+    const { workspace, membership } = await requireWorkspaceApiAccess(workspaceSlug, [
       "lead:enrich",
       "lead:read",
     ]);
     const payload = await getLeadEnrichmentForLead(workspace.id, leadId);
+    if (!hasPermission(membership.permissions, "lead:enrich")) {
+      return successResponse({
+        capability: payload.capability,
+        overlay: payload.overlay,
+        runs: [],
+      });
+    }
     return successResponse(payload);
   } catch (error) {
     return handleRouteError(error);

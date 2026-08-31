@@ -3,10 +3,10 @@ import "server-only";
 import {
   MARKET_INCOME_DISCLAIMER,
   emptyFinancialSnapshot,
+  parseOccupationalWageRange,
   type LeadFinancialSituationSnapshot,
   type MarketIncomeEstimate,
 } from "@/lib/lead-financial-situation";
-import { isHttpsUrl } from "@/lib/lead-enrichment";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadById } from "@/server/repositories/leads";
@@ -18,10 +18,7 @@ import {
   type LeadFinancialSituationRecord,
 } from "@/server/repositories/lead-financial-situation";
 import { getLeadEnrichmentCapability } from "@/server/services/lead-enrichment";
-import {
-  enrichmentOpenAiModel,
-  liveEnrichmentProviders,
-} from "@/server/services/lead-enrichment-providers";
+import { liveEnrichmentProviders } from "@/server/services/lead-enrichment-providers";
 
 export async function getFinancialSituationForLead(
   workspaceId: string,
@@ -133,55 +130,45 @@ export async function requestMarketIncomeEstimate(input: {
   }
 
   let sources: Array<{ url: string; title: string }> = [];
-  let rangeMin: number | null = 80000;
-  let rangeMax: number | null = 140000;
+  let rangeMin: number | null = null;
+  let rangeMax: number | null = null;
   let methodology =
-    "Occupational public salary-band search for the job title and location. Not a personal income finding.";
-  let confidencePercent = 45;
+    "Occupational public wage-band search for the job title and location only. Not a personal income finding. Numbers are taken from retrieved https snippets, not invented.";
+  let confidencePercent = 40;
   let provider = "demo_fixture";
-  let model = "demo-fixture";
+  let model = "none";
+  let demoMode = capability.demoMode;
 
-  if (!capability.demoMode) {
-    const search = await liveEnrichmentProviders.search(
-      `typical salary range "${jobTitle}" ${location} occupational statistics`,
-      ["news_press", "professional_registry"],
-    );
-    provider = search.provider;
-    const synthesis = await liveEnrichmentProviders.synthesize({
-      fullName: "occupational role",
-      email: "noreply@invalid.example",
-      known: { jobTitle, location },
-      allowedSources: ["news_press", "professional_registry"],
-      hits: search.hits,
-    });
-    model = synthesis.model;
-    const band = synthesis.suggestions.find((item) => item.fieldKey === "otherProfessional");
-    sources = search.hits.filter((hit) => isHttpsUrl(hit.url)).map((hit) => ({
-      url: hit.url,
-      title: hit.title,
-    }));
-    const numbers = (band?.value ?? synthesis.summary.text)
-      .replace(/,/g, "")
-      .match(/\d{4,7}/g)
-      ?.map(Number)
-      .filter((value) => value > 1000)
-      .sort((a, b) => a - b);
-    if (numbers && numbers.length >= 2) {
-      rangeMin = numbers[0] ?? null;
-      rangeMax = numbers[numbers.length - 1] ?? null;
-    } else {
-      rangeMin = null;
-      rangeMax = null;
-    }
-    methodology = synthesis.summary.text || methodology;
-    confidencePercent = Math.min(band?.confidencePercent ?? 40, 60);
-  } else {
+  if (capability.demoMode) {
+    rangeMin = 80000;
+    rangeMax = 140000;
+    methodology =
+      "Demo fixture occupational placeholder for this job title and location. Not live market data and not a personal income finding.";
+    confidencePercent = 40;
     sources = [
       {
         url: "https://www.example.com/occupational-wages",
         title: "Demo occupational wage table",
       },
     ];
+  } else {
+    const search = await liveEnrichmentProviders.search(
+      `typical salary range "${jobTitle}" ${location} occupational statistics`,
+      ["news_press", "professional_registry"],
+    );
+    provider = search.provider;
+    const parsed = parseOccupationalWageRange(search.hits);
+    if (!parsed) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "No cited occupational wage range was found for this job and location. No estimate was stored.",
+      );
+    }
+    rangeMin = parsed.rangeMin;
+    rangeMax = parsed.rangeMax;
+    sources = parsed.sources;
+    confidencePercent = Math.min(40 + parsed.sources.length * 5, 60);
+    methodology = `${methodology} Retrieved ${parsed.sources.length} cited source(s).`;
   }
 
   const estimate: MarketIncomeEstimate = {
@@ -194,8 +181,9 @@ export async function requestMarketIncomeEstimate(input: {
     jobTitleUsed: jobTitle,
     locationUsed: location,
     retrievedAt: new Date().toISOString(),
-    aiModel: model || enrichmentOpenAiModel(),
+    aiModel: model,
     searchProvider: provider,
+    demoMode,
     reviewed: false,
     reviewedBy: null,
     reviewedAt: null,

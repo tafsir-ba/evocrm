@@ -306,6 +306,70 @@ describe("lead enrichment service", () => {
     expect(updateLead).not.toHaveBeenCalled();
   });
 
+  it("edits an accepted enrichment value without requiring overwrite", async () => {
+    const suggestion = {
+      id: "sug-job",
+      fieldKey: "jobTitle" as const,
+      proposedValue: "Head of Sales",
+      currentValue: null,
+      currentOrigin: null,
+      confidencePercent: 86,
+      rationale: "Public team page",
+      sourceUrls: ["https://www.example-corp.ch/team/amira-keller"],
+      retrievedAt: new Date().toISOString(),
+      searchProvider: "demo_fixture",
+      aiModel: "demo-fixture",
+      status: "accepted" as const,
+      acceptedValue: "Head of Sales",
+      previousValue: null,
+      previousProvenance: null,
+      overwriteAcknowledged: false,
+      decidedBy: "user-1",
+      decidedAt: new Date().toISOString(),
+    };
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({ jobTitle: "Head of Sales" }),
+    );
+    vi.mocked(findEnrichmentRunById).mockResolvedValue({
+      id: "run-1",
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      initiatedBy: "user-1",
+      status: "accepted",
+      queryFullName: "Amira Keller",
+      queryEmail: DEMO_UNIQUE_EMAIL,
+      allowedSources: ["company_website"],
+      searchProvider: "demo_fixture",
+      aiModel: "demo-fixture",
+      retrievedAt: new Date().toISOString(),
+      expiresAt: null,
+      identityMatch: "unique",
+      identityRationale: null,
+      failureMessage: null,
+      demoMode: true,
+      sources: [],
+      suggestions: [suggestion],
+      summaryDraft: null,
+      acceptedSummary: null,
+      revokedAt: null,
+      revokedBy: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await applyLeadEnrichmentDecisions({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      runId: "run-1",
+      actorId: "user-1",
+      decisions: [{ suggestionId: "sug-job", action: "edit", editedValue: "Sales Director" }],
+    });
+
+    const patch = vi.mocked(updateLead).mock.calls[0]![2];
+    expect(patch.jobTitle).toBe("Sales Director");
+    expect(patch.intelligenceProvenance?.jobTitle?.method).toBe("enrichment");
+  });
+
   it("accepts with overwrite and never triggers campaign automation", async () => {
     const suggestion = {
       id: "sug-job",

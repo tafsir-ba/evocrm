@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { originLabel } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSuggestion } from "@/lib/lead-enrichment";
@@ -11,7 +13,6 @@ export function EnrichedField({
   suggestion,
   onClear,
   onApplyOverwrite,
-  editing,
   onEdit,
 }: {
   value: string;
@@ -19,15 +20,24 @@ export function EnrichedField({
   suggestion?: LeadEnrichmentSuggestion | null;
   onClear?: () => void;
   onApplyOverwrite?: () => void;
-  editing?: boolean;
   onEdit?: (next: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const isEnriched = origin === "enrichment";
   const pendingOverwrite =
     suggestion &&
     suggestion.status === "proposed" &&
     Boolean(suggestion.currentValue?.trim()) &&
     suggestion.proposedValue !== suggestion.currentValue;
+
+  function commitEdit(next: string) {
+    setEditing(false);
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === value) {
+      return;
+    }
+    onEdit?.(trimmed);
+  }
 
   return (
     <div className="space-y-1 min-w-0">
@@ -40,12 +50,16 @@ export function EnrichedField({
       >
         {onEdit && editing ? (
           <input
+            autoFocus
             className="w-full bg-transparent outline-none"
             defaultValue={value === "—" ? "" : value}
-            onBlur={(event) => onEdit(event.target.value)}
+            onBlur={(event) => commitEdit(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
-                onEdit((event.target as HTMLInputElement).value);
+                commitEdit((event.target as HTMLInputElement).value);
+              }
+              if (event.key === "Escape") {
+                setEditing(false);
               }
             }}
           />
@@ -60,6 +74,15 @@ export function EnrichedField({
             suggestion={isEnriched ? suggestion : null}
           />
         ) : null}
+        {isEnriched && onEdit && !editing ? (
+          <button
+            type="button"
+            className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-brand-700)]"
+            onClick={() => setEditing(true)}
+          >
+            Edit
+          </button>
+        ) : null}
         {isEnriched && onClear ? (
           <button
             type="button"
@@ -71,7 +94,7 @@ export function EnrichedField({
         ) : null}
       </div>
       {pendingOverwrite ? (
-        <div className="rounded-md border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 px-2 py-1.5">
+        <div className="rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 px-2 py-1.5">
           <p className="text-[12px] text-[var(--color-enrich-fg)]">
             Suggested: {suggestion.proposedValue} ({suggestion.confidencePercent}%)
           </p>

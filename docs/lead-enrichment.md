@@ -81,7 +81,7 @@ Financial permissions are **not** granted on project roles (workspace ceiling on
 ```txt
 GET    /api/workspaces/:slug/settings/lead-enrichment
 PATCH  /api/workspaces/:slug/settings/lead-enrichment     # settings:update
-GET    /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich or lead:read (accepted overlay only)
+GET    /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich (full runs) or lead:read (overlay + capability only)
 POST   /api/workspaces/:slug/leads/:id/enrichment         # lead:enrich — start run
 POST   /api/workspaces/:slug/leads/:id/enrichment/:runId/decisions
 POST   /api/workspaces/:slug/leads/:id/enrichment/:runId/revert

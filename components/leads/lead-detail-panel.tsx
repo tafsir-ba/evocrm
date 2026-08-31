@@ -171,6 +171,7 @@ export function LeadDetailPanel({
     currency: string;
     confidencePercent: number;
     disclaimer: string;
+    demoMode: boolean;
   } | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
@@ -314,6 +315,8 @@ export function LeadDetailPanel({
                 currency: estimate.currency,
                 confidencePercent: estimate.confidencePercent,
                 disclaimer: payload.data?.disclaimer ?? "",
+                demoMode:
+                  estimate.demoMode === true || estimate.searchProvider === "demo_fixture",
               }
             : null,
         );
@@ -442,6 +445,24 @@ export function LeadDetailPanel({
             suggestionId: suggestion.id,
             action: "accept",
             overwriteAcknowledged: true,
+          },
+        ],
+      }),
+    });
+    await loadLead({ silent: true });
+  }
+
+  async function editSuggestion(suggestion: LeadEnrichmentSuggestion, next: string) {
+    if (!activeRun) return;
+    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        decisions: [
+          {
+            suggestionId: suggestion.id,
+            action: "edit",
+            editedValue: next,
           },
         ],
       }),
@@ -627,6 +648,11 @@ export function LeadDetailPanel({
                     ? () => void applyOverwrite(suggestionFor("companyName")!)
                     : undefined
                 }
+                onEdit={
+                  canClearSuggestion(suggestionFor("companyName"))
+                    ? (next) => void editSuggestion(suggestionFor("companyName")!, next)
+                    : undefined
+                }
               />
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Job title">
@@ -642,6 +668,11 @@ export function LeadDetailPanel({
                 onApplyOverwrite={
                   canOverwriteSuggestion(suggestionFor("jobTitle"))
                     ? () => void applyOverwrite(suggestionFor("jobTitle")!)
+                    : undefined
+                }
+                onEdit={
+                  canClearSuggestion(suggestionFor("jobTitle"))
+                    ? (next) => void editSuggestion(suggestionFor("jobTitle")!, next)
                     : undefined
                 }
               />
@@ -730,6 +761,11 @@ export function LeadDetailPanel({
                             ? () => void applyOverwrite(suggestionFor("industry")!)
                             : undefined
                         }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("industry"))
+                            ? (next) => void editSuggestion(suggestionFor("industry")!, next)
+                            : undefined
+                        }
                       />
                       <Info
                         label="State / region"
@@ -744,6 +780,11 @@ export function LeadDetailPanel({
                         onApplyOverwrite={
                           canOverwriteSuggestion(suggestionFor("stateRegion"))
                             ? () => void applyOverwrite(suggestionFor("stateRegion")!)
+                            : undefined
+                        }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("stateRegion"))
+                            ? (next) => void editSuggestion(suggestionFor("stateRegion")!, next)
                             : undefined
                         }
                       />
@@ -762,6 +803,11 @@ export function LeadDetailPanel({
                             ? () => void applyOverwrite(suggestionFor("city")!)
                             : undefined
                         }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("city"))
+                            ? (next) => void editSuggestion(suggestionFor("city")!, next)
+                            : undefined
+                        }
                       />
                       <Info
                         label="Country"
@@ -778,6 +824,11 @@ export function LeadDetailPanel({
                             ? () => void applyOverwrite(suggestionFor("country")!)
                             : undefined
                         }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("country"))
+                            ? (next) => void editSuggestion(suggestionFor("country")!, next)
+                            : undefined
+                        }
                       />
                       <Info
                         label="Professional profile"
@@ -788,6 +839,15 @@ export function LeadDetailPanel({
                           canClearSuggestion(suggestionFor("professionalProfileUrl"))
                             ? () =>
                                 void clearSuggestion(suggestionFor("professionalProfileUrl")!)
+                            : undefined
+                        }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("professionalProfileUrl"))
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("professionalProfileUrl")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
@@ -801,6 +861,15 @@ export function LeadDetailPanel({
                         onClear={
                           canClearSuggestion(suggestionFor("preferredContactClues"))
                             ? () => void clearSuggestion(suggestionFor("preferredContactClues")!)
+                            : undefined
+                        }
+                        onEdit={
+                          canClearSuggestion(suggestionFor("preferredContactClues"))
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("preferredContactClues")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
@@ -941,6 +1010,15 @@ export function LeadDetailPanel({
                               ? () => void clearSuggestion(suggestionFor("otherProfessional")!)
                               : undefined
                           }
+                          onEdit={
+                            canClearSuggestion(suggestionFor("otherProfessional"))
+                              ? (next) =>
+                                  void editSuggestion(
+                                    suggestionFor("otherProfessional")!,
+                                    next,
+                                  )
+                              : undefined
+                          }
                         />
                       ) : null}
                       {enrichmentOverlay.summary?.text ? (
@@ -986,6 +1064,11 @@ export function LeadDetailPanel({
                           <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
                             Market-income estimate (occupational, not this person)
                           </p>
+                          {financialEstimate.demoMode ? (
+                            <p className="mb-1 text-[12.5px] text-[var(--color-warn-fg)]">
+                              Demo fixture — not live market data.
+                            </p>
+                          ) : null}
                           <p className="text-[13.5px] text-[var(--color-ink)]">
                             {financialEstimate.rangeMin ?? "—"} – {financialEstimate.rangeMax ?? "—"}{" "}
                             {financialEstimate.currency} ({financialEstimate.confidencePercent}%
@@ -1159,6 +1242,7 @@ function Info({
   suggestion,
   onClear,
   onApplyOverwrite,
+  onEdit,
 }: {
   label: string;
   value: string;
@@ -1166,6 +1250,7 @@ function Info({
   suggestion?: LeadEnrichmentSuggestion | null;
   onClear?: () => void;
   onApplyOverwrite?: () => void;
+  onEdit?: (next: string) => void;
 }) {
   return (
     <div>
@@ -1178,6 +1263,7 @@ function Info({
         suggestion={suggestion}
         onClear={onClear}
         onApplyOverwrite={onApplyOverwrite}
+        onEdit={onEdit}
       />
     </div>
   );

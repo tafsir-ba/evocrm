@@ -10,7 +10,7 @@ import {
   contentLooksExcluded,
   crmValueRequiresOverwrite,
   isSafeToAutoApplySuggestion,
-  isHttpsUrl,
+  citeOnlyRetrievedUrls,
   isLeadEnrichmentFieldKey,
   mergeWebEnrichmentAttributes,
   readWebEnrichmentAttributes,
@@ -111,12 +111,8 @@ function buildSuggestions(input: {
   retrievedAt: string;
   searchProvider: string;
   aiModel: string;
+  retrievedUrls: Iterable<string>;
 }): LeadEnrichmentSuggestion[] {
-  const allowedUrls = new Set(
-    /* filled by caller via sourceUrls already https-filtered below */
-    [] as string[],
-  );
-  void allowedUrls;
   const out: LeadEnrichmentSuggestion[] = [];
   for (const raw of input.synthesis.suggestions) {
     if (!isLeadEnrichmentFieldKey(raw.fieldKey)) {
@@ -127,12 +123,12 @@ function buildSuggestions(input: {
     if (!value) {
       continue;
     }
-    const sourceUrls = [...new Set(raw.sourceUrls.filter(isHttpsUrl))];
+    const sourceUrls = citeOnlyRetrievedUrls(raw.sourceUrls, input.retrievedUrls);
     const { confidencePercent, dropped } = clampConfidence({
       confidencePercent: raw.confidencePercent,
       sourceUrls,
     });
-    if (dropped || confidencePercent <= 0) {
+    if (dropped || confidencePercent <= 0 || sourceUrls.length === 0) {
       continue;
     }
     if (contentLooksExcluded(`${value} ${rationale}`)) {
@@ -350,16 +346,22 @@ export async function startLeadEnrichment(input: {
       retrievedAt,
       searchProvider: provider,
       aiModel: synthesis.model,
+      retrievedUrls: hits.map((hit) => hit.url),
     });
-    const summaryDraft: LeadEnrichmentSummary | null = synthesis.summary.text
-      ? {
-          text: synthesis.summary.text,
-          citationUrls: synthesis.summary.citationUrls.filter(isHttpsUrl),
-          status: "draft",
-          acceptedAt: null,
-          acceptedBy: null,
-        }
-      : null;
+    const citationUrls = citeOnlyRetrievedUrls(
+      synthesis.summary.citationUrls,
+      hits.map((hit) => hit.url),
+    );
+    const summaryDraft: LeadEnrichmentSummary | null =
+      synthesis.summary.text && citationUrls.length > 0
+        ? {
+            text: synthesis.summary.text,
+            citationUrls,
+            status: "draft",
+            acceptedAt: null,
+            acceptedBy: null,
+          }
+        : null;
 
     const reviewing = await updateEnrichmentRun(input.workspaceId, run.id, {
       status: "reviewing",
@@ -559,6 +561,25 @@ export async function applyLeadEnrichmentDecisions(input: {
         decidedAt: now,
       };
       cleared.push(suggestion.fieldKey);
+      continue;
+    }
+    if (
+      decision.action === "edit" &&
+      (suggestion.status === "accepted" || suggestion.status === "edited")
+    ) {
+      const editedValue = sanitizeEnrichmentText(decision.editedValue ?? "");
+      if (!editedValue) {
+        throw new AppError("VALIDATION_ERROR", "Accepted enrichment value cannot be empty.");
+      }
+      await writeField(suggestion.fieldKey, editedValue, stamp);
+      suggestions[index] = {
+        ...suggestion,
+        status: "edited",
+        acceptedValue: editedValue,
+        decidedBy: input.actorId,
+        decidedAt: now,
+      };
+      applied.push(suggestion.fieldKey);
       continue;
     }
     if (suggestion.status !== "proposed") {

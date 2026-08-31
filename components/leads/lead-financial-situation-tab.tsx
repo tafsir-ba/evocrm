@@ -314,6 +314,12 @@ export function LeadFinancialSituationTab({
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">
+            {estimateRecord.demoMode || estimateRecord.searchProvider === "demo_fixture" ? (
+              <p className="rounded-md bg-[var(--color-warn-bg)] px-2 py-1.5 text-[12.5px] text-[var(--color-warn-fg)]">
+                Demo fixture occupational placeholder — not live market data and not this
+                person’s income.
+              </p>
+            ) : null}
             <p>
               Range: {estimateRecord.rangeMin ?? "—"} – {estimateRecord.rangeMax ?? "—"}{" "}
               {estimateRecord.currency} ({estimateRecord.confidencePercent}% source confidence)

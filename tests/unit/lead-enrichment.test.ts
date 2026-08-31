@@ -6,10 +6,12 @@ import {
   crmValueRequiresOverwrite,
   HIGH_CONFIDENCE_THRESHOLD,
   isSafeToAutoApplySuggestion,
+  citeOnlyRetrievedUrls,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
 import { getLeadEnrichmentDemoFixture, DEMO_AMBIGUOUS_EMAIL, DEMO_UNIQUE_EMAIL } from "@/tests/fixtures/lead-enrichment-demo";
+import { parseOccupationalWageRange } from "@/lib/lead-financial-situation";
 
 describe("lead enrichment contract", () => {
   it("drops high-confidence suggestions without an https source", () => {
@@ -56,6 +58,24 @@ describe("lead enrichment contract", () => {
     expect(originLabel("manual")).toBe("CRM");
   });
 
+  it("keeps only retrieved https citations and drops invented URLs", () => {
+    const cited = citeOnlyRetrievedUrls(
+      [
+        "https://www.example-corp.ch/team/amira-keller",
+        "https://invented.example/profile",
+        "http://insecure.example/page",
+      ],
+      ["https://www.example-corp.ch/team/amira-keller"],
+    );
+    expect(cited).toEqual(["https://www.example-corp.ch/team/amira-keller"]);
+    expect(
+      citeOnlyRetrievedUrls(
+        ["https://invented.example/profile"],
+        ["https://www.example-corp.ch/team/amira-keller"],
+      ),
+    ).toEqual([]);
+  });
+
   it("returns no suggestions for ambiguous demo identity", () => {
     const fixture = getLeadEnrichmentDemoFixture({
       fullName: "John Smith",
@@ -75,5 +95,26 @@ describe("lead enrichment contract", () => {
     expect(fixture.suggestions.every((item) => item.sourceUrls[0]?.startsWith("https://"))).toBe(
       true,
     );
+  });
+
+  it("parses occupational wage ranges only from retrieved https snippets", () => {
+    expect(
+      parseOccupationalWageRange([
+        {
+          url: "https://stats.example/wages",
+          title: "Wage table",
+          snippet: "Typical range 90,000 to 130000 for this role.",
+        },
+      ]),
+    ).toEqual({
+      rangeMin: 90000,
+      rangeMax: 130000,
+      sources: [{ url: "https://stats.example/wages", title: "Wage table" }],
+    });
+    expect(
+      parseOccupationalWageRange([
+        { url: "https://stats.example/wages", title: "No numbers", snippet: "See PDF." },
+      ]),
+    ).toBeNull();
   });
 });
