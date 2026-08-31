@@ -6,7 +6,7 @@ Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KE
 
 1. Lead detail header **Enrich** CTA (`lead:enrich`). Hidden when the feature is off or the role cannot enrich.
 2. Clicking **Enrich** starts public-web search immediately (default allowed sources: professional directories, company sites, news/press, registries). A short animated progress state is shown. There is no source-picker or per-field accept gate before results appear.
-3. Search uses the lead’s **name + email only** (no phone, address, or financials). Work-email domains also search `name + domain`. Consumer inboxes (gmail, etc.) do not.
+3. Search uses the lead’s **name**, then name+email (no phone, address, or financials). Work-email domains also search `name + domain`. Distinctive names can match without the email appearing on the page.
 4. Search-provider hits are synthesized server-side with OpenAI. Citations must come from retrieved https URLs (Tavily / Brave / OpenAI `web_search` annotations). Empty retrieval → failed run, no invented profile.
 5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value” on the profile.
 6. On a unique match the dialog shows a brief “Profile filled” beat and **closes onto the lead**. Enriched fields pulse once. Each value has a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
