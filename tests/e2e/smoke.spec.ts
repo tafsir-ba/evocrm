@@ -72,4 +72,9 @@ test.describe("Cron protection", () => {
     const response = await request.post("/api/cron/campaigns/send-due");
     expect(response.status()).toBe(401);
   });
+
+  test("hubspot notes cron rejects missing secret", async ({ request }) => {
+    const response = await request.post("/api/cron/hubspot/notes");
+    expect(response.status()).toBe(401);
+  });
 });

@@ -711,6 +711,24 @@ POST /api/cron/campaigns/send-due
 
 Must not be callable from the browser without the secret.
 
+### HubSpot ongoing sync reconcile
+
+```txt
+POST /api/cron/hubspot/reconcile
+```
+
+**Protection:** `Authorization: Bearer <CRON_SECRET>`.
+
+Missed-event fallback for the HubSpot → EvoHome ongoing lead sync. Default **off** (`HUBSPOT_ONGOING_SYNC_RECONCILE` must be `true` for the internal worker). Paging keeps a fixed `lastmodifieddate` filter until the HubSpot `nextAfter` sequence is exhausted; failures do not advance the cursor. Never enrolls campaigns. Counts-only response (no PII). See `docs/hubspot-ongoing-sync.md`.
+
+```txt
+POST /api/cron/hubspot/notes
+```
+
+**Protection:** `Authorization: Bearer <CRON_SECRET>`.
+
+Missed-event fallback for the HubSpot notes / inbound-engagement workstream. Default **off** (`HUBSPOT_NOTES_SYNC_RECONCILE` plus `HUBSPOT_NOTES_SYNC_RELEASE_GATE`). Never changes lead project/status and never enrolls campaigns. Counts-only response (no PII).
+
 ---
 
 ## Signed Document URL Pattern
@@ -824,7 +842,15 @@ Email uniqueness is scoped per project (`workspaceId + projectId + emailNormaliz
 
 **Pre-parse guards:** `Content-Length` must not exceed **64 KB** before `request.json()` → `VALIDATION_ERROR` (HTTP 400).
 
-**Public middleware allowlist:** only `/api/integrations/website/leads` is public under integrations — not the entire `/api/integrations` prefix.
+**Public middleware allowlist:** `/api/integrations/website/leads` and `/api/integrations/hubspot/webhooks` are public under integrations — not the entire `/api/integrations` prefix.
+
+HubSpot signed webhook (public, signature v3):
+
+```txt
+POST /api/integrations/hubspot/webhooks
+```
+
+Verifies `X-HubSpot-Signature-v3`. Mutations are **gated** (`HUBSPOT_ONGOING_SYNC_RELEASE_GATE` + cursor dry-run). Operator guide: `docs/hubspot-ongoing-sync.md`.
 
 ---
 

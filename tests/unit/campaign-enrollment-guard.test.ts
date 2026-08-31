@@ -16,6 +16,15 @@ describe("campaign enrollment guard", () => {
     expect(isHubSpotOrLegacyMigratedLead({ integration: { inboundSource: "hero-form" } })).toBe(
       false,
     );
+    expect(
+      isBlockedFromAutomaticCampaignEnrollment({
+        integration: {
+          inboundSource: "hubspot",
+          idempotencyKey: "hubspot:contact:99",
+          acquisitionChannel: "organic_inbound",
+        },
+      }),
+    ).toBe(false);
   });
 
   it("blocks automatic enrollment for HubSpot keys, inbound sources, and stamped policy", () => {

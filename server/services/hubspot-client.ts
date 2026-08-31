@@ -1,5 +1,14 @@
 import "server-only";
 
+import { HUBSPOT_ONGOING_CONTACT_PROPERTIES } from "@/lib/hubspot-ongoing-sync";
+import {
+  HUBSPOT_EMAIL_PROPERTIES,
+  HUBSPOT_NOTE_PROPERTIES,
+  mapHubSpotEmailObjectToTimelineItem,
+  mapHubSpotFormMessageToTimelineItem,
+  mapHubSpotNoteObjectToTimelineItem,
+  type HubSpotTimelineItem,
+} from "@/lib/hubspot-notes-sync";
 import { AppError } from "@/server/errors";
 
 export type HubSpotContact = {
@@ -9,6 +18,7 @@ export type HubSpotContact = {
   email: string | null;
   phone: string | null;
   createdAt: string | null;
+  lastModifiedAt: string | null;
   properties: Record<string, string | null>;
 };
 
@@ -182,26 +192,9 @@ export async function fetchHubSpotContact(input: {
     accessToken: input.accessToken,
     path: `/crm/v3/objects/contacts/${encodeURIComponent(input.contactId)}`,
     searchParams: {
-      properties: [
-        "firstname",
-        "lastname",
-        "email",
-        "phone",
-        "mobilephone",
-        "hs_lead_status",
-        "company",
-        "jobtitle",
-        "industry",
-        "state",
-        "hs_state_code",
-        "associatedcompanyid",
-        "product_intersted_in",
-        "city",
-        "country",
-        "message",
-        "notes_last_contacted",
-        "createdate",
-      ].join(","),
+      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES, "hs_lead_status", "notes_last_contacted"].join(
+        ",",
+      ),
     },
   });
 
@@ -221,7 +214,20 @@ export async function fetchHubSpotContact(input: {
     id?: string;
     properties?: Record<string, string | null | undefined>;
     createdAt?: string;
+    updatedAt?: string;
   };
+  return mapHubSpotContactFromPayload(payload, input.contactId);
+}
+
+export function mapHubSpotContactFromPayload(
+  payload: {
+    id?: string;
+    properties?: Record<string, string | null | undefined>;
+    createdAt?: string;
+    updatedAt?: string;
+  },
+  fallbackId?: string,
+): HubSpotContact {
   const properties = payload.properties ?? {};
   const firstName = readProperty(properties, "firstname") ?? "HubSpot";
   const lastName = readProperty(properties, "lastname") ?? "Contact";
@@ -231,14 +237,19 @@ export async function fetchHubSpotContact(input: {
   const createdAt =
     readProperty(properties, "createdate") ??
     (typeof payload.createdAt === "string" ? payload.createdAt : null);
+  const lastModifiedAt =
+    readProperty(properties, "hs_lastmodifieddate") ??
+    readProperty(properties, "lastmodifieddate") ??
+    (typeof payload.updatedAt === "string" ? payload.updatedAt : null);
 
   return {
-    id: payload.id ?? input.contactId,
+    id: payload.id ?? fallbackId ?? "",
     firstName,
     lastName,
     email,
     phone,
     createdAt,
+    lastModifiedAt,
     properties: Object.fromEntries(
       Object.entries(properties).map(([key, value]) => [
         key,
@@ -246,6 +257,332 @@ export async function fetchHubSpotContact(input: {
       ]),
     ),
   };
+}
+
+export function mapHubSpotSearchHitToContact(raw: HubSpotContactRaw): HubSpotContact {
+  return mapHubSpotContactFromPayload({ id: raw.id, properties: raw.properties }, raw.id);
+}
+
+async function searchHubSpotContacts(input: {
+  accessToken: string;
+  filterGroups: Array<{ filters: Array<Record<string, string>> }>;
+  sortProperty: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
+  const { ok, status, body } = await hubspotPostJson({
+    accessToken: input.accessToken,
+    path: "/crm/v3/objects/contacts/search",
+    body: {
+      filterGroups: input.filterGroups,
+      sorts: [
+        { propertyName: input.sortProperty, direction: "ASCENDING" },
+        { propertyName: "hs_object_id", direction: "ASCENDING" },
+      ],
+      properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES],
+      limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+      ...(input.after ? { after: input.after } : {}),
+    },
+  });
+
+  if (!ok) {
+    throw new AppError(
+      "INTERNAL_ERROR",
+      `HubSpot contact search failed (${status}).`,
+      { expose: false },
+    );
+  }
+
+  const payload = body as {
+    results?: Array<{
+      id?: string;
+      properties?: Record<string, string | null | undefined>;
+      createdAt?: string;
+      updatedAt?: string;
+    }>;
+    paging?: { next?: { after?: string } };
+  };
+
+  return {
+    contacts: (payload.results ?? []).map((result) => mapHubSpotContactFromPayload(result, result.id)),
+    nextAfter: payload.paging?.next?.after ?? null,
+  };
+}
+
+export async function searchHubSpotContactsModifiedSince(input: {
+  accessToken: string;
+  modifiedAfterIso: string;
+  after?: string | null;
+  limit?: number;
+  operator?: "GT" | "GTE";
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
+  const modifiedMs = Date.parse(input.modifiedAfterIso);
+  if (!Number.isFinite(modifiedMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot reconcile watermark.");
+  }
+
+  return searchHubSpotContacts({
+    accessToken: input.accessToken,
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "lastmodifieddate",
+            operator: input.operator ?? "GTE",
+            value: String(modifiedMs),
+          },
+        ],
+      },
+    ],
+    sortProperty: "lastmodifieddate",
+    after: input.after,
+    limit: input.limit,
+  });
+}
+
+export async function searchHubSpotContactsCreatedOrModifiedSince(input: {
+  accessToken: string;
+  sinceIso: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
+  const sinceMs = Date.parse(input.sinceIso);
+  if (!Number.isFinite(sinceMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot cutover watermark.");
+  }
+
+  return searchHubSpotContacts({
+    accessToken: input.accessToken,
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "createdate",
+            operator: "GT",
+            value: String(sinceMs),
+          },
+        ],
+      },
+      {
+        filters: [
+          {
+            propertyName: "lastmodifieddate",
+            operator: "GTE",
+            value: String(sinceMs),
+          },
+        ],
+      },
+    ],
+    sortProperty: "lastmodifieddate",
+    after: input.after,
+    limit: input.limit,
+  });
+}
+
+export async function fetchHubSpotContactProjectAssociationIds(input: {
+  accessToken: string;
+  contactId: string;
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/contacts/${encodeURIComponent(input.contactId)}/associations/projects`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
+}
+
+async function fetchHubSpotAssociationIds(input: {
+  accessToken: string;
+  contactId: string;
+  toObjectType: "notes" | "emails";
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/contacts/${encodeURIComponent(input.contactId)}/associations/${input.toObjectType}`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
+}
+
+async function batchReadHubSpotObjects(input: {
+  accessToken: string;
+  objectType: "notes" | "emails";
+  ids: string[];
+  properties: readonly string[];
+}): Promise<Array<{ id: string; properties: Record<string, string | null> }>> {
+  if (input.ids.length === 0) {
+    return [];
+  }
+  const results: Array<{ id: string; properties: Record<string, string | null> }> = [];
+  const chunkSize = 100;
+  for (let offset = 0; offset < input.ids.length; offset += chunkSize) {
+    const chunk = input.ids.slice(offset, offset + chunkSize);
+    const { ok, body } = await hubspotPostJson({
+      accessToken: input.accessToken,
+      path: `/crm/v3/objects/${input.objectType}/batch/read`,
+      body: {
+        properties: [...input.properties],
+        inputs: chunk.map((id) => ({ id })),
+      },
+    });
+    if (!ok) {
+      continue;
+    }
+    const payload = body as {
+      results?: Array<{ id?: string; properties?: Record<string, string | null | undefined> }>;
+    };
+    for (const row of payload.results ?? []) {
+      if (!row.id) {
+        continue;
+      }
+      results.push({
+        id: String(row.id),
+        properties: Object.fromEntries(
+          Object.entries(row.properties ?? {}).map(([key, value]) => [
+            key,
+            typeof value === "string" ? value : null,
+          ]),
+        ),
+      });
+    }
+  }
+  return results;
+}
+
+export async function listHubSpotContactTimelineItems(input: {
+  accessToken: string;
+  contactId: string;
+  formMessage?: string | null;
+  formLabel?: string | null;
+  formOccurredAt?: string | null;
+}): Promise<HubSpotTimelineItem[]> {
+  const [noteIds, emailIds] = await Promise.all([
+    fetchHubSpotAssociationIds({
+      accessToken: input.accessToken,
+      contactId: input.contactId,
+      toObjectType: "notes",
+    }),
+    fetchHubSpotAssociationIds({
+      accessToken: input.accessToken,
+      contactId: input.contactId,
+      toObjectType: "emails",
+    }),
+  ]);
+
+  const [notes, emails] = await Promise.all([
+    batchReadHubSpotObjects({
+      accessToken: input.accessToken,
+      objectType: "notes",
+      ids: noteIds,
+      properties: HUBSPOT_NOTE_PROPERTIES,
+    }),
+    batchReadHubSpotObjects({
+      accessToken: input.accessToken,
+      objectType: "emails",
+      ids: emailIds,
+      properties: HUBSPOT_EMAIL_PROPERTIES,
+    }),
+  ]);
+
+  const items: HubSpotTimelineItem[] = [
+    ...notes.map((note) =>
+      mapHubSpotNoteObjectToTimelineItem({
+        id: note.id,
+        contactId: input.contactId,
+        properties: note.properties,
+      }),
+    ),
+    ...emails.map((email) =>
+      mapHubSpotEmailObjectToTimelineItem({
+        id: email.id,
+        contactId: input.contactId,
+        properties: email.properties,
+      }),
+    ),
+  ];
+
+  const formItem = mapHubSpotFormMessageToTimelineItem({
+    contactId: input.contactId,
+    message: input.formMessage,
+    formLabel: input.formLabel,
+    occurredAt: input.formOccurredAt,
+  });
+  if (formItem) {
+    items.push(formItem);
+  }
+
+  return items;
+}
+
+export async function searchHubSpotNoteObjectsModifiedSince(input: {
+  accessToken: string;
+  modifiedAfterIso: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ ids: string[]; nextAfter: string | null }> {
+  const modifiedMs = Date.parse(input.modifiedAfterIso);
+  if (!Number.isFinite(modifiedMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot notes watermark.");
+  }
+  const { ok, body } = await hubspotPostJson({
+    accessToken: input.accessToken,
+    path: "/crm/v3/objects/notes/search",
+    body: {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "hs_lastmodifieddate",
+              operator: "GTE",
+              value: String(modifiedMs),
+            },
+          ],
+        },
+      ],
+      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      properties: ["hs_lastmodifieddate"],
+      limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+      ...(input.after ? { after: input.after } : {}),
+    },
+  });
+  if (!ok) {
+    return { ids: [], nextAfter: null };
+  }
+  const payload = body as {
+    results?: Array<{ id?: string }>;
+    paging?: { next?: { after?: string } };
+  };
+  return {
+    ids: (payload.results ?? []).map((row) => String(row.id ?? "")).filter(Boolean),
+    nextAfter: payload.paging?.next?.after ?? null,
+  };
+}
+
+export async function fetchHubSpotNoteContactIds(input: {
+  accessToken: string;
+  noteId: string;
+}): Promise<string[]> {
+  const { ok, body } = await hubspotGetJson({
+    accessToken: input.accessToken,
+    path: `/crm/v4/objects/notes/${encodeURIComponent(input.noteId)}/associations/contacts`,
+  });
+  if (!ok) {
+    return [];
+  }
+  const payload = body as HubSpotAssociationsResponse;
+  return (payload.results ?? [])
+    .map((row) => (row.toObjectId == null ? "" : String(row.toObjectId)))
+    .filter(Boolean);
 }
 
 export async function assertHubSpotAccessToken(accessToken: string): Promise<void> {

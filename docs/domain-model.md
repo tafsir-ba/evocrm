@@ -448,6 +448,8 @@ Follow-up action (call, visit, task, email, etc.).
 | `cancelledAt` | Set when status behavior is `cancelled` |
 | `outcome` | |
 | `nextActionDate` | |
+| `hubspotExternalActivityId` | Sparse unique with workspace; HubSpot notes sync idempotency |
+| `attributes` | Provenance for HubSpot notes (`integration.sourceOccurredAt`, labels) |
 | `createdBy` | |
 | `createdAt` | |
 | `updatedAt` | |
@@ -632,7 +634,38 @@ External system connection (settings/internal in V1). Website lead capture is th
 | `updatedAt` | |
 | `archivedAt` | Set when archived (soft delete) |
 
-Setup protocol: `docs/website-lead-capture-setup.md`.
+Setup protocol: `docs/website-lead-capture-setup.md`. Ongoing HubSpot sync: `docs/hubspot-ongoing-sync.md`.
+
+---
+
+### HubSpotSyncCursor
+
+Per-integration watermark for the ongoing HubSpot connector (not historical GV/WD runs).
+
+| Field | Description |
+|-------|-------------|
+| `workspaceId` / `integrationId` / `portalId` | |
+| `status` | `pending_cutover`, `dry_run_verified`, `active`, `paused` |
+| `cutoverAt` | HubSpot `createdate` after this may count as new acquisition |
+| `lastReconciledModifiedAt` | Fixed search filter for the in-progress page sequence; advanced only after that sequence is exhausted with no failures |
+| `lastReconciledAfter` | HubSpot `paging.next.after` for the **same** filter; never applied to a newer watermark |
+| `lastReconciledContactId` | Tie-break id so equal `lastmodifieddate` values are not skipped after exhaustion |
+| `notesStatus` / `notesDryRunVerifiedAt` / `notesDryRunSummary` | Independent notes/timeline cutover |
+| `lastNotesReconciledModifiedAt` / `After` / `ContactId` | Notes missed-event pointer |
+| `dryRunVerifiedAt` | Required before `active` |
+| `dryRunSummary` | Counts only (no PII) |
+
+### HubSpotSyncEvent
+
+Durable event ledger for HubSpot webhook/reconcile deliveries.
+
+| Field | Description |
+|-------|-------------|
+| `eventKey` | Contact id + version timestamp + hashed email |
+| `contactId` | HubSpot id (not email) |
+| `status` | `received`, `processed`, `skipped`, `failed`, `dead_letter` |
+| `outcome` | `created`, `updated`, `duplicate`, `parked`, `would_*`, … |
+| `payloadSummary` | Non-PII counts/reasons |
 
 ---
 

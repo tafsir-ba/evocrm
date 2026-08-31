@@ -19,6 +19,9 @@ export const CAMPAIGN_ENROLLMENT_POLICY_KEY = "campaignEnrollmentPolicy";
 
 export const CAMPAIGN_GUARD_SOURCE = "hubspot_legacy_migration";
 
+/** Live HubSpot organic/website inbound may enter campaigns; never guess this flag. */
+export const ORGANIC_INBOUND_CHANNEL = "organic_inbound";
+
 export const AUTOMATIC_ENROLLMENT_SOURCES = [
   "project_auto_enroll",
   "rule_based_auto_enrollment",
@@ -64,11 +67,21 @@ export function readCampaignEnrollmentPolicy(
   };
 }
 
+export function isOrganicHubSpotInbound(
+  attributes: Record<string, unknown> | null | undefined,
+): boolean {
+  const integration = readIntegrationRecord(attributes);
+  return integration?.acquisitionChannel === ORGANIC_INBOUND_CHANNEL;
+}
+
 export function isHubSpotOrLegacyMigratedLead(
   attributes: Record<string, unknown> | null | undefined,
 ): boolean {
   if (readCampaignEnrollmentPolicy(attributes)) {
     return true;
+  }
+  if (isOrganicHubSpotInbound(attributes)) {
+    return false;
   }
   const integration = readIntegrationRecord(attributes);
   if (!integration) {

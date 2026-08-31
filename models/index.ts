@@ -35,6 +35,14 @@ export {
   type HubSpotMigrationRunDocument,
   HUBSPOT_MIGRATION_RUN_STATUSES,
 } from "./hubspot-migration-run";
+export {
+  HubSpotSyncCursorModel,
+  type HubSpotSyncCursorDocument,
+} from "./hubspot-sync-cursor";
+export {
+  HubSpotSyncEventModel,
+  type HubSpotSyncEventDocument,
+} from "./hubspot-sync-event";
 export { AuditLogModel, type AuditLogDocument } from "./audit-log";
 export { ImportJobModel, type ImportJobDocument } from "./import-job";
 export { ImportRowResultModel, type ImportRowResultDocument } from "./import-row-result";

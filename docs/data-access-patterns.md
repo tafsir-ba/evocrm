@@ -424,6 +424,7 @@ Normalization happens in the service layer before repository persist.
 - Never accept client `workspaceId` on integration management or website webhook payloads.
 - Archive integrations with `status = archived` and `archivedAt`; do not hard-delete.
 - Idempotency: query leads by `workspaceId` + `attributes.integration.integrationId` + `attributes.integration.idempotencyKey`.
+- Ongoing HubSpot sync also ledgers `HubSpotSyncEvent` (`workspaceId` + `integrationId` + `eventKey` unique) and `HubSpotSyncCursor` per integration. Reports must not include name/email/phone.
 - Integration logs: persist sanitized summaries only — no raw webhook bodies, API keys, or secrets.
 
 ---

@@ -89,3 +89,35 @@ export function parseHubSpotWebhookEvents(payload: unknown): HubSpotWebhookEvent
 export function isHubSpotContactCreationEvent(event: HubSpotWebhookEvent): boolean {
   return event.subscriptionType === "contact.creation";
 }
+
+export function isHubSpotContactPropertyChangeEvent(event: HubSpotWebhookEvent): boolean {
+  return event.subscriptionType === "contact.propertyChange";
+}
+
+/** Creation and property-change events participate in the ongoing upsert sync. */
+export function isHubSpotOngoingSyncEvent(event: HubSpotWebhookEvent): boolean {
+  return isHubSpotContactCreationEvent(event) || isHubSpotContactPropertyChangeEvent(event);
+}
+
+export function collapseHubSpotEventsByContact(
+  events: HubSpotWebhookEvent[],
+): HubSpotWebhookEvent[] {
+  const latest = new Map<string, HubSpotWebhookEvent>();
+  for (const event of events) {
+    if (!isHubSpotOngoingSyncEvent(event)) {
+      continue;
+    }
+    const contactId = String(event.objectId);
+    const current = latest.get(contactId);
+    if (!current) {
+      latest.set(contactId, event);
+      continue;
+    }
+    const currentAt = Number(current.occurredAt ?? 0);
+    const nextAt = Number(event.occurredAt ?? 0);
+    if (nextAt >= currentAt) {
+      latest.set(contactId, event);
+    }
+  }
+  return [...latest.values()];
+}

@@ -351,6 +351,7 @@ Authorization: Bearer <CRON_SECRET>
 - Idempotency via `Lead.attributes.integration.idempotencyKey` with a **unique** partial index on `workspaceId + integrationId + idempotencyKey` (non-archived leads); duplicate normalized email returns an existing lead reference **within the same project**.
 - Website lead webhook rate limiting: **60 requests per minute** per client IP for all requests, plus an additional **60 requests per minute** per supplied API key hash when a bearer/header key is present (before key validation). Excess requests return `RATE_LIMITED` (HTTP 429). Production uses MongoDB-backed counters (`RateLimitBucket` collection with TTL); tests use an in-process fallback. Complement with edge/WAF limits for defense in depth.
 - Website lead webhook pre-parse guard: reject `Content-Length` above **64 KB** before `request.json()`.
+- HubSpot webhook: signed v3, IP rate-limited, 64 KB body cap. CRM mutations require the ongoing-sync release gate and a verified cutover cursor (`docs/hubspot-ongoing-sync.md`). Reconcile cron uses `CRON_SECRET`. Sync never auto-enrolls campaigns.
 
 ---
 

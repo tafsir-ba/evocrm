@@ -529,22 +529,40 @@ export async function findActiveLeadByEmailNormalized(
   excludeLeadId?: string,
   projectId?: string,
 ): Promise<LeadRecord | null> {
+  const matches = await listActiveLeadsByNormalizedEmail(
+    workspaceId,
+    emailNormalized,
+    { excludeLeadId, projectId, limit: 1 },
+  );
+  return matches[0] ?? null;
+}
+
+export async function listActiveLeadsByNormalizedEmail(
+  workspaceId: string,
+  emailNormalized: string,
+  options?: {
+    excludeLeadId?: string;
+    projectId?: string;
+    limit?: number;
+  },
+): Promise<LeadRecord[]> {
   await connectDb();
   const query: Record<string, unknown> = {
     emailNormalized,
     archivedAt: null,
   };
-  if (excludeLeadId) {
-    query._id = { $ne: excludeLeadId };
+  if (options?.excludeLeadId) {
+    query._id = { $ne: options.excludeLeadId };
   }
-  if (projectId) {
-    query.projectId = projectId;
+  if (options?.projectId) {
+    query.projectId = options.projectId;
   }
 
-  const document = await LeadModel.findOne(
-    withWorkspaceScope(workspaceId, query),
-  ).lean<LeadDocument>();
-  return document ? toLeadRecord(document) : null;
+  const documents = await LeadModel.find(withWorkspaceScope(workspaceId, query))
+    .sort({ createdAt: 1, _id: 1 })
+    .limit(Math.min(Math.max(options?.limit ?? 50, 1), 100))
+    .lean<LeadDocument[]>();
+  return documents.map((document) => toLeadRecord(document));
 }
 
 export async function findLeadByIntegrationIdempotencyKey(
@@ -561,6 +579,27 @@ export async function findLeadByIntegrationIdempotencyKey(
     }),
   ).lean<LeadDocument>();
 
+  return document ? toLeadRecord(document) : null;
+}
+
+export async function findLeadByHubSpotContactId(
+  workspaceId: string,
+  contactId: string,
+): Promise<LeadRecord | null> {
+  await connectDb();
+  const trimmed = contactId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const document = await LeadModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      archivedAt: null,
+      $or: [
+        { "attributes.integration.idempotencyKey": `hubspot:contact:${trimmed}` },
+        { "attributes.integration.externalId": trimmed },
+      ],
+    }),
+  ).lean<LeadDocument>();
   return document ? toLeadRecord(document) : null;
 }
 

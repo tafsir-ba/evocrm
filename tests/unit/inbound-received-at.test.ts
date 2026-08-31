@@ -66,6 +66,24 @@ describe("genuine inbound received-at", () => {
     expect(importedToday).toBeNull();
   });
 
+  it("uses HubSpot source createdate for organic ongoing inbound, not CRM import time", () => {
+    const withSourceDate = resolveLeadInboundReceivedAt({
+      createdAt: now,
+      attributes: {
+        integration: {
+          inboundSource: "hubspot",
+          idempotencyKey: "hubspot:contact:99",
+          acquisitionChannel: "organic_inbound",
+          sourceCreatedAt: daysAgo(10).toISOString(),
+          receivedAt: daysAgo(10).toISOString(),
+          lastSyncedAt: now.toISOString(),
+        },
+      },
+    });
+    expect(withSourceDate?.basis).toBe("received_at");
+    expect(withSourceDate?.at.toISOString()).toBe(daysAgo(10).toISOString());
+  });
+
   it("uses HubSpot source createdate when present, and stays Unknown without it", () => {
     const withSourceDate = resolveLeadInboundReceivedAt({
       createdAt: now,

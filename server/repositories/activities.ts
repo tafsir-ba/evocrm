@@ -27,6 +27,8 @@ export type ActivityRecord = {
   cancelledAt: Date | null;
   outcome: string | null;
   nextActionDate: Date | null;
+  hubspotExternalActivityId: string | null;
+  attributes: Record<string, unknown>;
   createdBy: string;
   archivedAt: Date | null;
   createdAt: Date;
@@ -52,6 +54,8 @@ function toActivityRecord(document: ActivityDocument): ActivityRecord {
     cancelledAt: document.cancelledAt ?? null,
     outcome: document.outcome ?? null,
     nextActionDate: document.nextActionDate ?? null,
+    hubspotExternalActivityId: document.hubspotExternalActivityId ?? null,
+    attributes: (document.attributes as Record<string, unknown> | undefined) ?? {},
     createdBy: document.createdBy.toString(),
     archivedAt: document.archivedAt ?? null,
     createdAt: document.createdAt,
@@ -290,6 +294,9 @@ export async function createActivity(input: {
   outcome?: string | null;
   nextActionDate?: Date | null;
   createdBy: string;
+  createdAt?: Date;
+  hubspotExternalActivityId?: string | null;
+  attributes?: Record<string, unknown>;
 }): Promise<ActivityRecord> {
   await connectDb();
   const document = await ActivityModel.create({
@@ -311,8 +318,29 @@ export async function createActivity(input: {
     nextActionDate: input.nextActionDate ?? null,
     createdBy: input.createdBy,
     archivedAt: null,
+    hubspotExternalActivityId: input.hubspotExternalActivityId ?? null,
+    attributes: input.attributes ?? {},
+    ...(input.createdAt ? { createdAt: input.createdAt, updatedAt: input.createdAt } : {}),
   });
   return toActivityRecord(document.toObject() as ActivityDocument);
+}
+
+export async function findActivityByHubSpotExternalId(
+  workspaceId: string,
+  hubspotExternalActivityId: string,
+): Promise<ActivityRecord | null> {
+  await connectDb();
+  const trimmed = hubspotExternalActivityId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const document = await ActivityModel.findOne(
+    withWorkspaceScope(workspaceId, {
+      hubspotExternalActivityId: trimmed,
+      archivedAt: null,
+    }),
+  ).lean<ActivityDocument>();
+  return document ? toActivityRecord(document) : null;
 }
 
 export async function updateActivity(
