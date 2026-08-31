@@ -645,7 +645,9 @@ Per-integration watermark for the ongoing HubSpot connector (not historical GV/W
 | `workspaceId` / `integrationId` / `portalId` | |
 | `status` | `pending_cutover`, `dry_run_verified`, `active`, `paused` |
 | `cutoverAt` | HubSpot `createdate` after this may count as new acquisition |
-| `lastReconciledModifiedAt` | Missed-event search pointer |
+| `lastReconciledModifiedAt` | Fixed search filter for the in-progress page sequence; advanced only after that sequence is exhausted with no failures |
+| `lastReconciledAfter` | HubSpot `paging.next.after` for the **same** filter; never applied to a newer watermark |
+| `lastReconciledContactId` | Tie-break id so equal `lastmodifieddate` values are not skipped after exhaustion |
 | `dryRunVerifiedAt` | Required before `active` |
 | `dryRunSummary` | Counts only (no PII) |
 

@@ -98,6 +98,24 @@ export async function findLatestHubSpotSyncEventForContact(
   return document ? toRecord(document) : null;
 }
 
+export async function listRetryableHubSpotSyncEvents(
+  workspaceId: string,
+  integrationId: string,
+  limit = 50,
+): Promise<HubSpotSyncEventRecord[]> {
+  await connectDb();
+  const documents = await HubSpotSyncEventModel.find(
+    withWorkspaceScope(workspaceId, {
+      integrationId: new mongoose.Types.ObjectId(integrationId),
+      status: { $in: ["failed", "received"] },
+    }),
+  )
+    .sort({ updatedAt: 1, _id: 1 })
+    .limit(Math.min(Math.max(limit, 1), 100))
+    .lean<HubSpotSyncEventDocument[]>();
+  return documents.map((document) => toRecord(document));
+}
+
 export async function claimHubSpotSyncEvent(input: {
   workspaceId: string;
   integrationId: string;

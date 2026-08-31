@@ -4,6 +4,7 @@ import {
   campaignAttributesForHubSpotSync,
   classifyHubSpotLeadSource,
   envFlagEnabled,
+  evaluateHubSpotCutoverDryRun,
   evaluateHubSpotCutoverWatermark,
   evaluateHubSpotSyncMutationGate,
   hashNormalizedEmailForKey,
@@ -13,7 +14,11 @@ import {
   mergeLeadAttributesForHubSpotSync,
   parseHubSpotOngoingSyncReleaseGate,
   planHubSpotIdentityWrites,
+  planHubSpotReconcileCursorAdvance,
+  resolveHubSpotEmailMatch,
   resolveHubSpotInboundDates,
+  resolveHubSpotReconcileSearchWindow,
+  shouldSkipHubSpotReconcileContact,
   HUBSPOT_SOURCED_CHANNEL,
   ORGANIC_INBOUND_CHANNEL,
 } from "@/lib/hubspot-ongoing-sync";
@@ -243,5 +248,128 @@ describe("non-destructive identity updates", () => {
       externalId: "99",
       lastSyncedAt: "2026-08-31T00:00:00.000Z",
     });
+  });
+});
+
+describe("project-scoped email matching", () => {
+  it("ignores the same email in other projects and parks when the destination has more than one candidate", () => {
+    const otherProject = resolveHubSpotEmailMatch({
+      destinationProjectId: "project-b",
+      candidates: [
+        { id: "lead-a", projectId: "project-a", namesMatch: true },
+      ],
+    });
+    expect(otherProject).toEqual({ kind: "none" });
+
+    const uniqueInDestination = resolveHubSpotEmailMatch({
+      destinationProjectId: "project-b",
+      candidates: [
+        { id: "lead-a", projectId: "project-a", namesMatch: true },
+        { id: "lead-b", projectId: "project-b", namesMatch: true },
+      ],
+    });
+    expect(uniqueInDestination).toEqual({ kind: "match", leadId: "lead-b" });
+
+    const ambiguous = resolveHubSpotEmailMatch({
+      destinationProjectId: "project-b",
+      candidates: [
+        { id: "lead-b1", projectId: "project-b", namesMatch: true },
+        { id: "lead-b2", projectId: "project-b", namesMatch: true },
+      ],
+    });
+    expect(ambiguous).toEqual({ kind: "park", reason: "email_ambiguous_in_project" });
+  });
+});
+
+describe("reconcile paging watermark", () => {
+  it("keeps the filter watermark fixed while nextAfter is present and advances only when exhausted", () => {
+    const window = resolveHubSpotReconcileSearchWindow({
+      lastReconciledModifiedAt: "2026-08-01T00:00:00.000Z",
+      lastReconciledAfter: "page-2",
+      lastReconciledContactId: "10",
+      cutoverAt: "2026-07-01T00:00:00.000Z",
+    });
+    expect(window).toMatchObject({
+      modifiedAfterIso: "2026-08-01T00:00:00.000Z",
+      after: "page-2",
+      operator: "GTE",
+      skipContactIdAtWatermark: null,
+    });
+
+    const inProgress = planHubSpotReconcileCursorAdvance({
+      pageHadFailures: false,
+      nextAfter: "page-2",
+      contacts: [
+        { id: "11", lastModifiedAt: "2026-08-02T00:00:00.000Z" },
+        { id: "12", lastModifiedAt: "2026-08-03T00:00:00.000Z" },
+      ],
+      filterModifiedAtIso: "2026-08-01T00:00:00.000Z",
+      currentTieBreakContactId: "10",
+    });
+    expect(inProgress).toMatchObject({
+      shouldWrite: true,
+      lastReconciledModifiedAt: new Date("2026-08-01T00:00:00.000Z"),
+      lastReconciledAfter: "page-2",
+      lastReconciledContactId: "10",
+      reason: "page_in_progress",
+    });
+
+    const exhausted = planHubSpotReconcileCursorAdvance({
+      pageHadFailures: false,
+      nextAfter: null,
+      contacts: [{ id: "12", lastModifiedAt: "2026-08-03T00:00:00.000Z" }],
+      filterModifiedAtIso: "2026-08-01T00:00:00.000Z",
+      currentTieBreakContactId: "10",
+    });
+    expect(exhausted).toMatchObject({
+      shouldWrite: true,
+      lastReconciledModifiedAt: new Date("2026-08-03T00:00:00.000Z"),
+      lastReconciledAfter: null,
+      lastReconciledContactId: "12",
+      reason: "sequence_exhausted",
+    });
+  });
+
+  it("does not skip equal timestamps and holds the cursor when a page fails", () => {
+    expect(
+      shouldSkipHubSpotReconcileContact({
+        contactId: "12",
+        lastModifiedAt: "2026-08-03T00:00:00.000Z",
+        filterModifiedAtIso: "2026-08-03T00:00:00.000Z",
+        skipContactIdAtWatermark: "11",
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipHubSpotReconcileContact({
+        contactId: "10",
+        lastModifiedAt: "2026-08-03T00:00:00.000Z",
+        filterModifiedAtIso: "2026-08-03T00:00:00.000Z",
+        skipContactIdAtWatermark: "11",
+      }),
+    ).toBe(true);
+
+    const held = planHubSpotReconcileCursorAdvance({
+      pageHadFailures: true,
+      nextAfter: "page-2",
+      contacts: [{ id: "12", lastModifiedAt: "2026-08-03T00:00:00.000Z" }],
+      filterModifiedAtIso: "2026-08-01T00:00:00.000Z",
+      currentTieBreakContactId: "10",
+    });
+    expect(held).toMatchObject({
+      shouldWrite: false,
+      reason: "hold_for_failures",
+    });
+  });
+
+  it("rejects a zero-contact or unsearched cutover dry-run", () => {
+    expect(evaluateHubSpotCutoverDryRun({ received: 0, searched: true })).toEqual({
+      ok: false,
+      reason: "zero_contacts",
+    });
+    expect(evaluateHubSpotCutoverDryRun({ received: 4, searched: false })).toEqual({
+      ok: false,
+      reason: "search_not_run",
+    });
+    expect(evaluateHubSpotCutoverDryRun({ received: 4, searched: true })).toEqual({ ok: true });
   });
 });

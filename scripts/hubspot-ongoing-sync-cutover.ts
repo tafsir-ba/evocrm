@@ -2,7 +2,7 @@
  * Cutover helper for the ongoing HubSpot → EvoHome lead sync.
  * Never prints PII. Does not subscribe HubSpot webhooks.
  *
- *   npm run cutover:hubspot-ongoing -- --workspace-id=... --integration-id=... --dry-run
+ *   npm run cutover:hubspot-ongoing -- --workspace-id=... --integration-id=... --dry-run --cutover-at=ISO
  *   npm run cutover:hubspot-ongoing -- --workspace-id=... --integration-id=... --verify-dry-run
  *   npm run cutover:hubspot-ongoing -- --workspace-id=... --integration-id=... --activate
  *
@@ -73,8 +73,11 @@ async function main(): Promise<void> {
   }
 
   const { findIntegrationById } = await import("../server/repositories/integrations");
-  const { prepareHubSpotOngoingCutover, processOngoingHubSpotEvents, getHubSpotOngoingSyncObservability } =
-    await import("../server/services/hubspot-ongoing-sync");
+  const {
+    prepareHubSpotOngoingCutover,
+    runHubSpotOngoingCutoverDryRun,
+    getHubSpotOngoingSyncObservability,
+  } = await import("../server/services/hubspot-ongoing-sync");
 
   const integration = await findIntegrationById(workspaceId, integrationId);
   if (!integration || integration.type !== "hubspot") {
@@ -88,28 +91,46 @@ async function main(): Promise<void> {
     process.env.HUBSPOT_ONGOING_SYNC_RELEASE_GATE = "dry-run";
   }
 
-  const cursor = await prepareHubSpotOngoingCutover({
+  let cursor = await prepareHubSpotOngoingCutover({
     workspaceId,
     integrationId,
     portalId: integration.externalAccountId ?? "",
     cutoverAt,
-    verifyDryRun: hasFlag(argv, "verify-dry-run"),
-    activate: hasFlag(argv, "activate"),
   });
 
   let dryRunSummary: Record<string, unknown> | undefined;
   if (hasFlag(argv, "dry-run")) {
-    const summary = await processOngoingHubSpotEvents({
+    const summary = await runHubSpotOngoingCutoverDryRun({
       integration,
-      events: [],
-      path: "cutover",
+      cursor,
     });
-    dryRunSummary = { ...summary, triggerAutomation: false };
-    await prepareHubSpotOngoingCutover({
+    dryRunSummary = {
+      received: summary.received,
+      wouldCreate: summary.wouldCreate,
+      wouldUpdate: summary.wouldUpdate,
+      parked: summary.parked,
+      failed: summary.failed,
+      skipped: summary.skipped,
+      duplicates: summary.duplicates,
+      pages: summary.pages,
+      searched: true,
+      triggerAutomation: false,
+    };
+    cursor = await prepareHubSpotOngoingCutover({
       workspaceId,
       integrationId,
       portalId: integration.externalAccountId ?? "",
       dryRunSummary,
+    });
+  }
+
+  if (hasFlag(argv, "verify-dry-run") || hasFlag(argv, "activate")) {
+    cursor = await prepareHubSpotOngoingCutover({
+      workspaceId,
+      integrationId,
+      portalId: integration.externalAccountId ?? "",
+      verifyDryRun: hasFlag(argv, "verify-dry-run"),
+      activate: hasFlag(argv, "activate"),
     });
   }
 

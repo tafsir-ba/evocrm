@@ -15,11 +15,13 @@ vi.mock("@/server/security/integration-credentials", () => ({
 vi.mock("@/server/repositories/leads", () => ({
   findLeadByHubSpotContactId: vi.fn(),
   findActiveLeadByEmailNormalized: vi.fn(),
+  listActiveLeadsByNormalizedEmail: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/hubspot-sync-events", () => ({
   claimHubSpotSyncEvent: vi.fn(),
   findLatestHubSpotSyncEventForContact: vi.fn(),
+  listRetryableHubSpotSyncEvents: vi.fn(),
   updateHubSpotSyncEvent: vi.fn(),
   countHubSpotSyncEvents: vi.fn(),
 }));
@@ -56,6 +58,7 @@ vi.mock("@/server/services/hubspot-client", () => ({
   fetchHubSpotContact: vi.fn(),
   fetchHubSpotContactProjectAssociationIds: vi.fn(),
   searchHubSpotContactsModifiedSince: vi.fn(),
+  searchHubSpotContactsCreatedOrModifiedSince: vi.fn(),
 }));
 
 vi.mock("@/server/services/companies", () => ({
@@ -84,13 +87,14 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 import { findIntegrations } from "@/server/repositories/integrations";
-import { findActiveLeadByEmailNormalized, findLeadByHubSpotContactId } from "@/server/repositories/leads";
+import { listActiveLeadsByNormalizedEmail, findLeadByHubSpotContactId } from "@/server/repositories/leads";
 import {
   claimHubSpotSyncEvent,
   findLatestHubSpotSyncEventForContact,
+  listRetryableHubSpotSyncEvents,
   updateHubSpotSyncEvent,
 } from "@/server/repositories/hubspot-sync-events";
-import { ensureHubSpotSyncCursor } from "@/server/repositories/hubspot-sync-cursors";
+import { ensureHubSpotSyncCursor, findHubSpotSyncCursor, updateHubSpotSyncCursor } from "@/server/repositories/hubspot-sync-cursors";
 import { listHubSpotProjectMappings } from "@/server/repositories/hubspot-project-mappings";
 import { findProjectById, findProjects } from "@/server/repositories/projects";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
@@ -98,15 +102,18 @@ import { findMembershipsForLead } from "@/server/repositories/lead-project-membe
 import {
   fetchHubSpotContact,
   fetchHubSpotContactProjectAssociationIds,
+  searchHubSpotContactsCreatedOrModifiedSince,
   searchHubSpotContactsModifiedSince,
 } from "@/server/services/hubspot-client";
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import { createLeadForWorkspace, updateLeadForWorkspace } from "@/server/services/leads";
 import { applyPlannedMembershipsToLead } from "@/server/services/lead-project-memberships";
 import {
+  prepareHubSpotOngoingCutover,
   processOngoingHubSpotContact,
   processOngoingHubSpotEvents,
   reconcileHubSpotOngoingSync,
+  runHubSpotOngoingCutoverDryRun,
 } from "@/server/services/hubspot-ongoing-sync";
 
 const integration = {
@@ -135,6 +142,7 @@ const cursor = {
   cutoverAt: new Date("2026-08-01T00:00:00.000Z"),
   lastReconciledModifiedAt: null,
   lastReconciledAfter: null,
+  lastReconciledContactId: null,
   lastWebhookOccurredAt: null,
   dryRunVerifiedAt: new Date("2026-08-30T00:00:00.000Z"),
   dryRunSummary: {},
@@ -200,8 +208,9 @@ describe("ongoing HubSpot sync service", () => {
     process.env.HUBSPOT_ONGOING_SYNC_RECONCILE = "true";
 
     vi.mocked(findLeadByHubSpotContactId).mockResolvedValue(null);
-    vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue(null);
+    vi.mocked(listActiveLeadsByNormalizedEmail).mockResolvedValue([]);
     vi.mocked(findLatestHubSpotSyncEventForContact).mockResolvedValue(null);
+    vi.mocked(listRetryableHubSpotSyncEvents).mockResolvedValue([]);
     vi.mocked(claimHubSpotSyncEvent).mockResolvedValue(claimedEvent() as never);
     vi.mocked(updateHubSpotSyncEvent).mockResolvedValue(null);
     vi.mocked(fetchHubSpotContact).mockResolvedValue(organicContact);
@@ -251,6 +260,8 @@ describe("ongoing HubSpot sync service", () => {
     } as never);
     vi.mocked(findMembershipsForLead).mockResolvedValue([]);
     vi.mocked(ensureHubSpotSyncCursor).mockResolvedValue(cursor);
+    vi.mocked(findHubSpotSyncCursor).mockResolvedValue(cursor);
+    vi.mocked(updateHubSpotSyncCursor).mockResolvedValue(cursor);
     vi.mocked(findIntegrations).mockResolvedValue([integration] as never);
   });
 
@@ -519,19 +530,240 @@ describe("ongoing HubSpot sync service", () => {
 
   it("reconciliation searches HubSpot after the watermark without creating activities", async () => {
     vi.mocked(searchHubSpotContactsModifiedSince).mockResolvedValue({
-      contacts: [{ id: "99", properties: organicContact.properties }],
+      contacts: [{ ...organicContact, lastModifiedAt: "2026-08-20T10:00:00.000Z" }],
       nextAfter: null,
     });
-    const { findHubSpotSyncCursor, updateHubSpotSyncCursor } = await import(
-      "@/server/repositories/hubspot-sync-cursors"
-    );
-    vi.mocked(findHubSpotSyncCursor).mockResolvedValue(cursor);
-    vi.mocked(updateHubSpotSyncCursor).mockResolvedValue(cursor);
 
     const summary = await reconcileHubSpotOngoingSync({ workspaceId: "ws-1", limit: 10 });
-    expect(searchHubSpotContactsModifiedSince).toHaveBeenCalled();
+    expect(searchHubSpotContactsModifiedSince).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modifiedAfterIso: cursor.cutoverAt.toISOString(),
+        operator: "GTE",
+        after: null,
+      }),
+    );
     expect(createLeadForWorkspace).toHaveBeenCalled();
     expect(summary.created).toBe(1);
     expect(summary.integrations).toBe(1);
+    expect(updateHubSpotSyncCursor).toHaveBeenCalledWith(
+      "ws-1",
+      "int-hs",
+      expect.objectContaining({
+        lastReconciledModifiedAt: new Date("2026-08-20T10:00:00.000Z"),
+        lastReconciledAfter: null,
+        lastReconciledContactId: "99",
+      }),
+    );
+  });
+
+  it("matches email only inside the attributed project and never updates another project's lead", async () => {
+    vi.mocked(listActiveLeadsByNormalizedEmail).mockResolvedValue([
+      {
+        id: "lead-other-project",
+        projectId: "ffffffffffffffffffffffff",
+        firstName: "Ada",
+        lastName: "Lovelace",
+      },
+    ] as never);
+
+    const result = await processOngoingHubSpotContact({
+      integration,
+      contactId: "99",
+      path: "webhook",
+      cursor,
+      mutate: true,
+      planOnly: false,
+    });
+
+    expect(result.outcome).toBe("created");
+    expect(createLeadForWorkspace).toHaveBeenCalled();
+    expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("parks when the same email has more than one lead in the destination project", async () => {
+    vi.mocked(listActiveLeadsByNormalizedEmail).mockResolvedValue([
+      {
+        id: "lead-dest-1",
+        projectId: "cccccccccccccccccccccccc",
+        firstName: "Ada",
+        lastName: "Lovelace",
+      },
+      {
+        id: "lead-dest-2",
+        projectId: "cccccccccccccccccccccccc",
+        firstName: "Ada",
+        lastName: "Lovelace",
+      },
+    ] as never);
+
+    const result = await processOngoingHubSpotContact({
+      integration,
+      contactId: "99",
+      path: "webhook",
+      cursor,
+      mutate: true,
+      planOnly: false,
+    });
+
+    expect(result).toMatchObject({
+      outcome: "parked",
+      parkReason: "email_ambiguous_in_project",
+    });
+    expect(createLeadForWorkspace).not.toHaveBeenCalled();
+    expect(updateLeadForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the reconcile filter watermark while paging and only uses nextAfter on that result set", async () => {
+    const filterAt = new Date("2026-08-01T00:00:00.000Z");
+    vi.mocked(findHubSpotSyncCursor).mockResolvedValue({
+      ...cursor,
+      lastReconciledModifiedAt: filterAt,
+      lastReconciledAfter: null,
+    });
+    vi.mocked(searchHubSpotContactsModifiedSince).mockResolvedValue({
+      contacts: [{ ...organicContact, id: "99", lastModifiedAt: "2026-08-02T00:00:00.000Z" }],
+      nextAfter: "page-2",
+    });
+
+    await reconcileHubSpotOngoingSync({ workspaceId: "ws-1", limit: 1 });
+
+    expect(searchHubSpotContactsModifiedSince).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modifiedAfterIso: filterAt.toISOString(),
+        after: null,
+        operator: "GTE",
+      }),
+    );
+    expect(updateHubSpotSyncCursor).toHaveBeenCalledWith(
+      "ws-1",
+      "int-hs",
+      expect.objectContaining({
+        lastReconciledModifiedAt: filterAt,
+        lastReconciledAfter: "page-2",
+      }),
+    );
+
+    vi.mocked(findHubSpotSyncCursor).mockResolvedValue({
+      ...cursor,
+      lastReconciledModifiedAt: filterAt,
+      lastReconciledAfter: "page-2",
+    });
+    vi.mocked(searchHubSpotContactsModifiedSince).mockResolvedValue({
+      contacts: [
+        {
+          ...organicContact,
+          id: "100",
+          lastModifiedAt: "2026-08-02T00:00:00.000Z",
+        },
+      ],
+      nextAfter: null,
+    });
+    vi.mocked(claimHubSpotSyncEvent).mockResolvedValue(claimedEvent({ contactId: "100", id: "evt-2" }) as never);
+
+    await reconcileHubSpotOngoingSync({ workspaceId: "ws-1", limit: 1 });
+
+    expect(searchHubSpotContactsModifiedSince).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        modifiedAfterIso: filterAt.toISOString(),
+        after: "page-2",
+        operator: "GTE",
+      }),
+    );
+    expect(updateHubSpotSyncCursor).toHaveBeenLastCalledWith(
+      "ws-1",
+      "int-hs",
+      expect.objectContaining({
+        lastReconciledModifiedAt: new Date("2026-08-02T00:00:00.000Z"),
+        lastReconciledAfter: null,
+        lastReconciledContactId: "100",
+      }),
+    );
+  });
+
+  it("does not advance the reconcile cursor when a page fails and retries the failed contact", async () => {
+    vi.mocked(searchHubSpotContactsModifiedSince).mockResolvedValue({
+      contacts: [{ ...organicContact, lastModifiedAt: "2026-08-20T10:00:00.000Z" }],
+      nextAfter: null,
+    });
+    vi.mocked(createLeadForWorkspace).mockRejectedValueOnce(new Error("db timeout"));
+
+    const failed = await reconcileHubSpotOngoingSync({ workspaceId: "ws-1", limit: 10 });
+    expect(failed.failed).toBe(1);
+    expect(updateHubSpotSyncCursor).not.toHaveBeenCalled();
+
+    vi.mocked(listRetryableHubSpotSyncEvents).mockResolvedValue([
+      { contactId: "99", status: "failed", attemptCount: 1 },
+    ] as never);
+    vi.mocked(claimHubSpotSyncEvent).mockResolvedValue({
+      ...claimedEvent({ status: "failed", attemptCount: 1 }),
+      created: false,
+    } as never);
+
+    const retried = await reconcileHubSpotOngoingSync({ workspaceId: "ws-1", limit: 10 });
+    expect(retried.created).toBe(1);
+    expect(retried.failed).toBe(0);
+    expect(createLeadForWorkspace).toHaveBeenCalled();
+  });
+
+  it("cutover dry-run searches post-watermark contacts and writes would_* ledger outcomes", async () => {
+    process.env.HUBSPOT_ONGOING_SYNC_RELEASE_GATE = "dry-run";
+    vi.mocked(searchHubSpotContactsCreatedOrModifiedSince).mockResolvedValue({
+      contacts: [organicContact],
+      nextAfter: null,
+    });
+    vi.mocked(claimHubSpotSyncEvent).mockResolvedValue(claimedEvent({ id: "evt-dry" }) as never);
+
+    const summary = await runHubSpotOngoingCutoverDryRun({
+      integration,
+      cursor: { ...cursor, status: "pending_cutover", dryRunVerifiedAt: null },
+    });
+
+    expect(searchHubSpotContactsCreatedOrModifiedSince).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sinceIso: cursor.cutoverAt.toISOString(),
+      }),
+    );
+    expect(summary).toMatchObject({
+      searched: true,
+      received: 1,
+      wouldCreate: 1,
+      created: 0,
+    });
+    expect(createLeadForWorkspace).not.toHaveBeenCalled();
+    expect(updateHubSpotSyncEvent).toHaveBeenCalledWith(
+      "ws-1",
+      "evt-dry",
+      expect.objectContaining({ outcome: "would_create" }),
+    );
+  });
+
+  it("rejects a zero-contact cutover dry-run and will not verify it", async () => {
+    process.env.HUBSPOT_ONGOING_SYNC_RELEASE_GATE = "dry-run";
+    vi.mocked(searchHubSpotContactsCreatedOrModifiedSince).mockResolvedValue({
+      contacts: [],
+      nextAfter: null,
+    });
+
+    await expect(
+      runHubSpotOngoingCutoverDryRun({
+        integration,
+        cursor: { ...cursor, status: "pending_cutover", dryRunVerifiedAt: null },
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining("zero post-watermark") });
+
+    vi.mocked(ensureHubSpotSyncCursor).mockResolvedValue({
+      ...cursor,
+      dryRunSummary: { received: 0, searched: true },
+      dryRunVerifiedAt: null,
+    });
+
+    await expect(
+      prepareHubSpotOngoingCutover({
+        workspaceId: "ws-1",
+        integrationId: "int-hs",
+        portalId: "12345",
+        verifyDryRun: true,
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining("zero HubSpot contacts") });
   });
 });

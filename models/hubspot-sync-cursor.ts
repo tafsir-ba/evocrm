@@ -19,6 +19,7 @@ const hubspotSyncCursorSchema = new Schema(
     cutoverAt: { type: Date, default: null },
     lastReconciledModifiedAt: { type: Date, default: null },
     lastReconciledAfter: { type: String, trim: true, default: null },
+    lastReconciledContactId: { type: String, trim: true, default: null },
     lastWebhookOccurredAt: { type: Date, default: null },
     dryRunVerifiedAt: { type: Date, default: null },
     dryRunSummary: { type: Schema.Types.Mixed, default: {} },

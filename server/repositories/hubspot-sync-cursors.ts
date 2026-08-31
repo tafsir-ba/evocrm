@@ -22,6 +22,7 @@ export type HubSpotSyncCursorRecord = {
   cutoverAt: Date | null;
   lastReconciledModifiedAt: Date | null;
   lastReconciledAfter: string | null;
+  lastReconciledContactId: string | null;
   lastWebhookOccurredAt: Date | null;
   dryRunVerifiedAt: Date | null;
   dryRunSummary: Record<string, unknown>;
@@ -41,6 +42,7 @@ function toRecord(document: HubSpotSyncCursorDocument): HubSpotSyncCursorRecord 
     cutoverAt: document.cutoverAt ?? null,
     lastReconciledModifiedAt: document.lastReconciledModifiedAt ?? null,
     lastReconciledAfter: document.lastReconciledAfter ?? null,
+    lastReconciledContactId: document.lastReconciledContactId ?? null,
     lastWebhookOccurredAt: document.lastWebhookOccurredAt ?? null,
     dryRunVerifiedAt: document.dryRunVerifiedAt ?? null,
     dryRunSummary: (document.dryRunSummary as Record<string, unknown>) ?? {},
@@ -95,6 +97,7 @@ export async function updateHubSpotSyncCursor(
     cutoverAt: Date | null;
     lastReconciledModifiedAt: Date | null;
     lastReconciledAfter: string | null;
+    lastReconciledContactId: string | null;
     lastWebhookOccurredAt: Date | null;
     dryRunVerifiedAt: Date | null;
     dryRunSummary: Record<string, unknown>;

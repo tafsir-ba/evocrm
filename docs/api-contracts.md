@@ -719,7 +719,7 @@ POST /api/cron/hubspot/reconcile
 
 **Protection:** `Authorization: Bearer <CRON_SECRET>`.
 
-Missed-event fallback for the HubSpot → EvoHome ongoing lead sync. Default **off** (`HUBSPOT_ONGOING_SYNC_RECONCILE` must be `true` for the internal worker). Never enrolls campaigns. Counts-only response (no PII). See `docs/hubspot-ongoing-sync.md`.
+Missed-event fallback for the HubSpot → EvoHome ongoing lead sync. Default **off** (`HUBSPOT_ONGOING_SYNC_RECONCILE` must be `true` for the internal worker). Paging keeps a fixed `lastmodifieddate` filter until the HubSpot `nextAfter` sequence is exhausted; failures do not advance the cursor. Never enrolls campaigns. Counts-only response (no PII). See `docs/hubspot-ongoing-sync.md`.
 
 ---
 

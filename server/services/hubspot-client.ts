@@ -208,6 +208,18 @@ export async function fetchHubSpotContact(input: {
     createdAt?: string;
     updatedAt?: string;
   };
+  return mapHubSpotContactFromPayload(payload, input.contactId);
+}
+
+export function mapHubSpotContactFromPayload(
+  payload: {
+    id?: string;
+    properties?: Record<string, string | null | undefined>;
+    createdAt?: string;
+    updatedAt?: string;
+  },
+  fallbackId?: string,
+): HubSpotContact {
   const properties = payload.properties ?? {};
   const firstName = readProperty(properties, "firstname") ?? "HubSpot";
   const lastName = readProperty(properties, "lastname") ?? "Contact";
@@ -219,10 +231,11 @@ export async function fetchHubSpotContact(input: {
     (typeof payload.createdAt === "string" ? payload.createdAt : null);
   const lastModifiedAt =
     readProperty(properties, "hs_lastmodifieddate") ??
+    readProperty(properties, "lastmodifieddate") ??
     (typeof payload.updatedAt === "string" ? payload.updatedAt : null);
 
   return {
-    id: payload.id ?? input.contactId,
+    id: payload.id ?? fallbackId ?? "",
     firstName,
     lastName,
     email,
@@ -238,33 +251,26 @@ export async function fetchHubSpotContact(input: {
   };
 }
 
-export async function searchHubSpotContactsModifiedSince(input: {
+export function mapHubSpotSearchHitToContact(raw: HubSpotContactRaw): HubSpotContact {
+  return mapHubSpotContactFromPayload({ id: raw.id, properties: raw.properties }, raw.id);
+}
+
+async function searchHubSpotContacts(input: {
   accessToken: string;
-  modifiedAfterIso: string;
+  filterGroups: Array<{ filters: Array<Record<string, string>> }>;
+  sortProperty: string;
   after?: string | null;
   limit?: number;
-}): Promise<{ contacts: HubSpotContactRaw[]; nextAfter: string | null }> {
-  const modifiedMs = Date.parse(input.modifiedAfterIso);
-  if (!Number.isFinite(modifiedMs)) {
-    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot reconcile watermark.");
-  }
-
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
   const { ok, status, body } = await hubspotPostJson({
     accessToken: input.accessToken,
     path: "/crm/v3/objects/contacts/search",
     body: {
-      filterGroups: [
-        {
-          filters: [
-            {
-              propertyName: "lastmodifieddate",
-              operator: "GT",
-              value: String(modifiedMs),
-            },
-          ],
-        },
+      filterGroups: input.filterGroups,
+      sorts: [
+        { propertyName: input.sortProperty, direction: "ASCENDING" },
+        { propertyName: "hs_object_id", direction: "ASCENDING" },
       ],
-      sorts: [{ propertyName: "lastmodifieddate", direction: "ASCENDING" }],
       properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES],
       limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
       ...(input.after ? { after: input.after } : {}),
@@ -283,22 +289,86 @@ export async function searchHubSpotContactsModifiedSince(input: {
     results?: Array<{
       id?: string;
       properties?: Record<string, string | null | undefined>;
+      createdAt?: string;
+      updatedAt?: string;
     }>;
     paging?: { next?: { after?: string } };
   };
 
   return {
-    contacts: (payload.results ?? []).map((result) => ({
-      id: String(result.id ?? ""),
-      properties: Object.fromEntries(
-        Object.entries(result.properties ?? {}).map(([key, value]) => [
-          key,
-          typeof value === "string" ? value : null,
-        ]),
-      ),
-    })),
+    contacts: (payload.results ?? []).map((result) => mapHubSpotContactFromPayload(result, result.id)),
     nextAfter: payload.paging?.next?.after ?? null,
   };
+}
+
+export async function searchHubSpotContactsModifiedSince(input: {
+  accessToken: string;
+  modifiedAfterIso: string;
+  after?: string | null;
+  limit?: number;
+  operator?: "GT" | "GTE";
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
+  const modifiedMs = Date.parse(input.modifiedAfterIso);
+  if (!Number.isFinite(modifiedMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot reconcile watermark.");
+  }
+
+  return searchHubSpotContacts({
+    accessToken: input.accessToken,
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "lastmodifieddate",
+            operator: input.operator ?? "GTE",
+            value: String(modifiedMs),
+          },
+        ],
+      },
+    ],
+    sortProperty: "lastmodifieddate",
+    after: input.after,
+    limit: input.limit,
+  });
+}
+
+export async function searchHubSpotContactsCreatedOrModifiedSince(input: {
+  accessToken: string;
+  sinceIso: string;
+  after?: string | null;
+  limit?: number;
+}): Promise<{ contacts: HubSpotContact[]; nextAfter: string | null }> {
+  const sinceMs = Date.parse(input.sinceIso);
+  if (!Number.isFinite(sinceMs)) {
+    throw new AppError("VALIDATION_ERROR", "Invalid HubSpot cutover watermark.");
+  }
+
+  return searchHubSpotContacts({
+    accessToken: input.accessToken,
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "createdate",
+            operator: "GT",
+            value: String(sinceMs),
+          },
+        ],
+      },
+      {
+        filters: [
+          {
+            propertyName: "lastmodifieddate",
+            operator: "GTE",
+            value: String(sinceMs),
+          },
+        ],
+      },
+    ],
+    sortProperty: "lastmodifieddate",
+    after: input.after,
+    limit: input.limit,
+  });
 }
 
 export async function fetchHubSpotContactProjectAssociationIds(input: {

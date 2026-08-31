@@ -587,3 +587,185 @@ export function assertOngoingSyncSideEffectGuard(
 export function isLiveHubSpotInboundSource(value: string | null | undefined): boolean {
   return value === LIVE_HUBSPOT_INBOUND_SOURCE;
 }
+
+export type HubSpotEmailMatchCandidate = {
+  id: string;
+  projectId: string | null;
+  namesMatch: boolean;
+};
+
+export type HubSpotEmailMatchDecision =
+  | { kind: "none" }
+  | { kind: "match"; leadId: string }
+  | { kind: "park"; reason: "email_ambiguous_in_project" | "identity_conflict" };
+
+/**
+ * Email matching happens only after project attribution. Candidates in other
+ * projects are ignored. Multiple leads in the destination project are parked
+ * without updating anyone.
+ */
+export function resolveHubSpotEmailMatch(input: {
+  destinationProjectId: string;
+  candidates: HubSpotEmailMatchCandidate[];
+}): HubSpotEmailMatchDecision {
+  const destinationId = input.destinationProjectId.trim();
+  const inDestination = input.candidates.filter(
+    (candidate) => candidate.projectId != null && candidate.projectId === destinationId,
+  );
+  if (inDestination.length === 0) {
+    return { kind: "none" };
+  }
+  if (inDestination.length > 1) {
+    return { kind: "park", reason: "email_ambiguous_in_project" };
+  }
+  const [match] = inDestination;
+  if (!match.namesMatch) {
+    return { kind: "park", reason: "identity_conflict" };
+  }
+  return { kind: "match", leadId: match.id };
+}
+
+export function toIsoOrNull(value: Date | string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+export function compareHubSpotObjectIds(left: string, right: string): number {
+  const a = String(left).trim();
+  const b = String(right).trim();
+  if (a === b) {
+    return 0;
+  }
+  try {
+    const delta = BigInt(a) - BigInt(b);
+    if (delta < BigInt(0)) return -1;
+    if (delta > BigInt(0)) return 1;
+    return 0;
+  } catch {
+    return a.localeCompare(b);
+  }
+}
+
+export function resolveHubSpotReconcileSearchWindow(input: {
+  lastReconciledModifiedAt?: Date | string | null;
+  lastReconciledAfter?: string | null;
+  lastReconciledContactId?: string | null;
+  cutoverAt?: Date | string | null;
+}): {
+  modifiedAfterIso: string;
+  after: string | null;
+  operator: "GTE";
+  skipContactIdAtWatermark: string | null;
+} {
+  const modifiedAfterIso =
+    toIsoOrNull(input.lastReconciledModifiedAt) ??
+    toIsoOrNull(input.cutoverAt) ??
+    new Date(0).toISOString();
+  const after = input.lastReconciledAfter?.trim() || null;
+  return {
+    modifiedAfterIso,
+    after,
+    operator: "GTE",
+    skipContactIdAtWatermark: after ? null : input.lastReconciledContactId?.trim() || null,
+  };
+}
+
+export function shouldSkipHubSpotReconcileContact(input: {
+  contactId: string;
+  lastModifiedAt: string | null | undefined;
+  filterModifiedAtIso: string;
+  skipContactIdAtWatermark: string | null;
+}): boolean {
+  if (!input.skipContactIdAtWatermark) {
+    return false;
+  }
+  const modifiedIso = toIsoOrNull(input.lastModifiedAt ?? null);
+  if (!modifiedIso || modifiedIso !== input.filterModifiedAtIso) {
+    return false;
+  }
+  return compareHubSpotObjectIds(input.contactId, input.skipContactIdAtWatermark) <= 0;
+}
+
+export type HubSpotReconcileCursorAdvance = {
+  shouldWrite: boolean;
+  lastReconciledModifiedAt: Date | null;
+  lastReconciledAfter: string | null;
+  lastReconciledContactId: string | null;
+  reason: "hold_for_failures" | "page_in_progress" | "sequence_exhausted" | "empty_page";
+};
+
+/**
+ * Keep the search filter watermark fixed while HubSpot `nextAfter` is present.
+ * Advance it only after the page sequence is exhausted and the page had no failures.
+ */
+export function planHubSpotReconcileCursorAdvance(input: {
+  pageHadFailures: boolean;
+  nextAfter: string | null;
+  contacts: Array<{ id: string; lastModifiedAt: string | null | undefined }>;
+  filterModifiedAtIso: string;
+  currentTieBreakContactId?: string | null;
+}): HubSpotReconcileCursorAdvance {
+  const filterDate = new Date(input.filterModifiedAtIso);
+  const currentFilter = Number.isNaN(filterDate.getTime()) ? null : filterDate;
+  const currentTieBreak = input.currentTieBreakContactId?.trim() || null;
+
+  if (input.pageHadFailures) {
+    return {
+      shouldWrite: false,
+      lastReconciledModifiedAt: currentFilter,
+      lastReconciledAfter: null,
+      lastReconciledContactId: currentTieBreak,
+      reason: "hold_for_failures",
+    };
+  }
+
+  const nextAfter = input.nextAfter?.trim() || null;
+  if (nextAfter) {
+    return {
+      shouldWrite: true,
+      lastReconciledModifiedAt: currentFilter,
+      lastReconciledAfter: nextAfter,
+      lastReconciledContactId: currentTieBreak,
+      reason: "page_in_progress",
+    };
+  }
+
+  const last = input.contacts.at(-1);
+  const lastModified = toIsoOrNull(last?.lastModifiedAt ?? null);
+  if (!last || !lastModified) {
+    return {
+      shouldWrite: true,
+      lastReconciledModifiedAt: currentFilter,
+      lastReconciledAfter: null,
+      lastReconciledContactId: currentTieBreak,
+      reason: "empty_page",
+    };
+  }
+
+  return {
+    shouldWrite: true,
+    lastReconciledModifiedAt: new Date(lastModified),
+    lastReconciledAfter: null,
+    lastReconciledContactId: last.id,
+    reason: "sequence_exhausted",
+  };
+}
+
+export function evaluateHubSpotCutoverDryRun(input: {
+  received: number;
+  searched: boolean;
+}): { ok: true } | { ok: false; reason: "zero_contacts" | "search_not_run" } {
+  if (!input.searched) {
+    return { ok: false, reason: "search_not_run" };
+  }
+  if (input.received < 1) {
+    return { ok: false, reason: "zero_contacts" };
+  }
+  return { ok: true };
+}

@@ -77,6 +77,8 @@ Idempotency is keyed by **HubSpot contact ID** + **event/version timestamp** + *
 3. Ordered **multi-project memberships** with first-listed / earliest `sourceOrder` as primary (native memberships). Manual memberships are not overwritten.
 4. Conflicts, unmapped tokens, missing signal, or a destination that is EvoHome General / Grosvenor fallback → **park for review**. No write to EvoHome General.
 
+**Email matching is after attribution.** The sync matches normalized email only inside the attributed destination project. Leads with the same email in other projects are ignored and never updated or reassigned. If more than one candidate remains in the destination project, the contact is parked (`email_ambiguous_in_project`) with no CRM write.
+
 This sync does **not** apply the held ~2,380 historical multi-project cohort (`EVOHOME_APPLY_HELD_HUBSPOT_MULTI_PROJECT`).
 
 ---
@@ -87,10 +89,32 @@ A `HubSpotSyncCursor` per integration stores:
 
 - `cutoverAt` — HubSpot `createdate` **after** this instant may count as new acquisition
 - `status` — `pending_cutover` → `dry_run_verified` → `active` / `paused`
-- `lastReconciledModifiedAt` — missed-event fallback
+- `lastReconciledModifiedAt` — **fixed** HubSpot `lastmodifieddate` filter for the current page sequence
+- `lastReconciledAfter` — HubSpot paging token; valid only against that same filter
+- `lastReconciledContactId` — durable id tie-break for equal timestamps
 - `dryRunVerifiedAt` — required before activate
 
-Contacts at or before `cutoverAt` that are **already** in CRM (migration idempotency key) may receive non-destructive field updates. Contacts at or before `cutoverAt` that are **not** in CRM are parked (`pre_cutover_not_imported`) — they are not created as new leads.
+Contacts at or before `cutoverAt` that are **already** in CRM (migration idempotency key **or** email match in the destination project) may receive non-destructive field updates. Contacts at or before `cutoverAt` that are **not** in CRM are parked (`pre_cutover_not_imported`) — they are not created as new leads.
+
+---
+
+## Reconciliation paging (missed-event fallback)
+
+Guarantees:
+
+1. Search uses inclusive `lastmodifieddate GTE` the stored filter, sorted `lastmodifieddate` then `hs_object_id`.
+2. While `nextAfter` is present, the **filter watermark does not move**. The next tick/page sends the same `GTE` value plus `after=nextAfter` from that result set.
+3. The watermark and tie-break id advance **only** when `nextAfter` is null (sequence exhausted) **and** the page had zero failures (including ledger retries).
+4. Equal timestamps are not skipped: inclusive `GTE` plus `lastReconciledContactId` (skip ids `<=` the last seen id at that exact timestamp).
+5. Transient HubSpot/DB/mapping write failures mark the ledger `failed` (dead-letter after 5 attempts). Reconcile **retries failed/received ledger rows first** and **does not advance** the cursor, so those contacts remain retryable.
+
+---
+
+## Cutover dry-run
+
+`--dry-run` **must** search HubSpot for post-watermark contacts (`createdate GT cutoverAt` OR `lastmodifieddate GTE cutoverAt`), then write per-contact ledger outcomes (`would_create` / `would_update` / `parked`). Passing an empty event list is invalid.
+
+A dry-run that retrieves **zero** contacts is invalid: it cannot be saved as verified, and `--verify-dry-run` / `--activate` refuse. Set `--cutover-at=` so at least one staging/fixture contact is in the post-watermark window, then re-run.
 
 ---
 
@@ -135,9 +159,9 @@ Subscribe in HubSpot only after dry-run: `contact.creation` and `contact.propert
 
 1. Deploy this code with all gates **off**. Confirm `npm run typecheck` / `lint` / `test` / `build`.
 2. Confirm HubSpot project mappings for live slugs (wd_project). Unmapped → park, not General.
-3. `npm run cutover:hubspot-ongoing -- --dry-run` — captures watermark (`cutoverAt=now` unless `--cutover-at=`), reports counts **without PII**, writes `would_*` ledger rows.
-4. Spot-check parked conflicts. Fix mappings. Re-run dry-run until unexpected is zero.
-5. `npm run cutover:hubspot-ongoing -- --verify-dry-run` — stamps `dryRunVerifiedAt`.
+3. `npm run cutover:hubspot-ongoing -- --dry-run --cutover-at=<iso>` — searches HubSpot for post-watermark contacts, writes `would_create` / `would_update` / `parked` ledger rows, reports counts **without PII**. A zero-contact result is invalid and is not verifiable.
+4. Spot-check parked conflicts. Fix mappings. Re-run dry-run until unexpected is zero (still a non-zero HubSpot result set).
+5. `npm run cutover:hubspot-ongoing -- --verify-dry-run` — stamps `dryRunVerifiedAt` only if the last dry-run searched HubSpot and `received >= 1`.
 6. Set env `HUBSPOT_ONGOING_SYNC_RELEASE_GATE=dry-run` in staging. Send a **fixture** webhook (or HubSpot test app). Confirm ledger, no CRM writes.
 7. Create one staging contact **after** watermark with a mapped `wd_project` and organic source; set `HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE=true` **and** `RELEASE_GATE=enabled` **only on staging**. Confirm create, source, dates, no campaign enrollment.
 8. Production: set cursor active via `npm run cutover:hubspot-ongoing -- --activate` (refuses unless verified). Then set `HUBSPOT_ONGOING_SYNC_RELEASE_GATE=enabled` and `HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE=true`. Subscribe HubSpot webhooks.
@@ -153,7 +177,7 @@ Rollback: set `HUBSPOT_ONGOING_SYNC_RELEASE_GATE=off` and/or pause the HubSpot i
 - `HubSpotSyncEvent` — durable per-event ledger (`received` → `processed` / `skipped` / `failed` / `dead_letter`)
 - `HubSpotSyncCursor` — watermark + reconcile pointer + dry-run verification
 - `IntegrationLog` + audit actions (`integration.hubspot_sync_*`) — counts and contact **ids** only
-- Dead-letter after 5 failed attempts; retry on next webhook/reconcile until then
+- Dead-letter after 5 failed attempts; reconcile retries `failed`/`received` ledger rows before paging and will not advance the watermark past a failed page
 
 Reports never include name, email, or phone.
 

@@ -10,6 +10,7 @@ import {
   classifyHubSpotLeadSource,
   evaluateHubSpotCutoverWatermark,
   evaluateHubSpotSyncMutationGate,
+  evaluateHubSpotCutoverDryRun,
   hashNormalizedEmailForKey,
   hubspotOngoingContactIdempotencyKey,
   hubspotSyncEventKey,
@@ -17,7 +18,11 @@ import {
   mergeLeadAttributesForHubSpotSync,
   nextHubSpotSyncEventStatus,
   planHubSpotIdentityWrites,
+  planHubSpotReconcileCursorAdvance,
+  resolveHubSpotEmailMatch,
   resolveHubSpotInboundDates,
+  resolveHubSpotReconcileSearchWindow,
+  shouldSkipHubSpotReconcileContact,
   HUBSPOT_ONGOING_SYNC_INTELLIGENCE_SOURCE,
   HUBSPOT_ONGOING_SYNC_SIDE_EFFECT_GUARD,
   type HubSpotOwnedFields,
@@ -32,7 +37,7 @@ import { normalizePilotNamePart } from "@/lib/hubspot-gv-pilot";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import {
   findLeadByHubSpotContactId,
-  findActiveLeadByEmailNormalized,
+  listActiveLeadsByNormalizedEmail,
   type LeadRecord,
 } from "@/server/repositories/leads";
 import { findMembershipsForLead } from "@/server/repositories/lead-project-memberships";
@@ -41,6 +46,7 @@ import {
   claimHubSpotSyncEvent,
   countHubSpotSyncEvents,
   findLatestHubSpotSyncEventForContact,
+  listRetryableHubSpotSyncEvents,
   updateHubSpotSyncEvent,
 } from "@/server/repositories/hubspot-sync-events";
 import {
@@ -56,6 +62,7 @@ import {
   assertHubSpotAccessToken,
   fetchHubSpotContact,
   fetchHubSpotContactProjectAssociationIds,
+  searchHubSpotContactsCreatedOrModifiedSince,
   searchHubSpotContactsModifiedSince,
   type HubSpotContact,
 } from "@/server/services/hubspot-client";
@@ -318,66 +325,15 @@ export async function processOngoingHubSpotContact(input: {
   if (!claimed.created && claimed.record.status === "processed") {
     return { outcome: "duplicate", leadId: claimed.record.leadId };
   }
+  if (!claimed.created && claimed.record.status === "dead_letter") {
+    return { outcome: "skipped", leadId: claimed.record.leadId, parkReason: "dead_letter" };
+  }
 
   const attempts = claimed.record.attemptCount + 1;
   await updateHubSpotSyncEvent(workspaceId, claimed.record.id, { attemptCount: attempts });
 
   try {
     await ensureDefaultDictionaries(workspaceId);
-
-    let existing = existingByContact;
-    if (!existing && emailFields?.emailNormalized) {
-      const byEmail = await findActiveLeadByEmailNormalized(
-        workspaceId,
-        emailFields.emailNormalized,
-      );
-      if (byEmail) {
-        if (!namesMatch(byEmail, contact)) {
-          await updateHubSpotSyncEvent(workspaceId, claimed.record.id, {
-            status: "processed",
-            outcome: "parked",
-            parkReason: "identity_conflict",
-          });
-          await logSync({
-            integration: input.integration,
-            eventType: "hubspot.sync.parked",
-            status: "success",
-            summary: { contactId, reason: "identity_conflict" },
-          });
-          return { outcome: "parked", leadId: null, parkReason: "identity_conflict" };
-        }
-        existing = byEmail;
-      }
-    }
-
-    const watermark = evaluateHubSpotCutoverWatermark({
-      sourceCreatedAt: contact.createdAt,
-      cutoverAt: input.cursor.cutoverAt,
-      existingLead: Boolean(existing),
-    });
-    if (watermark.kind === "park") {
-      await updateHubSpotSyncEvent(workspaceId, claimed.record.id, {
-        status: "processed",
-        outcome: "parked",
-        parkReason: watermark.reason,
-        leadId: existing?.id ?? null,
-      });
-      await logSync({
-        integration: input.integration,
-        eventType: "hubspot.sync.parked",
-        status: "success",
-        summary: { contactId, reason: watermark.reason },
-      });
-      return { outcome: "parked", leadId: existing?.id ?? null, parkReason: watermark.reason };
-    }
-
-    const classification = classifyHubSpotLeadSource({
-      analyticsSource: contact.properties.hs_analytics_source,
-      latestSource: contact.properties.hs_latest_source,
-      objectSource: contact.properties.hs_object_source,
-    });
-    const newAcquisition = watermark.kind === "new_acquisition" && !existing;
-    const organic = newAcquisition && classification.organic;
 
     const mappings = await loadAttributionMappings(workspaceId, input.integration.id);
     let associationIds: string[] = [];
@@ -411,8 +367,70 @@ export async function processOngoingHubSpotContact(input: {
           conflicts: attribution.conflicts.join(","),
         },
       });
-      return { outcome: "parked", leadId: existing?.id ?? null, parkReason: attribution.reason };
+      return { outcome: "parked", leadId: existingByContact?.id ?? null, parkReason: attribution.reason };
     }
+
+    let existing = existingByContact;
+    if (!existing && emailFields?.emailNormalized) {
+      const candidates = await listActiveLeadsByNormalizedEmail(
+        workspaceId,
+        emailFields.emailNormalized,
+      );
+      const emailMatch = resolveHubSpotEmailMatch({
+        destinationProjectId: attribution.primaryProjectId,
+        candidates: candidates.map((lead) => ({
+          id: lead.id,
+          projectId: lead.projectId,
+          namesMatch: namesMatch(lead, contact),
+        })),
+      });
+      if (emailMatch.kind === "park") {
+        await updateHubSpotSyncEvent(workspaceId, claimed.record.id, {
+          status: "processed",
+          outcome: "parked",
+          parkReason: emailMatch.reason,
+        });
+        await logSync({
+          integration: input.integration,
+          eventType: "hubspot.sync.parked",
+          status: "success",
+          summary: { contactId, reason: emailMatch.reason },
+        });
+        return { outcome: "parked", leadId: null, parkReason: emailMatch.reason };
+      }
+      if (emailMatch.kind === "match") {
+        existing = candidates.find((lead) => lead.id === emailMatch.leadId) ?? null;
+      }
+    }
+
+    const watermark = evaluateHubSpotCutoverWatermark({
+      sourceCreatedAt: contact.createdAt,
+      cutoverAt: input.cursor.cutoverAt,
+      existingLead: Boolean(existing),
+    });
+    if (watermark.kind === "park") {
+      await updateHubSpotSyncEvent(workspaceId, claimed.record.id, {
+        status: "processed",
+        outcome: "parked",
+        parkReason: watermark.reason,
+        leadId: existing?.id ?? null,
+      });
+      await logSync({
+        integration: input.integration,
+        eventType: "hubspot.sync.parked",
+        status: "success",
+        summary: { contactId, reason: watermark.reason },
+      });
+      return { outcome: "parked", leadId: existing?.id ?? null, parkReason: watermark.reason };
+    }
+
+    const classification = classifyHubSpotLeadSource({
+      analyticsSource: contact.properties.hs_analytics_source,
+      latestSource: contact.properties.hs_latest_source,
+      objectSource: contact.properties.hs_object_source,
+    });
+    const newAcquisition = watermark.kind === "new_acquisition" && !existing;
+    const organic = newAcquisition && classification.organic;
 
     const primaryProject = await findProjectById(workspaceId, attribution.primaryProjectId);
     if (!primaryProject || primaryProject.archivedAt) {
@@ -712,7 +730,7 @@ function buildUtm(properties: Record<string, string | null>): { utm?: Record<str
 
 export async function processOngoingHubSpotEvents(input: {
   integration: IntegrationRecord;
-  events: Array<{ contactId: string; event?: HubSpotWebhookEvent }>;
+  events: Array<{ contactId: string; event?: HubSpotWebhookEvent; contact?: HubSpotContact }>;
   path: "webhook" | "reconcile" | "cutover";
 }): Promise<HubSpotOngoingSyncSummary> {
   const cursor = await ensureHubSpotSyncCursor({
@@ -745,6 +763,7 @@ export async function processOngoingHubSpotEvents(input: {
         cursor,
         mutate: gate.mutate,
         planOnly: !gate.mutate,
+        contactOverride: item.contact,
       });
       tally(summary, result.outcome, gate.mutate);
     } catch {
@@ -761,6 +780,18 @@ export async function processOngoingHubSpotEvents(input: {
   }
 
   return summary;
+}
+
+function addSummaries(target: HubSpotOngoingSyncSummary, source: HubSpotOngoingSyncSummary): void {
+  target.received += source.received;
+  target.created += source.created;
+  target.updated += source.updated;
+  target.duplicates += source.duplicates;
+  target.skipped += source.skipped;
+  target.parked += source.parked;
+  target.failed += source.failed;
+  target.wouldCreate += source.wouldCreate;
+  target.wouldUpdate += source.wouldUpdate;
 }
 
 export async function reconcileHubSpotOngoingSync(input?: {
@@ -781,44 +812,76 @@ export async function reconcileHubSpotOngoingSync(input?: {
     const credentials = decodeHubSpotCredentials(integration.credentialsEncrypted);
     await assertHubSpotAccessToken(credentials.accessToken);
 
-    const modifiedAfter =
-      cursor?.lastReconciledModifiedAt?.toISOString() ??
-      cursor?.cutoverAt?.toISOString() ??
-      new Date(0).toISOString();
+    const retryable = await listRetryableHubSpotSyncEvents(
+      integration.workspaceId,
+      integration.id,
+      input?.limit ?? 50,
+    );
+    const retriedContactIds = new Set(retryable.map((event) => event.contactId));
+    const retrySummary =
+      retryable.length > 0
+        ? await processOngoingHubSpotEvents({
+            integration,
+            events: retryable.map((event) => ({ contactId: event.contactId })),
+            path: "reconcile",
+          })
+        : emptySummary();
+    addSummaries(totals, retrySummary);
+
+    const window = resolveHubSpotReconcileSearchWindow({
+      lastReconciledModifiedAt: cursor?.lastReconciledModifiedAt,
+      lastReconciledAfter: cursor?.lastReconciledAfter,
+      lastReconciledContactId: cursor?.lastReconciledContactId,
+      cutoverAt: cursor?.cutoverAt,
+    });
 
     const page = await searchHubSpotContactsModifiedSince({
       accessToken: credentials.accessToken,
-      modifiedAfterIso: modifiedAfter,
-      after: cursor?.lastReconciledAfter,
+      modifiedAfterIso: window.modifiedAfterIso,
+      after: window.after,
       limit: input?.limit ?? 50,
+      operator: window.operator,
     });
 
-    const events = page.contacts
-      .filter((contact) => contact.id)
-      .map((contact) => ({ contactId: contact.id }));
+    const pageContacts = page.contacts.filter((contact) => {
+      if (!contact.id || retriedContactIds.has(contact.id)) {
+        return false;
+      }
+      return !shouldSkipHubSpotReconcileContact({
+        contactId: contact.id,
+        lastModifiedAt: contact.lastModifiedAt,
+        filterModifiedAtIso: window.modifiedAfterIso,
+        skipContactIdAtWatermark: window.skipContactIdAtWatermark,
+      });
+    });
+
     const pageSummary = await processOngoingHubSpotEvents({
       integration,
-      events,
+      events: pageContacts.map((contact) => ({ contactId: contact.id, contact })),
       path: "reconcile",
     });
-    totals.received += pageSummary.received;
-    totals.created += pageSummary.created;
-    totals.updated += pageSummary.updated;
-    totals.duplicates += pageSummary.duplicates;
-    totals.skipped += pageSummary.skipped;
-    totals.parked += pageSummary.parked;
-    totals.failed += pageSummary.failed;
-    totals.wouldCreate += pageSummary.wouldCreate;
-    totals.wouldUpdate += pageSummary.wouldUpdate;
+    addSummaries(totals, pageSummary);
 
-    const last = page.contacts.at(-1);
-    const lastModified = last?.properties.hs_lastmodifieddate;
-    await Promise.resolve(
-      updateHubSpotSyncCursor(integration.workspaceId, integration.id, {
-        lastReconciledModifiedAt: lastModified ? new Date(lastModified) : cursor?.lastReconciledModifiedAt,
-        lastReconciledAfter: page.nextAfter,
-      }),
-    ).catch(() => undefined);
+    const advance = planHubSpotReconcileCursorAdvance({
+      pageHadFailures: retrySummary.failed > 0 || pageSummary.failed > 0,
+      nextAfter: page.nextAfter,
+      contacts: page.contacts.map((contact) => ({
+        id: contact.id,
+        lastModifiedAt: contact.lastModifiedAt,
+      })),
+      filterModifiedAtIso: window.modifiedAfterIso,
+      currentTieBreakContactId: cursor?.lastReconciledContactId,
+    });
+
+    if (advance.shouldWrite) {
+      await Promise.resolve(
+        updateHubSpotSyncCursor(integration.workspaceId, integration.id, {
+          lastReconciledModifiedAt: advance.lastReconciledModifiedAt,
+          lastReconciledAfter: advance.lastReconciledAfter,
+          lastReconciledContactId: advance.lastReconciledContactId,
+        }),
+      ).catch(() => undefined);
+    }
   }
 
   return { ...totals, integrations: integrationCount };
@@ -874,7 +937,21 @@ export async function prepareHubSpotOngoingCutover(input: {
   if (input.dryRunSummary) {
     patch.dryRunSummary = input.dryRunSummary;
   }
+
+  const summaryForVerify = input.dryRunSummary ?? cursor.dryRunSummary;
   if (input.verifyDryRun) {
+    const verification = evaluateHubSpotCutoverDryRun({
+      received: Number(summaryForVerify?.received ?? 0),
+      searched: summaryForVerify?.searched === true,
+    });
+    if (!verification.ok) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        verification.reason === "search_not_run"
+          ? "Cutover dry-run must search HubSpot before verification."
+          : "Cutover dry-run returned zero HubSpot contacts; verification is invalid.",
+      );
+    }
     patch.dryRunVerifiedAt = new Date();
     patch.status = "dry_run_verified";
   }
@@ -890,6 +967,56 @@ export async function prepareHubSpotOngoingCutover(input: {
   }
   const updated = await updateHubSpotSyncCursor(input.workspaceId, input.integrationId, patch);
   return updated ?? cursor;
+}
+
+export async function runHubSpotOngoingCutoverDryRun(input: {
+  integration: IntegrationRecord;
+  cursor: HubSpotSyncCursorRecord;
+  limit?: number;
+  maxPages?: number;
+}): Promise<HubSpotOngoingSyncSummary & { searched: true; pages: number }> {
+  const sinceIso =
+    input.cursor.cutoverAt?.toISOString() ?? new Date(0).toISOString();
+  const credentials = decodeHubSpotCredentials(input.integration.credentialsEncrypted);
+  await assertHubSpotAccessToken(credentials.accessToken);
+
+  const totals = emptySummary();
+  let after: string | null = null;
+  let pages = 0;
+  const maxPages = Math.min(Math.max(input.maxPages ?? 20, 1), 50);
+  const pageLimit = input.limit ?? 50;
+
+  do {
+    const page = await searchHubSpotContactsCreatedOrModifiedSince({
+      accessToken: credentials.accessToken,
+      sinceIso,
+      after,
+      limit: pageLimit,
+    });
+    pages += 1;
+    const pageSummary = await processOngoingHubSpotEvents({
+      integration: input.integration,
+      events: page.contacts
+        .filter((contact) => contact.id)
+        .map((contact) => ({ contactId: contact.id, contact })),
+      path: "cutover",
+    });
+    addSummaries(totals, pageSummary);
+    after = page.nextAfter;
+  } while (after && pages < maxPages);
+
+  const verification = evaluateHubSpotCutoverDryRun({
+    received: totals.received,
+    searched: true,
+  });
+  if (!verification.ok) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Cutover dry-run retrieved zero post-watermark HubSpot contacts. Set --cutover-at to include at least one fixture contact and re-run.",
+    );
+  }
+
+  return { ...totals, searched: true, pages };
 }
 
 export { HUBSPOT_ONGOING_SYNC_SIDE_EFFECT_GUARD };
