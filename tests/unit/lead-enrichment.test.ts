@@ -6,12 +6,16 @@ import {
   crmValueRequiresOverwrite,
   HIGH_CONFIDENCE_THRESHOLD,
   isSafeToAutoApplySuggestion,
+  isUniqueEnrichmentReveal,
   citeOnlyRetrievedUrls,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
 import { getLeadEnrichmentDemoFixture, DEMO_AMBIGUOUS_EMAIL, DEMO_UNIQUE_EMAIL } from "@/tests/fixtures/lead-enrichment-demo";
-import { parseOccupationalWageRange } from "@/lib/lead-financial-situation";
+import {
+  parseOccupationalWageRange,
+  shouldRequestMarketEstimateAfterEnrichment,
+} from "@/lib/lead-financial-situation";
 
 describe("lead enrichment contract", () => {
   it("drops high-confidence suggestions without an https source", () => {
@@ -116,5 +120,42 @@ describe("lead enrichment contract", () => {
         { url: "https://stats.example/wages", title: "No numbers", snippet: "See PDF." },
       ]),
     ).toBeNull();
+  });
+
+  it("treats unique accepted/reviewing runs as a one-click profile reveal", () => {
+    expect(isUniqueEnrichmentReveal({ status: "accepted", identityMatch: "unique" })).toBe(true);
+    expect(isUniqueEnrichmentReveal({ status: "reviewing", identityMatch: "unique" })).toBe(true);
+    expect(isUniqueEnrichmentReveal({ status: "ambiguous", identityMatch: "ambiguous" })).toBe(
+      false,
+    );
+    expect(isUniqueEnrichmentReveal({ status: "failed", identityMatch: "none" })).toBe(false);
+  });
+
+  it("requests a labelled occupational estimate only after a unique reveal with job and location", () => {
+    expect(
+      shouldRequestMarketEstimateAfterEnrichment({
+        uniqueReveal: true,
+        jobTitle: "Head of Sales",
+        city: "Zürich",
+        stateRegion: null,
+        country: "Switzerland",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequestMarketEstimateAfterEnrichment({
+        uniqueReveal: true,
+        jobTitle: "Head of Sales",
+        city: null,
+        stateRegion: null,
+        country: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRequestMarketEstimateAfterEnrichment({
+        uniqueReveal: false,
+        jobTitle: "Head of Sales",
+        country: "Switzerland",
+      }),
+    ).toBe(false);
   });
 });

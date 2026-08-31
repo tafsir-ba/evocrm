@@ -11,6 +11,7 @@ export function EnrichedField({
   value,
   origin,
   suggestion,
+  reveal,
   onClear,
   onApplyOverwrite,
   onEdit,
@@ -18,6 +19,7 @@ export function EnrichedField({
   value: string;
   origin?: LeadFieldProvenanceMethod | "unknown" | null;
   suggestion?: LeadEnrichmentSuggestion | null;
+  reveal?: boolean;
   onClear?: () => void;
   onApplyOverwrite?: () => void;
   onEdit?: (next: string) => void;
@@ -29,6 +31,7 @@ export function EnrichedField({
     suggestion.status === "proposed" &&
     Boolean(suggestion.currentValue?.trim()) &&
     suggestion.proposedValue !== suggestion.currentValue;
+  const highlight = Boolean(reveal && (isEnriched || pendingOverwrite));
 
   function commitEdit(next: string) {
     setEditing(false);
@@ -40,7 +43,7 @@ export function EnrichedField({
   }
 
   return (
-    <div className="space-y-1 min-w-0">
+    <div className={highlight ? "enrich-reveal space-y-1 min-w-0" : "space-y-1 min-w-0"}>
       <p
         className={
           isEnriched

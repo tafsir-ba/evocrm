@@ -3,6 +3,7 @@ import "server-only";
 import {
   MARKET_INCOME_DISCLAIMER,
   emptyFinancialSnapshot,
+  hasOccupationalEstimateInputs,
   parseOccupationalWageRange,
   type LeadFinancialSituationSnapshot,
   type MarketIncomeEstimate,
@@ -120,14 +121,14 @@ export async function requestMarketIncomeEstimate(input: {
   if (!lead || lead.archivedAt) {
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
-  const location = [lead.city, lead.stateRegion, lead.country].filter(Boolean).join(", ");
   const jobTitle = lead.jobTitle?.trim();
-  if (!jobTitle || !location) {
+  if (!hasOccupationalEstimateInputs(lead) || !jobTitle) {
     throw new AppError(
       "VALIDATION_ERROR",
       "Market-income estimate needs a job title and a location (city, region, or country).",
     );
   }
+  const location = [lead.city, lead.stateRegion, lead.country].filter(Boolean).join(", ");
 
   let sources: Array<{ url: string; title: string }> = [];
   let rangeMin: number | null = null;

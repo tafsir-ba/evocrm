@@ -184,3 +184,23 @@ body {
   background: radial-gradient(circle at 30% 30%, #ddd6fe, #7c3aed);
   animation: enrich-orb 1.4s ease-in-out infinite;
 }
+
+.enrich-orb-done {
+  animation: none;
+  box-shadow: 0 0 0 6px rgb(109 40 217 / 0.14);
+}
+
+@keyframes enrich-reveal {
+  0% {
+    box-shadow: 0 0 0 0 rgb(109 40 217 / 0.38);
+    background-color: var(--color-enrich-bg);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgb(109 40 217 / 0);
+  }
+}
+
+.enrich-reveal {
+  border-radius: 8px;
+  animation: enrich-reveal 1.15s ease-out 1;
+}

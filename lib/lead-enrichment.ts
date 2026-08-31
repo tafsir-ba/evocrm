@@ -253,6 +253,17 @@ export function originLabel(
   return "Unknown";
 }
 
+export function isUniqueEnrichmentReveal(run: {
+  status: string;
+  identityMatch?: string | null;
+}): boolean {
+  return (
+    run.identityMatch === "unique" &&
+    run.status !== "ambiguous" &&
+    run.status !== "failed"
+  );
+}
+
 export type WebEnrichmentAttributes = {
   preferredContactClues?: string | null;
   otherProfessional?: string | null;

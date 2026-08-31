@@ -8,11 +8,12 @@ Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KE
 2. Clicking **Enrich** starts public-web search immediately (default allowed sources: professional directories, company sites, news/press, registries). A short animated progress state is shown. There is no source-picker or per-field accept gate before results appear.
 3. Search uses the lead’s **name + email only** (no phone, address, or financials).
 4. Search-provider hits are synthesized server-side with OpenAI. The model may only cite provided results; it must not invent facts.
-5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value”.
-6. The profile shows enriched values with a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
+5. **Safe** suggestions (empty fields, or fields already owned by enrichment) are written onto the lead profile at once. CRM-entered / imported / website / API values are **kept** unless the user later chooses “Replace CRM value” on the profile.
+6. On a unique match the dialog shows a brief “Profile filled” beat and **closes onto the lead**. Enriched fields pulse once. Each value has a violet **Enriched** badge, confidence %, rationale, source links, retrieval time, and model/search provenance. Users can edit, **Clear** a field, **Revert this enrichment**, or **Delete enrichment data**.
 7. **What we know** is a cited summary stored on the lead. It is not a campaign, drip, status change, or outbound message.
+8. If the operator has `lead:financial_update` and the profile now has job title plus city/region/country, Enrich also requests the **occupational market-income estimate**. It is shown as a labelled **Estimate** card, never mixed with declared income. No cited wage numbers → no invented range. Agents without financial permission still get the profile + summary only.
 
-Ambiguous identity → run status `ambiguous`, **no suggestions**, no profile write. Missing verifiable source → confidence capped; high confidence is rejected.
+Ambiguous identity → run status `ambiguous`, **no suggestions**, no profile write; the dialog stays open with the reason. Missing verifiable source → confidence capped; high confidence is rejected.
 
 ## Data model
 
@@ -54,7 +55,7 @@ Separate collection. **Never** filled by public-web enrichment.
 
 Manual fields: declared annual income/revenue, employment type, available deposit/equity, target budget/purchase price, financing need, existing commitments, affordability notes, currency, source, as-of date, confidence, assessor notes.
 
-Optional **market-income estimate** (job + location only, not the person): range, methodology, sources, confidence, human-reviewed flag. Stored separately from declared figures. Must never drive credit, mortgage, pricing, housing, or eligibility decisions.
+Optional **market-income estimate** (job + location only, not the person): range, methodology, sources, confidence, human-reviewed flag. Stored separately from declared figures. Enrich may request it after a unique match for operators with financial update permission. Must never drive credit, mortgage, pricing, housing, or eligibility decisions.
 
 History in `revisions[]`. Soft-delete `deletedAt`. Export via GET.
 

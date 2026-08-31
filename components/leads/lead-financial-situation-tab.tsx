@@ -130,6 +130,9 @@ export function LeadFinancialSituationTab({
         credit, mortgage, pricing, or eligibility decision.
       </p>
       {error ? <p className="text-[13px] text-[var(--color-danger-fg)]">{error}</p> : null}
+      <p className="text-[13px] font-semibold text-[var(--color-ink)]">
+        Declared figures (user-entered)
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <Label htmlFor="fin-income">Declared annual income / revenue</Label>
@@ -309,9 +312,15 @@ export function LeadFinancialSituationTab({
         </Button>
       ) : null}
 
-      <div className="rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] p-3 space-y-2">
-        <p className="text-[13px] font-semibold">Market-income estimate (optional, not declared income)</p>
+      <div className="rounded-lg border border-dashed border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/30 p-3 space-y-2">
+        <p className="text-[13px] font-semibold text-[var(--color-enrich-fg)]">
+          AI occupational estimate — not a declared figure
+        </p>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{MARKET_INCOME_DISCLAIMER}</p>
+        <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+          Enrich requests this after a unique match when job title and location are on the
+          profile. It never writes into declared income, deposit, or budget fields.
+        </p>
         {estimateRecord ? (
           <div className="text-[13px] space-y-1">
             {estimateRecord.demoMode || estimateRecord.searchProvider === "demo_fixture" ? (
@@ -321,14 +330,31 @@ export function LeadFinancialSituationTab({
               </p>
             ) : null}
             <p>
-              Range: {estimateRecord.rangeMin ?? "—"} – {estimateRecord.rangeMax ?? "—"}{" "}
-              {estimateRecord.currency} ({estimateRecord.confidencePercent}% source confidence)
+              Range: {estimateRecord.rangeMin?.toLocaleString() ?? "—"} –{" "}
+              {estimateRecord.rangeMax?.toLocaleString() ?? "—"} {estimateRecord.currency} (
+              {estimateRecord.confidencePercent}% source confidence)
             </p>
             <p>{estimateRecord.methodology}</p>
             <p className="text-[12px] text-[var(--color-ink-muted)]">
               Job {estimateRecord.jobTitleUsed} · {estimateRecord.locationUsed} ·{" "}
               {estimateRecord.searchProvider} / {estimateRecord.aiModel}
             </p>
+            {estimateRecord.sources?.length ? (
+              <ul className="text-[12px] space-y-0.5">
+                {estimateRecord.sources.map((source) => (
+                  <li key={source.url}>
+                    <a
+                      className="text-[var(--color-brand-700)] hover:underline break-all"
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {source.title || source.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p className="text-[12px]">
               {estimateRecord.reviewed ? "Human-reviewed" : "Awaiting human review"}
             </p>

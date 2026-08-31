@@ -40,10 +40,13 @@ import { EnrichedField } from "@/components/leads/enriched-field";
 import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
 import { LeadFinancialSituationTab } from "@/components/leads/lead-financial-situation-tab";
 import {
+  isUniqueEnrichmentReveal,
   readWebEnrichmentAttributes,
   type LeadEnrichmentSuggestion,
 } from "@/lib/lead-enrichment";
 import type { LeadFieldProvenanceMethod } from "@/lib/lead-intelligence";
+import { shouldRequestMarketEstimateAfterEnrichment } from "@/lib/lead-financial-situation";
+import type { EnrichmentAppliedRun } from "@/components/leads/lead-enrichment-modal";
 import {
   LeadProjectMemberships,
   type LeadProjectMembershipItem,
@@ -165,6 +168,9 @@ export function LeadDetailPanel({
     }>
   >([]);
   const [enrichmentEnabled, setEnrichmentEnabled] = useState(false);
+  const [revealRunId, setRevealRunId] = useState<string | null>(null);
+  const [estimatePending, setEstimatePending] = useState(false);
+  const [estimateReveal, setEstimateReveal] = useState(false);
   const [financialEstimate, setFinancialEstimate] = useState<{
     rangeMin: number | null;
     rangeMax: number | null;
@@ -172,11 +178,14 @@ export function LeadDetailPanel({
     confidencePercent: number;
     disclaimer: string;
     demoMode: boolean;
+    jobTitleUsed?: string;
+    locationUsed?: string;
+    sources?: Array<{ url: string; title: string }>;
   } | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
-  const loadLead = useCallback(async (opts?: { silent?: boolean }) => {
+  const loadLead = useCallback(async (opts?: { silent?: boolean }): Promise<LeadDetail | null> => {
     if (!opts?.silent) {
       setLoading(true);
     }
@@ -190,11 +199,11 @@ export function LeadDetailPanel({
 
       if (response.status === 403) {
         setForbidden(true);
-        return;
+        return null;
       }
       if (response.status === 404) {
         setNotFound(true);
-        return;
+        return null;
       }
       if (!response.ok) {
         throw new Error(payload.error?.message ?? "Failed to load lead.");
@@ -210,16 +219,101 @@ export function LeadDetailPanel({
         setEnrichmentEnabled(Boolean(enrichPayload.data?.capability?.enabled));
         setEnrichmentRuns(enrichPayload.data?.runs ?? []);
       }
+      return nextLead;
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
+      return null;
     } finally {
       setLoading(false);
     }
   }, [apiBase, leadId]);
 
-  const refreshLead = useCallback(() => {
-    void loadLead({ silent: true });
-  }, [loadLead]);
+  const loadEstimate = useCallback(async () => {
+    if (!canFinancialRead) {
+      setFinancialEstimate(null);
+      return;
+    }
+    try {
+      const response = await fetch(`${apiBase}/leads/${leadId}/financial-situation`);
+      const payload = await response.json();
+      if (!response.ok) {
+        return;
+      }
+      const estimate = payload.data?.record?.marketIncomeEstimate;
+      setFinancialEstimate(
+        estimate
+          ? {
+              rangeMin: estimate.rangeMin ?? null,
+              rangeMax: estimate.rangeMax ?? null,
+              currency: estimate.currency,
+              confidencePercent: estimate.confidencePercent,
+              disclaimer: payload.data?.disclaimer ?? "",
+              demoMode:
+                estimate.demoMode === true || estimate.searchProvider === "demo_fixture",
+              jobTitleUsed: estimate.jobTitleUsed,
+              locationUsed: estimate.locationUsed,
+              sources: estimate.sources ?? [],
+            }
+          : null,
+      );
+    } catch {
+      setFinancialEstimate(null);
+    }
+  }, [apiBase, leadId, canFinancialRead]);
+
+  const handleEnriched = useCallback(
+    async (run: EnrichmentAppliedRun) => {
+      const unique = isUniqueEnrichmentReveal(run);
+      if (unique) {
+        setRevealRunId(run.id);
+      }
+      const nextLead = await loadLead({ silent: true });
+      if (
+        !unique ||
+        !canFinancialUpdate ||
+        !nextLead ||
+        !shouldRequestMarketEstimateAfterEnrichment({
+          uniqueReveal: true,
+          jobTitle: nextLead.jobTitle,
+          city: nextLead.city,
+          stateRegion: nextLead.stateRegion,
+          country: nextLead.country,
+        })
+      ) {
+        if (canFinancialRead) {
+          await loadEstimate();
+        }
+        return;
+      }
+      setEstimatePending(true);
+      try {
+        const response = await fetch(
+          `${apiBase}/leads/${leadId}/financial-situation/market-estimate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          },
+        );
+        if (response.ok) {
+          setEstimateReveal(true);
+        }
+        await loadEstimate();
+      } catch {
+        // Occupational search may find no cited numbers; keep the labelled teaser.
+      } finally {
+        setEstimatePending(false);
+      }
+    },
+    [
+      apiBase,
+      canFinancialRead,
+      canFinancialUpdate,
+      leadId,
+      loadEstimate,
+      loadLead,
+    ],
+  );
 
   useEffect(() => {
     void loadLead();
@@ -294,43 +388,8 @@ export function LeadDetailPanel({
   }, [apiBase]);
 
   useEffect(() => {
-    if (!canFinancialRead) {
-      setFinancialEstimate(null);
-      return;
-    }
-    let cancelled = false;
-    async function loadEstimate() {
-      try {
-        const response = await fetch(`${apiBase}/leads/${leadId}/financial-situation`);
-        const payload = await response.json();
-        if (cancelled || !response.ok) {
-          return;
-        }
-        const estimate = payload.data?.record?.marketIncomeEstimate;
-        setFinancialEstimate(
-          estimate
-            ? {
-                rangeMin: estimate.rangeMin ?? null,
-                rangeMax: estimate.rangeMax ?? null,
-                currency: estimate.currency,
-                confidencePercent: estimate.confidencePercent,
-                disclaimer: payload.data?.disclaimer ?? "",
-                demoMode:
-                  estimate.demoMode === true || estimate.searchProvider === "demo_fixture",
-              }
-            : null,
-        );
-      } catch {
-        if (!cancelled) {
-          setFinancialEstimate(null);
-        }
-      }
-    }
     void loadEstimate();
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBase, leadId, canFinancialRead]);
+  }, [loadEstimate]);
 
   async function mutateMemberships(
     path: string,
@@ -405,6 +464,7 @@ export function LeadDetailPanel({
     enrichmentRuns.find((run) => run.status === "accepted" || run.status === "reviewing") ??
     enrichmentRuns[0] ??
     null;
+  const revealing = Boolean(revealRunId);
 
   function suggestionFor(fieldKey: string) {
     return activeRun?.suggestions.find((item) => item.fieldKey === fieldKey) ?? null;
@@ -478,6 +538,8 @@ export function LeadDetailPanel({
     await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/revert`, {
       method: "POST",
     });
+    setRevealRunId(null);
+    setEstimateReveal(false);
     await loadLead({ silent: true });
   }
 
@@ -486,6 +548,8 @@ export function LeadDetailPanel({
       return;
     }
     await fetch(`${apiBase}/leads/${leadId}/enrichment`, { method: "DELETE" });
+    setRevealRunId(null);
+    setEstimateReveal(false);
     await loadLead({ silent: true });
   }
 
@@ -574,7 +638,11 @@ export function LeadDetailPanel({
               <Button
                 variant="outline"
                 leadingIcon={<IconSparkles size={14} />}
-                onClick={() => setEnrichOpen(true)}
+                onClick={() => {
+                  setRevealRunId(null);
+                  setEstimateReveal(false);
+                  setEnrichOpen(true);
+                }}
               >
                 Enrich
               </Button>
@@ -638,6 +706,7 @@ export function LeadDetailPanel({
                 value={lead.company?.name ?? "—"}
                 origin={lead.intelligenceProvenance?.companyId?.method}
                 suggestion={suggestionFor("companyName")}
+                reveal={revealing}
                 onClear={
                   canClearSuggestion(suggestionFor("companyName"))
                     ? () => void clearSuggestion(suggestionFor("companyName")!)
@@ -660,6 +729,7 @@ export function LeadDetailPanel({
                 value={lead.jobTitle ?? "—"}
                 origin={lead.intelligenceProvenance?.jobTitle?.method}
                 suggestion={suggestionFor("jobTitle")}
+                reveal={revealing}
                 onClear={
                   canClearSuggestion(suggestionFor("jobTitle"))
                     ? () => void clearSuggestion(suggestionFor("jobTitle")!)
@@ -750,6 +820,7 @@ export function LeadDetailPanel({
                         label="Industry"
                         value={lead.industry ?? "—"}
                         origin={lead.intelligenceProvenance?.industry?.method}
+                        reveal={revealing}
                         suggestion={suggestionFor("industry")}
                         onClear={
                           canClearSuggestion(suggestionFor("industry"))
@@ -771,6 +842,7 @@ export function LeadDetailPanel({
                         label="State / region"
                         value={lead.stateRegion ?? "—"}
                         origin={lead.intelligenceProvenance?.stateRegion?.method}
+                        reveal={revealing}
                         suggestion={suggestionFor("stateRegion")}
                         onClear={
                           canClearSuggestion(suggestionFor("stateRegion"))
@@ -792,6 +864,7 @@ export function LeadDetailPanel({
                         label="City"
                         value={lead.city ?? "—"}
                         origin={lead.intelligenceProvenance?.city?.method}
+                        reveal={revealing}
                         suggestion={suggestionFor("city")}
                         onClear={
                           canClearSuggestion(suggestionFor("city"))
@@ -813,6 +886,7 @@ export function LeadDetailPanel({
                         label="Country"
                         value={lead.country ?? "—"}
                         origin={lead.intelligenceProvenance?.country?.method}
+                        reveal={revealing}
                         suggestion={suggestionFor("country")}
                         onClear={
                           canClearSuggestion(suggestionFor("country"))
@@ -834,6 +908,7 @@ export function LeadDetailPanel({
                         label="Professional profile"
                         value={lead.professionalProfileUrl ?? "—"}
                         origin={lead.intelligenceProvenance?.professionalProfileUrl?.method}
+                        reveal={revealing}
                         suggestion={suggestionFor("professionalProfileUrl")}
                         onClear={
                           canClearSuggestion(suggestionFor("professionalProfileUrl"))
@@ -857,6 +932,7 @@ export function LeadDetailPanel({
                         origin={
                           enrichmentOverlay.preferredContactClues ? "enrichment" : undefined
                         }
+                        reveal={revealing}
                         suggestion={suggestionFor("preferredContactClues")}
                         onClear={
                           canClearSuggestion(suggestionFor("preferredContactClues"))
@@ -1004,6 +1080,7 @@ export function LeadDetailPanel({
                           label="Other public professional information"
                           value={enrichmentOverlay.otherProfessional}
                           origin="enrichment"
+                          reveal={revealing}
                           suggestion={suggestionFor("otherProfessional")}
                           onClear={
                           canClearSuggestion(suggestionFor("otherProfessional"))
@@ -1022,7 +1099,13 @@ export function LeadDetailPanel({
                         />
                       ) : null}
                       {enrichmentOverlay.summary?.text ? (
-                        <div className="md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3">
+                        <div
+                          className={
+                            revealing
+                              ? "enrich-reveal md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3"
+                              : "md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3"
+                          }
+                        >
                           <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
                             What we know
                           </p>
@@ -1060,29 +1143,74 @@ export function LeadDetailPanel({
                         </div>
                       ) : null}
                       {canFinancialRead && financialEstimate ? (
-                        <div className="md:col-span-2 rounded-lg border border-[var(--color-line)] p-3">
-                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
-                            Market-income estimate (occupational, not this person)
-                          </p>
+                        <div
+                          className={
+                            estimateReveal
+                              ? "enrich-reveal md:col-span-2 rounded-lg border border-dashed border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/30 p-3"
+                              : "md:col-span-2 rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] p-3"
+                          }
+                        >
+                          <div className="mb-1 flex items-center gap-2">
+                            <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold">
+                              AI occupational estimate — not a declared figure
+                            </p>
+                            <Badge tone="enrich" size="sm">
+                              Estimate
+                            </Badge>
+                          </div>
                           {financialEstimate.demoMode ? (
                             <p className="mb-1 text-[12.5px] text-[var(--color-warn-fg)]">
-                              Demo fixture — not live market data.
+                              Demo fixture — not live market data and not this person’s income.
                             </p>
                           ) : null}
-                          <p className="text-[13.5px] text-[var(--color-ink)]">
-                            {financialEstimate.rangeMin ?? "—"} – {financialEstimate.rangeMax ?? "—"}{" "}
+                          <p className="text-[13.5px] text-[var(--color-ink)] tabular">
+                            {financialEstimate.rangeMin?.toLocaleString() ?? "—"} –{" "}
+                            {financialEstimate.rangeMax?.toLocaleString() ?? "—"}{" "}
                             {financialEstimate.currency} ({financialEstimate.confidencePercent}%
                             source confidence)
                           </p>
+                          {financialEstimate.jobTitleUsed || financialEstimate.locationUsed ? (
+                            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+                              Based on {financialEstimate.jobTitleUsed ?? "job"}
+                              {financialEstimate.locationUsed
+                                ? ` · ${financialEstimate.locationUsed}`
+                                : ""}
+                              . Separate from any user-entered income on the Financial situation
+                              tab.
+                            </p>
+                          ) : null}
+                          {financialEstimate.sources && financialEstimate.sources.length > 0 ? (
+                            <ul className="mt-2 text-[12px] space-y-0.5">
+                              {financialEstimate.sources.map((source) => (
+                                <li key={source.url}>
+                                  <a
+                                    className="text-[var(--color-brand-700)] hover:underline break-all"
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {source.title || source.url}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
                           <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
                             {financialEstimate.disclaimer}
                           </p>
                         </div>
-                      ) : canFinancialRead && lead.jobTitle && (lead.city || lead.stateRegion) ? (
+                      ) : canFinancialRead && estimatePending ? (
                         <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
-                          Optional occupational market-income estimate is on the Financial situation
-                          tab. It is never used for automated credit, mortgage, pricing, or
-                          eligibility decisions.
+                          Requesting labelled occupational estimate (job and location only)…
+                        </p>
+                      ) : canFinancialRead &&
+                        lead.jobTitle &&
+                        (lead.city || lead.stateRegion || lead.country) ? (
+                        <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
+                          Optional occupational market-income estimate is labelled separately on
+                          the Financial situation tab. It is never mixed with declared figures and
+                          must not be used for automated credit, mortgage, pricing, or eligibility
+                          decisions.
                         </p>
                       ) : null}
                       {integrationAttrs && (
@@ -1207,7 +1335,7 @@ export function LeadDetailPanel({
         onClose={() => setEnrichOpen(false)}
         workspaceSlug={workspaceSlug}
         leadId={leadId}
-        onApplied={refreshLead}
+        onApplied={(run) => void handleEnriched(run)}
       />
     </>
   );
@@ -1240,6 +1368,7 @@ function Info({
   value,
   origin,
   suggestion,
+  reveal,
   onClear,
   onApplyOverwrite,
   onEdit,
@@ -1248,6 +1377,7 @@ function Info({
   value: string;
   origin?: LeadFieldProvenanceMethod | "unknown" | null;
   suggestion?: LeadEnrichmentSuggestion | null;
+  reveal?: boolean;
   onClear?: () => void;
   onApplyOverwrite?: () => void;
   onEdit?: (next: string) => void;
@@ -1261,6 +1391,7 @@ function Info({
         value={value}
         origin={origin}
         suggestion={suggestion}
+        reveal={reveal}
         onClear={onClear}
         onApplyOverwrite={onApplyOverwrite}
         onEdit={onEdit}

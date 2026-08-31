@@ -105,6 +105,30 @@ export function parseOccupationalWageRange(
   };
 }
 
+export function hasOccupationalEstimateInputs(lead: {
+  jobTitle?: string | null;
+  city?: string | null;
+  stateRegion?: string | null;
+  country?: string | null;
+}): boolean {
+  const jobTitle = lead.jobTitle?.trim();
+  const location = [lead.city, lead.stateRegion, lead.country]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(", ");
+  return Boolean(jobTitle && location);
+}
+
+export function shouldRequestMarketEstimateAfterEnrichment(input: {
+  uniqueReveal: boolean;
+  jobTitle?: string | null;
+  city?: string | null;
+  stateRegion?: string | null;
+  country?: string | null;
+}): boolean {
+  return input.uniqueReveal && hasOccupationalEstimateInputs(input);
+}
+
 export function emptyFinancialSnapshot(currency: string): LeadFinancialSituationSnapshot {
   return {
     declaredAnnualIncome: null,

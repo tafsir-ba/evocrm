@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import {
-  crmValueRequiresOverwrite,
-  LEAD_ENRICHMENT_FIELD_LABELS,
-  type LeadEnrichmentSuggestion,
-} from "@/lib/lead-enrichment";
+import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
 
 type RunPayload = {
   id: string;
@@ -16,21 +12,13 @@ type RunPayload = {
   identityMatch: string | null;
   identityRationale: string | null;
   failureMessage: string | null;
-  searchProvider: string | null;
-  aiModel: string | null;
-  retrievedAt: string | null;
-  suggestions: LeadEnrichmentSuggestion[];
-  summaryDraft: {
-    text: string;
-    citationUrls: string[];
-    status: string;
-  } | null;
-  acceptedSummary: {
-    text: string;
-    citationUrls: string[];
-  } | null;
-  sources: Array<{ url: string; title: string }>;
   demoMode: boolean;
+};
+
+export type EnrichmentAppliedRun = {
+  id: string;
+  status: string;
+  identityMatch: string | null;
 };
 
 const PROGRESS_STEPS = [
@@ -39,6 +27,8 @@ const PROGRESS_STEPS = [
   "Synthesizing cited results…",
   "Filling safe profile fields…",
 ];
+
+const REVEAL_CLOSE_MS = 560;
 
 export function LeadEnrichmentModal({
   open,
@@ -51,14 +41,17 @@ export function LeadEnrichmentModal({
   onClose: () => void;
   workspaceSlug: string;
   leadId: string;
-  onApplied: () => void;
+  onApplied: (run: EnrichmentAppliedRun) => void;
 }) {
   const api = `/api/workspaces/${workspaceSlug}/leads/${leadId}/enrichment`;
   const [phase, setPhase] = useState<"running" | "done">("running");
   const [progressIndex, setProgressIndex] = useState(0);
   const [run, setRun] = useState<RunPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const onAppliedRef = useRef(onApplied);
+  const onCloseRef = useRef(onClose);
+  onAppliedRef.current = onApplied;
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) {
@@ -66,11 +59,11 @@ export function LeadEnrichmentModal({
       setProgressIndex(0);
       setRun(null);
       setError(null);
-      setSaving(false);
       return;
     }
 
     let cancelled = false;
+    let closeTimer: number | undefined;
     const timer = window.setInterval(() => {
       setProgressIndex((index) => Math.min(index + 1, PROGRESS_STEPS.length - 1));
     }, 700);
@@ -92,22 +85,17 @@ export function LeadEnrichmentModal({
         const next = payload.data.run as RunPayload;
         setRun(next);
         setPhase("done");
-        const appliedSafe = next.suggestions.some(
-          (item) => item.status === "accepted" || item.status === "edited",
-        );
-        if (
-          appliedSafe &&
-          next.status !== "ambiguous" &&
-          next.status !== "failed" &&
-          !next.suggestions.some(
-            (item) =>
-              item.status === "proposed" &&
-              crmValueRequiresOverwrite(item.currentValue, item.currentOrigin),
-          )
-        ) {
-          onApplied();
-        } else if (appliedSafe) {
-          onApplied();
+        if (isUniqueEnrichmentReveal(next)) {
+          onAppliedRef.current({
+            id: next.id,
+            status: next.status,
+            identityMatch: next.identityMatch,
+          });
+          closeTimer = window.setTimeout(() => {
+            if (!cancelled) {
+              onCloseRef.current();
+            }
+          }, REVEAL_CLOSE_MS);
         }
       } catch (err) {
         if (!cancelled) {
@@ -121,45 +109,13 @@ export function LeadEnrichmentModal({
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-    };
-  }, [open, api, onApplied]);
-
-  const blocked = run?.suggestions.filter(
-    (item) =>
-      item.status === "proposed" &&
-      crmValueRequiresOverwrite(item.currentValue, item.currentOrigin),
-  ) ?? [];
-
-  async function applyOverwrites() {
-    if (!run || blocked.length === 0) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await fetch(`${api}/${run.id}/decisions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          decisions: blocked.map((item) => ({
-            suggestionId: item.id,
-            action: "accept",
-            overwriteAcknowledged: true,
-          })),
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Could not apply suggestions.");
+      if (closeTimer !== undefined) {
+        window.clearTimeout(closeTimer);
       }
-      onApplied();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not apply suggestions.");
-    } finally {
-      setSaving(false);
-    }
-  }
+    };
+  }, [open, api]);
 
-  const summary = run?.acceptedSummary ?? run?.summaryDraft;
+  const uniqueReveal = Boolean(run && !error && isUniqueEnrichmentReveal(run));
 
   return (
     <Modal
@@ -168,16 +124,11 @@ export function LeadEnrichmentModal({
       title="Enrich lead"
       className="max-w-lg"
       footer={
-        phase === "done" ? (
+        phase === "done" && !uniqueReveal ? (
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
-            {blocked.length > 0 ? (
-              <Button disabled={saving} loading={saving} onClick={() => void applyOverwrites()}>
-                Replace CRM values
-              </Button>
-            ) : null}
           </div>
         ) : null
       }
@@ -190,12 +141,28 @@ export function LeadEnrichmentModal({
           </p>
           <p className="mt-2 text-[12.5px] text-[var(--color-ink-muted)] max-w-sm">
             Public-web search uses name and email only. CRM-entered values are never overwritten
-            silently.
+            silently. The profile fills in one step.
           </p>
         </div>
       ) : null}
 
-      {phase === "done" ? (
+      {phase === "done" && uniqueReveal ? (
+        <div className="flex flex-col items-center py-8 text-center">
+          <span className="enrich-orb enrich-orb-done" aria-hidden />
+          <p className="mt-5 text-[15px] font-medium text-[var(--color-ink)]">Profile filled</p>
+          <p className="mt-2 text-[12.5px] text-[var(--color-ink-muted)] max-w-sm">
+            Safe public professional fields, the “what we know” note, and sources are on the lead.
+            You can edit, clear, or revert from the profile.
+          </p>
+          {run?.demoMode ? (
+            <p className="mt-3 rounded-md bg-[var(--color-warn-bg)] px-3 py-2 text-[12.5px] text-[var(--color-warn-fg)]">
+              Dry-run / demo fixture. No live web search was sent.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {phase === "done" && !uniqueReveal ? (
         <div className="space-y-3">
           {error ? (
             <p className="text-[13px] text-[var(--color-danger-fg)]">{error}</p>
@@ -217,32 +184,8 @@ export function LeadEnrichmentModal({
               {run.failureMessage || "No unique public professional identity matched."}
             </p>
           ) : null}
-          {run && run.status !== "ambiguous" && run.status !== "failed" && !error ? (
-            <p className="text-[13px] text-[var(--color-ink)]">
-              Safe public professional fields are now on the profile. Review badges, sources, and
-              the “what we know” note. You can edit, clear, or revert the entire run.
-            </p>
-          ) : null}
-          {summary?.text ? (
-            <div className="rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/40 p-3">
-              <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
-                What we know
-              </p>
-              <p className="text-[13px] text-[var(--color-ink-soft)]">{summary.text}</p>
-            </div>
-          ) : null}
-          {blocked.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-                These CRM-entered values were kept. Replace only if you intend to overwrite them.
-              </p>
-              {blocked.map((item) => (
-                <p key={item.id} className="text-[13px]">
-                  {LEAD_ENRICHMENT_FIELD_LABELS[item.fieldKey]}: {item.currentValue} →{" "}
-                  {item.proposedValue}
-                </p>
-              ))}
-            </div>
+          {!run && !error ? (
+            <p className="text-[13px] text-[var(--color-ink-muted)]">No enrichment result.</p>
           ) : null}
         </div>
       ) : null}
