@@ -172,6 +172,7 @@ async function main(): Promise<void> {
   const { listHubSpotProjectMappings } = await import(
     "../server/repositories/hubspot-project-mappings"
   );
+  const { findIntegrationById } = await import("../server/repositories/integrations");
   const { findDictionaryItemByTypeAndKey } = await import(
     "../server/repositories/dictionary-items"
   );
