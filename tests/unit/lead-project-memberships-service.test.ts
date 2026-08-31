@@ -322,7 +322,9 @@ describe("lead project membership service", () => {
       ["mem-2", { isPrimary: false }],
       ["mem-1", { isPrimary: true }],
     ]);
+    expect(updateLead).toHaveBeenCalledWith("ws-1", "lead-1", { projectId: "project-2" });
     expect(archiveMembership).not.toHaveBeenCalled();
+    expect(createAuditLog).not.toHaveBeenCalled();
     expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
@@ -353,6 +355,32 @@ describe("lead project membership service", () => {
       isPrimary: false,
     });
     expect(createAuditLog).not.toHaveBeenCalled();
+    expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
+
+    const retriedPrimary = { ...createdPrimary, id: "mem-retry" };
+    vi.mocked(createMembership).mockResolvedValue(retriedPrimary);
+    vi.mocked(updateLead).mockResolvedValue(orphanLead as never);
+    vi.mocked(findMembershipsForLead)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([retriedPrimary]);
+
+    const retried = await addLeadProjectMembership({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      projectId: "project-2",
+    });
+
+    expect(createMembership).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isPrimary: true,
+        projectId: "project-2",
+      }),
+    );
+    expect(archiveMembership).toHaveBeenCalledTimes(1);
+    expect(retried).toEqual([
+      expect.objectContaining({ id: "mem-retry", isPrimary: true, archivedAt: null }),
+    ]);
     expect(evaluateCampaignAutoEnrollmentForLead).not.toHaveBeenCalled();
   });
 
