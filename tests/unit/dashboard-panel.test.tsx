@@ -23,6 +23,7 @@ const dashboardData = {
     },
     metrics: {
       newLeads: 12,
+      importedLeads: 26149,
       activeOpportunities: 4,
       wonOpportunities: 2,
       lostOpportunities: 1,
@@ -30,6 +31,14 @@ const dashboardData = {
       wonValue: [{ currency: "CHF", amount: 420000 }],
       activitiesDueToday: 1,
       overdueActivities: 2,
+    },
+    cmpReconciliation: {
+      sourceCohortCount: 46,
+      membershipCount: 0,
+      overlapCount: 0,
+      sourceOnlyCount: 46,
+      membershipOnlyCount: 0,
+      cmpProjects: [],
     },
   },
   pipeline: {
@@ -154,10 +163,18 @@ describe("DashboardPanel operator view", () => {
     render(<DashboardPanel workspaceSlug="demo" workspaceTimezone="Europe/Zurich" />);
 
     expect(await screen.findByText("New leads")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /New leads/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^New leads/i })).toHaveAttribute(
       "href",
-      expect.stringContaining("/w/demo/leads?createdFrom="),
+      expect.stringContaining("acquisition=genuine_inbound"),
     );
+    expect(screen.getByRole("link", { name: /^Imported/i })).toHaveAttribute(
+      "href",
+      expect.stringContaining("acquisition=legacy_import"),
+    );
+    expect(screen.getByText("26149")).toBeInTheDocument();
+    expect(screen.getByText("Excluded from new leads")).toBeInTheDocument();
+    expect(screen.getByText("CMP source vs CRM membership")).toBeInTheDocument();
+    expect(screen.getByText(/46 CMP source-cohort leads, 0 CRM CMP project memberships/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Overdue/i })).toHaveAttribute(
       "href",
       "/w/demo/activities?view=overdue",
@@ -168,6 +185,10 @@ describe("DashboardPanel operator view", () => {
       "/w/demo/activities/a-overdue/edit",
     );
     expect(screen.getByText("Site web")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Site web/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("acquisition=genuine_inbound"),
+    );
     expect(screen.getByRole("link", { name: /Site web/ })).toHaveAttribute(
       "href",
       expect.stringContaining("sourceId=src-web"),

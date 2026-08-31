@@ -123,12 +123,17 @@ async function main(): Promise<void> {
   let project = await findProjectByReference(WD_MIGRATION_WORKSPACE_ID, reference);
   let created = false;
   if (!project) {
-    project = await createProjectForWorkspace(WD_MIGRATION_WORKSPACE_ID, integration.createdBy, {
-      name,
-      reference,
-      projectType: "development",
-      description: `HubSpot wd_project source ${slug}`,
-    });
+    project = await createProjectForWorkspace(
+      WD_MIGRATION_WORKSPACE_ID,
+      integration.createdBy,
+      {
+        name,
+        reference,
+        projectType: "development",
+        description: `HubSpot wd_project source ${slug}`,
+      },
+      { allowWithoutPrimaryCompany: true },
+    );
     created = true;
   }
 

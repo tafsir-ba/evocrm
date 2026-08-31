@@ -44,8 +44,18 @@ describe("lead import automation", () => {
       expect.objectContaining({
         firstName: "John",
         lastName: "Smith",
+        attributes: expect.objectContaining({
+          import: expect.objectContaining({
+            kind: "csv",
+            source: "lead_import",
+          }),
+        }),
       }),
-      { triggerAutomation: false },
+      {
+        triggerAutomation: false,
+        intelligenceMethod: "import",
+        intelligenceSource: "lead_import",
+      },
     );
   });
 
@@ -76,8 +86,15 @@ describe("lead import automation", () => {
       expect.objectContaining({
         firstName: "John",
         lastName: "Smith",
+        attributes: expect.objectContaining({
+          import: expect.objectContaining({ kind: "csv" }),
+        }),
       }),
-      { triggerAutomation: true },
+      {
+        triggerAutomation: true,
+        intelligenceMethod: "import",
+        intelligenceSource: "lead_import",
+      },
     );
   });
 });

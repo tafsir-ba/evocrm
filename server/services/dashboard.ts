@@ -4,14 +4,17 @@ import { findActivities } from "@/server/repositories/activities";
 import {
   countActivitiesDueToday,
   countLeadsCreatedInRange,
+  countLegacyImportedLeadsCreatedInRange,
   countLostOpportunitiesInRange,
   countOpportunitiesByStatusIds,
   countOverdueActivities,
   countWonOpportunitiesInRange,
+  getCmpReconciliation,
   groupLeadsBySource,
   groupOpportunitiesByStatus,
   groupPropertiesByStatus,
   sumOpportunityValuesByCurrency,
+  type CmpReconciliationResult,
   type CurrencySum,
 } from "@/server/repositories/dashboard";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
@@ -45,6 +48,7 @@ export type DashboardSummaryResult = {
   dateRange: DashboardDateRange;
   metrics: {
     newLeads: number;
+    importedLeads: number;
     activeOpportunities: number;
     wonOpportunities: number;
     lostOpportunities: number;
@@ -53,6 +57,7 @@ export type DashboardSummaryResult = {
     activitiesDueToday: number;
     overdueActivities: number;
   };
+  cmpReconciliation: CmpReconciliationResult;
 };
 
 export type DashboardPipelineStage = {
@@ -276,6 +281,7 @@ export async function getDashboardSummaryForWorkspace(
 
   const [
     newLeads,
+    importedLeads,
     activeOpportunities,
     wonOpportunities,
     lostOpportunities,
@@ -283,8 +289,10 @@ export async function getDashboardSummaryForWorkspace(
     wonValue,
     activitiesDueToday,
     overdueActivities,
+    cmpReconciliation,
   ] = await Promise.all([
-    countLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId),
+    countLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId, "genuine_inbound"),
+    countLegacyImportedLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId),
     countOpportunitiesByStatusIds(workspaceId, openIds, projectId),
     countWonOpportunitiesInRange(workspaceId, wonIds, dateRange.from, dateRange.to, projectId),
     countLostOpportunitiesInRange(workspaceId, lostIds, dateRange.from, dateRange.to, projectId),
@@ -307,12 +315,14 @@ export async function getDashboardSummaryForWorkspace(
       projectId,
     ),
     countOverdueActivities(workspaceId, pendingStatusIds, new Date(), projectId),
+    getCmpReconciliation(workspaceId, projectId),
   ]);
 
   return {
     dateRange,
     metrics: {
       newLeads,
+      importedLeads,
       activeOpportunities,
       wonOpportunities,
       lostOpportunities,
@@ -321,6 +331,7 @@ export async function getDashboardSummaryForWorkspace(
       activitiesDueToday,
       overdueActivities,
     },
+    cmpReconciliation,
   };
 }
 
@@ -366,7 +377,7 @@ export async function getDashboardSourcesForWorkspace(
   const projectId = query.projectId;
   const [sourceItems, grouped] = await Promise.all([
     listDictionaryItemsForWorkspace(workspaceId, { type: "lead_source" }),
-    groupLeadsBySource(workspaceId, dateRange.from, dateRange.to, projectId),
+    groupLeadsBySource(workspaceId, dateRange.from, dateRange.to, projectId, "genuine_inbound"),
   ]);
 
   const sourceMap = new Map(sourceItems.map((item) => [item.id, item]));

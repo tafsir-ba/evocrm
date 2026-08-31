@@ -5,10 +5,18 @@ import {
   normalizeProjectLocation,
   type ProjectLocation,
 } from "@/lib/project-location";
-import { normalizeProjectCompanies } from "@/lib/project-operating-record";
+import {
+  hasPrimaryBusinessCompany,
+  PRIMARY_COMPANY_REQUIRED_MESSAGE,
+  normalizeProjectCompanies,
+  primaryDeveloperCompanyId,
+  retainExistingCompanyProvenance,
+  type ProjectCompanyRole,
+} from "@/lib/project-operating-record";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findCompaniesByIds } from "@/server/repositories/companies";
+import { findLeads, findLeadsByCompanyIds } from "@/server/repositories/leads";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import {
   archiveProject,
@@ -24,6 +32,24 @@ import {
 } from "@/server/repositories/projects";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import type { CreateProjectInput, UpdateProjectInput } from "@/server/validation/projects";
+
+export type CreateProjectOptions = {
+  /** System/migration callers only. Standard API creates always require a primary company. */
+  allowWithoutPrimaryCompany?: boolean;
+};
+
+export type ProjectCompanyPerson = {
+  id: string;
+  companyId: string | null;
+  projectId: string | null;
+  fullName: string;
+  email: string | null;
+};
+
+export type ProjectDetailRecord = ProjectRecord & {
+  companyPeople: ProjectCompanyPerson[];
+  associablePeople: ProjectCompanyPerson[];
+};
 
 function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
   return {
@@ -108,21 +134,36 @@ async function validatePropertyTypeId(
   }
 }
 
+function requirePrimaryBusinessCompany(
+  companies: Array<{ companyId: string; role: ProjectCompanyRole; isPrimary: boolean }>,
+): void {
+  if (!hasPrimaryBusinessCompany(companies)) {
+    throw new AppError("VALIDATION_ERROR", PRIMARY_COMPANY_REQUIRED_MESSAGE);
+  }
+}
+
 async function withCompanyNames(
   workspaceId: string,
   project: ProjectRecord,
 ): Promise<ProjectRecord> {
-  if (project.companies.length === 0) {
-    return project;
+  return (await withCompanyNamesForProjects(workspaceId, [project]))[0]!;
+}
+
+async function withCompanyNamesForProjects<T extends ProjectRecord>(
+  workspaceId: string,
+  projects: T[],
+): Promise<T[]> {
+  const ids = [
+    ...new Set(projects.flatMap((project) => project.companies.map((item) => item.companyId))),
+  ];
+  if (ids.length === 0) {
+    return projects;
   }
 
-  const found = await findCompaniesByIds(
-    workspaceId,
-    project.companies.map((item) => item.companyId),
-  );
+  const found = await findCompaniesByIds(workspaceId, ids);
   const byId = new Map(found.map((company) => [company.id, company]));
 
-  return {
+  return projects.map((project) => ({
     ...project,
     companies: project.companies.map((link) => {
       const company = byId.get(link.companyId);
@@ -131,6 +172,46 @@ async function withCompanyNames(
         company: company ? { id: company.id, name: company.name } : null,
       };
     }),
+  }));
+}
+
+function toCompanyPerson(lead: {
+  id: string;
+  companyId?: string | null;
+  projectId: string | null;
+  fullName: string;
+  email: string | null;
+}): ProjectCompanyPerson {
+  return {
+    id: lead.id,
+    companyId: lead.companyId ?? null,
+    projectId: lead.projectId,
+    fullName: lead.fullName,
+    email: lead.email,
+  };
+}
+
+async function withCompanyPeople(
+  workspaceId: string,
+  project: ProjectRecord,
+): Promise<ProjectDetailRecord> {
+  const companyIds = project.companies.map((item) => item.companyId);
+  const primaryCompanyId = primaryDeveloperCompanyId(project.companies);
+
+  const [companyLeads, projectLeads] = await Promise.all([
+    findLeadsByCompanyIds(workspaceId, companyIds, { limit: 50 }),
+    findLeads(workspaceId, { projectId: project.id, page: 1, pageSize: 50 }),
+  ]);
+
+  const associatedIds = new Set(companyLeads.map((lead) => lead.id));
+  const associablePeople = projectLeads.leads
+    .filter((lead) => !associatedIds.has(lead.id) && (lead.companyId ?? null) !== primaryCompanyId)
+    .map(toCompanyPerson);
+
+  return {
+    ...project,
+    companyPeople: companyLeads.map(toCompanyPerson),
+    associablePeople,
   };
 }
 
@@ -138,33 +219,38 @@ export async function listProjectsForWorkspace(
   workspaceId: string,
   filter: ProjectListFilter = {},
 ): Promise<ProjectListItem[]> {
-  return findProjects(workspaceId, filter);
+  return withCompanyNamesForProjects(workspaceId, await findProjects(workspaceId, filter));
 }
 
 export async function listProjectsPageForWorkspace(
   workspaceId: string,
   filter: ProjectListFilter = {},
 ): Promise<{ projects: ProjectListItem[]; total: number }> {
-  return findProjectsPage(workspaceId, filter);
+  const result = await findProjectsPage(workspaceId, filter);
+  return {
+    projects: await withCompanyNamesForProjects(workspaceId, result.projects),
+    total: result.total,
+  };
 }
 
 export async function getProjectForWorkspace(
   workspaceId: string,
   projectId: string,
-): Promise<ProjectRecord> {
+): Promise<ProjectDetailRecord> {
   const project = await findProjectById(workspaceId, projectId);
 
   if (!project) {
     throw new AppError("NOT_FOUND", "Project not found.");
   }
 
-  return withCompanyNames(workspaceId, project);
+  return withCompanyPeople(workspaceId, await withCompanyNames(workspaceId, project));
 }
 
 export async function createProjectForWorkspace(
   workspaceId: string,
   actorId: string,
   input: CreateProjectInput,
+  options: CreateProjectOptions = {},
 ): Promise<ProjectRecord> {
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assigned to");
@@ -178,6 +264,9 @@ export async function createProjectForWorkspace(
   }
 
   const companies = normalizeProjectCompanies(input.companies);
+  if (!options.allowWithoutPrimaryCompany) {
+    requirePrimaryBusinessCompany(companies);
+  }
   await validateProjectCompanies(workspaceId, companies);
   await validatePropertyTypeId(workspaceId, input.propertyTypeId);
 
@@ -308,7 +397,11 @@ export async function updateProjectForWorkspace(
     }
   }
   if (input.companies !== undefined) {
-    const companies = normalizeProjectCompanies(input.companies);
+    const companies = retainExistingCompanyProvenance(
+      normalizeProjectCompanies(input.companies),
+      existing.companies,
+    );
+    requirePrimaryBusinessCompany(companies);
     await validateProjectCompanies(workspaceId, companies);
     updatePayload.companies = companies;
   }

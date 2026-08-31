@@ -27,6 +27,7 @@ import {
   type ProjectBrowserView,
 } from "@/lib/project-browser";
 import { SWISS_CANTONS, type ProjectLocation } from "@/lib/project-location";
+import type { ProjectCompanyListLink } from "@/lib/projects-table";
 import { PROJECT_FILTER_PARAM } from "@/lib/project-scope";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -47,6 +48,7 @@ type ProjectRecord = {
   city: string | null;
   country: string | null;
   location?: ProjectLocation | null;
+  companies?: ProjectCompanyListLink[];
   projectType: string | null;
   archivedAt: string | null;
   createdAt: string;

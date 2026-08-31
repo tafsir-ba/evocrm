@@ -8,8 +8,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/w/demo/leads",
 }));
 
+const projectFilterState = vi.hoisted(() => ({ current: null as string | null }));
+
 vi.mock("@/lib/use-workspace-project-filter", () => ({
-  useWorkspaceProjectFilter: () => null,
+  useWorkspaceProjectFilter: () => projectFilterState.current,
 }));
 
 import { LeadsPanel } from "@/components/leads/leads-panel";
@@ -45,6 +47,10 @@ const sampleLead = {
     { id: "t2", name: "Genève", color: "#1D4ED8" },
     { id: "t3", name: "Chalet", color: "#0F766E" },
   ],
+  company: { id: "507f1f77bcf86cd799439061", name: "EvoHome SA" },
+  jobTitle: "Buyer",
+  industry: "Hospitality",
+  stateRegion: "Geneva",
   assignedUser: {
     id: members[0].userId,
     name: members[0].name,
@@ -91,6 +97,9 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
     if (url.includes("/members")) {
       return jsonResponse({ data: { members } });
     }
+    if (url.includes("/companies")) {
+      return jsonResponse({ data: { companies: [] } });
+    }
     if (url.includes("/leads/") && init?.method === "PATCH") {
       return jsonResponse({ data: { lead: sampleLead } });
     }
@@ -108,6 +117,7 @@ async function expandDesktopRow(user: ReturnType<typeof userEvent.setup>) {
 describe("LeadsPanel table", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    projectFilterState.current = null;
     mockLeadsFetch();
   });
 
@@ -124,6 +134,7 @@ describe("LeadsPanel table", () => {
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
     expect(screen.getByRole("columnheader", { name: "Lead" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Company" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
@@ -132,6 +143,7 @@ describe("LeadsPanel table", () => {
     expect(screen.getByRole("columnheader", { name: "Next" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Urgency" })).toBeInTheDocument();
 
+    expect(screen.getAllByText("EvoHome SA").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Les Terrasses").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Site web").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nouveau").length).toBeGreaterThan(0);
@@ -277,6 +289,32 @@ describe("LeadsPanel table", () => {
     expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     expect(screen.getAllByText("Camille Müller").length).toBeGreaterThan(0);
+  });
+
+  it("can include associated projects when a primary project filter is active", async () => {
+    const user = userEvent.setup();
+    projectFilterState.current = "507f1f77bcf86cd799439051";
+    mockLeadsFetch();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
+
+    const checkbox = await screen.findByLabelText("Include associated projects");
+    await user.click(checkbox);
+
+    await waitFor(() => {
+      const listCall = vi
+        .mocked(fetch)
+        .mock.calls.find(([input]) => String(input).includes("/leads?") && String(input).includes("includeAssociated=true"));
+      expect(listCall).toBeTruthy();
+      expect(String(listCall?.[0])).toContain("projectId=507f1f77bcf86cd799439051");
+    });
   });
 
   it("still supports archived restore from the opened row", async () => {

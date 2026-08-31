@@ -35,6 +35,10 @@ vi.mock("@/server/services/leads", () => ({
   })),
 }));
 
+vi.mock("@/server/services/companies", () => ({
+  resolveOrCreateCompanyByName: vi.fn(),
+}));
+
 vi.mock("@/server/services/integration-logs", () => ({
   buildWebsiteLeadPayloadSummary: vi.fn((input) => input),
   writeIntegrationLog: vi.fn(),
@@ -83,6 +87,7 @@ import {
 } from "@/server/services/hubspot-client";
 import { writeIntegrationLog } from "@/server/services/integration-logs";
 import { createLeadForWorkspace } from "@/server/services/leads";
+import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import { processHubSpotWebhookRequest } from "@/server/services/hubspot-lead-capture";
 import { verifyHubSpotSignatureV3 } from "@/server/utils/hubspot-webhook";
 
@@ -130,11 +135,21 @@ describe("hubspot lead capture webhook", () => {
       email: "ada@example.com",
       phone: null,
       createdAt: "2024-01-01T00:00:00.000Z",
-      properties: { company: "Analytical Engines" },
+      properties: {
+        company: "Analytical Engines",
+        jobtitle: "Analyst",
+        industry: "Technology",
+        state: "Geneva",
+        product_intersted_in: "CMP",
+      },
     });
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: { id: "lead-1" },
       warnings: [],
+    } as never);
+    vi.mocked(resolveOrCreateCompanyByName).mockResolvedValue({
+      company: { id: "company-1", name: "Analytical Engines" },
+      created: true,
     } as never);
   });
 
@@ -167,12 +182,17 @@ describe("hubspot lead capture webhook", () => {
         lastName: "Lovelace",
         email: "ada@example.com",
         sourceId: "source-hubspot",
+        industry: "Technology",
+        jobTitle: "Analyst",
+        stateRegion: "Geneva",
+        companyId: "company-1",
         attributes: expect.objectContaining({
           integration: expect.objectContaining({
             externalId: "99",
             inboundSource: "hubspot",
             idempotencyKey: "hubspot:contact:99",
             sourceCreatedAt: "2024-01-01T00:00:00.000Z",
+            productInterestedIn: "CMP",
           }),
           campaignEnrollmentPolicy: {
             defaultExcluded: true,
@@ -180,7 +200,11 @@ describe("hubspot lead capture webhook", () => {
           },
         }),
       }),
-      { triggerAutomation: false },
+      {
+        triggerAutomation: false,
+        intelligenceMethod: "hubspot",
+        intelligenceSource: "hubspot_lead_capture",
+      },
     );
     expect(summary).toEqual({
       received: 1,

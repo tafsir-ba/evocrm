@@ -34,6 +34,10 @@ vi.mock("@/server/services/leads", () => ({
   })),
 }));
 
+vi.mock("@/server/services/companies", () => ({
+  resolveOrCreateCompanyByName: vi.fn(async () => null),
+}));
+
 vi.mock("@/server/services/integration-logs", () => ({
   buildWebsiteLeadPayloadSummary: vi.fn(() => ({ emailPresent: true })),
   writeIntegrationLog: vi.fn(),
@@ -60,6 +64,7 @@ import {
 } from "@/server/repositories/leads";
 import { writeIntegrationLog } from "@/server/services/integration-logs";
 import { createLeadForWorkspace } from "@/server/services/leads";
+import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   captureWebsiteLead,
   resolveWebsiteIntegrationFromApiKey,
@@ -140,6 +145,7 @@ describe("website lead capture service", () => {
       }
       return null;
     });
+    vi.mocked(resolveOrCreateCompanyByName).mockResolvedValue(null);
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: {
         id: "lead-1",
@@ -181,6 +187,7 @@ describe("website lead capture service", () => {
         tagsResolved: [],
         assignedUser: null,
         ownerUser: null,
+        company: null,
       },
       warnings: [],
     });
@@ -237,10 +244,46 @@ describe("website lead capture service", () => {
           }),
         },
       }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
     expect(result.leadId).toBe("lead-1");
     expect(writeIntegrationLog).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: "website.lead.created", status: "success" }),
+    );
+  });
+
+  it("maps optional intelligence fields and company name without changing enrollment defaults", async () => {
+    vi.mocked(resolveOrCreateCompanyByName).mockResolvedValue({
+      company: { id: "company-1", name: "EvoHome" },
+      created: false,
+    } as never);
+
+    await captureWebsiteLead("raw-key", {
+      firstName: "John",
+      lastName: "Smith",
+      email: "john@example.com",
+      industry: "Hospitality",
+      jobTitle: "Buyer",
+      stateRegion: "Geneva",
+      companyName: "EvoHome",
+    });
+
+    expect(createLeadForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({
+        industry: "Hospitality",
+        jobTitle: "Buyer",
+        stateRegion: "Geneva",
+        companyId: "company-1",
+      }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 
@@ -483,6 +526,10 @@ describe("website lead capture service", () => {
       "ws-1",
       "user-1",
       expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 
@@ -525,6 +572,10 @@ describe("website lead capture service", () => {
       "ws-1",
       "user-1",
       expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 
@@ -550,6 +601,10 @@ describe("website lead capture service", () => {
       "ws-1",
       "user-1",
       expect.objectContaining({ projectId: TEST_PROJECT_ID }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 

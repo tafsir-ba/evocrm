@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hasPrimaryBusinessCompany,
   normalizeCompanyNameKey,
   normalizeProjectCompanies,
+  primaryCompanyLink,
   primaryDeveloperCompanyId,
+  retainExistingCompanyProvenance,
 } from "@/lib/project-operating-record";
 
 describe("project operating record", () => {
@@ -54,6 +57,18 @@ describe("project operating record", () => {
 
     expect(associations[0]?.isPrimary).toBe(false);
     expect(primaryDeveloperCompanyId(associations)).toBeNull();
+    expect(hasPrimaryBusinessCompany(associations)).toBe(false);
+  });
+
+  it("resolves the primary company link for list and detail display", () => {
+    const associations = normalizeProjectCompanies([
+      { companyId: "dev-1", role: "developer", isPrimary: true },
+      { companyId: "own-1", role: "owner" },
+    ]);
+
+    expect(hasPrimaryBusinessCompany(associations)).toBe(true);
+    expect(primaryCompanyLink(associations)?.companyId).toBe("dev-1");
+    expect(primaryCompanyLink([])).toBeNull();
   });
 
   it("preserves billed/linked provenance on the primary company link", () => {
@@ -70,5 +85,22 @@ describe("project operating record", () => {
     ]);
 
     expect(associations[0]?.provenance).toEqual(provenance);
+  });
+
+  it("retains stored provenance when an edit save omits it", () => {
+    const provenance = {
+      method: "workbook_import" as const,
+      relationship: "billed_linked" as const,
+      source: "workbook-derived mapping (operator-approved)",
+      appliedAt: "2026-08-30T18:00:00.000Z",
+      notes: "Establishes a billed/linked company relationship. Does not claim legal ownership.",
+    };
+
+    const next = retainExistingCompanyProvenance(
+      normalizeProjectCompanies([{ companyId: "dev-1", role: "developer", isPrimary: true }]),
+      [{ companyId: "dev-1", role: "developer", isPrimary: true, provenance }],
+    );
+
+    expect(next[0]?.provenance).toEqual(provenance);
   });
 });

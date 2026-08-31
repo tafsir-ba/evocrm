@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   closedPeriodSummary,
   defaultAttentionTab,
+  formatCmpReconciliationSummary,
   rankProjectsForOperator,
   type DashboardAttentionTab,
   type DashboardProjectHealthItem,
@@ -43,6 +44,7 @@ type DashboardData = {
     dateRange: { from: string; to: string; timezone: string };
     metrics: {
       newLeads: number;
+      importedLeads?: number;
       activeOpportunities: number;
       wonOpportunities: number;
       lostOpportunities: number;
@@ -50,6 +52,19 @@ type DashboardData = {
       wonValue: CurrencyAmount[];
       activitiesDueToday: number;
       overdueActivities: number;
+    };
+    cmpReconciliation?: {
+      sourceCohortCount: number;
+      membershipCount: number;
+      overlapCount: number;
+      sourceOnlyCount: number;
+      membershipOnlyCount: number;
+      cmpProjects: Array<{
+        id: string;
+        name: string;
+        reference: string | null;
+        membershipCount: number;
+      }>;
     };
   };
   pipeline: {
@@ -286,16 +301,33 @@ export function DashboardPanel({
         </div>
       ) : data && metrics ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 xl:grid-cols-6 gap-2">
+          <div
+            className={`grid grid-cols-2 gap-2 ${
+              (metrics.importedLeads ?? 0) > 0 ? "xl:grid-cols-7" : "xl:grid-cols-6"
+            }`}
+          >
             <StatLink
               href={scopedHref("leads", {
                 createdFrom: data.summary.dateRange.from,
                 createdTo: data.summary.dateRange.to,
+                acquisition: "genuine_inbound",
               })}
               label="New leads"
               value={String(metrics.newLeads)}
-              hint={dateRangeLabel}
+              hint={`Genuine inbound · ${dateRangeLabel}`}
             />
+            {(metrics.importedLeads ?? 0) > 0 ? (
+              <StatLink
+                href={scopedHref("leads", {
+                  createdFrom: data.summary.dateRange.from,
+                  createdTo: data.summary.dateRange.to,
+                  acquisition: "legacy_import",
+                })}
+                label="Imported"
+                value={String(metrics.importedLeads)}
+                hint="Excluded from new leads"
+              />
+            ) : null}
             <StatLink
               href={scopedHref("activities", { view: "overdue" })}
               label="Overdue"
@@ -448,12 +480,13 @@ export function DashboardPanel({
               <CardHeader
                 density="compact"
                 title="Lead sources"
-                subtitle={`${data.sources.total} new leads · ${dateRangeLabel}`}
+                subtitle={`${data.sources.total} genuine inbound · ${dateRangeLabel}`}
                 action={
                   <Link
                     href={scopedHref("leads", {
                       createdFrom: data.summary.dateRange.from,
                       createdTo: data.summary.dateRange.to,
+                      acquisition: "genuine_inbound",
                     })}
                     className="text-[12px] font-medium text-[var(--color-brand-700)] hover:underline"
                   >
@@ -476,6 +509,7 @@ export function DashboardPanel({
                             sourceId: item.source?.id,
                             createdFrom: data.summary.dateRange.from,
                             createdTo: data.summary.dateRange.to,
+                            acquisition: "genuine_inbound",
                           })}
                           className="flex items-center gap-2 text-[12.5px] hover:bg-[var(--color-canvas)]"
                         >
@@ -497,7 +531,7 @@ export function DashboardPanel({
                 </ul>
               ) : (
                 <p className="py-3 text-[12.5px] text-[var(--color-ink-muted)]">
-                  No leads created in this period, so there is no source mix to show.
+                  No genuine inbound leads in this period, so there is no source mix to show.
                 </p>
               )}
             </Card>
@@ -571,6 +605,86 @@ export function DashboardPanel({
               ) : null}
             </Card>
           </div>
+
+          {data.summary.cmpReconciliation ? (
+            <Card className="!p-3">
+              <CardHeader
+                density="compact"
+                title="CMP source vs CRM membership"
+                subtitle={formatCmpReconciliationSummary({
+                  sourceCohortCount: data.summary.cmpReconciliation.sourceCohortCount,
+                  membershipCount: data.summary.cmpReconciliation.membershipCount,
+                  overlapCount: data.summary.cmpReconciliation.overlapCount,
+                  sourceOnlyCount: data.summary.cmpReconciliation.sourceOnlyCount,
+                  membershipOnlyCount: data.summary.cmpReconciliation.membershipOnlyCount,
+                  cmpProjectCount: data.summary.cmpReconciliation.cmpProjects.length,
+                })}
+              />
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <p className="rounded-md border border-[var(--color-line)] px-2 py-1.5">
+                  <span className="block text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                    Source cohort
+                  </span>
+                  <span className="text-[16px] font-semibold tabular">
+                    {data.summary.cmpReconciliation.sourceCohortCount}
+                  </span>
+                </p>
+                <p className="rounded-md border border-[var(--color-line)] px-2 py-1.5">
+                  <span className="block text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                    CRM membership
+                  </span>
+                  <span className="text-[16px] font-semibold tabular">
+                    {data.summary.cmpReconciliation.membershipCount}
+                  </span>
+                </p>
+                <p className="rounded-md border border-[var(--color-line)] px-2 py-1.5">
+                  <span className="block text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                    In both
+                  </span>
+                  <span className="text-[16px] font-semibold tabular">
+                    {data.summary.cmpReconciliation.overlapCount}
+                  </span>
+                </p>
+                <p className="rounded-md border border-[var(--color-line)] px-2 py-1.5">
+                  <span className="block text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">
+                    Source only
+                  </span>
+                  <span className="text-[16px] font-semibold tabular">
+                    {data.summary.cmpReconciliation.sourceOnlyCount}
+                  </span>
+                </p>
+              </div>
+              {data.summary.cmpReconciliation.cmpProjects.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {data.summary.cmpReconciliation.cmpProjects.map((project) => (
+                    <li key={project.id}>
+                      <Link
+                        href={workspacePath(workspaceSlug, "projects", project.id)}
+                        className="flex items-center justify-between text-[12.5px] hover:bg-[var(--color-canvas)]"
+                      >
+                        <span className="truncate text-[var(--color-ink-soft)]">
+                          {project.name}
+                          {project.reference ? (
+                            <span className="ml-1 text-[var(--color-ink-muted)]">
+                              {project.reference}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="tabular text-[var(--color-ink)]">
+                          {project.membershipCount}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[12.5px] text-[var(--color-ink-muted)]">
+                  No CRM project named CMP. Counts stay separate from new inbound and never
+                  enroll campaigns.
+                </p>
+              )}
+            </Card>
+          ) : null}
 
           <Card className="!p-3">
             <CardHeader
@@ -660,6 +774,7 @@ function StatLink({
   return (
     <Link
       href={href}
+      aria-label={`${label}: ${value}. ${hint}`}
       className="rounded-lg border border-[var(--color-line)] bg-white px-2.5 py-2 hover:border-[var(--color-brand-300)] hover:bg-[var(--color-canvas)]"
     >
       <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">

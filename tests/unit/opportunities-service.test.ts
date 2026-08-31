@@ -105,6 +105,7 @@ describe("opportunity service", () => {
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
       workspaceId: "ws-1",
+      ...leadRecordExtras,
       projectId: "project-1",
       archivedAt: null,
       fullName: "John Smith",

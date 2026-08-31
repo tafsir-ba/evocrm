@@ -46,8 +46,20 @@ type LeadListItem = {
   statusId?: string;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
+  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  projectMemberships?: Array<{
+    id: string;
+    projectId: string;
+    isPrimary: boolean;
+    sourceOrder: number;
+    project: { id: string; name: string; reference: string | null } | null;
+  }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
+  company?: { id: string; name: string } | null;
+  industry?: string | null;
+  jobTitle?: string | null;
+  stateRegion?: string | null;
   lastActivity?: { id: string; title: string; at: string | Date } | null;
   nextAction?: { id: string; title: string; at: string | Date } | null;
 };
@@ -80,7 +92,9 @@ export function LeadsPanel({
   const assignedToParam = searchParams.get("assignedTo") ?? "";
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
+  const acquisitionParam = searchParams.get("acquisition");
   const projectId = useWorkspaceProjectFilter();
+  const [includeAssociated, setIncludeAssociated] = useState(false);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -99,6 +113,11 @@ export function LeadsPanel({
   const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState("");
   const [transactionIntentFilter, setTransactionIntentFilter] = useState("");
   const [usagePurposeFilter, setUsagePurposeFilter] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("");
+  const [jobTitleFilter, setJobTitleFilter] = useState("");
+  const [stateRegionFilter, setStateRegionFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
@@ -121,22 +140,31 @@ export function LeadsPanel({
     setWebsiteOptionsWarning(null);
 
     try {
-      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes] = await Promise.all([
-        fetch(`${apiBase}/dictionary-items?type=lead_status`),
-        fetch(`${apiBase}/dictionary-items?type=lead_source`),
-        fetch(`${apiBase}/tags?entityType=lead`),
-        fetch(`${apiBase}/integrations?type=website`),
-        fetch(`${apiBase}/members`),
-      ]);
-
-      const [statusPayload, sourcePayload, tagsPayload, integrationsPayload, membersPayload] =
+      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes, companiesRes] =
         await Promise.all([
-          statusRes.json(),
-          sourceRes.json(),
-          tagsRes.json(),
-          integrationsRes.json(),
-          membersRes.json(),
+          fetch(`${apiBase}/dictionary-items?type=lead_status`),
+          fetch(`${apiBase}/dictionary-items?type=lead_source`),
+          fetch(`${apiBase}/tags?entityType=lead`),
+          fetch(`${apiBase}/integrations?type=website`),
+          fetch(`${apiBase}/members`),
+          fetch(`${apiBase}/companies`),
         ]);
+
+      const [
+        statusPayload,
+        sourcePayload,
+        tagsPayload,
+        integrationsPayload,
+        membersPayload,
+        companiesPayload,
+      ] = await Promise.all([
+        statusRes.json(),
+        sourceRes.json(),
+        tagsRes.json(),
+        integrationsRes.json(),
+        membersRes.json(),
+        companiesRes.json(),
+      ]);
 
       if (statusRes.ok) {
         setStatuses(statusPayload.data.items as DictionaryItem[]);
@@ -168,6 +196,14 @@ export function LeadsPanel({
         setMembers((membersPayload?.data?.members as LeadTableMember[] | undefined) ?? []);
       } else {
         setMembers([]);
+      }
+      if (companiesRes.ok) {
+        setCompanies(
+          ((companiesPayload?.data?.companies as Array<{ id: string; name: string }> | undefined) ??
+            []) as Array<{ id: string; name: string }>,
+        );
+      } else {
+        setCompanies([]);
       }
     } catch {
       setWebsiteOptionsWarning("Could not load some lead filter options.");
@@ -218,10 +254,16 @@ export function LeadsPanel({
     utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    industryFilter,
+    jobTitleFilter,
+    stateRegionFilter,
+    companyFilter,
     projectId,
+    includeAssociated,
     showArchived,
     createdFromParam,
     createdToParam,
+    acquisitionParam,
   ]);
 
   useEffect(() => {
@@ -244,6 +286,7 @@ export function LeadsPanel({
   }, [
     page,
     projectId,
+    includeAssociated,
     propertyTypeInterestFilter,
     search,
     sourceFilter,
@@ -254,9 +297,14 @@ export function LeadsPanel({
     utmCampaignFilter,
     transactionIntentFilter,
     usagePurposeFilter,
+    industryFilter,
+    jobTitleFilter,
+    stateRegionFilter,
+    companyFilter,
     showArchived,
     createdFromParam,
     createdToParam,
+    acquisitionParam,
   ]);
 
   const selectedCount = useMemo(() => {
@@ -307,6 +355,9 @@ export function LeadsPanel({
     if (createdToParam) {
       filters.createdTo = createdToParam;
     }
+    if (acquisitionParam === "genuine_inbound" || acquisitionParam === "legacy_import") {
+      filters.acquisition = acquisitionParam;
+    }
     if (tagFilter) {
       filters.tagId = tagFilter;
     }
@@ -325,8 +376,23 @@ export function LeadsPanel({
     if (usagePurposeFilter) {
       filters.usagePurpose = usagePurposeFilter;
     }
+    if (industryFilter.trim()) {
+      filters.industry = industryFilter.trim();
+    }
+    if (jobTitleFilter.trim()) {
+      filters.jobTitle = jobTitleFilter.trim();
+    }
+    if (stateRegionFilter.trim()) {
+      filters.stateRegion = stateRegionFilter.trim();
+    }
+    if (companyFilter) {
+      filters.companyId = companyFilter;
+    }
     if (projectId) {
       filters.projectId = projectId;
+    }
+    if (projectId && includeAssociated) {
+      filters.includeAssociated = "true";
     }
     if (showArchived) {
       filters.includeArchived = "true";
@@ -587,6 +653,19 @@ export function LeadsPanel({
           />
           Show archived
         </label>
+        {projectId ? (
+          <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+            <input
+              type="checkbox"
+              checked={includeAssociated}
+              onChange={(event) => {
+                setPage(1);
+                setIncludeAssociated(event.target.checked);
+              }}
+            />
+            Include associated projects
+          </label>
+        ) : null}
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"
@@ -640,7 +719,11 @@ export function LeadsPanel({
         </Select>
         {createdFromParam || createdToParam ? (
           <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)]">
-            Created in linked period
+            {acquisitionParam === "legacy_import"
+              ? "Imported in linked period"
+              : acquisitionParam === "genuine_inbound"
+                ? "Genuine inbound in linked period"
+                : "Created in linked period"}
             <button
               type="button"
               className="font-medium text-[var(--color-brand-700)] hover:underline"
@@ -648,6 +731,7 @@ export function LeadsPanel({
                 const next = new URLSearchParams(searchParams.toString());
                 next.delete("createdFrom");
                 next.delete("createdTo");
+                next.delete("acquisition");
                 const qs = next.toString();
                 router.replace(
                   `${workspacePath(workspaceSlug, "leads")}${qs ? `?${qs}` : ""}`,
@@ -670,7 +754,11 @@ export function LeadsPanel({
           utmCampaignFilter ||
           propertyTypeInterestFilter ||
           transactionIntentFilter ||
-          usagePurposeFilter
+          usagePurposeFilter ||
+          industryFilter ||
+          jobTitleFilter ||
+          stateRegionFilter ||
+          companyFilter
             ? " · on"
             : ""}
         </button>
@@ -774,6 +862,56 @@ export function LeadsPanel({
             </option>
           ))}
         </Select>
+        <Select
+          fieldSize="sm"
+          className="w-auto min-w-[160px]"
+          aria-label="Filter by company"
+          value={companyFilter}
+          onChange={(event) => {
+            setPage(1);
+            setCompanyFilter(event.target.value);
+          }}
+        >
+          <option value="">All companies</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </Select>
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="Industry"
+          aria-label="Filter by industry"
+          value={industryFilter}
+          onChange={(event) => {
+            setPage(1);
+            setIndustryFilter(event.target.value);
+          }}
+        />
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="Job title"
+          aria-label="Filter by job title"
+          value={jobTitleFilter}
+          onChange={(event) => {
+            setPage(1);
+            setJobTitleFilter(event.target.value);
+          }}
+        />
+        <Input
+          fieldSize="sm"
+          className="w-auto min-w-[140px] max-w-[180px]"
+          placeholder="State / region"
+          aria-label="Filter by state or region"
+          value={stateRegionFilter}
+          onChange={(event) => {
+            setPage(1);
+            setStateRegionFilter(event.target.value);
+          }}
+        />
       </div>
       ) : null}
 

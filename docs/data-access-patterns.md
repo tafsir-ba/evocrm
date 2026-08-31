@@ -376,10 +376,12 @@ Opportunity.aggregate([
 
 | Query | Repository helper | Notes |
 |-------|-------------------|-------|
-| New leads count | `countLeadsCreatedInRange` | `createdAt` bounds; excludes archived |
+| New leads count | `countLeadsCreatedInRange` | `createdAt` bounds; genuine inbound only (`$nor` legacy import); excludes archived |
+| Imported leads count | `countLegacyImportedLeadsCreatedInRange` | Same date bounds; HubSpot GV/WD + CSV import only |
 | Open/won/lost counts | `countOpportunitiesByStatusIds`, `countWon/LostOpportunitiesInRange` | Status IDs resolved from dictionary `behavior`, never labels |
 | Pipeline/value sums | `sumOpportunityValuesByCurrency`, `groupOpportunitiesByStatus` | Grouped by `currency`; no conversion |
-| Leads by source | `groupLeadsBySource` | Date-bounded; null `sourceId` → unknown bucket |
+| Leads by source | `groupLeadsBySource` | Date-bounded genuine inbound; null `sourceId` → unknown bucket |
+| CMP reconciliation | `getCmpReconciliation` | CMP source-cohort attributes vs CRM CMP project memberships |
 | Properties by status | `groupPropertiesByStatus` | Current state; excludes archived |
 | Activities due/overdue | `countActivitiesDueToday`, `countOverdueActivities` | Pending status IDs; due today uses workspace day bounds |
 

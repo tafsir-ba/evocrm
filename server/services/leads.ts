@@ -18,6 +18,21 @@ import {
   type LeadListFilter,
   type LeadRecord,
 } from "@/server/repositories/leads";
+import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
+import {
+  ensurePrimaryMembershipForLead,
+  loadMembershipsByLeadIds,
+  type LeadProjectMembershipSummary,
+} from "@/server/services/lead-project-memberships";
+import { buildMembershipProvenance } from "@/lib/lead-project-membership";
+import {
+  buildLeadFieldProvenance,
+  mergeIntelligenceProvenance,
+  normalizeIntelligenceText,
+  type LeadFieldProvenanceMethod,
+  type LeadIntelligenceProvenance,
+} from "@/lib/lead-intelligence";
+import { findCompaniesByIds } from "@/server/repositories/companies";
 import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
@@ -62,12 +77,20 @@ export type LeadProjectSummary = {
   reference: string | null;
 };
 
+export type LeadCompanySummary = {
+  id: string;
+  name: string;
+};
+
 export type LeadListItem = LeadRecord & {
   project: LeadProjectSummary | null;
+  projectMemberships?: LeadProjectMembershipSummary[];
+  secondaryProjects?: LeadProjectSummary[];
   status: LeadDictionarySummary | null;
   source: LeadDictionarySummary | null;
   tagsResolved: LeadTagSummary[];
   assignedUser: LeadUserSummary | null;
+  company: LeadCompanySummary | null;
   lastActivity?: LeadActivityEvent | null;
   nextAction?: LeadActivityEvent | null;
 };
@@ -83,6 +106,66 @@ export type LeadMutationResult = {
 
 function deriveFullName(firstName: string, lastName: string): string {
   return `${firstName.trim()} ${lastName.trim()}`.trim();
+}
+
+const INTELLIGENCE_TEXT_FIELDS = ["industry", "jobTitle", "stateRegion"] as const;
+
+async function resolveCompanySummary(
+  workspaceId: string,
+  companyId: string | null | undefined,
+): Promise<LeadCompanySummary | null> {
+  if (!companyId) {
+    return null;
+  }
+  const found = await findCompaniesByIds(workspaceId, [companyId]);
+  const company = found[0];
+  return company ? { id: company.id, name: company.name } : null;
+}
+
+function stampProvidedIntelligenceProvenance(input: {
+  existing?: {
+    industry: string | null;
+    jobTitle: string | null;
+    stateRegion: string | null;
+    companyId?: string | null;
+    intelligenceProvenance?: LeadIntelligenceProvenance;
+  };
+  incoming: {
+    industry?: string | null;
+    jobTitle?: string | null;
+    stateRegion?: string | null;
+    companyId?: string | null;
+  };
+  method: LeadFieldProvenanceMethod;
+  source: string;
+}): LeadIntelligenceProvenance {
+  const stamp = buildLeadFieldProvenance({
+    method: input.method,
+    source: input.source,
+    notes: input.method === "manual" ? "Updated from CRM form or API." : null,
+  });
+  const next: LeadIntelligenceProvenance = { ...(input.existing?.intelligenceProvenance ?? {}) };
+
+  for (const field of INTELLIGENCE_TEXT_FIELDS) {
+    if (input.incoming[field] === undefined) {
+      continue;
+    }
+    const incoming = normalizeIntelligenceText(input.incoming[field]);
+    const existing = normalizeIntelligenceText(input.existing?.[field] ?? null);
+    if (incoming !== existing) {
+      next[field] = stamp;
+    }
+  }
+
+  if (input.incoming.companyId !== undefined) {
+    const incoming = input.incoming.companyId;
+    const existing = input.existing?.companyId ?? null;
+    if (incoming !== existing) {
+      next.companyId = stamp;
+    }
+  }
+
+  return mergeIntelligenceProvenance(input.existing?.intelligenceProvenance, next);
 }
 
 export function normalizeLeadEmail(email: string): {
@@ -290,29 +373,51 @@ async function resolveProjectSummary(
   };
 }
 
-async function enrichLeadListItem(lead: LeadRecord): Promise<LeadListItem> {
-  const [project, status, source, tagsResolved, assignedUser] = await Promise.all([
+function secondaryProjectsFromMemberships(
+  memberships: LeadProjectMembershipSummary[],
+): LeadProjectSummary[] {
+  return memberships
+    .filter((membership) => !membership.isPrimary && membership.project)
+    .map((membership) => membership.project!)
+    .filter(
+      (project, index, all) => all.findIndex((item) => item.id === project.id) === index,
+    );
+}
+
+async function enrichLeadListItem(
+  lead: LeadRecord,
+  memberships: LeadProjectMembershipSummary[] = [],
+): Promise<LeadListItem> {
+  const [project, status, source, tagsResolved, assignedUser, company] = await Promise.all([
     resolveProjectSummary(lead.workspaceId, lead.projectId),
     resolveDictionarySummary(lead.workspaceId, lead.statusId, "lead_status"),
     resolveDictionarySummary(lead.workspaceId, lead.sourceId, "lead_source"),
     resolveTagsSummary(lead.workspaceId, lead.tags),
     resolveUserSummary(lead.assignedTo),
+    resolveCompanySummary(lead.workspaceId, lead.companyId),
   ]);
 
   return {
     ...lead,
     project,
+    projectMemberships: memberships,
+    secondaryProjects: secondaryProjectsFromMemberships(memberships),
     status,
     source,
     tagsResolved,
     assignedUser,
+    company,
     lastActivity: null,
     nextAction: null,
   };
 }
 
 async function enrichLeadRecord(lead: LeadRecord): Promise<LeadDetail> {
-  const listItem = await enrichLeadListItem(lead);
+  const membershipsByLead = await loadMembershipsByLeadIds(lead.workspaceId, [lead.id]);
+  const listItem = await enrichLeadListItem(
+    lead,
+    membershipsByLead.get(lead.id) ?? [],
+  );
   const ownerUser = await resolveUserSummary(lead.ownerId);
   return { ...listItem, ownerUser };
 }
@@ -332,6 +437,46 @@ function leadSnapshot(lead: LeadRecord): Record<string, unknown> {
     propertyTypeInterests: lead.propertyTypeInterests,
     transactionIntent: lead.transactionIntent,
     usagePurpose: lead.usagePurpose,
+    companyId: lead.companyId ?? null,
+    industry: lead.industry,
+    jobTitle: lead.jobTitle,
+    stateRegion: lead.stateRegion,
+  };
+}
+
+async function validateOptionalCompanyId(
+  workspaceId: string,
+  companyId: string | null | undefined,
+): Promise<void> {
+  if (!companyId) {
+    return;
+  }
+
+  const found = await findCompaniesByIds(workspaceId, [companyId]);
+  if (found.length !== 1) {
+    throw new AppError("VALIDATION_ERROR", "Company was not found.");
+  }
+}
+
+async function resolveListFilter(
+  workspaceId: string,
+  filter: LeadListFilter,
+): Promise<LeadListFilter> {
+  if (!filter.projectId || !filter.includeAssociated) {
+    return filter;
+  }
+
+  const associatedLeadIds = await findLeadIdsForProjectMembership(
+    workspaceId,
+    filter.projectId,
+  );
+  const requested = filter.leadIds?.length
+    ? associatedLeadIds.filter((id) => filter.leadIds!.includes(id))
+    : associatedLeadIds;
+
+  return {
+    ...filter,
+    associatedLeadIds: requested,
   };
 }
 
@@ -340,10 +485,19 @@ export async function listLeadsForWorkspace(
   filter: LeadListFilter = {},
 ): Promise<{ leads: LeadListItem[]; total: number }> {
   await assertValidProjectFilter(workspaceId, filter.projectId);
-  const { leads, total } = await findLeads(workspaceId, filter);
+  const listFilter = await resolveListFilter(workspaceId, filter);
+  const { leads, total } = await findLeads(workspaceId, listFilter);
+  const membershipsByLead = await loadMembershipsByLeadIds(
+    workspaceId,
+    leads.map((lead) => lead.id),
+  );
 
   const [enriched, activitySummaries] = await Promise.all([
-    Promise.all(leads.map((lead) => enrichLeadListItem(lead))),
+    Promise.all(
+      leads.map((lead) =>
+        enrichLeadListItem(lead, membershipsByLead.get(lead.id) ?? []),
+      ),
+    ),
     findLeadActivitySummaries(
       workspaceId,
       leads.map((lead) => lead.id),
@@ -384,6 +538,8 @@ export async function createLeadForWorkspace(
     triggerAutomation?: boolean;
     /** When set (e.g. email display label for nameMissing leads), overrides derived fullName. */
     displayFullName?: string;
+    intelligenceMethod?: LeadFieldProvenanceMethod;
+    intelligenceSource?: string;
   },
 ): Promise<LeadMutationResult> {
   await validateActiveProjectId(workspaceId, input.projectId);
@@ -396,6 +552,7 @@ export async function createLeadForWorkspace(
     input.assignedTo,
     "Assigned to",
   );
+  await validateOptionalCompanyId(workspaceId, input.companyId);
 
   const fullName = options?.displayFullName ?? deriveFullName(input.firstName, input.lastName);
   const emailFields = input.email ? normalizeLeadEmail(input.email) : null;
@@ -439,7 +596,39 @@ export async function createLeadForWorkspace(
     tags: input.tags ?? [],
     attributes: input.attributes ?? {},
     emailConsentStatus: input.emailConsentStatus ?? "unknown",
+    companyId: input.companyId ?? null,
+    industry: normalizeIntelligenceText(input.industry) ?? null,
+    jobTitle: normalizeIntelligenceText(input.jobTitle) ?? null,
+    stateRegion: normalizeIntelligenceText(input.stateRegion) ?? null,
+    intelligenceProvenance: stampProvidedIntelligenceProvenance({
+      incoming: {
+        industry: input.industry,
+        jobTitle: input.jobTitle,
+        stateRegion: input.stateRegion,
+        companyId: input.companyId ?? null,
+      },
+      method: options?.intelligenceMethod ?? "manual",
+      source: options?.intelligenceSource ?? "lead_create",
+    }),
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+  });
+
+  await ensurePrimaryMembershipForLead({
+    workspaceId,
+    leadId: lead.id,
+    projectId: input.projectId,
+    actorId,
+    source: "lead_create",
+    joinedAt: lead.createdAt,
+    sourceOrder: 0,
+    provenance: buildMembershipProvenance({
+      method: "lead_create",
+      source: "lead_create",
+      notes: "Primary membership from lead create.",
+      appliedAt: lead.createdAt,
+      sourceMembershipDate: lead.createdAt,
+      sourceOrder: 0,
+    }),
   });
 
   await createAuditLog({
@@ -483,6 +672,11 @@ export async function updateLeadForWorkspace(
   leadId: string,
   actorId: string,
   input: UpdateLeadInput,
+  options?: {
+    triggerAutomation?: boolean;
+    intelligenceMethod?: LeadFieldProvenanceMethod;
+    intelligenceSource?: string;
+  },
 ): Promise<LeadMutationResult> {
   const existing = await findLeadById(workspaceId, leadId);
 
@@ -508,6 +702,9 @@ export async function updateLeadForWorkspace(
       input.assignedTo,
       "Assigned to",
     );
+  }
+  if (input.companyId !== undefined) {
+    await validateOptionalCompanyId(workspaceId, input.companyId);
   }
 
   const updatePayload: Parameters<typeof updateLead>[2] = {};
@@ -622,6 +819,36 @@ export async function updateLeadForWorkspace(
   if (input.emailUnsubscribeReason !== undefined) {
     updatePayload.emailUnsubscribeReason = input.emailUnsubscribeReason;
   }
+  if (input.companyId !== undefined) {
+    updatePayload.companyId = input.companyId;
+  }
+  if (input.industry !== undefined) {
+    updatePayload.industry = normalizeIntelligenceText(input.industry);
+  }
+  if (input.jobTitle !== undefined) {
+    updatePayload.jobTitle = normalizeIntelligenceText(input.jobTitle);
+  }
+  if (input.stateRegion !== undefined) {
+    updatePayload.stateRegion = normalizeIntelligenceText(input.stateRegion);
+  }
+  if (
+    input.industry !== undefined ||
+    input.jobTitle !== undefined ||
+    input.stateRegion !== undefined ||
+    input.companyId !== undefined
+  ) {
+    updatePayload.intelligenceProvenance = stampProvidedIntelligenceProvenance({
+      existing,
+      incoming: {
+        industry: input.industry,
+        jobTitle: input.jobTitle,
+        stateRegion: input.stateRegion,
+        companyId: input.companyId,
+      },
+      method: options?.intelligenceMethod ?? "manual",
+      source: options?.intelligenceSource ?? "lead_update",
+    });
+  }
 
   const updated = await updateLead(workspaceId, leadId, updatePayload);
 
@@ -673,23 +900,25 @@ export async function updateLeadForWorkspace(
     });
   }
 
-  try {
-    await evaluateCampaignAutoEnrollmentForLead({
-      workspaceId,
-      leadId,
-      trigger: "lead_updated",
-      actorId,
-    });
-  } catch (error) {
-    logAutoEnrollmentFailure(
-      {
+  if (options?.triggerAutomation !== false) {
+    try {
+      await evaluateCampaignAutoEnrollmentForLead({
         workspaceId,
         leadId,
         trigger: "lead_updated",
         actorId,
-      },
-      error,
-    );
+      });
+    } catch (error) {
+      logAutoEnrollmentFailure(
+        {
+          workspaceId,
+          leadId,
+          trigger: "lead_updated",
+          actorId,
+        },
+        error,
+      );
+    }
   }
 
   return {
@@ -776,6 +1005,7 @@ function buildBulkDeleteLeadFilter(
     includeArchived: filters.includeArchived,
     search: filters.search,
     projectId: filters.projectId,
+    includeAssociated: filters.includeAssociated,
     statusId: filters.statusId,
     sourceId: filters.sourceId,
     assignedTo: filters.assignedTo,
@@ -788,6 +1018,7 @@ function buildBulkDeleteLeadFilter(
     utmCampaign: filters.utmCampaign,
     createdFrom: filters.createdFrom,
     createdTo: filters.createdTo,
+    acquisition: filters.acquisition,
     excludeIds: input.excludeLeadIds,
   };
 }
@@ -798,7 +1029,10 @@ export async function purgeLeadsForWorkspace(
   input: BulkDeleteLeadsInput,
 ): Promise<{ deletedCount: number; requestedCount: number }> {
   const leadIds = input.selectAll
-    ? await findLeadIds(workspaceId, buildBulkDeleteLeadFilter(input))
+    ? await findLeadIds(
+        workspaceId,
+        await resolveListFilter(workspaceId, buildBulkDeleteLeadFilter(input)),
+      )
     : await findLeadIds(workspaceId, {
         leadIds: input.leadIds ?? [],
         includeArchived: true,

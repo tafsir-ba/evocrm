@@ -25,6 +25,7 @@ export type CompanySelectorProps = {
   className?: string;
   id?: string;
   name?: string;
+  required?: boolean;
 };
 
 export function CompanySelector({
@@ -42,6 +43,7 @@ export function CompanySelector({
   className,
   id,
   name,
+  required = false,
 }: CompanySelectorProps) {
   const [query, setQuery] = useState("");
 
@@ -92,6 +94,7 @@ export function CompanySelector({
       <select
         id={id}
         name={name}
+        required={required}
         value={selectedCompanyId ?? ""}
         disabled={disabled}
         onChange={(event) => {

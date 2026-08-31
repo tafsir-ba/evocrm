@@ -1,5 +1,7 @@
 import { isHubSpotOrLegacyMigratedLead } from "@/lib/campaign-enrollment-guard";
+import { isLegacyImportLead } from "@/lib/inbound-acquisition";
 import { readLeadIntegrationAttributes } from "@/lib/lead-integration-attributes";
+import type { LeadIntelligenceProvenance } from "@/lib/lead-intelligence";
 import { daysSince, formatRelativeAge, parseListDate } from "@/lib/list-view";
 
 export const INBOUND_DEMAND_DAYS = 30;
@@ -20,6 +22,7 @@ export type LeadInboundSnapshot = {
   projectId?: string | null;
   createdAt?: string | Date | null;
   attributes?: Record<string, unknown> | null;
+  intelligenceProvenance?: LeadIntelligenceProvenance | null;
 };
 
 const BASIS_LABEL: Record<InboundReceivedBasis, string> = {
@@ -72,7 +75,13 @@ export function resolveLeadInboundReceivedAt(
     }
   }
 
-  if (isHubSpotOrLegacyMigratedLead(lead.attributes)) {
+  if (
+    isHubSpotOrLegacyMigratedLead(lead.attributes) ||
+    isLegacyImportLead({
+      attributes: lead.attributes,
+      intelligenceProvenance: lead.intelligenceProvenance,
+    })
+  ) {
     return null;
   }
 

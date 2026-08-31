@@ -47,6 +47,11 @@ export const leadListQuerySchema = z.object({
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
   projectId: objectIdSchema.optional(),
+  companyId: objectIdSchema.optional(),
+  includeAssociated: z
+    .union([z.literal("true"), z.literal("false")])
+    .optional()
+    .transform((value) => value === "true"),
   statusId: objectIdSchema.optional(),
   sourceId: objectIdSchema.optional(),
   assignedTo: objectIdSchema.optional(),
@@ -55,10 +60,14 @@ export const leadListQuerySchema = z.object({
   propertyTypeInterest: z.enum(PROPERTY_TYPE_INTERESTS).optional(),
   transactionIntent: transactionIntentSchema.optional(),
   usagePurpose: usagePurposeSchema.optional(),
+  industry: z.string().trim().max(120).optional(),
+  jobTitle: z.string().trim().max(120).optional(),
+  stateRegion: z.string().trim().max(120).optional(),
   integrationId: objectIdSchema.optional(),
   utmCampaign: z.string().trim().min(1).max(120).optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
+  acquisition: z.enum(["genuine_inbound", "legacy_import"]).optional(),
 });
 
 const createLeadBudgetRefinement = {
@@ -88,10 +97,14 @@ const createLeadInputObjectSchema = z
     propertyTypeInterests: propertyTypeInterestsSchema,
     transactionIntent: transactionIntentSchema.optional(),
     usagePurpose: usagePurposeSchema.optional(),
+    industry: z.string().trim().max(120).nullable().optional(),
+    jobTitle: z.string().trim().max(120).nullable().optional(),
+    stateRegion: z.string().trim().max(120).nullable().optional(),
     notes: z.string().trim().max(5000).optional(),
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,
     emailConsentStatus: emailConsentStatusSchema.optional(),
+    companyId: objectIdSchema.optional(),
     createdAt: z.coerce.date().optional(),
   })
   .strict();
@@ -125,12 +138,16 @@ export const updateLeadInputSchema = z
     propertyTypeInterests: propertyTypeInterestsSchema,
     transactionIntent: transactionIntentSchema.nullable().optional(),
     usagePurpose: usagePurposeSchema.nullable().optional(),
+    industry: z.string().trim().max(120).nullable().optional(),
+    jobTitle: z.string().trim().max(120).nullable().optional(),
+    stateRegion: z.string().trim().max(120).nullable().optional(),
     notes: z.string().trim().max(5000).nullable().optional(),
     tags: z.array(objectIdSchema).max(20).optional(),
     attributes: attributesSchema,
     emailConsentStatus: emailConsentStatusSchema.optional(),
     emailUnsubscribedAt: z.coerce.date().nullable().optional(),
     emailUnsubscribeReason: z.string().trim().max(500).nullable().optional(),
+    companyId: objectIdSchema.nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

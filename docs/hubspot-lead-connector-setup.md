@@ -17,7 +17,7 @@ Historical import is **project-by-project** and not enabled until mapping review
 3. **Refresh HubSpot projects**, then explicitly map each HubSpot project → Evohome project (or Skip)
 4. Do **not** import until Phase 2 dry-run / Phase 3 pilot are approved
 
-Companies are not a separate Evohome entity in V1; future pilot imports will store HubSpot company id/name on lead attributes/notes only.
+Associated company is a Company FK (`Lead.companyId`). Live HubSpot creates and CMP enrichment map `industry`, `jobtitle`, `state`/`hs_state_code`, and `company` onto structured lead fields. Enrichment fills blank or HubSpot-owned values only, preserves manual CRM edits, and never enrolls campaigns (`npm run enrich:hubspot-cmp-lead-intelligence`). Shared contract: `lib/lead-intelligence.ts`.
 
 Live signed webhooks remain deferred until a client secret is saved and webhook setup is approved.
 

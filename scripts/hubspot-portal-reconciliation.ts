@@ -52,6 +52,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type HubSpotContactListPage = {
+  results?: Array<{ id: string; properties: Record<string, string | null> }>;
+  paging?: { next?: { after?: string } };
+};
+
 async function hubspotListAll(input: {
   accessToken: string;
   properties: string[];
@@ -60,13 +65,9 @@ async function hubspotListAll(input: {
 }> {
   const results: Array<{ id: string; properties: Record<string, string | null> }> = [];
   let after: string | undefined;
-  type HubSpotListPage = {
-    results?: Array<{ id: string; properties: Record<string, string | null> }>;
-    paging?: { next?: { after?: string } };
-  };
   for (;;) {
     let lastError: unknown = null;
-    let page: HubSpotListPage | null = null;
+    let page: HubSpotContactListPage | null = null;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const params = new URLSearchParams({
         limit: "100",
@@ -94,7 +95,7 @@ async function hubspotListAll(input: {
         await sleep(500 * 2 ** attempt);
         continue;
       }
-      page = (await response.json()) as HubSpotListPage;
+      page = (await response.json()) as HubSpotContactListPage;
       break;
     }
     if (!page) {

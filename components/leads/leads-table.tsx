@@ -10,8 +10,10 @@ import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
 import { IconChevronDown, IconChevronRight, IconMail, IconPhone } from "@/lib/icons";
 import {
+  formatLeadRoleLine,
   formatNextStepCell,
   formatOwnerName,
+  formatProjectMembershipCell,
   formatRelativeAge,
   formatSourceContext,
   formatUtmTitle,
@@ -19,6 +21,7 @@ import {
   telHref,
   visibleLeadTags,
 } from "@/lib/leads-table";
+import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -48,8 +51,20 @@ export type LeadTableItem = {
   statusId?: string;
   source: LeadTableDictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
+  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  projectMemberships?: Array<{
+    id: string;
+    projectId: string;
+    isPrimary: boolean;
+    sourceOrder: number;
+    project: { id: string; name: string; reference: string | null } | null;
+  }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   assignedUser: { id: string; name: string | null; email: string } | null;
+  company?: { id: string; name: string } | null;
+  industry?: string | null;
+  jobTitle?: string | null;
+  stateRegion?: string | null;
   lastActivity?: { id: string; title: string; at: string | Date } | null;
   nextAction?: { id: string; title: string; at: string | Date } | null;
 };
@@ -391,6 +406,8 @@ function ExpandedDetails({
         ) : null}
         {utmTitle ? <p title={utmTitle}>UTM {source.context}</p> : null}
         {last.kind === "last" ? <p>{last.text}</p> : null}
+        {lead.industry ? <p>Industry {lead.industry}</p> : null}
+        {lead.stateRegion ? <p>State / region {lead.stateRegion}</p> : null}
         {lead.tagsResolved.length > 0 ? <LeadTags tags={lead.tagsResolved} max={6} /> : null}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -453,7 +470,7 @@ export function LeadsTable({
   onRestore,
 }: LeadsTableProps) {
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
-  const columnCount = (canDelete ? 1 : 0) + 10;
+  const columnCount = (canDelete ? 1 : 0) + 11;
 
   function toggleExpanded(leadId: string) {
     setExpandedLeadIds((current) => {
@@ -470,7 +487,7 @@ export function LeadsTable({
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-[1020px] w-full text-[12.5px] leading-none">
+        <table className="min-w-[1120px] w-full text-[12.5px] leading-none">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
               {canDelete && (
@@ -490,6 +507,7 @@ export function LeadsTable({
                 </th>
               )}
               <th className="px-1.5 py-1 text-left">Lead</th>
+              <th className="w-[8.5rem] px-1.5 py-1 text-left">Company</th>
               <th className="w-[8.5rem] px-1.5 py-1 text-left">Project</th>
               <th className="w-[7.5rem] px-1.5 py-1 text-left">Source</th>
               <th className="w-[7.5rem] px-1.5 py-1 text-left">Status</th>
@@ -548,17 +566,39 @@ export function LeadsTable({
                         </Link>
                         <ContactPopover lead={lead} />
                       </div>
+                      {formatLeadRoleLine(lead) ? (
+                        <p className="mt-0.5 truncate text-[11px] text-[var(--color-ink-muted)]">
+                          {formatLeadRoleLine(lead)}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <p className="truncate text-[var(--color-ink-soft)]" title={lead.company?.name ?? undefined}>
+                        {lead.company?.name ?? "—"}
+                      </p>
                     </td>
                     <td className="px-1.5 py-1">
                       <p
                         className="truncate text-[var(--color-ink-soft)]"
                         title={
-                          lead.project
-                            ? [lead.project.name, lead.project.reference].filter(Boolean).join(" · ")
-                            : undefined
+                          formatProjectMembershipCell({
+                            primaryName: lead.project
+                              ? [lead.project.name, lead.project.reference]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : null,
+                            secondaryCount: lead.secondaryProjects?.length ?? 0,
+                          }).text
                         }
                       >
-                        {lead.project?.name ?? "—"}
+                        {lead.projectMemberships && lead.projectMemberships.length > 0 ? (
+                          <LeadProjectMemberships
+                            memberships={lead.projectMemberships}
+                            compact
+                          />
+                        ) : (
+                          lead.project?.name ?? "—"
+                        )}
                       </p>
                     </td>
                     <td className="px-1.5 py-1">
@@ -684,6 +724,11 @@ export function LeadsTable({
                     <span className="truncate text-[11.5px] text-[var(--color-ink-soft)]">
                       {formatOwnerName(lead.assignedUser)}
                     </span>
+                    {formatLeadRoleLine(lead) ? (
+                      <span className="truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                        {formatLeadRoleLine(lead)}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="mt-1">
                     <NextStepCell lead={lead} />
@@ -699,7 +744,14 @@ export function LeadsTable({
               {expanded ? (
                 <div className="mt-2 border-t border-[var(--color-line)] pt-2">
                   <p className="mb-2 truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                    {[lead.project?.name, source.source, source.context]
+                    {[
+                      formatProjectMembershipCell({
+                        primaryName: lead.project?.name,
+                        secondaryCount: lead.secondaryProjects?.length ?? 0,
+                      }).text,
+                      source.source,
+                      source.context,
+                    ]
                       .filter((value) => value && value !== "—")
                       .join(" · ") || "No project or source"}
                   </p>

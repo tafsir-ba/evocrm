@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 import { summarizeProjectInboundDemand } from "@/lib/inbound-received-at";
 import type { InboundReceivedBasis } from "@/lib/inbound-received-at";
+import type { LeadIntelligenceProvenance } from "@/lib/lead-intelligence";
 import { countAttachedCampaignsByProject } from "@/lib/project-attached-campaigns";
 import {
   canPaginateProjectsInDatabase,
@@ -256,12 +257,13 @@ async function loadProjectCounts(
         projectId: { $in: projectObjectIds },
         archivedAt: null,
       })
-        .select({ projectId: 1, createdAt: 1, attributes: 1 })
+        .select({ projectId: 1, createdAt: 1, attributes: 1, intelligenceProvenance: 1 })
         .lean<
           Array<{
             projectId?: mongoose.Types.ObjectId;
             createdAt?: Date;
             attributes?: Record<string, unknown>;
+            intelligenceProvenance?: LeadIntelligenceProvenance;
           }>
         >(),
     ]);
@@ -275,6 +277,7 @@ async function loadProjectCounts(
       projectId: lead.projectId?.toString() ?? null,
       createdAt: lead.createdAt ?? null,
       attributes: lead.attributes ?? {},
+      intelligenceProvenance: lead.intelligenceProvenance ?? {},
     })),
   );
   for (const [projectId, inbound] of inboundByProject) {

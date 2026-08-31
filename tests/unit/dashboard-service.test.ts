@@ -8,6 +8,7 @@ import {
 
 vi.mock("@/server/repositories/dashboard", () => ({
   countLeadsCreatedInRange: vi.fn(),
+  countLegacyImportedLeadsCreatedInRange: vi.fn(),
   countOpportunitiesByStatusIds: vi.fn(),
   countWonOpportunitiesInRange: vi.fn(),
   countLostOpportunitiesInRange: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/server/repositories/dashboard", () => ({
   groupLeadsBySource: vi.fn(),
   groupOpportunitiesByStatus: vi.fn(),
   groupPropertiesByStatus: vi.fn(),
+  getCmpReconciliation: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/activities", () => ({
@@ -48,10 +50,12 @@ import { findActivities } from "@/server/repositories/activities";
 import {
   countActivitiesDueToday,
   countLeadsCreatedInRange,
+  countLegacyImportedLeadsCreatedInRange,
   countLostOpportunitiesInRange,
   countOpportunitiesByStatusIds,
   countOverdueActivities,
   countWonOpportunitiesInRange,
+  getCmpReconciliation,
   groupLeadsBySource,
   groupOpportunitiesByStatus,
   groupPropertiesByStatus,
@@ -168,6 +172,16 @@ describe("dashboard service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    vi.mocked(countLegacyImportedLeadsCreatedInRange).mockResolvedValue(0);
+    vi.mocked(getCmpReconciliation).mockResolvedValue({
+      sourceCohortCount: 0,
+      membershipCount: 0,
+      overlapCount: 0,
+      sourceOnlyCount: 0,
+      membershipOnlyCount: 0,
+      cmpProjects: [],
+    });
+
     vi.mocked(findWorkspaceById).mockResolvedValue({
       id: workspaceId,
       name: "Demo",
@@ -251,7 +265,19 @@ describe("dashboard service", () => {
       dateTo,
     });
 
-    expect(countLeadsCreatedInRange).toHaveBeenCalledWith(workspaceId, dateFrom, dateTo, undefined);
+    expect(countLeadsCreatedInRange).toHaveBeenCalledWith(
+      workspaceId,
+      dateFrom,
+      dateTo,
+      undefined,
+      "genuine_inbound",
+    );
+    expect(countLegacyImportedLeadsCreatedInRange).toHaveBeenCalledWith(
+      workspaceId,
+      dateFrom,
+      dateTo,
+      undefined,
+    );
     expect(countOpportunitiesByStatusIds).toHaveBeenCalledWith(workspaceId, ["status-open"], undefined);
     expect(countWonOpportunitiesInRange).toHaveBeenCalledWith(
       workspaceId,
@@ -274,6 +300,7 @@ describe("dashboard service", () => {
       undefined,
     );
     expect(result.metrics.newLeads).toBe(12);
+    expect(result.metrics.importedLeads).toBe(0);
     expect(result.metrics.activeOpportunities).toBe(8);
     expect(result.metrics.activePipelineValue).toEqual([
       { currency: "CHF", amount: 1000000 },
@@ -295,8 +322,40 @@ describe("dashboard service", () => {
     const result = await getDashboardSummaryForWorkspace(workspaceId);
 
     expect(result.metrics.newLeads).toBe(0);
+    expect(result.metrics.importedLeads).toBe(0);
     expect(result.metrics.activePipelineValue).toEqual([]);
     expect(result.metrics.wonValue).toEqual([]);
+  });
+
+  it("keeps August HubSpot import volume out of newLeads and reports it separately", async () => {
+    vi.mocked(countLeadsCreatedInRange).mockResolvedValue(12);
+    vi.mocked(countLegacyImportedLeadsCreatedInRange).mockResolvedValue(26149);
+    vi.mocked(countOpportunitiesByStatusIds).mockResolvedValue(0);
+    vi.mocked(countWonOpportunitiesInRange).mockResolvedValue(0);
+    vi.mocked(countLostOpportunitiesInRange).mockResolvedValue(0);
+    vi.mocked(sumOpportunityValuesByCurrency).mockResolvedValue([]);
+    vi.mocked(countActivitiesDueToday).mockResolvedValue(0);
+    vi.mocked(countOverdueActivities).mockResolvedValue(0);
+    vi.mocked(getCmpReconciliation).mockResolvedValue({
+      sourceCohortCount: 46,
+      membershipCount: 0,
+      overlapCount: 0,
+      sourceOnlyCount: 46,
+      membershipOnlyCount: 0,
+      cmpProjects: [],
+    });
+
+    const result = await getDashboardSummaryForWorkspace(workspaceId);
+
+    expect(result.metrics.newLeads).toBe(12);
+    expect(result.metrics.importedLeads).toBe(26149);
+    expect(result.cmpReconciliation).toEqual(
+      expect.objectContaining({
+        sourceCohortCount: 46,
+        membershipCount: 0,
+        overlapCount: 0,
+      }),
+    );
   });
 
   it("builds pipeline stages from dictionary order with currency totals", async () => {
@@ -353,6 +412,13 @@ describe("dashboard service", () => {
 
     const result = await getDashboardSourcesForWorkspace(workspaceId);
 
+    expect(groupLeadsBySource).toHaveBeenCalledWith(
+      workspaceId,
+      expect.any(Date),
+      expect.any(Date),
+      undefined,
+      "genuine_inbound",
+    );
     expect(result.sources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

@@ -16,6 +16,14 @@ const sampleProject = {
   reference: "LT-01",
   city: "Genève",
   country: "Suisse",
+  companies: [
+    {
+      companyId: "507f1f77bcf86cd7994390aa",
+      role: "developer",
+      isPrimary: true,
+      company: { id: "507f1f77bcf86cd7994390aa", name: "Promotor SA" },
+    },
+  ],
   projectType: null,
   archivedAt: null,
   createdAt: "2026-08-20T12:00:00.000Z",
@@ -56,6 +64,7 @@ describe("workspace ProjectsPanel list", () => {
 
     expect(await screen.findAllByText("Les Terrasses")).not.toHaveLength(0);
     expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Company" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Location" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Leads" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Inventory" })).toBeInTheDocument();
@@ -68,6 +77,7 @@ describe("workspace ProjectsPanel list", () => {
     expect(screen.queryByRole("link", { name: "View" })).not.toBeInTheDocument();
 
     expect(screen.getAllByText("LT-01").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Promotor SA").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Genève, Suisse").length).toBeGreaterThan(0);
     expect(screen.getAllByText("12").length).toBeGreaterThan(0);
     expect(screen.getAllByText("3 pipeline").length).toBeGreaterThan(0);

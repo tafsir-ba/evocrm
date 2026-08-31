@@ -42,6 +42,7 @@ DictionaryItem
 Tag
 Project
 Lead
+LeadProjectMembership
 Property
 Opportunity
 Activity
@@ -313,6 +314,11 @@ Demand-side record (buyer/inquirer).
 | `budgetMin` | |
 | `budgetMax` | |
 | `preferredAreas[]` | |
+| `companyId` | Optional associated Company (FK). Not a project company link. |
+| `industry` | Optional lead intelligence |
+| `jobTitle` | Optional lead intelligence |
+| `stateRegion` | Optional state / region string |
+| `intelligenceProvenance` | Per-field map: `method` (`manual` \| `hubspot` \| `import` \| `website` \| `api`), `source`, `appliedAt`, `notes` |
 | `notes` | |
 | `tags[]` | Tag IDs |
 | `attributes` | Flexible key-value bag |
@@ -326,6 +332,25 @@ Demand-side record (buyer/inquirer).
 | `archivedAt` | |
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
+
+**Lead timestamps:** `createdAt` is CRM created/imported time. Original inbound uses `attributes.integration.receivedAt` or HubSpot `sourceCreatedAt`. Project Active ≤30 days / Stale >30 days / Unknown uses the newest genuine original inbound date, never CRM import `createdAt` or last activity.
+
+**Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and associated `companyId` (Company FK, not a project company link). `intelligenceProvenance` records how each field was last written. HubSpot CMP enrichment may fill blank or HubSpot-owned values only; manual CRM values are preserved. Enrichment never enrolls campaigns.
+
+**Project memberships:** A lead may belong to multiple projects through `LeadProjectMembership`. Exactly one membership is primary. `Lead.projectId` is the denormalized primary project (list/filter/search default, email uniqueness, campaign matching). Secondary memberships never create campaign or drip enrollment.
+
+| Field | Description |
+|-------|-------------|
+| `workspaceId` | Tenant scope |
+| `leadId` | Contact (lead) |
+| `projectId` | Associated project |
+| `isPrimary` | Exactly one active primary per lead |
+| `joinedAt` | Membership date (historical HubSpot order uses source date) |
+| `sourceOrder` | Stable order within the contact |
+| `source` | `lead_create`, `backfill`, `manual`, `hubspot_association`, `import` |
+| `provenance` | Method, source, appliedAt, notes, optional HubSpot ids |
+
+Unique active `(workspaceId, leadId, projectId)`. Unique active primary `(workspaceId, leadId)` where `isPrimary` is true. Changing primary is a deliberate API/UI action; historical import selects the earliest `joinedAt` / `sourceOrder`.
 
 **Phase 4:** Mongoose model at `/models/lead.ts`. `fullName` derived server-side from `firstName` + `lastName`. `emailNormalized` unique per **project** within a workspace for non-archived leads with email (partial unique index on `{ workspaceId, projectId, emailNormalized }` + service check). `phoneNormalized` stored for search; duplicate phone warns but does not block. `statusId` validated as same-workspace `lead_status` dictionary item; `sourceId` as `lead_source`. `tags[]` validated as same-workspace tags with `entityTypes` including `lead`. Archive via `DELETE` sets `archivedAt`. `Lead.notes` is a static internal field — not the future Activity type Note timeline. Assignment UI uses `GET /api/workspaces/[workspaceSlug]/members` (`settings:read`) for active member picker; create/edit send `assignedTo` validated server-side.
 
@@ -474,12 +499,14 @@ Dashboard is read-only aggregation over existing entities — no new persisted m
 
 | Metric | Source entities | Behavior |
 |--------|-----------------|----------|
-| New leads | Lead | `createdAt` in date range; archived excluded |
+| New leads | Lead | Genuine inbound with CRM `createdAt` in date range; archived and legacy/migration/CSV imports excluded |
+| Imported leads | Lead | Legacy HubSpot GV/WD migrations and CSV imports with CRM `createdAt` in range; never mixed into new inbound |
 | Active opportunities | Opportunity + `opportunity_status` | `behavior = open`; not date-bounded |
 | Won / lost opportunities | Opportunity + `opportunity_status` | `terminal_won` / `terminal_lost` + close timestamps in date range |
 | Active pipeline / won value | Opportunity | Sum `value` grouped by `currency`; open or won only |
 | Activities due today / overdue | Activity + `activity_status` | Pending behavior; due today uses `Workspace.timezone` |
-| Leads by source | Lead + `lead_source` | Date-bounded grouping |
+| Leads by source | Lead + `lead_source` | Date-bounded grouping of genuine inbound only |
+| CMP source vs membership | Lead + LeadProjectMembership + Project | HubSpot CMP product cohort versus CRM CMP project membership; explainable, no enrollment |
 | Properties by status | Property + `property_status` | Current inventory snapshot |
 | Opportunities by stage | Opportunity + `opportunity_status` | Dictionary order; all non-archived |
 
@@ -719,6 +746,7 @@ All foreign keys must resolve within the same workspace:
 | `Document.linkedEntityId` | Linked entity must exist in same workspace |
 | `CampaignStep.documentIds` | Documents must be same workspace |
 | `CampaignEnrollment` | Lead/opportunity must be same workspace |
+| `LeadProjectMembership.leadId` / `projectId` | Lead and project must exist in same workspace |
 
 ---
 
@@ -732,6 +760,7 @@ Workspace
   ├─ Project
   ├─ Property ── (optional Project)
   ├─ Lead
+  │    └─ LeadProjectMembership ── Project
   ├─ Opportunity ── Lead + Property
   ├─ Activity ── (optional Lead / Property / Opportunity)
   ├─ Document ── linked entity

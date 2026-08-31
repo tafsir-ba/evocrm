@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   closedPeriodSummary,
   defaultAttentionTab,
+  formatCmpReconciliationSummary,
   rankProjectsForOperator,
 } from "@/lib/dashboard-view";
 
@@ -83,5 +84,18 @@ describe("dashboard view helpers", () => {
     expect(ranked[0]?.status.label).toBe("Stale");
     expect(ranked[1]?.status.label).toBe("Unknown");
     expect(ranked[2]?.status.label).toBe("Active");
+  });
+
+  it("explains CMP source cohort versus CRM membership without blending counts", () => {
+    expect(
+      formatCmpReconciliationSummary({
+        sourceCohortCount: 46,
+        membershipCount: 0,
+        overlapCount: 0,
+        sourceOnlyCount: 46,
+        membershipOnlyCount: 0,
+        cmpProjectCount: 0,
+      }),
+    ).toContain("0 CRM CMP project memberships");
   });
 });

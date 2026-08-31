@@ -124,6 +124,11 @@ export function buildTestProjectRecord(overrides: Partial<ProjectRecord> = {}): 
 
 export const leadRecordExtras = {
   projectId: TEST_PROJECT_ID,
+  companyId: null,
+  industry: null,
+  jobTitle: null,
+  stateRegion: null,
+  intelligenceProvenance: {},
 };
 
 export function buildTestLeadRecord(overrides: Partial<LeadRecord> = {}): LeadRecord {
@@ -150,6 +155,10 @@ export function buildTestLeadRecord(overrides: Partial<LeadRecord> = {}): LeadRe
     propertyTypeInterests: [],
     transactionIntent: null,
     usagePurpose: null,
+    industry: null,
+    jobTitle: null,
+    stateRegion: null,
+    intelligenceProvenance: {},
     notes: null,
     tags: [],
     attributes: {},

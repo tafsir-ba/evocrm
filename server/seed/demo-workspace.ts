@@ -6,6 +6,7 @@ import { findUserByEmail } from "@/server/repositories/users";
 import { findWorkspaceBySlug } from "@/server/repositories/workspaces";
 import { hashPassword } from "@/server/services/credentials-auth";
 import { createActivityForWorkspace } from "@/server/services/activities";
+import { createCompanyForWorkspace } from "@/server/services/companies";
 import { createCampaignForWorkspace } from "@/server/services/campaigns";
 import { createCampaignStepForWorkspace } from "@/server/services/campaign-steps";
 import { createIntegrationForWorkspace } from "@/server/services/integrations";
@@ -119,14 +120,20 @@ async function seedDemoEntities(
     entityTypes: ["lead", "property", "opportunity"],
   });
 
+  const { company } = await createCompanyForWorkspace(workspaceId, actorId, {
+    name: "Riverside Promotor",
+  });
+
   const project = await createProjectForWorkspace(workspaceId, actorId, {
     name: "Riverside Residences",
     reference: "RR-001",
     city: "Lisbon",
+    companies: [{ companyId: company.id, role: "developer", isPrimary: true }],
   });
 
   const lead = await createLeadForWorkspace(workspaceId, actorId, {
     projectId: project.id,
+    companyId: company.id,
     firstName: "Ana",
     lastName: "Silva",
     email: "ana.silva@example.com",

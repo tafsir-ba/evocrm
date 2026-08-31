@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatProjectLocationLabel } from "@/lib/project-location";
 import type { ProjectLocation } from "@/lib/project-location";
+import { workspacePath } from "@/lib/workspace-paths";
 
 type ProjectRecord = {
   id: string;
@@ -57,7 +59,6 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
   const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProjectFormState>(emptyForm);
 
@@ -109,19 +110,11 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
   );
 
   function resetForm() {
-    setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
-  }
-
-  function startCreate() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setShowForm(true);
   }
 
   function startEdit(project: ProjectRecord) {
-    setShowForm(false);
     setEditingId(project.id);
     setForm({
       name: project.name,
@@ -133,17 +126,6 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
     });
   }
 
-  function buildCreatePayload(formState: ProjectFormState) {
-    return {
-      name: formState.name,
-      reference: formState.reference.trim() || undefined,
-      address: formState.address.trim() || undefined,
-      city: formState.city.trim() || undefined,
-      country: formState.country.trim() || undefined,
-      description: formState.description.trim() || undefined,
-    };
-  }
-
   function buildUpdatePayload(formState: ProjectFormState) {
     return {
       name: formState.name,
@@ -153,23 +135,6 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
       country: formState.country.trim() || null,
       description: formState.description.trim() || null,
     };
-  }
-
-  async function createProject() {
-    const response = await fetch(`${apiBase}/projects`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildCreatePayload(form)),
-    });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error?.message ?? "Failed to create project.");
-      return;
-    }
-
-    resetForm();
-    await loadProjects();
   }
 
   async function saveProject(projectId: string) {
@@ -318,14 +283,15 @@ export function ProjectsPanel({ workspaceSlug, canUpdate }: ProjectsPanelProps) 
             </label>
           </div>
           {canUpdate && (
-            <Button size="sm" onClick={() => (showForm ? resetForm() : startCreate())}>
-              {showForm ? "Cancel" : "+ Create project"}
-            </Button>
+            <Link
+              href={workspacePath(workspaceSlug, "projects", "new")}
+              className="inline-flex h-8 items-center rounded-md bg-[var(--color-brand-600)] px-3 text-[13px] font-medium text-white shadow-[var(--shadow-xs)] hover:bg-[var(--color-brand-700)]"
+            >
+              + Create project
+            </Link>
           )}
         </div>
       </Card>
-
-      {canUpdate && showForm && renderForm("New project", createProject, "Create project")}
 
       {canUpdate && editingId && renderForm("Edit project", () => saveProject(editingId), "Save changes")}
 

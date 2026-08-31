@@ -44,6 +44,9 @@ vi.mock("@/models/opportunity", () => ({
 vi.mock("@/models/lead", () => ({
   LeadModel: { deleteMany: vi.fn() },
 }));
+vi.mock("@/models/lead-project-membership", () => ({
+  LeadProjectMembershipModel: { deleteMany: vi.fn() },
+}));
 vi.mock("@/models/property", () => ({
   PropertyModel: { deleteMany: vi.fn() },
 }));

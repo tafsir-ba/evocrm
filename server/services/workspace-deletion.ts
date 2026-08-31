@@ -18,6 +18,7 @@ import { IntegrationLogModel } from "@/models/integration-log";
 import { ImportJobModel } from "@/models/import-job";
 import { ImportRowResultModel } from "@/models/import-row-result";
 import { LeadModel } from "@/models/lead";
+import { LeadProjectMembershipModel } from "@/models/lead-project-membership";
 import { MembershipModel } from "@/models/membership";
 import { OpportunityModel } from "@/models/opportunity";
 import { ProjectModel } from "@/models/project";
@@ -108,6 +109,7 @@ async function deleteWorkspaceData(workspaceId: string): Promise<void> {
   await DocumentModel.deleteMany({ workspaceId: workspaceObjectId });
   await ActivityModel.deleteMany({ workspaceId: workspaceObjectId });
   await OpportunityModel.deleteMany({ workspaceId: workspaceObjectId });
+  await LeadProjectMembershipModel.deleteMany({ workspaceId: workspaceObjectId });
   await LeadModel.deleteMany({ workspaceId: workspaceObjectId });
   await PropertyModel.deleteMany({ workspaceId: workspaceObjectId });
   await ProjectModel.deleteMany({ workspaceId: workspaceObjectId });

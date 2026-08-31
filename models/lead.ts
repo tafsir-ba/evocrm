@@ -12,6 +12,7 @@ const leadSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", default: null },
     statusId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", required: true },
     sourceId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
@@ -42,6 +43,10 @@ const leadSchema = new Schema(
       enum: USAGE_PURPOSES,
       default: null,
     },
+    industry: { type: String, trim: true, default: null },
+    jobTitle: { type: String, trim: true, default: null },
+    stateRegion: { type: String, trim: true, default: null },
+    intelligenceProvenance: { type: Schema.Types.Mixed, default: {} },
     notes: { type: String, trim: true, default: null },
     tags: { type: [{ type: Schema.Types.ObjectId, ref: "Tag" }], default: [] },
     attributes: { type: Schema.Types.Mixed, default: {} },
@@ -62,6 +67,7 @@ const leadSchema = new Schema(
 leadSchema.index({ workspaceId: 1 });
 leadSchema.index({ workspaceId: 1, projectId: 1 });
 leadSchema.index({ workspaceId: 1, projectId: 1, archivedAt: 1 });
+leadSchema.index({ workspaceId: 1, companyId: 1, archivedAt: 1 });
 leadSchema.index({ workspaceId: 1, createdAt: -1 });
 leadSchema.index({ workspaceId: 1, updatedAt: -1 });
 leadSchema.index({ workspaceId: 1, archivedAt: 1 });
@@ -75,6 +81,9 @@ leadSchema.index({ workspaceId: 1, tags: 1 });
 leadSchema.index({ workspaceId: 1, propertyTypeInterests: 1 });
 leadSchema.index({ workspaceId: 1, transactionIntent: 1 });
 leadSchema.index({ workspaceId: 1, usagePurpose: 1 });
+leadSchema.index({ workspaceId: 1, industry: 1 });
+leadSchema.index({ workspaceId: 1, jobTitle: 1 });
+leadSchema.index({ workspaceId: 1, stateRegion: 1 });
 leadSchema.index(
   { workspaceId: 1, projectId: 1, emailNormalized: 1 },
   {

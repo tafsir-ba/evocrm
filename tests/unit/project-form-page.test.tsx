@@ -64,7 +64,8 @@ describe("ProjectFormPage", () => {
 
     expect(await screen.findByLabelText(/Project \/ development name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Internal reference/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Primary developer")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Primary company/)).toBeInTheDocument();
+    expect(screen.getByText(/company this development is for/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Commercial stage")).toBeInTheDocument();
     expect(screen.getByLabelText("Project type")).toBeInTheDocument();
     expect(screen.getByLabelText("Property type")).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("ProjectFormPage", () => {
     await screen.findByLabelText(/Project \/ development name/);
     await user.type(screen.getByLabelText(/Project \/ development name/), "Les Terrasses");
     await user.type(screen.getByLabelText(/Internal reference/), "LT-01");
-    await user.selectOptions(screen.getByLabelText("Primary developer"), COMPANY_ID);
+    await user.selectOptions(screen.getByLabelText(/Primary company/), COMPANY_ID);
     await user.selectOptions(screen.getByLabelText("Commercial stage"), "pre_launch");
     await user.selectOptions(screen.getByLabelText("Project type"), "development");
     await user.selectOptions(screen.getByLabelText("Property type"), PROPERTY_TYPE_ID);
@@ -140,7 +141,125 @@ describe("ProjectFormPage", () => {
     expect(body.city).toBeUndefined();
     expect(body.campaignId).toBeUndefined();
     expect(body.enroll).toBeUndefined();
+    expect(body.location.provenance).toBeUndefined();
     expect(push).toHaveBeenCalledWith("/w/demo/projects/507f1f77bcf86cd7994390dd");
+  });
+
+  it("saves an edited project without sending stored location provenance", async () => {
+    const projectId = "6a94694a44d6c01e42138e49";
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url.endsWith("/companies") && method === "GET") {
+        return jsonResponse({ companies: [{ id: COMPANY_ID, name: "Promotor SA" }] });
+      }
+      if (url.includes("/members")) {
+        return jsonResponse({
+          members: [{ userId: MEMBER_ID, name: "Alex Portfolio", email: "alex@example.com" }],
+        });
+      }
+      if (url.includes("property_type")) {
+        return jsonResponse({
+          items: [{ id: PROPERTY_TYPE_ID, label: "Apartment", isActive: true }],
+        });
+      }
+      if (url.endsWith(`/projects/${projectId}`) && method === "GET") {
+        return jsonResponse({
+          project: {
+            name: "Résidence Petit Saconnex",
+            reference: "PSX",
+            projectType: null,
+            commercialStage: "live",
+            propertyTypeId: null,
+            website: null,
+            address: null,
+            city: "Petit Saconnex",
+            country: "Switzerland",
+            location: {
+              countryCode: "CH",
+              countryName: "Switzerland",
+              cantonCode: "GE",
+              cantonName: "Genève",
+              municipality: "Petit Saconnex",
+              postalCode: "1209",
+              normalizedAddress: null,
+              latitude: null,
+              longitude: null,
+              precision: "locality",
+              sourceUrl: null,
+              confidence: "high",
+              reviewStatus: "verified",
+              provenance: {
+                method: "user_confirmed",
+                catalogKey: "petit-saconnex",
+                appliedAt: "2026-08-01T00:00:00.000Z",
+                previousManual: null,
+                notes: "Operator confirmed.",
+              },
+            },
+            companies: [
+              {
+                companyId: COMPANY_ID,
+                role: "developer",
+                isPrimary: true,
+                company: { id: COMPANY_ID, name: "Promotor SA" },
+              },
+            ],
+            description: null,
+            ownerId: null,
+            assignedTo: null,
+          },
+        });
+      }
+      if (url.endsWith(`/projects/${projectId}`) && method === "PATCH") {
+        return jsonResponse({ project: { id: projectId } });
+      }
+      return jsonResponse({});
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    render(<ProjectFormPage workspaceSlug="demo" mode="edit" projectId={projectId} />);
+
+    expect(await screen.findByDisplayValue("Résidence Petit Saconnex")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save project" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/workspaces/demo/projects/${projectId}`,
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+
+    const patchCall = fetchMock.mock.calls.find(([url, init]) => {
+      return String(url).endsWith(`/projects/${projectId}`) && init?.method === "PATCH";
+    });
+    const body = JSON.parse(String(patchCall?.[1]?.body));
+    expect(body.location).toMatchObject({
+      countryCode: "CH",
+      cantonCode: "GE",
+      municipality: "Petit Saconnex",
+      postalCode: "1209",
+    });
+    expect(body.location.provenance).toBeUndefined();
+    expect(push).toHaveBeenCalledWith(`/w/demo/projects/${projectId}`);
+  });
+
+  it("does not create without a primary company", async () => {
+    const user = userEvent.setup();
+    render(<ProjectFormPage workspaceSlug="demo" mode="create" />);
+
+    await screen.findByLabelText(/Project \/ development name/);
+    expect(screen.getByLabelText(/Primary company/)).toBeRequired();
+    await user.type(screen.getByLabelText(/Project \/ development name/), "Orphan Development");
+    await user.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(
+      vi.mocked(global.fetch).mock.calls.some(([url, init]) => {
+        return String(url).endsWith("/projects") && init?.method === "POST";
+      }),
+    ).toBe(false);
   });
 
   it("does not require coordinates to create", async () => {

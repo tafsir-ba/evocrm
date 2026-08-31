@@ -80,3 +80,20 @@ export function rankProjectsForOperator(
     })
     .slice(0, 6);
 }
+
+export function formatCmpReconciliationSummary(input: {
+  sourceCohortCount: number;
+  membershipCount: number;
+  overlapCount: number;
+  sourceOnlyCount: number;
+  membershipOnlyCount: number;
+  cmpProjectCount: number;
+}): string {
+  if (input.cmpProjectCount === 0 && input.sourceCohortCount === 0) {
+    return "No CRM CMP project and no CMP source-cohort leads stored yet.";
+  }
+  if (input.cmpProjectCount === 0) {
+    return `${input.sourceCohortCount} CMP source-cohort leads, 0 CRM CMP project memberships. HubSpot CMP was not migrated onto a CMP project.`;
+  }
+  return `${input.overlapCount} in both · ${input.sourceOnlyCount} source only · ${input.membershipOnlyCount} membership only`;
+}

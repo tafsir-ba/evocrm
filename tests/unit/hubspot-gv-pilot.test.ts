@@ -247,7 +247,10 @@ describe("hubspot GV pilot guards and manifest", () => {
     ).toThrow(/destination_not_gv/);
     expect(() => assertSideEffectGuard()).not.toThrow();
     expect(() =>
-      assertSideEffectGuard({ ...GV_PILOT_SIDE_EFFECT_GUARD, triggerAutomation: true }),
+      assertSideEffectGuard({
+        ...GV_PILOT_SIDE_EFFECT_GUARD,
+        triggerAutomation: true,
+      } as unknown as typeof GV_PILOT_SIDE_EFFECT_GUARD),
     ).toThrow(/automation_must_be_suppressed/);
     expect(GV_PILOT_ABORT_THRESHOLD).toBe(1);
     expect(shouldAbortRun(1)).toBe(true);

@@ -41,6 +41,10 @@ vi.mock("@/server/services/leads", () => ({
   })),
 }));
 
+vi.mock("@/server/services/companies", () => ({
+  resolveOrCreateCompanyByName: vi.fn(async () => null),
+}));
+
 vi.mock("@/server/services/integration-logs", () => ({
   buildWebsiteLeadPayloadSummary: vi.fn(() => ({ emailPresent: true })),
   writeIntegrationLog: vi.fn(),
@@ -172,6 +176,7 @@ function makeLead(overrides: Record<string, unknown> = {}) {
     tagsResolved: [],
     assignedUser: null,
     ownerUser: null,
+    company: null,
     ...overrides,
   };
 }
@@ -398,6 +403,10 @@ describe("multi-website lead segregation (investigation)", () => {
           integration: expect.objectContaining({ integrationId: "int-website-a" }),
         },
       }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 
@@ -458,6 +467,10 @@ describe("multi-website lead segregation (investigation)", () => {
         projectId: PROJECT_A,
         email: "shared@example.com",
       }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 
@@ -581,6 +594,10 @@ describe("multi-website lead segregation (investigation)", () => {
           },
         },
       }),
+      {
+        intelligenceMethod: "website",
+        intelligenceSource: "website_lead_capture",
+      },
     );
   });
 });

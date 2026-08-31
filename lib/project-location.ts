@@ -187,6 +187,40 @@ export function hasStructuredLocation(
   );
 }
 
+/** Writable location fields accepted by project create/update APIs. */
+export type ProjectLocationWriteInput = Omit<ProjectLocation, "provenance">;
+
+/**
+ * Build a location payload that can be sent back to the API.
+ * Provenance and other stored-only keys are omitted so a GET→edit→PATCH
+ * round-trip does not fail strict request validation.
+ */
+export function toProjectLocationWriteInput(
+  location: ProjectLocation,
+): ProjectLocationWriteInput | null {
+  if (!hasStructuredLocation(location) && !location.countryCode && !location.countryName) {
+    return null;
+  }
+
+  const sourceUrl = location.sourceUrl?.trim() || null;
+  const hasEvidence = Boolean(sourceUrl);
+  return {
+    countryCode: location.countryCode?.trim() || null,
+    countryName: location.countryName?.trim() || null,
+    cantonCode: location.cantonCode?.trim() || null,
+    cantonName: location.cantonName?.trim() || null,
+    municipality: location.municipality?.trim() || null,
+    postalCode: location.postalCode?.trim() || null,
+    normalizedAddress: location.normalizedAddress?.trim() || null,
+    latitude: hasEvidence ? location.latitude : null,
+    longitude: hasEvidence ? location.longitude : null,
+    precision: hasEvidence && location.precision === "unknown" ? "address" : location.precision,
+    sourceUrl,
+    confidence: hasEvidence ? location.confidence : null,
+    reviewStatus: location.reviewStatus,
+  };
+}
+
 export function formatStructuredProjectLocation(
   location: ProjectLocation | null | undefined,
 ): string {

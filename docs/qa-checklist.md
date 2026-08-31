@@ -365,7 +365,8 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] Dashboard APIs under `/api/workspaces/[workspaceSlug]/dashboard/*`
 - [ ] `dashboard:read` enforced server-side on all dashboard routes and page
 - [ ] Metrics calculated backend-side (not client-side full-record aggregation)
-- [ ] `newLeads` date-scoped; excludes archived leads
+- [ ] `newLeads` date-scoped genuine inbound; excludes archived and legacy/migration/CSV imports
+- [ ] `importedLeads` shown separately from new inbound / source mix
 - [ ] `activeOpportunities` uses `opportunity_status.behavior = open` (not date-bounded)
 - [ ] `wonOpportunities` / `lostOpportunities` use terminal behaviors + date range on `wonAt`/`lostAt` (fallback `closedAt`)
 - [ ] `activePipelineValue` includes open opportunities only; grouped by currency

@@ -14,9 +14,11 @@ import {
   hasStructuredLocation,
   type ProjectLocation,
 } from "@/lib/project-location";
+import { ProjectCompanyPeople } from "@/components/projects/project-company-people";
 import {
-  primaryDeveloperCompanyId,
+  primaryCompanyLink,
   PROJECT_COMMERCIAL_STAGE_LABELS,
+  PROJECT_COMPANY_ROLE_LABELS,
   PROJECT_TYPE_LABELS,
   type ProjectCommercialStage,
   type ProjectCompanyRole,
@@ -46,6 +48,20 @@ type ProjectDetail = {
   companies?: ProjectCompanyLink[];
   description: string | null;
   archivedAt: string | null;
+  companyPeople?: Array<{
+    id: string;
+    companyId: string | null;
+    projectId: string | null;
+    fullName: string;
+    email: string | null;
+  }>;
+  associablePeople?: Array<{
+    id: string;
+    companyId: string | null;
+    projectId: string | null;
+    fullName: string;
+    email: string | null;
+  }>;
 };
 
 const TABS = [
@@ -144,9 +160,12 @@ export function ProjectDetailPanel({
 
   const stageLabel = commercialStageLabel(project.commercialStage);
   const typeLabel = projectTypeLabel(project.projectType);
-  const primaryDeveloperId = primaryDeveloperCompanyId(project.companies ?? []);
-  const primaryDeveloper =
-    project.companies?.find((link) => link.companyId === primaryDeveloperId)?.company?.name ?? null;
+  const primaryCompany = primaryCompanyLink(project.companies ?? []);
+  const primaryCompanyName = primaryCompany?.company?.name ?? null;
+  const primaryCompanyRole =
+    primaryCompany && primaryCompany.role in PROJECT_COMPANY_ROLE_LABELS
+      ? PROJECT_COMPANY_ROLE_LABELS[primaryCompany.role]
+      : null;
 
   return (
     <>
@@ -210,8 +229,11 @@ export function ProjectDetailPanel({
         </div>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px]">
           <div>
-            <dt className="text-[var(--color-ink-muted)]">Primary developer</dt>
-            <dd className="text-[var(--color-ink)]">{primaryDeveloper || "—"}</dd>
+            <dt className="text-[var(--color-ink-muted)]">Primary company</dt>
+            <dd className="text-[var(--color-ink)]">{primaryCompanyName || "—"}</dd>
+            {primaryCompanyRole ? (
+              <dd className="mt-1 text-[12px] text-[var(--color-ink-muted)]">{primaryCompanyRole}</dd>
+            ) : null}
           </div>
           <div>
             <dt className="text-[var(--color-ink-muted)]">Location</dt>
@@ -263,6 +285,18 @@ export function ProjectDetailPanel({
             </dd>
           </div>
         </dl>
+      </div>
+
+      <div className="mt-4">
+        <ProjectCompanyPeople
+          workspaceSlug={workspaceSlug}
+          companyName={primaryCompanyName}
+          companyId={primaryCompany?.companyId ?? null}
+          people={project.companyPeople ?? []}
+          associablePeople={project.associablePeople ?? []}
+          canAssociate={canUpdate && !project.archivedAt}
+          onAssociated={() => loadProject()}
+        />
       </div>
     </>
   );

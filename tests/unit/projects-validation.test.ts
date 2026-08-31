@@ -71,6 +71,82 @@ describe("project validation schemas", () => {
     }
   });
 
+  it("accepts an edit save that round-trips stored location provenance", () => {
+    const result = updateProjectInputSchema.safeParse({
+      name: "Petit Saconnex",
+      reference: null,
+      projectType: null,
+      commercialStage: null,
+      propertyTypeId: null,
+      website: null,
+      location: {
+        countryCode: "CH",
+        countryName: "Switzerland",
+        cantonCode: "GE",
+        cantonName: "Genève",
+        municipality: "Petit Saconnex",
+        postalCode: "1209",
+        normalizedAddress: null,
+        latitude: null,
+        longitude: null,
+        precision: "locality",
+        sourceUrl: null,
+        confidence: null,
+        reviewStatus: "verified",
+        provenance: {
+          method: "user_confirmed",
+          catalogKey: "petit-saconnex",
+          appliedAt: "2026-08-01T00:00:00.000Z",
+          previousManual: null,
+          notes: "Operator confirmed.",
+        },
+      },
+      address: null,
+      city: "Petit Saconnex",
+      country: "Switzerland",
+      companies: [
+        {
+          companyId: "507f1f77bcf86cd7994390aa",
+          role: "developer",
+          isPrimary: true,
+        },
+      ],
+      description: null,
+      ownerId: null,
+      assignedTo: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.location).toMatchObject({
+        countryCode: "CH",
+        cantonCode: "GE",
+        municipality: "Petit Saconnex",
+        postalCode: "1209",
+      });
+      expect(result.data.location && "provenance" in result.data.location).toBe(false);
+    }
+  });
+
+  it("treats empty location strings as null instead of rejecting the save", () => {
+    const result = updateProjectInputSchema.safeParse({
+      location: {
+        countryCode: "",
+        cantonCode: "",
+        sourceUrl: "",
+        municipality: "Petit Saconnex",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.location?.countryCode).toBeNull();
+      expect(result.data.location?.cantonCode).toBeNull();
+      expect(result.data.location?.sourceUrl).toBeNull();
+      expect(result.data.location?.municipality).toBe("Petit Saconnex");
+    }
+  });
+
   it("accepts structured location filters and rejects stuffing geography into country", () => {
     const list = projectListQuerySchema.safeParse({
       countryCode: "jm",
@@ -85,6 +161,9 @@ describe("project validation schemas", () => {
 
     const create = createProjectInputSchema.safeParse({
       name: "Grosvenor Vistas",
+      companies: [
+        { companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true },
+      ],
       location: {
         countryCode: "jm",
         municipality: "Kingston",
@@ -95,6 +174,39 @@ describe("project validation schemas", () => {
     expect(create.success).toBe(true);
     if (create.success) {
       expect(create.data.location?.countryCode).toBe("JM");
+    }
+  });
+
+  it("accepts company links that round-trip stored provenance or extra display fields", () => {
+    const result = updateProjectInputSchema.safeParse({
+      companies: [
+        {
+          companyId: "507f1f77bcf86cd7994390aa",
+          role: "developer",
+          isPrimary: true,
+          company: { id: "507f1f77bcf86cd7994390aa", name: "Promotor SA" },
+          provenance: {
+            method: "workbook_import",
+            relationship: "billed_linked",
+            source: "workbook-derived mapping (operator-approved)",
+            appliedAt: "2026-08-30T18:00:00.000Z",
+            notes: "Billed/linked. Does not claim legal ownership.",
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.companies?.[0]).toMatchObject({
+        companyId: "507f1f77bcf86cd7994390aa",
+        role: "developer",
+        isPrimary: true,
+        provenance: {
+          relationship: "billed_linked",
+        },
+      });
+      expect(result.data.companies?.[0] && "company" in result.data.companies[0]).toBe(false);
     }
   });
 
@@ -129,5 +241,21 @@ describe("project validation schemas", () => {
         companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "sponsor" }],
       }).success,
     ).toBe(false);
+  });
+
+  it("requires a primary company (developer/client) on standard create", () => {
+    expect(createProjectInputSchema.safeParse({ name: "Standalone" }).success).toBe(false);
+    expect(
+      createProjectInputSchema.safeParse({
+        name: "Standalone",
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "owner" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      updateProjectInputSchema.safeParse({
+        companies: [{ companyId: "507f1f77bcf86cd7994390aa", role: "owner" }],
+      }).success,
+    ).toBe(false);
+    expect(updateProjectInputSchema.safeParse({ name: "Keep legacy" }).success).toBe(true);
   });
 });

@@ -31,6 +31,9 @@ describe("ProjectsPanel", () => {
 
     render(<ProjectsPanel workspaceSlug="demo" canUpdate={true} />);
 
-    expect(await screen.findByRole("button", { name: "+ Create project" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "+ Create project" })).toHaveAttribute(
+      "href",
+      "/w/demo/projects/new",
+    );
   });
 });
