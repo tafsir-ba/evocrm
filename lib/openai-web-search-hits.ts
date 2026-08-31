@@ -97,12 +97,5 @@ export function extractOpenAiWebSearchHits(
   for (const match of extraText.matchAll(/https:\/\/[^\s)\]>"']+/g)) {
     addHit(acc, match[0]!, "", "", retrievedAt);
   }
-  if (extraText) {
-    for (const hit of acc.values()) {
-      if (!hit.snippet) {
-        hit.snippet = extraText.slice(0, 500);
-      }
-    }
-  }
   return { hits: [...acc.values()].slice(0, 12), extraText };
 }

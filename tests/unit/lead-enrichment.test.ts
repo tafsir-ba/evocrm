@@ -9,6 +9,8 @@ import {
   isUniqueEnrichmentReveal,
   citeOnlyRetrievedUrls,
   enrichmentSearchQueries,
+  filterEnrichmentHitsForPerson,
+  isPlausibleJobTitle,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
@@ -31,7 +33,7 @@ describe("lead enrichment contract", () => {
         confidencePercent: 90,
         sourceUrls: ["https://example.com/profile"],
       }),
-    ).toEqual({ confidencePercent: 90, dropped: false });
+    ).toEqual({ confidencePercent: 85, dropped: false });
   });
 
   it("caps unsourced low confidence and never treats it as a truth claim", () => {
@@ -166,17 +168,46 @@ describe("lead enrichment contract", () => {
     ).toBe(false);
   });
 
-  it("searches name+email first and adds a work-domain query", () => {
+  it("searches the distinctive name, then email, then work domain", () => {
     expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@evo-home.ch")).toEqual([
+      '"Alisa Scarlett-Buchanan"',
       '"Alisa Scarlett-Buchanan" "alisa@evo-home.ch"',
       '"Alisa Scarlett-Buchanan" evo-home.ch',
     ]);
     expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@gmail.com")).toEqual([
+      '"Alisa Scarlett-Buchanan"',
       '"Alisa Scarlett-Buchanan" "alisa@gmail.com"',
     ]);
     expect(enrichmentSearchQueries("radu@neho.ch", "radu@neho.ch")).toEqual([
+      '"radu"',
       '"radu" "radu@neho.ch"',
       '"radu" neho.ch',
     ]);
+  });
+
+  it("rejects sentence-like job titles and trap citations", () => {
+    expect(isPlausibleJobTitle("Counsel")).toBe(true);
+    expect(isPlausibleJobTitle("Employee of the Corporate Legal Services Division")).toBe(
+      false,
+    );
+    expect(
+      filterEnrichmentHitsForPerson(
+        [
+          {
+            url: "https://www.jsimlo.sk/trap/index.php/function.html",
+            title: "function",
+            snippet: "",
+            retrievedAt: "2026-08-31T12:00:00.000Z",
+          },
+          {
+            url: "https://nla.gov.jm/reports/alisa-scarlett-buchanan",
+            title: "Alisa Scarlett-Buchanan — National Land Agency",
+            snippet: "Legal services division",
+            retrievedAt: "2026-08-31T12:00:00.000Z",
+          },
+        ],
+        "Alisa Scarlett-Buchanan",
+      ).map((hit) => hit.url),
+    ).toEqual(["https://nla.gov.jm/reports/alisa-scarlett-buchanan"]);
   });
 });

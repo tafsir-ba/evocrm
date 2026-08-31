@@ -213,7 +213,7 @@ export async function defaultSynthesize(input: SynthesizeInput): Promise<Synthes
   const sources = input.hits
     .map((hit, index) => `${index + 1}. ${hit.title} — ${hit.url}\n${hit.snippet}`)
     .join("\n\n");
-  const prompt = `You extract public professional facts for CRM review. Use ONLY the search results. Do not invent facts.
+  const prompt = `You are an internal CRM research assistant. Extract every public professional/business fact that the search results support. Be thorough, not timid. Do not invent facts, URLs, or numbers.
 
 Lead: ${input.fullName} <${input.email}>
 Already known: ${JSON.stringify(input.known)}
@@ -226,13 +226,15 @@ Return JSON:
 {
   "identityMatch": "unique" | "ambiguous" | "none",
   "identityRationale": "string",
-  "suggestions": [{"fieldKey":"companyName|jobTitle|industry|city|stateRegion|country|preferredContactClues|professionalProfileUrl|otherProfessional","value":"string","confidencePercent":0-100,"rationale":"string","sourceUrls":["https://..."]}],
-  "summary": {"text":"cited summary","citationUrls":["https://..."]}
+  "suggestions": [{"fieldKey":"companyName|jobTitle|industry|city|stateRegion|country|preferredContactClues|professionalProfileUrl|otherProfessional","value":"string","confidencePercent":0-85,"rationale":"string","sourceUrls":["https://..."]}],
+  "summary": {"text":"cited summary of public professional facts","citationUrls":["https://..."]}
 }
 
-Identity: unique when retrieved pages point to a single professional matching this name, and either the email appears or a work-email domain matches the cited employer. Ambiguous when several people match. None when nothing corroborates the person. If not unique, return no suggestions.
+Identity: unique when the results describe one professional matching this name. A distinctive name (three parts or a hyphenated surname) can be unique even if the email is not printed on the page. Use work-email domain as extra corroboration when present. Ambiguous when several people match. None when nothing corroborates the person.
 
-Rules: public professional/business info only. Exclude credentials, government IDs, health data, exact home address, minors, protected characteristics, private social material, unverified allegations, and any financial data. Every suggestion needs at least one https source URL from the results. Confidence is source-quality/identity-match, not truth.`;
+Fill every field the sources support: employer, short job title (role only, e.g. Counsel — never a sentence or “employee of the …”), industry, city, region, country, public profile/company URL, contact clues. Prefer current or recent pages over 10+ year-old reports.
+
+Never extract income, wealth, credit, property ownership, health, home address, or anything not on the results. Every suggestion needs an https URL copied from the results. Confidence is source-quality, not truth, and must stay ≤ 85.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -247,7 +249,8 @@ Rules: public professional/business info only. Exclude credentials, government I
       messages: [
         {
           role: "system",
-          content: "You only restate cited public professional facts. Never invent.",
+          content:
+            "Extract all cited public professional facts for internal CRM research. Never invent sources or numbers.",
         },
         { role: "user", content: prompt },
       ],

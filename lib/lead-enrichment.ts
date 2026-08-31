@@ -87,6 +87,7 @@ export const CRM_ENTERED_PROVENANCE_METHODS: readonly LeadFieldProvenanceMethod[
 
 export const DEFAULT_ENRICHMENT_RETENTION_DAYS = 180;
 export const HIGH_CONFIDENCE_THRESHOLD = 70;
+export const SOURCED_CONFIDENCE_CAP = 85;
 export const UNSOURCED_CONFIDENCE_CAP = 40;
 
 export const WEB_ENRICHMENT_SIDE_EFFECT_GUARD = {
@@ -231,12 +232,69 @@ export function enrichmentPersonQueryName(fullName: string, email: string): stri
 export function enrichmentSearchQueries(fullName: string, email: string): string[] {
   const name = enrichmentPersonQueryName(fullName, email);
   const address = email.trim();
-  const queries = [`"${name}" "${address}"`];
+  const queries: string[] = [];
+  if (name && !name.includes("@")) {
+    queries.push(`"${name}"`);
+    queries.push(`"${name}" "${address}"`);
+  } else {
+    queries.push(`"${name}" "${address}"`);
+  }
   const domain = address.split("@")[1]?.toLowerCase();
   if (domain && !GENERIC_EMAIL_DOMAINS.has(domain)) {
     queries.push(`"${name}" ${domain}`);
   }
   return [...new Set(queries)];
+}
+
+export function personNameTokens(fullName: string): string[] {
+  return fullName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+}
+
+export function isLowQualityEnrichmentUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hay = `${parsed.hostname}${parsed.pathname}`.toLowerCase();
+    return /\/trap\/|\/function\.html|\/cgi-bin\/|bit\.ly|tinyurl\.com|t\.co\//i.test(hay);
+  } catch {
+    return true;
+  }
+}
+
+export function hitMentionsPerson(
+  hit: { url: string; title: string; snippet?: string },
+  fullName: string,
+): boolean {
+  const tokens = personNameTokens(fullName);
+  if (tokens.length === 0) {
+    return true;
+  }
+  const hay = `${hit.title} ${hit.url} ${hit.snippet ?? ""}`.toLowerCase();
+  const matches = tokens.filter((token) => hay.includes(token));
+  if (tokens.some((token) => token.length >= 7 || token.includes("-"))) {
+    return matches.some((token) => token.length >= 6);
+  }
+  return matches.length >= Math.min(2, tokens.length);
+}
+
+export function isPlausibleJobTitle(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 2 || trimmed.length > 80) {
+    return false;
+  }
+  if (/employee of the /i.test(trimmed)) {
+    return false;
+  }
+  if (/annual report|\brecognized as\b|\bwas an?\b/i.test(trimmed)) {
+    return false;
+  }
+  if (/[.!?]/.test(trimmed) && trimmed.split(/\s+/).length > 8) {
+    return false;
+  }
+  return true;
 }
 
 export function mergeEnrichmentHits(
@@ -256,6 +314,15 @@ export function mergeEnrichmentHits(
     }
   }
   return [...merged.values()].slice(0, 12);
+}
+
+export function filterEnrichmentHitsForPerson(
+  hits: Array<{ url: string; title: string; snippet: string; retrievedAt: string }>,
+  fullName: string,
+): Array<{ url: string; title: string; snippet: string; retrievedAt: string }> {
+  return hits.filter(
+    (hit) => !isLowQualityEnrichmentUrl(hit.url) && hitMentionsPerson(hit, fullName),
+  );
 }
 
 /** Citations must come from retrieved search hits, not model-invented URLs. */
@@ -318,6 +385,7 @@ export function clampConfidence(input: {
     }
     confidence = Math.min(confidence, UNSOURCED_CONFIDENCE_CAP);
   }
+  confidence = Math.min(confidence, SOURCED_CONFIDENCE_CAP);
   return { confidencePercent: confidence, dropped: false };
 }
 

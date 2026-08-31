@@ -11,8 +11,11 @@ import {
   crmValueRequiresOverwrite,
   isSafeToAutoApplySuggestion,
   citeOnlyRetrievedUrls,
+  enrichmentPersonQueryName,
   enrichmentSearchQueries,
+  filterEnrichmentHitsForPerson,
   isLeadEnrichmentFieldKey,
+  isPlausibleJobTitle,
   mergeEnrichmentHits,
   mergeWebEnrichmentAttributes,
   readWebEnrichmentAttributes,
@@ -123,6 +126,9 @@ function buildSuggestions(input: {
     const value = sanitizeEnrichmentText(raw.value);
     const rationale = sanitizeEnrichmentText(raw.rationale) ?? "";
     if (!value) {
+      continue;
+    }
+    if (raw.fieldKey === "jobTitle" && !isPlausibleJobTitle(value)) {
       continue;
     }
     const sourceUrls = citeOnlyRetrievedUrls(raw.sourceUrls, input.retrievedUrls);
@@ -314,7 +320,10 @@ export async function startLeadEnrichment(input: {
         const search = await providers.search(query, allowedSources);
         provider = search.provider;
         hitGroups.push(search.hits);
-        hits = mergeEnrichmentHits(hitGroups);
+        hits = filterEnrichmentHitsForPerson(
+          mergeEnrichmentHits(hitGroups),
+          enrichmentPersonQueryName(fullName, email),
+        );
         if (hits.length >= 4) {
           break;
         }
