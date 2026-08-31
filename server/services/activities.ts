@@ -83,6 +83,7 @@ export type ActivityListItem = ActivityRecord & {
   property: ActivityPropertySummary | null;
   opportunity: ActivityOpportunitySummary | null;
   assignedUser: ActivityUserSummary | null;
+  createdByUser: ActivityUserSummary | null;
   isOverdue: boolean;
   isUpcoming: boolean;
 };
@@ -348,13 +349,14 @@ async function resolveOpportunitySummary(
 }
 
 export async function enrichActivityListItem(activity: ActivityRecord): Promise<ActivityListItem> {
-  const [type, status, lead, property, opportunity, assignedUser] = await Promise.all([
+  const [type, status, lead, property, opportunity, assignedUser, createdByUser] = await Promise.all([
     resolveDictionarySummary(activity.workspaceId, activity.typeId, "activity_type"),
     resolveDictionarySummary(activity.workspaceId, activity.statusId, "activity_status"),
     resolveLeadSummary(activity.workspaceId, activity.leadId),
     resolvePropertySummary(activity.workspaceId, activity.propertyId),
     resolveOpportunitySummary(activity.workspaceId, activity.opportunityId),
     resolveUserSummary(activity.assignedTo),
+    resolveUserSummary(activity.createdBy),
   ]);
 
   const now = new Date();
@@ -367,6 +369,7 @@ export async function enrichActivityListItem(activity: ActivityRecord): Promise<
     property,
     opportunity,
     assignedUser,
+    createdByUser,
     isOverdue: isActivityOverdue(activity, status?.behavior, now),
     isUpcoming: isActivityUpcoming(activity, status?.behavior, now),
   };

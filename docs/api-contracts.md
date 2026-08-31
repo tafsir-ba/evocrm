@@ -254,7 +254,7 @@ DELETE /api/workspaces/[workspaceSlug]/properties/[propertyId]  # archive (soft)
 
 **DELETE** sets `archivedAt`; does not hard-delete.
 
-UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[propertyId]`. Status/type options from dictionary APIs (`property_status`, `property_type`); tags from tags API with `entityType=property`; projects from projects API (active only). **Phase 7:** Activities tab loads real workspace-scoped activities via `GET /activities?propertyId=…`. Media/Files/Notes tabs remain placeholders.
+UI routes: `/w/[workspaceSlug]/properties`, `/w/[workspaceSlug]/properties/[propertyId]`. Status/type options from dictionary APIs (`property_status`, `property_type`); tags from tags API with `entityType=property`; projects from projects API (active only). **Phase 7:** Activities tab loads real workspace-scoped activities via `GET /activities?propertyId=…`. Lead **Notes** tab uses `GET/POST /activities` with activity type `note` (optional follow-up creates a pending `task`). Property Media/Notes tabs remain placeholders.
 
 ### Opportunities
 

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
 import { ActivitiesSection } from "@/components/activities/activities-section";
+import { NotesSection } from "@/components/activities/notes-section";
 import { DocumentsSection } from "@/components/documents/documents-section";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { PageHeader } from "@/components/layout/page-header";
@@ -816,7 +817,7 @@ export function LeadDetailPanel({
           {lead.notes && (
             <>
               <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mt-5 mb-2">
-                Notes
+                Internal notes
               </p>
               <p className="text-[13px] text-[var(--color-ink-soft)] whitespace-pre-wrap">
                 {lead.notes}
@@ -1354,14 +1355,15 @@ export function LeadDetailPanel({
                   key: "notes",
                   label: "Notes",
                   content: (
-                    <div className="px-5 pb-5">
-                      <StateView
-                        variant="empty"
-                        compact
-                        title="Timeline notes coming soon"
-                        description="Use the internal notes field on the lead record for now. Persisted timeline notes arrive in a later phase."
-                      />
-                    </div>
+                    <NotesSection
+                      workspaceSlug={workspaceSlug}
+                      workspaceTimezone={workspaceTimezone}
+                      leadId={leadId}
+                      canRead={canReadActivities}
+                      canCreate={canCreateActivity && !lead.archivedAt}
+                      canUpdate={canUpdateActivity && !lead.archivedAt}
+                      canArchive={canArchiveActivity && !lead.archivedAt}
+                    />
                   ),
                 },
                 {

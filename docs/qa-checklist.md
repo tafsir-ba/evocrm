@@ -302,7 +302,7 @@ Phase 1 is UI-only with mock data. Verify shell and boundaries only:
 - [ ] Lead detail UI at `/w/[workspaceSlug]/leads/[leadId]` with edit drawer and placeholder tabs
 - [ ] Status/source/tag options from backend dictionaries/tags APIs (not hardcoded canonical arrays)
 - [ ] No Contacts module; Leads remains primary people module
-- [ ] Opportunities/Activities/Files/timeline Notes tabs are placeholders only
+- [ ] Lead Notes tab supports timestamped internal notes and optional follow-up tasks
 - [ ] Lead create/edit drawers include assigned-to selector backed by `GET /members`
 - [ ] Unit tests for service, repository, API permissions, validation, workspace isolation
 
