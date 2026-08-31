@@ -170,6 +170,58 @@ export function isHttpsUrl(value: string): boolean {
   }
 }
 
+const GENERIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "hotmail.com",
+  "outlook.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "proton.me",
+  "protonmail.com",
+  "aol.com",
+  "gmx.com",
+  "gmx.net",
+  "mail.com",
+  "zoho.com",
+  "yandex.com",
+  "example.com",
+  "example.org",
+]);
+
+/** Name+email first. Work-email domains get a second query; consumer inboxes do not. */
+export function enrichmentSearchQueries(fullName: string, email: string): string[] {
+  const name = fullName.trim();
+  const address = email.trim();
+  const queries = [`"${name}" "${address}"`];
+  const domain = address.split("@")[1]?.toLowerCase();
+  if (domain && !GENERIC_EMAIL_DOMAINS.has(domain)) {
+    queries.push(`"${name}" ${domain}`);
+  }
+  return queries;
+}
+
+export function mergeEnrichmentHits(
+  groups: Array<Array<{ url: string; title: string; snippet: string; retrievedAt: string }>>,
+): Array<{ url: string; title: string; snippet: string; retrievedAt: string }> {
+  const merged = new Map<
+    string,
+    { url: string; title: string; snippet: string; retrievedAt: string }
+  >();
+  for (const group of groups) {
+    for (const hit of group) {
+      if (!isHttpsUrl(hit.url) || merged.has(hit.url)) {
+        continue;
+      }
+      merged.set(hit.url, hit);
+    }
+  }
+  return [...merged.values()].slice(0, 12);
+}
+
 /** Citations must come from retrieved search hits, not model-invented URLs. */
 export function citeOnlyRetrievedUrls(
   urls: string[],

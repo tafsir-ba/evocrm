@@ -11,7 +11,9 @@ import {
   crmValueRequiresOverwrite,
   isSafeToAutoApplySuggestion,
   citeOnlyRetrievedUrls,
+  enrichmentSearchQueries,
   isLeadEnrichmentFieldKey,
+  mergeEnrichmentHits,
   mergeWebEnrichmentAttributes,
   readWebEnrichmentAttributes,
   sanitizeEnrichmentText,
@@ -306,12 +308,32 @@ export async function startLeadEnrichment(input: {
       };
     } else {
       const providers = input.providers ?? liveEnrichmentProviders;
-      const search = await providers.search(
-        `"${fullName}" "${email}"`,
-        allowedSources,
-      );
-      hits = search.hits;
-      provider = search.provider;
+      const queries = enrichmentSearchQueries(fullName, email);
+      const hitGroups: Array<typeof hits> = [];
+      for (const query of queries) {
+        const search = await providers.search(query, allowedSources);
+        provider = search.provider;
+        hitGroups.push(search.hits);
+        hits = mergeEnrichmentHits(hitGroups);
+        if (hits.length >= 4) {
+          break;
+        }
+      }
+      if (hits.length === 0) {
+        const updated = await updateEnrichmentRun(input.workspaceId, run.id, {
+          status: "failed",
+          searchProvider: provider,
+          retrievedAt: new Date(retrievedAt),
+          identityMatch: "none",
+          identityRationale: "No public professional web sources were retrieved.",
+          failureMessage:
+            "No public professional web sources were retrieved for this name and email. Enrichment will not invent a profile.",
+          sources: [],
+          suggestions: [],
+          summaryDraft: null,
+        });
+        return updated;
+      }
       synthesis = await providers.synthesize({
         fullName,
         email,

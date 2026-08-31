@@ -5,6 +5,7 @@ import type { LeadEnrichmentFieldKey } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentIdentityMatch } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
 import { isHttpsUrl } from "@/lib/lead-enrichment";
+import { extractOpenAiWebSearchHits } from "@/lib/openai-web-search-hits";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
 
@@ -141,63 +142,55 @@ async function searchOpenAiWeb(
   if (!key) {
     return { hits: [], extraText: "" };
   }
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: enrichmentOpenAiModel(),
-      tools: [{ type: "web_search_preview" }],
-      input: query,
-    }),
+  const model = enrichmentOpenAiModel();
+  const input = `Find public professional pages for ${query}. Prefer company sites, professional directories, news, and registries. Return employers, job titles, locations, and https URLs. Do not invent sources.`;
+  const retrievedAt = new Date().toISOString();
+
+  async function post(body: Record<string, unknown>): Promise<Response> {
+    return fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  let response = await post({
+    model,
+    tools: [{ type: "web_search" }],
+    tool_choice: "required",
+    include: ["web_search_call.action.sources"],
+    input,
   });
+  if (response.status === 400) {
+    response = await post({
+      model,
+      tools: [{ type: "web_search_preview" }],
+      input,
+    });
+  }
   if (!response.ok) {
     throw new AppError("INTERNAL_ERROR", "OpenAI web search failed.", {
       details: { status: response.status },
     });
   }
-  const payload = (await response.json()) as {
-    output_text?: string;
-    output?: Array<{
-      type?: string;
-      content?: Array<{ type?: string; text?: string }>;
-    }>;
-  };
-  const text =
-    payload.output_text ??
-    payload.output
-      ?.flatMap((item) => item.content ?? [])
-      .map((part) => part.text ?? "")
-      .join("\n") ??
-    "";
-  const retrievedAt = new Date().toISOString();
-  const urls = Array.from(text.matchAll(/https:\/\/[^\s)\]>"']+/g)).map((match) => match[0]!);
-  const unique = [...new Set(urls)].slice(0, 8);
-  return {
-    extraText: text.slice(0, 4000),
-    hits: unique.filter(isHttpsUrl).map((url) => ({
-      url,
-      title: url,
-      snippet: "",
-      retrievedAt,
-    })),
-  };
+  const payload: unknown = await response.json();
+  return extractOpenAiWebSearchHits(payload, retrievedAt);
 }
 
 export async function defaultSearch(
   query: string,
-  allowedSources: LeadEnrichmentAllowedSource[],
+  _allowedSources: LeadEnrichmentAllowedSource[],
 ): Promise<{ hits: LeadEnrichmentSearchHit[]; provider: string }> {
-  const scoped = `${query} ${allowedSourceHint(allowedSources)}`;
   if (getEnv().TAVILY_API_KEY) {
-    return { hits: await searchTavily(scoped), provider: "tavily" };
+    return { hits: await searchTavily(query), provider: "tavily" };
   }
   if (getEnv().BRAVE_SEARCH_API_KEY) {
-    return { hits: await searchBrave(scoped), provider: "brave" };
+    return { hits: await searchBrave(query), provider: "brave" };
   }
-  const openai = await searchOpenAiWeb(scoped);
+  const openai = await searchOpenAiWeb(query);
   return { hits: openai.hits, provider: "openai_web_search" };
 }
 
@@ -220,7 +213,7 @@ export async function defaultSynthesize(input: SynthesizeInput): Promise<Synthes
   const sources = input.hits
     .map((hit, index) => `${index + 1}. ${hit.title} — ${hit.url}\n${hit.snippet}`)
     .join("\n\n");
-  const prompt = `You extract public professional facts for CRM review. Use ONLY the search results. Do not invent facts. If identity is not uniquely matched to name+email, set identityMatch to "ambiguous" or "none" and return no suggestions.
+  const prompt = `You extract public professional facts for CRM review. Use ONLY the search results. Do not invent facts.
 
 Lead: ${input.fullName} <${input.email}>
 Already known: ${JSON.stringify(input.known)}
@@ -236,6 +229,8 @@ Return JSON:
   "suggestions": [{"fieldKey":"companyName|jobTitle|industry|city|stateRegion|country|preferredContactClues|professionalProfileUrl|otherProfessional","value":"string","confidencePercent":0-100,"rationale":"string","sourceUrls":["https://..."]}],
   "summary": {"text":"cited summary","citationUrls":["https://..."]}
 }
+
+Identity: unique when retrieved pages point to a single professional matching this name, and either the email appears or a work-email domain matches the cited employer. Ambiguous when several people match. None when nothing corroborates the person. If not unique, return no suggestions.
 
 Rules: public professional/business info only. Exclude credentials, government IDs, health data, exact home address, minors, protected characteristics, private social material, unverified allegations, and any financial data. Every suggestion needs at least one https source URL from the results. Confidence is source-quality/identity-match, not truth.`;
 

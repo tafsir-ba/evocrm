@@ -36,13 +36,13 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 }));
 
 vi.mock("@/server/env", () => ({
-  getEnv: () => ({
+  getEnv: vi.fn(() => ({
     OPENAI_API_KEY: undefined,
     TAVILY_API_KEY: undefined,
     BRAVE_SEARCH_API_KEY: undefined,
     LEAD_ENRICHMENT_DEMO: undefined,
     OPENAI_ENRICHMENT_MODEL: undefined,
-  }),
+  })),
 }));
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
@@ -57,6 +57,7 @@ import {
 } from "@/server/repositories/lead-enrichment";
 import { findLeadById, updateLead } from "@/server/repositories/leads";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
+import { getEnv } from "@/server/env";
 import { resolveOrCreateCompanyByName } from "@/server/services/companies";
 import {
   applyLeadEnrichmentDecisions,
@@ -83,6 +84,17 @@ describe("lead enrichment service", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getEnv).mockReset();
+    vi.mocked(getEnv).mockImplementation(
+      () =>
+        ({
+          OPENAI_API_KEY: undefined,
+          TAVILY_API_KEY: undefined,
+          BRAVE_SEARCH_API_KEY: undefined,
+          LEAD_ENRICHMENT_DEMO: undefined,
+          OPENAI_ENRICHMENT_MODEL: undefined,
+        }) as never,
+    );
     suggestionSeq = 0;
     vi.mocked(newSuggestionId).mockImplementation(() => `sug-${++suggestionSeq}`);
     vi.mocked(findWorkspaceById).mockResolvedValue(workspace as never);
@@ -471,6 +483,47 @@ describe("lead enrichment service", () => {
     const capability = await getLeadEnrichmentCapability("ws-1");
     expect(capability.reasonDisabled).not.toMatch(/turned off/i);
     expect(capability.reasonDisabled).toMatch(/OPENAI_API_KEY/);
+  });
+
+  it("fails without inventing a profile when search returns no sources", async () => {
+    vi.mocked(getEnv).mockImplementation(
+      () =>
+        ({
+          OPENAI_API_KEY: "sk-test",
+          TAVILY_API_KEY: undefined,
+          BRAVE_SEARCH_API_KEY: undefined,
+          LEAD_ENRICHMENT_DEMO: undefined,
+          OPENAI_ENRICHMENT_MODEL: undefined,
+        }) as never,
+    );
+    vi.mocked(findWorkspaceById).mockResolvedValue({
+      ...workspace,
+      leadEnrichment: { ...workspace.leadEnrichment, demoMode: false },
+    } as never);
+    vi.mocked(findLeadById).mockResolvedValue(
+      buildTestLeadRecord({
+        fullName: "Alisa Scarlett-Buchanan",
+        firstName: "Alisa",
+        lastName: "Scarlett-Buchanan",
+        email: "alisa@example-agency.ch",
+      }),
+    );
+
+    const run = await startLeadEnrichment({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+      providers: {
+        search: async () => ({ hits: [], provider: "openai_web_search" }),
+        synthesize: async () => {
+          throw new Error("should not synthesize without hits");
+        },
+      },
+    });
+
+    expect(run.status).toBe("failed");
+    expect(run.failureMessage).toMatch(/will not invent/i);
+    expect(updateLead).not.toHaveBeenCalled();
   });
 
   it("revokes by restoring accepted fields without wiping the audit trail", async () => {

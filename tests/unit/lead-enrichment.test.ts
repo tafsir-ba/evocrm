@@ -8,6 +8,7 @@ import {
   isSafeToAutoApplySuggestion,
   isUniqueEnrichmentReveal,
   citeOnlyRetrievedUrls,
+  enrichmentSearchQueries,
   originLabel,
   sanitizeEnrichmentText,
 } from "@/lib/lead-enrichment";
@@ -157,5 +158,15 @@ describe("lead enrichment contract", () => {
         country: "Switzerland",
       }),
     ).toBe(false);
+  });
+
+  it("searches name+email first and adds a work-domain query", () => {
+    expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@evo-home.ch")).toEqual([
+      '"Alisa Scarlett-Buchanan" "alisa@evo-home.ch"',
+      '"Alisa Scarlett-Buchanan" evo-home.ch',
+    ]);
+    expect(enrichmentSearchQueries("Alisa Scarlett-Buchanan", "alisa@gmail.com")).toEqual([
+      '"Alisa Scarlett-Buchanan" "alisa@gmail.com"',
+    ]);
   });
 });
