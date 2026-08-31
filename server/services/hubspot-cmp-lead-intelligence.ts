@@ -53,10 +53,10 @@ export type HubSpotCmpIntelligenceReport = {
 
 function leadIntelligenceValues(lead: LeadRecord): LeadIntelligenceValues {
   return {
-    industry: lead.industry,
-    jobTitle: lead.jobTitle,
-    stateRegion: lead.stateRegion,
-    companyId: lead.companyId,
+    industry: lead.industry ?? null,
+    jobTitle: lead.jobTitle ?? null,
+    stateRegion: lead.stateRegion ?? null,
+    companyId: lead.companyId ?? null,
   };
 }
 
@@ -180,7 +180,7 @@ export async function runHubSpotCmpLeadIntelligenceEnrichment(input: {
       const snapshot = snapshotFromRaw(contact);
       const companyName = normalizeIntelligenceText(snapshot.properties.company);
       const applyCompany = shouldApplyAssociatedCompany({
-        existingCompanyId: lead.companyId,
+        existingCompanyId: lead.companyId ?? null,
         existingProvenance: lead.intelligenceProvenance,
         companyName,
       });

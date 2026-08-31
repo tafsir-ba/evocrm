@@ -333,6 +333,8 @@ Demand-side record (buyer/inquirer).
 
 **V1 note:** Contacts are represented as Leads. There is no separate Contact entity.
 
+**Lead intelligence:** Optional `industry`, `jobTitle`, `stateRegion`, and associated `companyId` (Company FK, not a project company link). `intelligenceProvenance` records how each field was last written. HubSpot CMP enrichment may fill blank or HubSpot-owned values only; manual CRM values are preserved. Enrichment never enrolls campaigns.
+
 **Project memberships:** A lead may belong to multiple projects through `LeadProjectMembership`. Exactly one membership is primary. `Lead.projectId` is the denormalized primary project (list/filter/search default, email uniqueness, campaign matching). Secondary memberships never create campaign or drip enrollment.
 
 | Field | Description |

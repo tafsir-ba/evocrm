@@ -187,6 +187,7 @@ describe("website lead capture service", () => {
         tagsResolved: [],
         assignedUser: null,
         ownerUser: null,
+        company: null,
       },
       warnings: [],
     });

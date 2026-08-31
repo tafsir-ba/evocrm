@@ -176,6 +176,7 @@ function makeLead(overrides: Record<string, unknown> = {}) {
     tagsResolved: [],
     assignedUser: null,
     ownerUser: null,
+    company: null,
     ...overrides,
   };
 }
