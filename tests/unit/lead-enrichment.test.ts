@@ -8,6 +8,8 @@ import {
   isSafeToAutoApplySuggestion,
   isUniqueEnrichmentReveal,
   citeOnlyRetrievedUrls,
+  emailLocalPartToPersonName,
+  enrichmentPersonQueryName,
   enrichmentSearchQueries,
   crmOwnedMarketContext,
   enrichmentMarketHints,
@@ -231,6 +233,34 @@ describe("lead enrichment contract", () => {
       '"radu" "radu@neho.ch"',
       '"radu" neho.ch',
       '"radu" LinkedIn',
+    ]);
+  });
+
+  it("strips a year from an email-as-name so Yanis Berger is searchable", () => {
+    expect(emailLocalPartToPersonName("yanis_berger96")).toBe("yanis berger");
+    expect(
+      enrichmentPersonQueryName("yanis_berger96@wls1.com", "yanis_berger96@wls1.com"),
+    ).toBe("yanis berger");
+    expect(
+      enrichmentPlaceFromProject({
+        location: {
+          countryCode: "CH",
+          cantonName: "Vaud",
+          municipality: "Brent",
+        },
+      }).searchPlace,
+    ).toBe("Montreux");
+    expect(
+      enrichmentSearchQueries("yanis_berger96@wls1.com", "yanis_berger96@wls1.com", {
+        searchPlace: "Montreux",
+      }),
+    ).toEqual([
+      '"yanis berger" Montreux',
+      '"yanis berger" LinkedIn Montreux',
+      '"yanis berger" "yanis_berger96@wls1.com"',
+      '"yanis berger" wls1.com',
+      '"yanis berger" LinkedIn',
+      '"yanis berger"',
     ]);
   });
 

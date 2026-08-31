@@ -218,13 +218,32 @@ export function canonicalizeEnrichmentUrl(url: string): string | null {
   }
 }
 
+/** Turn `yanis_berger96` into `yanis berger` — drop separators and a trailing year. */
+export function emailLocalPartToPersonName(localPart: string): string {
+  const tokens = localPart
+    .replace(/[._+\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((token, index, all) => {
+      if (index === all.length - 1) {
+        const stripped = token.replace(/\d+$/g, "");
+        return stripped.length >= 2 ? stripped : token;
+      }
+      return token;
+    })
+    .filter((token) => !/^\d+$/.test(token));
+  return tokens.join(" ").trim();
+}
+
 /** Name+email first. Work-email domains get a second query; consumer inboxes do not. */
 export function enrichmentPersonQueryName(fullName: string, email: string): string {
   const name = fullName.trim();
   const address = email.trim();
   if (!name || name.includes("@") || name.toLowerCase() === address.toLowerCase()) {
     const local = address.split("@")[0] ?? "";
-    return local.replace(/[._+\-]+/g, " ").replace(/\s+/g, " ").trim() || name;
+    return emailLocalPartToPersonName(local) || name;
   }
   return name;
 }
@@ -283,6 +302,9 @@ const MARKET_LOCATION_ALIASES: Record<string, string> = {
   berne: "switzerland",
   basel: "switzerland",
   lugano: "switzerland",
+  montreux: "switzerland",
+  brent: "switzerland",
+  vaud: "switzerland",
   canada: "canada",
   canadien: "canada",
   canadienne: "canada",
@@ -351,6 +373,12 @@ function compactPlaceKey(value: string | null | undefined): string {
 
 const GENEVA_PLACE_KEYS = new Set(["geneve", "genf", "geneva", "ge"]);
 
+/** Village / CRM label → the metro a broker would type. */
+const MUNICIPALITY_SEARCH_PLACE: Record<string, string> = {
+  brent: "Montreux",
+  confignon: "Geneva",
+};
+
 export function isGenevaPlace(value: string | null | undefined): boolean {
   return GENEVA_PLACE_KEYS.has(compactPlaceKey(value));
 }
@@ -382,6 +410,15 @@ export function enrichmentPlaceFromProject(
       stateRegion: "Geneva",
       country: country ?? "Switzerland",
       searchPlace: "Geneva",
+    };
+  }
+  const metro = municipality ? MUNICIPALITY_SEARCH_PLACE[compactPlaceKey(municipality)] : null;
+  if (metro) {
+    return {
+      city: metro,
+      stateRegion: canton,
+      country,
+      searchPlace: metro,
     };
   }
   const searchPlace = municipality || canton || country;

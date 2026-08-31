@@ -218,10 +218,24 @@ export async function defaultSearch(
   options: EnrichmentSearchOptions = {},
 ): Promise<{ hits: LeadEnrichmentSearchHit[]; provider: string }> {
   if (getEnv().TAVILY_API_KEY) {
-    return { hits: await searchTavily(query, options), provider: "tavily" };
+    try {
+      const hits = await searchTavily(query, options);
+      if (hits.length > 0) {
+        return { hits, provider: "tavily" };
+      }
+    } catch {
+      // Empty or failed Tavily — try the next provider rather than fail the run.
+    }
   }
   if (getEnv().BRAVE_SEARCH_API_KEY) {
-    return { hits: await searchBrave(query), provider: "brave" };
+    try {
+      const hits = await searchBrave(query);
+      if (hits.length > 0) {
+        return { hits, provider: "brave" };
+      }
+    } catch {
+      // Fall through to OpenAI web search.
+    }
   }
   const openai = await searchOpenAiWeb(query);
   return { hits: openai.hits, provider: "openai_web_search" };
