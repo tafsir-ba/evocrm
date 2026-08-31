@@ -13,6 +13,7 @@ import {
   enrichmentMarketHints,
   enrichmentPlaceFromProject,
   looksLikeSwissPhone,
+  tavilyCountryFromMarketHints,
   rankEnrichmentHits,
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
@@ -252,6 +253,8 @@ describe("lead enrichment contract", () => {
       country: "Switzerland",
       searchPlace: "Geneva",
     });
+    expect(tavilyCountryFromMarketHints(["Geneva", "Suisse"])).toBe("switzerland");
+    expect(tavilyCountryFromMarketHints(["Montréal"])).toBe("canada");
     expect(
       enrichmentSearchQueries("carmen smith", "carmen.smith2@hotmail.com", {
         searchPlace: "Geneva",

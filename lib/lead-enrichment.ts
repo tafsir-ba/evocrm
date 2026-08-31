@@ -251,7 +251,7 @@ export type EnrichmentProjectGeo = {
   } | null;
 };
 
-const PEOPLE_DATA_VENDOR_HOSTS = [
+export const PEOPLE_DATA_VENDOR_HOSTS = [
   "rocketreach.co",
   "zoominfo.com",
   "apollo.io",
@@ -441,6 +441,25 @@ export function enrichmentMarketHints(context: EnrichmentSearchContext): string[
     push("Switzerland");
   }
   return hints;
+}
+
+const TAVILY_COUNTRY_BY_MARKET: Record<string, string> = {
+  switzerland: "switzerland",
+  france: "france",
+  canada: "canada",
+  "united states": "united states",
+  "united kingdom": "united kingdom",
+};
+
+/** Tavily `country` boost — lowercase English country name from their enum. */
+export function tavilyCountryFromMarketHints(hints: string[]): string | null {
+  for (const hint of hints) {
+    const market = canonicalMarketCountry(hint);
+    if (market && TAVILY_COUNTRY_BY_MARKET[market]) {
+      return TAVILY_COUNTRY_BY_MARKET[market];
+    }
+  }
+  return null;
 }
 
 export function enrichmentPrimaryMarketLabel(context: EnrichmentSearchContext): string | null {

@@ -657,7 +657,8 @@ describe("lead enrichment service", () => {
       },
     } as never);
 
-    const search = vi.fn(async (query: string) => ({
+    const search = vi.fn(
+      async (query: string, _sources?: unknown, _options?: { country?: string | null }) => ({
       hits:
         query.includes("Geneva")
           ? [
@@ -670,7 +671,8 @@ describe("lead enrichment service", () => {
             ]
           : [],
       provider: "tavily",
-    }));
+    }),
+    );
 
     await startLeadEnrichment({
       workspaceId: "ws-1",
@@ -714,6 +716,7 @@ describe("lead enrichment service", () => {
     });
 
     expect(search.mock.calls[0]?.[0]).toBe('"carmen smith" Geneva');
+    expect(search.mock.calls[0]?.[2]).toEqual({ country: "switzerland" });
     expect(findProjectById).toHaveBeenCalledWith("ws-1", "proj-cressy");
   });
 

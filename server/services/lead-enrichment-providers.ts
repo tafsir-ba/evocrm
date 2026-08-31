@@ -4,7 +4,7 @@ import type { LeadEnrichmentAllowedSource } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentFieldKey } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentIdentityMatch } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
-import { isHttpsUrl } from "@/lib/lead-enrichment";
+import { isHttpsUrl, PEOPLE_DATA_VENDOR_HOSTS } from "@/lib/lead-enrichment";
 import { extractOpenAiWebSearchHits } from "@/lib/openai-web-search-hits";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
@@ -34,13 +34,36 @@ export type SynthesizeResult = {
   model: string;
 };
 
+export type EnrichmentSearchOptions = {
+  country?: string | null;
+};
+
 export type EnrichmentProviders = {
   search: (
     query: string,
     allowedSources: LeadEnrichmentAllowedSource[],
+    options?: EnrichmentSearchOptions,
   ) => Promise<{ hits: LeadEnrichmentSearchHit[]; provider: string }>;
   synthesize: (input: SynthesizeInput) => Promise<SynthesizeResult>;
 };
+
+export function liveSearchProviderName(): "tavily" | "brave" | "openai_web_search" | "none" {
+  const env = getEnv();
+  if (env.TAVILY_API_KEY) {
+    return "tavily";
+  }
+  if (env.BRAVE_SEARCH_API_KEY) {
+    return "brave";
+  }
+  if (env.OPENAI_API_KEY) {
+    return "openai_web_search";
+  }
+  return "none";
+}
+
+export function isTavilyConfigured(): boolean {
+  return Boolean(getEnv().TAVILY_API_KEY);
+}
 
 const SOURCE_HINTS: Record<LeadEnrichmentAllowedSource, string> = {
   professional_directory: "public professional directories",
@@ -71,20 +94,28 @@ function allowedSourceHint(allowedSources: LeadEnrichmentAllowedSource[]): strin
   return allowedSources.map((source) => SOURCE_HINTS[source]).join(", ");
 }
 
-async function searchTavily(query: string): Promise<LeadEnrichmentSearchHit[]> {
+async function searchTavily(
+  query: string,
+  options: EnrichmentSearchOptions = {},
+): Promise<LeadEnrichmentSearchHit[]> {
   const key = getEnv().TAVILY_API_KEY;
   if (!key) {
     return [];
   }
   const response = await fetch("https://api.tavily.com/search", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      api_key: key,
       query,
       search_depth: "basic",
+      topic: "general",
       include_answer: false,
       max_results: 8,
+      exclude_domains: PEOPLE_DATA_VENDOR_HOSTS,
+      ...(options.country ? { country: options.country } : {}),
     }),
   });
   if (!response.ok) {
@@ -184,9 +215,10 @@ async function searchOpenAiWeb(
 export async function defaultSearch(
   query: string,
   _allowedSources: LeadEnrichmentAllowedSource[],
+  options: EnrichmentSearchOptions = {},
 ): Promise<{ hits: LeadEnrichmentSearchHit[]; provider: string }> {
   if (getEnv().TAVILY_API_KEY) {
-    return { hits: await searchTavily(query), provider: "tavily" };
+    return { hits: await searchTavily(query, options), provider: "tavily" };
   }
   if (getEnv().BRAVE_SEARCH_API_KEY) {
     return { hits: await searchBrave(query), provider: "brave" };

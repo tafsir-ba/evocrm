@@ -33,7 +33,7 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Phase 11 | Only if checkout UI added |
 | `OPENAI_API_KEY` | Optional | Manual lead enrichment; feature stays disabled until set |
 | `OPENAI_ENRICHMENT_MODEL` | Optional | Defaults to `gpt-4o-mini` |
-| `TAVILY_API_KEY` | Optional | Preferred public-web search provider |
+| `TAVILY_API_KEY` | Optional | Preferred public-web search (Tavily). Set on DigitalOcean; Enrich uses Bearer auth. |
 | `BRAVE_SEARCH_API_KEY` | Optional | Alternate search provider |
 | `LEAD_ENRICHMENT_DEMO` | Optional | `true` uses the dry-run fixture |
 

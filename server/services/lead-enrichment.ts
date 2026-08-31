@@ -21,6 +21,7 @@ import {
   mergeEnrichmentHits,
   shouldContinueEnrichmentSearch,
   suggestedLocationConflictsWithMarket,
+  tavilyCountryFromMarketHints,
   mergeWebEnrichmentAttributes,
   readWebEnrichmentAttributes,
   sanitizeEnrichmentText,
@@ -55,7 +56,9 @@ import {
   isDemoEnvEnabled,
   isOpenAiConfigured,
   isSearchConfigured,
+  isTavilyConfigured,
   liveEnrichmentProviders,
+  liveSearchProviderName,
   type EnrichmentProviders,
   type SynthesizeResult,
 } from "@/server/services/lead-enrichment-providers";
@@ -177,6 +180,8 @@ export async function getLeadEnrichmentCapability(workspaceId: string): Promise<
   demoMode: boolean;
   openaiConfigured: boolean;
   searchConfigured: boolean;
+  tavilyConfigured: boolean;
+  searchProvider: "tavily" | "brave" | "openai_web_search" | "none";
   retentionDays: number;
   legalReviewAcknowledgedAt: string | null;
   reasonDisabled: string | null;
@@ -186,6 +191,8 @@ export async function getLeadEnrichmentCapability(workspaceId: string): Promise<
   const settings = workspace?.leadEnrichment;
   const openaiConfigured = isOpenAiConfigured();
   const searchConfigured = isSearchConfigured();
+  const tavilyConfigured = isTavilyConfigured();
+  const searchProvider = liveSearchProviderName();
   const demoMode = Boolean(settings?.demoMode) || isDemoEnvEnabled();
   const enabledFlag = settings?.enabled !== false;
   let reasonDisabled: string | null = null;
@@ -199,6 +206,8 @@ export async function getLeadEnrichmentCapability(workspaceId: string): Promise<
     demoMode,
     openaiConfigured,
     searchConfigured,
+    tavilyConfigured,
+    searchProvider,
     retentionDays: settings?.retentionDays ?? 180,
     legalReviewAcknowledgedAt: settings?.legalReviewAcknowledgedAt
       ? settings.legalReviewAcknowledgedAt.toISOString()
@@ -345,8 +354,11 @@ export async function startLeadEnrichment(input: {
       const providers = input.providers ?? liveEnrichmentProviders;
       const queries = enrichmentSearchQueries(fullName, email, searchContext);
       const hitGroups: Array<typeof hits> = [];
+      const searchCountry = tavilyCountryFromMarketHints(marketHints);
       for (const query of queries) {
-        const search = await providers.search(query, allowedSources);
+        const search = await providers.search(query, allowedSources, {
+          country: searchCountry,
+        });
         provider = search.provider;
         hitGroups.push(search.hits);
         hits = filterEnrichmentHitsForPerson(
@@ -920,6 +932,8 @@ export async function getLeadEnrichmentWorkspaceSettings(workspaceId: string) {
     legalReviewAcknowledgedBy: enrichment?.legalReviewAcknowledgedBy ?? null,
     openaiConfigured: capability.openaiConfigured,
     searchConfigured: capability.searchConfigured,
+    tavilyConfigured: capability.tavilyConfigured,
+    searchProvider: capability.searchProvider,
     usable: capability.enabled,
     reasonDisabled: capability.reasonDisabled,
   };

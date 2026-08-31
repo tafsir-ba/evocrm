@@ -63,7 +63,7 @@ History in `revisions[]`. Soft-delete `deletedAt`. Export via GET.
 
 `enabled` (default **true**), `demoMode` (dry-run fixture), `retentionDays` (default 180). Turn off in Settings → Lead enrichment to hide the Enrich CTA.
 
-Env (optional, not production-required): `OPENAI_API_KEY`, `OPENAI_ENRICHMENT_MODEL`, `TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY`, `LEAD_ENRICHMENT_DEMO`.
+Env: `OPENAI_API_KEY` (required for live Enrich), `TAVILY_API_KEY` (preferred web search — Bearer auth, country boost, contact-vendor domains excluded), `OPENAI_ENRICHMENT_MODEL`, `BRAVE_SEARCH_API_KEY`, `LEAD_ENRICHMENT_DEMO`. Settings → Lead enrichment shows whether Tavily is live. Dry-run / demo fixture must be off or Tavily is not called.
 
 ## Access
 

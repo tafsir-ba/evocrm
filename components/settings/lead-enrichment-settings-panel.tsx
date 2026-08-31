@@ -12,6 +12,8 @@ type Settings = {
   retentionDays: number;
   openaiConfigured: boolean;
   searchConfigured: boolean;
+  tavilyConfigured: boolean;
+  searchProvider: "tavily" | "brave" | "openai_web_search" | "none";
   usable: boolean;
   reasonDisabled: string | null;
   legalReviewAcknowledgedAt: string | null;
@@ -73,9 +75,10 @@ export function LeadEnrichmentSettingsPanel({
     <Card>
       <h2 className="text-[15px] font-semibold mb-1">Lead enrichment</h2>
       <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-4">
-        Manual public-web research. Enabled for this workspace; live search still needs
-        OPENAI_API_KEY on the server. Policy: docs/lead-enrichment.md. Disable here to hide
-        Enrich. Re-enabling requires the legal/privacy acknowledgement.
+        Manual public-web research. Live Enrich needs OPENAI_API_KEY (synthesis) and a search
+        key — Tavily first, then Brave, then OpenAI web search. Set TAVILY_API_KEY on the
+        server (DigitalOcean env). Uncheck dry-run below or Tavily is never called. Policy:
+        docs/lead-enrichment.md.
       </p>
       {error ? <p className="text-[13px] text-[var(--color-danger-fg)] mb-3">{error}</p> : null}
       <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] mb-4">
@@ -84,8 +87,24 @@ export function LeadEnrichmentSettingsPanel({
           <dd>{settings.openaiConfigured ? "Configured" : "Missing"}</dd>
         </div>
         <div>
-          <dt className="text-[var(--color-ink-muted)]">Search provider</dt>
-          <dd>{settings.searchConfigured ? "Configured" : "Missing"}</dd>
+          <dt className="text-[var(--color-ink-muted)]">Tavily search</dt>
+          <dd>
+            {settings.tavilyConfigured
+              ? settings.demoMode
+                ? "Key present — dry-run is on, so it is not used"
+                : "Live (first provider)"
+              : "Missing TAVILY_API_KEY"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--color-ink-muted)]">Active search</dt>
+          <dd>
+            {settings.demoMode
+              ? "Demo fixture"
+              : settings.searchProvider === "none"
+                ? "None"
+                : settings.searchProvider}
+          </dd>
         </div>
         <div>
           <dt className="text-[var(--color-ink-muted)]">Usable now</dt>
