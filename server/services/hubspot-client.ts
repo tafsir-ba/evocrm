@@ -273,10 +273,9 @@ async function searchHubSpotContacts(input: {
     path: "/crm/v3/objects/contacts/search",
     body: {
       filterGroups: input.filterGroups,
-      sorts: [
-        { propertyName: input.sortProperty, direction: "ASCENDING" },
-        { propertyName: "hs_object_id", direction: "ASCENDING" },
-      ],
+      // HubSpot contact search accepts at most one sort rule. Equal-timestamp
+      // contacts are still de-duplicated by the durable contact-id watermark.
+      sorts: [{ propertyName: input.sortProperty, direction: "ASCENDING" }],
       properties: [...HUBSPOT_ONGOING_CONTACT_PROPERTIES],
       limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
       ...(input.after ? { after: input.after } : {}),
