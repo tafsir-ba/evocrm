@@ -69,9 +69,7 @@ describe("project sharing invite route permissions", () => {
       isWorkspaceAdmin: false,
     } as never);
     vi.mocked(sendProjectInvitation).mockResolvedValue({
-      mode: "invitation",
       invitation: { id: "inv-1", email: "x@y.com" },
-      isExistingMember: false,
     } as never);
 
     const response = await postSharing(

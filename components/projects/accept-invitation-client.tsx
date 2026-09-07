@@ -12,11 +12,19 @@ export function AcceptInvitationClient() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"idle" | "accepting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [result, setResult] = useState<{
     workspaceId: string;
     projectId: string;
     projectRole: string;
+    workspaceSlug: string | null;
   } | null>(null);
+
+  const acceptCallbackPath = token
+    ? `/invitations/accept?token=${encodeURIComponent(token)}`
+    : "/invitations/accept";
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(acceptCallbackPath)}`;
+  const signupHref = `/signup?callbackUrl=${encodeURIComponent(acceptCallbackPath)}`;
 
   useEffect(() => {
     if (!PROJECT_SHARING_ENABLED || !token || status !== "idle") {
@@ -26,6 +34,7 @@ export function AcceptInvitationClient() {
     async function accept() {
       setStatus("accepting");
       setErrorMessage(null);
+      setErrorCode(null);
 
       try {
         const response = await fetch("/api/invitations/accept", {
@@ -36,6 +45,12 @@ export function AcceptInvitationClient() {
         const payload = await response.json();
 
         if (!response.ok) {
+          const code = payload.error?.code ?? null;
+          setErrorCode(code);
+          if (code === "UNAUTHENTICATED") {
+            window.location.href = loginHref;
+            return;
+          }
           setStatus("error");
           setErrorMessage(payload.error?.message ?? "Could not accept invitation.");
           return;
@@ -43,6 +58,12 @@ export function AcceptInvitationClient() {
 
         setResult(payload.data);
         setStatus("success");
+
+        const slug = payload.data?.workspaceSlug;
+        const projectId = payload.data?.projectId;
+        if (slug && projectId) {
+          window.location.href = `/w/${slug}/projects/${projectId}`;
+        }
       } catch {
         setStatus("error");
         setErrorMessage("Something went wrong. Please try again.");
@@ -50,7 +71,7 @@ export function AcceptInvitationClient() {
     }
 
     void accept();
-  }, [token, status]);
+  }, [token, status, loginHref]);
 
   if (!PROJECT_SHARING_ENABLED) {
     return (
@@ -67,6 +88,11 @@ export function AcceptInvitationClient() {
       </Card>
     );
   }
+
+  const successHref =
+    result?.workspaceSlug && result.projectId
+      ? `/w/${result.workspaceSlug}/projects/${result.projectId}`
+      : "/workspaces";
 
   return (
     <Card className="max-w-md w-full text-center space-y-4">
@@ -87,8 +113,8 @@ export function AcceptInvitationClient() {
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             You now have access to the project as {result?.projectRole?.replace("_", " ")}.
           </p>
-          <Button onClick={() => (window.location.href = "/workspaces")}>
-            Go to workspaces
+          <Button onClick={() => (window.location.href = successHref)}>
+            {result?.workspaceSlug ? "Open project" : "Go to workspaces"}
           </Button>
         </>
       ) : status === "error" ? (
@@ -99,9 +125,14 @@ export function AcceptInvitationClient() {
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             {errorMessage ?? "Invalid invitation link."}
           </p>
-          <Button variant="secondary" onClick={() => (window.location.href = "/login")}>
-            Sign in
-          </Button>
+          <div className="flex flex-col gap-2 items-center">
+            <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
+              Sign in
+            </Button>
+            <Button variant="ghost" onClick={() => (window.location.href = signupHref)}>
+              Create an account
+            </Button>
+          </div>
         </>
       ) : (
         <>

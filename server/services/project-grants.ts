@@ -1,15 +1,11 @@
 import "server-only";
 
-import {
-  canAssignProjectRole,
-  type ProjectRoleKey,
-} from "@/lib/project-sharing-roles";
+import { type ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import {
   countActiveProjectAdmins,
   createProjectGrant,
-  findActiveProjectGrant,
   findActiveProjectGrantsForProject,
   findProjectGrant,
   reactivateProjectGrant,
@@ -18,12 +14,6 @@ import {
   type ProjectGrantRecord,
 } from "@/server/repositories/project-grants";
 import { findProjectById } from "@/server/repositories/projects";
-import {
-  createMembership,
-  findMembership,
-  reactivateMembership,
-} from "@/server/repositories/memberships";
-import { findRoleByWorkspaceAndKey } from "@/server/repositories/roles";
 import { findUserById, findUserByEmail } from "@/server/repositories/users";
 import {
   isProjectRoleKey,
@@ -67,106 +57,6 @@ export async function listProjectGrantsForProject(
 ): Promise<ProjectGrantListItem[]> {
   const grants = await findActiveProjectGrantsForProject(workspaceId, projectId);
   return Promise.all(grants.map(toGrantListItem));
-}
-
-async function ensureWorkspaceMembershipForShare(input: {
-  workspaceId: string;
-  userId: string;
-  invitedBy: string;
-}): Promise<void> {
-  const membership = await findMembership(input.userId, input.workspaceId);
-
-  if (membership?.status === "active") {
-    return;
-  }
-
-  if (membership?.status === "suspended") {
-    throw new AppError(
-      "CONFLICT",
-      "This user is suspended in this workspace and cannot be granted project access.",
-    );
-  }
-
-  const viewerRole = await findRoleByWorkspaceAndKey(input.workspaceId, "viewer");
-  if (!viewerRole) {
-    throw new AppError("INTERNAL_ERROR", "Could not resolve workspace viewer role.");
-  }
-
-  if (membership?.status === "removed" || membership?.status === "invited") {
-    await reactivateMembership({
-      membershipId: membership.id,
-      workspaceId: input.workspaceId,
-      roleId: viewerRole.id,
-      invitedBy: input.invitedBy,
-    });
-    return;
-  }
-
-  await createMembership({
-    userId: input.userId,
-    workspaceId: input.workspaceId,
-    roleId: viewerRole.id,
-    status: "active",
-    invitedBy: input.invitedBy,
-    joinedAt: new Date(),
-  });
-}
-
-/**
- * Immediately share a project with a registered EvoCRM user (no email invite).
- */
-export async function shareProjectWithRegisteredUser(input: {
-  workspaceId: string;
-  projectId: string;
-  targetEmail: string;
-  projectRole: ProjectRoleKey;
-  actorId: string;
-  actorProjectRole: ProjectRoleKey;
-  isWorkspaceAdmin: boolean;
-}): Promise<ProjectGrantListItem> {
-  if (!isProjectRoleKey(input.projectRole)) {
-    throw new AppError("VALIDATION_ERROR", "Invalid project role.");
-  }
-
-  if (
-    !input.isWorkspaceAdmin &&
-    !canAssignProjectRole(input.actorProjectRole, input.projectRole)
-  ) {
-    throw new AppError(
-      "PERMISSION_DENIED",
-      "You cannot grant a project role higher than your own.",
-    );
-  }
-
-  const project = await findProjectById(input.workspaceId, input.projectId);
-  if (!project || project.archivedAt) {
-    throw new AppError("NOT_FOUND", "Project not found or archived.");
-  }
-
-  const normalizedEmail = input.targetEmail.toLowerCase().trim();
-  const actor = await findUserById(input.actorId);
-  if (actor?.email?.toLowerCase() === normalizedEmail) {
-    throw new AppError("CONFLICT", "You already have access to this project.");
-  }
-
-  const targetUser = await findUserByEmail(normalizedEmail);
-  if (!targetUser) {
-    throw new AppError("NOT_FOUND", "No EvoCRM account found for that email.");
-  }
-
-  await ensureWorkspaceMembershipForShare({
-    workspaceId: input.workspaceId,
-    userId: targetUser.id,
-    invitedBy: input.actorId,
-  });
-
-  return addProjectGrant({
-    workspaceId: input.workspaceId,
-    projectId: input.projectId,
-    targetEmail: normalizedEmail,
-    projectRole: input.projectRole,
-    actorId: input.actorId,
-  });
 }
 
 export async function addProjectGrant(input: {

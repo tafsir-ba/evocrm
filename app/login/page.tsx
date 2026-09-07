@@ -128,7 +128,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-6 text-center">
             New to EvoHome?{" "}
             <Link
-              href="/signup"
+              href={
+                callbackUrl
+                  ? `/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                  : "/signup"
+              }
               className="text-[var(--color-brand-700)] hover:underline focus-ring rounded"
             >
               Create an account

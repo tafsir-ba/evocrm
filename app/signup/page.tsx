@@ -8,8 +8,17 @@ import { IconLogo } from "@/lib/icons";
 
 export const metadata = { title: "Create account — EvoHome CRM" };
 
-export default function SignupPage() {
+type SignupPageProps = {
+  searchParams: Promise<{ callbackUrl?: string }>;
+};
+
+export default async function SignupPage({ searchParams }: SignupPageProps) {
+  const { callbackUrl } = await searchParams;
+  const redirectTo = callbackUrl ?? "/workspaces";
   const googleEnabled = isGoogleAuthConfigured();
+  const loginHref = callbackUrl
+    ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    : "/login";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-canvas)] p-6 sm:p-10">
@@ -40,7 +49,7 @@ export default function SignupPage() {
             : "Create an account with your email and a strong password — minimum 12 characters with at least one letter and one number."}
         </p>
 
-        {googleEnabled && <GoogleSignInButton callbackUrl="/workspaces" />}
+        {googleEnabled && <GoogleSignInButton callbackUrl={redirectTo} />}
 
         {googleEnabled && <AuthMethodDivider label="Or with email" />}
 
@@ -51,13 +60,13 @@ export default function SignupPage() {
               : "mt-6 rounded-xl border border-[var(--color-line)] bg-white p-6"
           }
         >
-          <SignupForm />
+          <SignupForm callbackUrl={redirectTo} />
         </div>
 
         <p className="text-[13px] text-[var(--color-ink-muted)] mt-6 text-center">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={loginHref}
             className="text-[var(--color-brand-700)] hover:underline focus-ring rounded"
           >
             Sign in

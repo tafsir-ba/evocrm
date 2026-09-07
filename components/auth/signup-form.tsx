@@ -7,7 +7,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 
-export function SignupForm() {
+export function SignupForm({
+  callbackUrl = "/workspaces",
+}: {
+  callbackUrl?: string;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -55,7 +59,7 @@ export function SignupForm() {
         return;
       }
 
-      router.push("/workspaces");
+      router.push(callbackUrl || "/workspaces");
       router.refresh();
     } catch {
       setError("Could not create account.");

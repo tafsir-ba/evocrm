@@ -121,7 +121,7 @@ describe("sendProjectInvitation (email accept before grant)", () => {
     });
   });
 
-  it("sends an invite email and does not create a grant for non-members", async () => {
+  it("sends an invite email and does not create a grant on send", async () => {
     const result = await sendProjectInvitation({
       workspaceId: "ws-1",
       projectId: "proj-1",

@@ -83,8 +83,20 @@ export async function POST(request: Request, context: RouteContext) {
       isWorkspaceAdmin: access.isWorkspaceAdmin,
     });
 
+    if (result.mode === "grant") {
+      return successResponse(
+        {
+          mode: "grant",
+          grant: result.grant,
+          message: `Access granted to ${result.grant.userEmail}.`,
+        },
+        { status: 201 },
+      );
+    }
+
     return successResponse(
       {
+        mode: "invitation",
         invitation: result.invitation,
         message: `Invitation sent to ${result.invitation.email}. They must accept before gaining access.`,
       },

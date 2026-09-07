@@ -112,11 +112,16 @@ describe("sendProjectInvitation", () => {
     vi.mocked(findPendingInvitation).mockResolvedValue(null);
     vi.mocked(findActiveProjectGrant).mockResolvedValue(null);
     vi.mocked(sendCampaignEmail).mockResolvedValue({ success: true });
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      id: "user-target",
+      email: "member@example.com",
+      name: "Member",
+    } as never);
     vi.mocked(createProjectInvitation).mockResolvedValue({
       id: "inv-1",
       workspaceId,
       projectId,
-      email: "new@example.com",
+      email: "member@example.com",
       projectRole: "viewer",
       status: "pending",
       invitedBy: actorId,
@@ -144,7 +149,6 @@ describe("sendProjectInvitation", () => {
   });
 
   it("blocks duplicate pending invitations", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
     vi.mocked(findPendingInvitation).mockResolvedValue({
       id: "inv-existing",
       status: "pending",
@@ -154,7 +158,7 @@ describe("sendProjectInvitation", () => {
       sendProjectInvitation({
         workspaceId,
         projectId,
-        email: "new@example.com",
+        email: "member@example.com",
         projectRole: "viewer",
         actorId,
         actorProjectRole: "contributor",
@@ -164,13 +168,11 @@ describe("sendProjectInvitation", () => {
   });
 
   it("enforces role ceiling for non-admin inviters", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
-
     await expect(
       sendProjectInvitation({
         workspaceId,
         projectId,
-        email: "new@example.com",
+        email: "member@example.com",
         projectRole: "project_admin",
         actorId,
         actorProjectRole: "contributor",
@@ -179,13 +181,12 @@ describe("sendProjectInvitation", () => {
     ).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
   });
 
-  it("allows workspace admins to assign any role", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
-
+  it("allows workspace admins to assign any role via invite email", async () => {
+    vi.mocked(findMembership).mockResolvedValue(null);
     const result = await sendProjectInvitation({
       workspaceId,
       projectId,
-      email: "new@example.com",
+      email: "member@example.com",
       projectRole: "project_admin",
       actorId,
       actorProjectRole: "viewer",
@@ -194,13 +195,10 @@ describe("sendProjectInvitation", () => {
 
     expect(result.mode).toBe("invitation");
     expect(createProjectInvitation).toHaveBeenCalled();
+    expect(sendCampaignEmail).toHaveBeenCalled();
   });
 
   it("grants immediately for existing active workspace members", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue({
-      id: "user-target",
-      email: "member@example.com",
-    } as never);
     vi.mocked(findMembership).mockResolvedValue({
       id: "mem-1",
       status: "active",
@@ -224,6 +222,39 @@ describe("sendProjectInvitation", () => {
     expect(result.mode).toBe("grant");
     expect(addProjectGrant).toHaveBeenCalled();
     expect(createProjectInvitation).not.toHaveBeenCalled();
+  });
+
+  it("invites unregistered emails so they can sign up", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(createProjectInvitation).mockResolvedValue({
+      id: "inv-2",
+      workspaceId,
+      projectId,
+      email: "unknown@example.com",
+      projectRole: "viewer",
+      status: "pending",
+      invitedBy: actorId,
+      expiresAt: new Date(Date.now() + 86400000),
+      acceptedAt: null,
+      revokedAt: null,
+      lastResentAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+
+    const result = await sendProjectInvitation({
+      workspaceId,
+      projectId,
+      email: "unknown@example.com",
+      projectRole: "viewer",
+      actorId,
+      actorProjectRole: "project_admin",
+      isWorkspaceAdmin: true,
+    });
+
+    expect(result.mode).toBe("invitation");
+    expect(createProjectInvitation).toHaveBeenCalled();
+    expect(sendCampaignEmail).toHaveBeenCalled();
   });
 });
 
@@ -258,7 +289,7 @@ describe("acceptProjectInvitation", () => {
     } as never);
   });
 
-  it("creates membership and grant for new users", async () => {
+  it("creates membership and grant for registered invitees after accept", async () => {
     vi.mocked(findMembership).mockResolvedValue(null);
     vi.mocked(createMembership).mockResolvedValue({
       id: "mem-new",
@@ -282,6 +313,17 @@ describe("acceptProjectInvitation", () => {
     );
     expect(result.workspaceSlug).toBe("acme");
     expect(result.projectId).toBe(projectId);
+  });
+
+  it("rejects when signed-in email does not match the invite", async () => {
+    await expect(
+      acceptProjectInvitation({
+        token: "raw-token",
+        userId: "user-other",
+        userEmail: "other@example.com",
+      }),
+    ).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    expect(createProjectGrant).not.toHaveBeenCalled();
   });
 
   it("rejects suspended memberships", async () => {

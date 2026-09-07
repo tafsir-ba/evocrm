@@ -103,7 +103,15 @@ export async function sendProjectInvitation(input: {
   message?: string;
   actorProjectRole?: ProjectRoleKey;
   isWorkspaceAdmin?: boolean;
-}): Promise<{ invitation: InvitationListItem }> {
+}): Promise<
+  | { mode: "invitation"; invitation: InvitationListItem; isExistingMember: boolean }
+  | {
+      mode: "grant";
+      grant: Awaited<
+        ReturnType<typeof import("@/server/services/project-grants").addProjectGrant>
+      >;
+    }
+> {
   if (!isProjectRoleKey(input.projectRole)) {
     throw new AppError("VALIDATION_ERROR", "Invalid project role.");
   }
@@ -122,7 +130,7 @@ export async function sendProjectInvitation(input: {
 
   const actor = await findUserById(input.actorId);
   if (actor?.email && actor.email.toLowerCase().trim() === normalizedEmail) {
-    throw new AppError("CONFLICT", "You already have access to this project.");
+    throw new AppError("CONFLICT", "You cannot invite yourself to a project.");
   }
 
   if (
@@ -132,20 +140,14 @@ export async function sendProjectInvitation(input: {
   ) {
     throw new AppError(
       "PERMISSION_DENIED",
-      "You cannot grant a project role higher than your own.",
+      "You cannot assign a project role higher than your own.",
     );
   }
 
   const existingUser = await findUserByEmail(normalizedEmail);
-  if (!existingUser) {
-    throw new AppError("NOT_FOUND", "No EvoCRM account found for that email.");
-  }
-
-  const existingGrant = await findActiveProjectGrant(
-    input.workspaceId,
-    input.projectId,
-    existingUser.id,
-  );
+  const existingGrant = existingUser
+    ? await findActiveProjectGrant(input.workspaceId, input.projectId, existingUser.id)
+    : null;
   if (existingGrant) {
     throw new AppError("CONFLICT", "This user already has access to this project.");
   }
@@ -160,6 +162,22 @@ export async function sendProjectInvitation(input: {
       "CONFLICT",
       "A pending invitation already exists for this email. Resend or revoke it first.",
     );
+  }
+
+  const activeMembership = existingUser
+    ? await findMembership(existingUser.id, input.workspaceId)
+    : null;
+
+  if (existingUser && activeMembership?.status === "active") {
+    const { addProjectGrant } = await import("@/server/services/project-grants");
+    const grant = await addProjectGrant({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      targetEmail: normalizedEmail,
+      projectRole: input.projectRole,
+      actorId: input.actorId,
+    });
+    return { mode: "grant", grant };
   }
 
   const { raw: token, hash: tokenHash } = generateInvitationToken();
@@ -225,7 +243,11 @@ export async function sendProjectInvitation(input: {
     },
   });
 
-  return { invitation: await toInvitationListItem(invitation) };
+  return {
+    mode: "invitation",
+    invitation: await toInvitationListItem(invitation),
+    isExistingMember: Boolean(existingUser),
+  };
 }
 
 export async function resendProjectInvitation(input: {
