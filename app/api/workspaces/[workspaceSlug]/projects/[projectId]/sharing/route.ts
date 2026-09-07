@@ -5,8 +5,11 @@ import {
   listProjectGrantsForProject,
   changeProjectGrantRole,
   removeProjectGrant,
-  shareProjectWithRegisteredUser,
 } from "@/server/services/project-grants";
+import {
+  listProjectInvitations,
+  sendProjectInvitation,
+} from "@/server/services/project-invitations";
 import { assertProjectSharingEnabled } from "@/server/features/project-sharing";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { z } from "zod";
@@ -43,10 +46,14 @@ export async function GET(_request: Request, context: RouteContext) {
       "project:read",
     );
 
-    const grants = await listProjectGrantsForProject(workspace.id, projectId);
+    const [grants, invitations] = await Promise.all([
+      listProjectGrantsForProject(workspace.id, projectId),
+      listProjectInvitations(workspace.id, projectId),
+    ]);
 
     return successResponse({
       grants,
+      invitations: invitations.filter((inv) => inv.status === "pending"),
       canShare: true,
       canManageGrants:
         access.projectRole === "project_admin" || access.isWorkspaceAdmin,
@@ -62,15 +69,14 @@ export async function POST(request: Request, context: RouteContext) {
     assertProjectSharingEnabled();
     const { workspaceSlug, projectId } = await context.params;
     const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug);
-    // Any accessor may share; requireProjectAccess blocks users without access.
     const access = await requireProjectAccess(workspace.id, userId, projectId);
 
     const body = parseRequestOrThrow(shareSchema, await request.json());
 
-    const grant = await shareProjectWithRegisteredUser({
+    const result = await sendProjectInvitation({
       workspaceId: workspace.id,
       projectId,
-      targetEmail: body.email,
+      email: body.email,
       projectRole: body.projectRole,
       actorId: userId,
       actorProjectRole: access.projectRole,
@@ -79,8 +85,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     return successResponse(
       {
-        grant,
-        message: `Access granted to ${grant.userEmail}.`,
+        invitation: result.invitation,
+        message: `Invitation sent to ${result.invitation.email}. They must accept before gaining access.`,
       },
       { status: 201 },
     );

@@ -9,7 +9,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IconPlus } from "@/lib/icons";
+import { IconMail, IconPlus } from "@/lib/icons";
 import {
   canAssignProjectRole,
   PROJECT_ROLE_DISPLAY_DEFINITIONS,
@@ -27,8 +27,20 @@ type GrantItem = {
   createdAt: string;
 };
 
+type InvitationItem = {
+  id: string;
+  email: string;
+  projectRole: ProjectRoleKey;
+  projectRoleName: string;
+  status: string;
+  invitedByName: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
+
 type SharingData = {
   grants: GrantItem[];
+  invitations: InvitationItem[];
   canShare: boolean;
   canManageGrants: boolean;
   actorProjectRole: ProjectRoleKey;
@@ -41,6 +53,16 @@ type ProjectSharingPanelProps = {
   canManageGrants: boolean;
   actorProjectRole: ProjectRoleKey;
 };
+
+function formatWhen(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export function ProjectSharingPanel({
   workspaceSlug,
@@ -82,7 +104,9 @@ export function ProjectSharingPanel({
       const body = await response.json();
       setData(body.data);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load sharing data.");
+      setError(
+        loadError instanceof Error ? loadError.message : "Failed to load sharing data.",
+      );
     } finally {
       setLoading(false);
     }
@@ -109,17 +133,20 @@ export function ProjectSharingPanel({
       });
       const payload = await response.json();
       if (!response.ok) {
-        setActionError(payload.error?.message ?? "Could not share project.");
+        setActionError(payload.error?.message ?? "Could not send invitation.");
         return;
       }
 
       setShareOpen(false);
       setShareEmail("");
       setShareRole("contributor");
-      setSuccessMessage(payload.data?.message ?? "Access granted.");
+      setSuccessMessage(
+        payload.data?.message ??
+          "Invitation sent. They must accept the email link before gaining access.",
+      );
       await loadData();
     } catch {
-      setActionError("Could not share project.");
+      setActionError("Could not send invitation.");
     } finally {
       setSharing(false);
     }
@@ -157,6 +184,28 @@ export function ProjectSharingPanel({
     await loadData();
   }
 
+  async function handleInvitationAction(
+    invitationId: string,
+    action: "resend" | "revoke",
+  ) {
+    setActionError(null);
+    setSuccessMessage(null);
+    const response = await fetch(`${apiBase}/invitations/${invitationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!response.ok) {
+      const body = await response.json();
+      setActionError(body.error?.message ?? `Failed to ${action} invitation.`);
+      return;
+    }
+    if (action === "resend") {
+      setSuccessMessage("Invitation resent.");
+    }
+    await loadData();
+  }
+
   if (loading) {
     return (
       <Card>
@@ -178,6 +227,7 @@ export function ProjectSharingPanel({
   }
 
   const grants = data?.grants ?? [];
+  const pendingInvitations = data?.invitations ?? [];
   const showShare = data?.canShare ?? canShare;
   const manageGrants = data?.canManageGrants ?? canManageGrants;
 
@@ -190,7 +240,8 @@ export function ProjectSharingPanel({
               Share project
             </h3>
             <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
-              Grant access to a registered EvoCRM user by email. Access is applied immediately.
+              Invite a registered EvoCRM user by email. Access is granted only after they
+              accept.
             </p>
           </div>
           {showShare ? (
@@ -208,20 +259,20 @@ export function ProjectSharingPanel({
         </div>
 
         {successMessage ? (
-          <p className="text-[12.5px] text-[var(--color-success-fg,var(--color-brand-700))] mb-3">
-            {successMessage}
-          </p>
+          <p className="text-[12.5px] text-[var(--color-brand-700)] mb-3">{successMessage}</p>
         ) : null}
         {actionError ? (
           <p className="text-[12.5px] text-[var(--color-danger-fg)] mb-3">{actionError}</p>
         ) : null}
 
-        {grants.length === 0 ? (
+        {grants.length === 0 && pendingInvitations.length === 0 ? (
           <p className="text-[13px] text-[var(--color-ink-muted)] py-4 text-center">
-            Only you have access so far. Share the project with a teammate by email.
+            No collaborators yet. Share the project with a teammate by email.
           </p>
-        ) : (
-          <div className="space-y-2">
+        ) : null}
+
+        {grants.length > 0 ? (
+          <div className="space-y-2 mb-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
               People with access
             </p>
@@ -271,7 +322,53 @@ export function ProjectSharingPanel({
               </div>
             ))}
           </div>
-        )}
+        ) : null}
+
+        {pendingInvitations.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+              Pending invitations
+            </p>
+            {pendingInvitations.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between gap-3 py-2 border-b border-[var(--color-line)] last:border-0"
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-[var(--color-ink)] truncate">
+                    <IconMail
+                      size={13}
+                      className="inline mr-1.5 text-[var(--color-ink-muted)]"
+                    />
+                    {inv.email}
+                  </p>
+                  <p className="text-[12px] text-[var(--color-ink-muted)]">
+                    {inv.projectRoleName} · Expires {formatWhen(inv.expiresAt)}
+                    {inv.invitedByName ? ` · by ${inv.invitedByName}` : null}
+                  </p>
+                </div>
+                {manageGrants ? (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void handleInvitationAction(inv.id, "resend")}
+                    >
+                      Resend
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void handleInvitationAction(inv.id, "revoke")}
+                    >
+                      Revoke
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </Card>
 
       <Modal
@@ -296,14 +393,15 @@ export function ProjectSharingPanel({
               disabled={sharing || !shareEmail.trim()}
               onClick={() => void handleShare()}
             >
-              {sharing ? "Sharing…" : "Grant access"}
+              {sharing ? "Sending…" : "Send invite"}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <p className="text-[13px] text-[var(--color-ink-muted)]">
-            Enter the email of someone who already has an EvoCRM account. They get access right away.
+            Enter the email of someone who already has an EvoCRM account. They receive an
+            email and must click Accept before access is granted.
           </p>
           <div>
             <Label htmlFor="share-email">Email address</Label>
