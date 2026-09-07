@@ -93,14 +93,11 @@ export async function backfillProjectGrants(options: {
 
   await connectDb();
 
-  let workspaceRecords =
+  const workspaceRecords = (
     options.workspaceId !== undefined
       ? [await findWorkspaceById(options.workspaceId)]
-      : await findAllWorkspaces();
-
-  workspaceRecords = workspaceRecords.filter(
-    (workspace): workspace is NonNullable<typeof workspace> => Boolean(workspace),
-  );
+      : await findAllWorkspaces()
+  ).filter((workspace): workspace is NonNullable<typeof workspace> => Boolean(workspace));
 
   if (options.workspaceId && workspaceRecords.length === 0) {
     throw new AppError("NOT_FOUND", "Workspace not found.");

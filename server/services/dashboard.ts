@@ -45,7 +45,7 @@ async function resolveDashboardProjectScope(
   userId: string | undefined,
   query: { projectId?: string },
 ): Promise<DashboardProjectScope> {
-  const scoped = await applyUserProjectScope(workspaceId, userId, {
+  const scoped = await applyUserProjectScope<DashboardProjectScope>(workspaceId, userId, {
     projectId: query.projectId,
   });
   return {
