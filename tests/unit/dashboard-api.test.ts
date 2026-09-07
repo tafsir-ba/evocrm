@@ -142,7 +142,7 @@ describe("dashboard API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getDashboardSummaryForWorkspace).toHaveBeenCalledWith("ws-1", {});
+    expect(getDashboardSummaryForWorkspace).toHaveBeenCalledWith("ws-1", {}, "user-1");
     const body = await response.json();
     expect(body.data.metrics.newLeads).toBe(0);
   });
@@ -176,7 +176,7 @@ describe("dashboard API routes", () => {
     expect(getDashboardSummaryForWorkspace).toHaveBeenCalledWith("ws-1", {
       periodDays: 30,
       timezone: "Europe/Zurich",
-    });
+    }, "user-1");
   });
 
   it("validates dateFrom/dateTo query params", async () => {
@@ -224,7 +224,7 @@ describe("dashboard API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getDashboardForWorkspace).toHaveBeenCalledWith("ws-1", {});
+    expect(getDashboardForWorkspace).toHaveBeenCalledWith("ws-1", {}, "user-1");
   });
 
   it("exposes pipeline, activities, sources, and properties endpoints", async () => {

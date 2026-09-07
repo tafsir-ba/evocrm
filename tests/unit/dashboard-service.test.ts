@@ -271,19 +271,27 @@ describe("dashboard service", () => {
       dateTo,
       undefined,
       "genuine_inbound",
+      undefined,
     );
     expect(countLegacyImportedLeadsCreatedInRange).toHaveBeenCalledWith(
       workspaceId,
       dateFrom,
       dateTo,
       undefined,
+      undefined,
     );
-    expect(countOpportunitiesByStatusIds).toHaveBeenCalledWith(workspaceId, ["status-open"], undefined);
+    expect(countOpportunitiesByStatusIds).toHaveBeenCalledWith(
+      workspaceId,
+      ["status-open"],
+      undefined,
+      undefined,
+    );
     expect(countWonOpportunitiesInRange).toHaveBeenCalledWith(
       workspaceId,
       ["status-won"],
       dateFrom,
       dateTo,
+      undefined,
       undefined,
     );
     expect(countLostOpportunitiesInRange).toHaveBeenCalledWith(
@@ -292,10 +300,12 @@ describe("dashboard service", () => {
       dateFrom,
       dateTo,
       undefined,
+      undefined,
     );
     expect(sumOpportunityValuesByCurrency).toHaveBeenCalledWith(
       workspaceId,
       ["status-open"],
+      undefined,
       undefined,
       undefined,
     );
@@ -418,6 +428,7 @@ describe("dashboard service", () => {
       expect.any(Date),
       undefined,
       "genuine_inbound",
+      undefined,
     );
     expect(result.sources).toEqual(
       expect.arrayContaining([
@@ -595,11 +606,16 @@ describe("dashboard service", () => {
 
     const result = await getRecentOpportunitiesForWorkspace(workspaceId, 5);
 
-    expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith(workspaceId, {
-      page: 1,
-      pageSize: 5,
-      includeArchived: false,
-    });
+    expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith(
+      workspaceId,
+      {
+        page: 1,
+        pageSize: 5,
+        includeArchived: false,
+        projectId: undefined,
+      },
+      undefined,
+    );
     expect(result).toHaveLength(1);
     expect(result[0]?.leadName).toBe("Jane Doe");
   });

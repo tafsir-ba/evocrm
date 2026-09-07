@@ -15,6 +15,7 @@ import {
 } from "@/lib/project-operating-record";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { PROJECT_SHARING_ENABLED } from "@/lib/project-sharing-feature";
 import {
   requireProjectAccess,
   resolveAllowedProjectIds,

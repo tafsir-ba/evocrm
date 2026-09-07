@@ -204,7 +204,7 @@ describe("activity API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getActivityForWorkspace).toHaveBeenCalledWith("ws-1", "act-1");
+    expect(getActivityForWorkspace).toHaveBeenCalledWith("ws-1", "act-1", "user-1");
   });
 
   it("updates activity with activity:update", async () => {

@@ -15,9 +15,9 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "lead:read");
+    const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug, "lead:read");
 
-    const lead = await getLeadForWorkspace(workspace.id, leadId);
+    const lead = await getLeadForWorkspace(workspace.id, leadId, userId);
 
     return successResponse({ lead });
   } catch (error) {

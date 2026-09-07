@@ -154,6 +154,7 @@ describe("lead API routes", () => {
         projectId: "507f1f77bcf86cd799439051",
         includeAssociated: true,
       }),
+      "user-1",
     );
   });
 

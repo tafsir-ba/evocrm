@@ -15,12 +15,16 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, opportunityId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "opportunity:read",
     );
 
-    const opportunity = await getOpportunityForWorkspace(workspace.id, opportunityId);
+    const opportunity = await getOpportunityForWorkspace(
+      workspace.id,
+      opportunityId,
+      userId,
+    );
 
     return successResponse({ opportunity });
   } catch (error) {

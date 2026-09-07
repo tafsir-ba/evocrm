@@ -1,16 +1,13 @@
 /**
- * Backfill ProjectGrant rows so existing members keep project access after
- * ProjectGrant enforcement is enabled.
- *
- * - Ensures each project creator has an active project_admin grant
- * - Ensures each active non-owner/admin workspace member has a grant on every
- *   project in that workspace (contributor if they have project:update, else viewer)
+ * Backfill ProjectGrant rows for project creators and non-admin workspace members.
+ * Idempotent. Does not send invitation emails.
  *
  * Usage:
  *   npm run migrate:project-grants -- --dry-run
- *   npm run migrate:project-grants
+ *   npm run migrate:project-grants -- --actor-id=<userObjectId>
+ *   npm run migrate:project-grants -- --workspace-id=<id> --actor-id=<userObjectId>
  *
- * Accepts MONGODB_URI or MONGO_URL.
+ * Accepts MONGODB_URI or MONGO_URL. Defaults to database `evocrm` when the URI has no db path.
  */
 import Module from "node:module";
 
@@ -56,17 +53,38 @@ function bootstrapEnv(): void {
   }
 }
 
+function readArg(name: string): string | undefined {
+  const prefix = `--${name}=`;
+  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  return match ? match.slice(prefix.length).trim() || undefined : undefined;
+}
+
 async function main(): Promise<void> {
   bootstrapEnv();
   const dryRun = process.argv.includes("--dry-run");
+  const workspaceId = readArg("workspace-id");
+  const actorId = readArg("actor-id");
+  if (!dryRun && !actorId) {
+    throw new Error(
+      "Provide --actor-id=<userObjectId> when applying project grant backfill.",
+    );
+  }
   const { backfillProjectGrants } = await import(
     "../server/services/project-grants-backfill"
   );
-  const result = await backfillProjectGrants({ dryRun });
-  console.log(JSON.stringify(result, null, 2));
+  const result = await backfillProjectGrants({
+    workspaceId,
+    actorId: actorId ?? "000000000000000000000001",
+    dryRun,
+  });
+  console.log("[migrate:project-grants] complete", result);
+  const mongoose = await import("mongoose");
+  await mongoose.default.disconnect().catch(() => undefined);
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch(async (error: unknown) => {
+  console.error("[migrate:project-grants] failed", error);
+  const mongoose = await import("mongoose");
+  await mongoose.default.disconnect().catch(() => undefined);
   process.exit(1);
 });

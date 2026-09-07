@@ -11,10 +11,11 @@ describe("isProtectedAppPath", () => {
     expect(isProtectedAppPath("/")).toBe(true);
   });
 
-  it("protects workspace, admin, and scoped API surfaces", () => {
+  it("protects workspace, admin, invitation accept, and scoped API surfaces", () => {
     expect(isProtectedAppPath("/workspaces")).toBe(true);
     expect(isProtectedAppPath("/w/demo-agency/dashboard")).toBe(true);
     expect(isProtectedAppPath("/admin")).toBe(true);
+    expect(isProtectedAppPath("/invitations/accept")).toBe(true);
     expect(isProtectedAppPath("/api/me")).toBe(true);
     expect(isProtectedAppPath("/api/workspaces/demo/leads")).toBe(true);
   });

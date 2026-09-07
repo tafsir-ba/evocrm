@@ -15,9 +15,9 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, propertyId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "property:read");
+    const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug, "property:read");
 
-    const property = await getPropertyForWorkspace(workspace.id, propertyId);
+    const property = await getPropertyForWorkspace(workspace.id, propertyId, userId);
 
     return successResponse({ property });
   } catch (error) {

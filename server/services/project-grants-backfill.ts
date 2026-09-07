@@ -1,170 +1,196 @@
 import "server-only";
 
+import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
 import { connectDb } from "@/server/db/mongoose";
-import { MembershipModel } from "@/models/membership";
-import { ProjectModel } from "@/models/project";
-import { RoleModel } from "@/models/role";
+import { AppError } from "@/server/errors";
+import { findActiveMembershipsForWorkspace } from "@/server/repositories/memberships";
 import {
   createProjectGrant,
   findProjectGrant,
   reactivateProjectGrant,
 } from "@/server/repositories/project-grants";
-import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
+import { findProjects } from "@/server/repositories/projects";
+import { findRoleByIdInWorkspace } from "@/server/repositories/roles";
+import { findAllWorkspaces, findWorkspaceById } from "@/server/repositories/workspaces";
 
-const WORKSPACE_ADMIN_KEYS = new Set(["owner", "admin"]);
+const OBJECT_ID_PATTERN = /^[a-fA-F0-9]{24}$/;
+const PLACEHOLDER_ACTOR_ID = "000000000000000000000001";
+const WORKSPACE_ADMIN_ROLE_KEYS = new Set(["owner", "admin"]);
 
 export type ProjectGrantsBackfillResult = {
   dryRun: boolean;
-  projectsScanned: number;
+  workspaces: number;
+  projects: number;
   creatorGrantsCreated: number;
+  creatorGrantsReactivated: number;
+  creatorGrantsSkipped: number;
   memberGrantsCreated: number;
-  grantsReactivated: number;
-  skipped: number;
+  memberGrantsReactivated: number;
+  memberGrantsSkipped: number;
 };
 
-export async function backfillProjectGrants(input: {
+async function ensureGrant(input: {
+  workspaceId: string;
+  projectId: string;
+  userId: string;
+  projectRole: ProjectRoleKey;
+  grantedBy: string;
   dryRun: boolean;
-}): Promise<ProjectGrantsBackfillResult> {
-  await connectDb();
-
-  const projects = await ProjectModel.find({})
-    .select({ _id: 1, workspaceId: 1, createdBy: 1 })
-    .lean<Array<{ _id: unknown; workspaceId: unknown; createdBy: unknown }>>();
-
-  const result: ProjectGrantsBackfillResult = {
-    dryRun: input.dryRun,
-    projectsScanned: projects.length,
-    creatorGrantsCreated: 0,
-    memberGrantsCreated: 0,
-    grantsReactivated: 0,
-    skipped: 0,
-  };
-
-  const roles = await RoleModel.find({})
-    .select({ _id: 1, workspaceId: 1, key: 1, permissions: 1 })
-    .lean<
-      Array<{
-        _id: unknown;
-        workspaceId: unknown;
-        key?: string;
-        permissions?: string[];
-      }>
-    >();
-
-  const roleById = new Map(
-    roles.map((role) => [
-      String(role._id),
-      {
-        key: role.key ?? "",
-        permissions: role.permissions ?? [],
-        workspaceId: String(role.workspaceId),
-      },
-    ]),
+}): Promise<"created" | "reactivated" | "skipped"> {
+  const existing = await findProjectGrant(
+    input.workspaceId,
+    input.projectId,
+    input.userId,
   );
 
-  const memberships = await MembershipModel.find({ status: "active" })
-    .select({ userId: 1, workspaceId: 1, roleId: 1 })
-    .lean<Array<{ userId: unknown; workspaceId: unknown; roleId: unknown }>>();
-
-  const membersByWorkspace = new Map<
-    string,
-    Array<{ userId: string; roleKey: string; permissions: string[] }>
-  >();
-
-  for (const membership of memberships) {
-    const workspaceId = String(membership.workspaceId);
-    const role = roleById.get(String(membership.roleId));
-    if (!role || role.workspaceId !== workspaceId) {
-      continue;
-    }
-    if (WORKSPACE_ADMIN_KEYS.has(role.key)) {
-      continue;
-    }
-    const list = membersByWorkspace.get(workspaceId) ?? [];
-    list.push({
-      userId: String(membership.userId),
-      roleKey: role.key,
-      permissions: role.permissions,
-    });
-    membersByWorkspace.set(workspaceId, list);
+  if (existing?.status === "active") {
+    return "skipped";
   }
 
-  async function ensureGrant(inputGrant: {
-    workspaceId: string;
-    projectId: string;
-    userId: string;
-    projectRole: ProjectRoleKey;
-    grantedBy: string;
-    counter: "creatorGrantsCreated" | "memberGrantsCreated";
-  }): Promise<void> {
-    const existing = await findProjectGrant(
-      inputGrant.workspaceId,
-      inputGrant.projectId,
-      inputGrant.userId,
+  if (input.dryRun) {
+    return existing ? "reactivated" : "created";
+  }
+
+  if (existing) {
+    const reactivated = await reactivateProjectGrant(
+      input.workspaceId,
+      input.projectId,
+      input.userId,
+      input.projectRole,
+      input.grantedBy,
     );
-
-    if (existing?.status === "active") {
-      result.skipped += 1;
-      return;
+    if (!reactivated) {
+      throw new AppError("INTERNAL_ERROR", "Failed to reactivate project grant.");
     }
-
-    if (input.dryRun) {
-      result[inputGrant.counter] += 1;
-      return;
-    }
-
-    if (existing?.status === "removed") {
-      await reactivateProjectGrant(
-        inputGrant.workspaceId,
-        inputGrant.projectId,
-        inputGrant.userId,
-        inputGrant.projectRole,
-        inputGrant.grantedBy,
-      );
-      result.grantsReactivated += 1;
-      return;
-    }
-
-    await createProjectGrant({
-      workspaceId: inputGrant.workspaceId,
-      projectId: inputGrant.projectId,
-      userId: inputGrant.userId,
-      projectRole: inputGrant.projectRole,
-      grantedBy: inputGrant.grantedBy,
-    });
-    result[inputGrant.counter] += 1;
+    return "reactivated";
   }
 
-  for (const project of projects) {
-    const workspaceId = String(project.workspaceId);
-    const projectId = String(project._id);
-    const createdBy = String(project.createdBy);
+  await createProjectGrant({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    userId: input.userId,
+    projectRole: input.projectRole,
+    grantedBy: input.grantedBy,
+  });
+  return "created";
+}
 
-    await ensureGrant({
-      workspaceId,
-      projectId,
-      userId: createdBy,
-      projectRole: "project_admin",
-      grantedBy: createdBy,
-      counter: "creatorGrantsCreated",
-    });
+export async function backfillProjectGrants(options: {
+  workspaceId?: string;
+  actorId: string;
+  dryRun?: boolean;
+}): Promise<ProjectGrantsBackfillResult> {
+  const dryRun = options.dryRun ?? false;
+  if (
+    !dryRun &&
+    (!OBJECT_ID_PATTERN.test(options.actorId) || options.actorId === PLACEHOLDER_ACTOR_ID)
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Backfill requires a real --actor-id (24-character hex user ObjectId).",
+    );
+  }
 
-    const members = membersByWorkspace.get(workspaceId) ?? [];
-    for (const member of members) {
-      if (member.userId === createdBy) {
-        continue;
+  await connectDb();
+
+  let workspaceRecords =
+    options.workspaceId !== undefined
+      ? [await findWorkspaceById(options.workspaceId)]
+      : await findAllWorkspaces();
+
+  workspaceRecords = workspaceRecords.filter(
+    (workspace): workspace is NonNullable<typeof workspace> => Boolean(workspace),
+  );
+
+  if (options.workspaceId && workspaceRecords.length === 0) {
+    throw new AppError("NOT_FOUND", "Workspace not found.");
+  }
+
+  const result: ProjectGrantsBackfillResult = {
+    dryRun,
+    workspaces: workspaceRecords.length,
+    projects: 0,
+    creatorGrantsCreated: 0,
+    creatorGrantsReactivated: 0,
+    creatorGrantsSkipped: 0,
+    memberGrantsCreated: 0,
+    memberGrantsReactivated: 0,
+    memberGrantsSkipped: 0,
+  };
+
+  for (const workspace of workspaceRecords) {
+    const projects = await findProjects(workspace.id, { includeArchived: true });
+    result.projects += projects.length;
+
+    const memberships = await findActiveMembershipsForWorkspace(workspace.id);
+    const roleCache = new Map<
+      string,
+      { key: string; permissions: string[] } | null
+    >();
+
+    async function resolveMembershipRole(roleId: string) {
+      if (roleCache.has(roleId)) {
+        return roleCache.get(roleId) ?? null;
       }
-      const projectRole: ProjectRoleKey = member.permissions.includes("project:update")
-        ? "contributor"
-        : "viewer";
-      await ensureGrant({
-        workspaceId,
-        projectId,
-        userId: member.userId,
-        projectRole,
-        grantedBy: createdBy,
-        counter: "memberGrantsCreated",
+      const role = await findRoleByIdInWorkspace(roleId, workspace.id);
+      const value = role
+        ? { key: role.key, permissions: role.permissions as string[] }
+        : null;
+      roleCache.set(roleId, value);
+      return value;
+    }
+
+    for (const project of projects) {
+      const creatorOutcome = await ensureGrant({
+        workspaceId: workspace.id,
+        projectId: project.id,
+        userId: project.createdBy,
+        projectRole: "project_admin",
+        grantedBy: options.actorId,
+        dryRun,
       });
+      if (creatorOutcome === "created") {
+        result.creatorGrantsCreated += 1;
+      } else if (creatorOutcome === "reactivated") {
+        result.creatorGrantsReactivated += 1;
+      } else {
+        result.creatorGrantsSkipped += 1;
+      }
+
+      for (const membership of memberships) {
+        if (membership.userId === project.createdBy) {
+          continue;
+        }
+
+        const role = await resolveMembershipRole(membership.roleId);
+        if (!role) {
+          continue;
+        }
+
+        if (WORKSPACE_ADMIN_ROLE_KEYS.has(role.key)) {
+          continue;
+        }
+
+        const projectRole: ProjectRoleKey = role.permissions.includes("project:update")
+          ? "contributor"
+          : "viewer";
+
+        const memberOutcome = await ensureGrant({
+          workspaceId: workspace.id,
+          projectId: project.id,
+          userId: membership.userId,
+          projectRole,
+          grantedBy: options.actorId,
+          dryRun,
+        });
+        if (memberOutcome === "created") {
+          result.memberGrantsCreated += 1;
+        } else if (memberOutcome === "reactivated") {
+          result.memberGrantsReactivated += 1;
+        } else {
+          result.memberGrantsSkipped += 1;
+        }
+      }
     }
   }
 

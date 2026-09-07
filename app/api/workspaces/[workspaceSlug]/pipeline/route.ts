@@ -11,7 +11,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "opportunity:read",
     );
@@ -24,16 +24,20 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
-    const pipeline = await getPipelineForWorkspace(workspace.id, {
-      search: query.search,
-      projectId: query.projectId,
-      statusId: query.statusId,
-      assignedTo: query.assignedTo,
-      ownerId: query.ownerId,
-      tagId: query.tagId,
-      leadId: query.leadId,
-      propertyId: query.propertyId,
-    });
+    const pipeline = await getPipelineForWorkspace(
+      workspace.id,
+      {
+        search: query.search,
+        projectId: query.projectId,
+        statusId: query.statusId,
+        assignedTo: query.assignedTo,
+        ownerId: query.ownerId,
+        tagId: query.tagId,
+        leadId: query.leadId,
+        propertyId: query.propertyId,
+      },
+      userId,
+    );
 
     return successResponse({ ...pipeline });
   } catch (error) {

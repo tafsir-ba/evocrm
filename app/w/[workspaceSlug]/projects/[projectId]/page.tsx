@@ -1,6 +1,8 @@
 import { ProjectDetailPanel } from "@/components/projects/project-detail-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { AppError } from "@/server/errors";
 import { hasPermission } from "@/server/permissions/permissions";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
 type Params = Promise<{ workspaceSlug: string; projectId: string }>;
@@ -19,6 +21,26 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
         </p>
       </PageContainer>
     );
+  }
+
+  try {
+    await requireProjectAccess(
+      access.context.workspace.id,
+      access.user.id,
+      projectId,
+      "project:read",
+    );
+  } catch (error) {
+    if (error instanceof AppError && error.code === "PERMISSION_DENIED") {
+      return (
+        <PageContainer>
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            You do not have access to this project.
+          </p>
+        </PageContainer>
+      );
+    }
+    throw error;
   }
 
   const permissions = access.context.membership.role.permissions;
