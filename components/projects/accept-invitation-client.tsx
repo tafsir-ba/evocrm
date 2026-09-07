@@ -26,13 +26,6 @@ export function AcceptInvitationClient() {
     return `/login?callbackUrl=${encodeURIComponent(callback)}`;
   }, [token]);
 
-  const signupHref = useMemo(() => {
-    const callback = token
-      ? `/invitations/accept?token=${encodeURIComponent(token)}`
-      : "/invitations/accept";
-    return `/signup?callbackUrl=${encodeURIComponent(callback)}`;
-  }, [token]);
-
   useEffect(() => {
     if (!PROJECT_SHARING_ENABLED || !token || status !== "idle") {
       return;
@@ -63,12 +56,6 @@ export function AcceptInvitationClient() {
 
         setResult(payload.data);
         setStatus("success");
-
-        const slug = payload.data?.workspaceSlug;
-        const projectId = payload.data?.projectId;
-        if (slug && projectId) {
-          window.location.href = `/w/${slug}/projects/${projectId}`;
-        }
       } catch {
         setStatus("error");
         setErrorMessage("Something went wrong. Please try again.");
@@ -130,14 +117,9 @@ export function AcceptInvitationClient() {
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             {errorMessage ?? "Invalid invitation link."}
           </p>
-          <div className="flex flex-col gap-2 items-center">
-            <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
-              Sign in with the invited email
-            </Button>
-            <Button variant="ghost" onClick={() => (window.location.href = signupHref)}>
-              Create an account
-            </Button>
-          </div>
+          <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
+            Sign in with the invited email
+          </Button>
         </>
       ) : (
         <>

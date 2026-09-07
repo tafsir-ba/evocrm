@@ -42,10 +42,6 @@ vi.mock("@/server/repositories/project-invitations", () => ({
   updateInvitationTokenForResend: vi.fn(),
 }));
 
-vi.mock("@/server/services/project-grants", () => ({
-  addProjectGrant: vi.fn(),
-}));
-
 vi.mock("@/server/email/resend", () => ({
   sendCampaignEmail: vi.fn(),
 }));
@@ -80,7 +76,6 @@ import { findProjectById } from "@/server/repositories/projects";
 import { findRoleByWorkspaceAndKey } from "@/server/repositories/roles";
 import { findUserByEmail, findUserById } from "@/server/repositories/users";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
-import { addProjectGrant } from "@/server/services/project-grants";
 import {
   acceptProjectInvitation,
   sendProjectInvitation,
@@ -182,7 +177,6 @@ describe("sendProjectInvitation", () => {
   });
 
   it("allows workspace admins to assign any role via invite email", async () => {
-    vi.mocked(findMembership).mockResolvedValue(null);
     const result = await sendProjectInvitation({
       workspaceId,
       projectId,
@@ -193,20 +187,16 @@ describe("sendProjectInvitation", () => {
       isWorkspaceAdmin: true,
     });
 
-    expect(result.mode).toBe("invitation");
+    expect(result.invitation.email).toBe("member@example.com");
     expect(createProjectInvitation).toHaveBeenCalled();
     expect(sendCampaignEmail).toHaveBeenCalled();
+    expect(createProjectGrant).not.toHaveBeenCalled();
   });
 
-  it("grants immediately for existing active workspace members", async () => {
+  it("still sends an invite (no grant) for existing active workspace members", async () => {
     vi.mocked(findMembership).mockResolvedValue({
       id: "mem-1",
       status: "active",
-    } as never);
-    vi.mocked(addProjectGrant).mockResolvedValue({
-      id: "grant-1",
-      userEmail: "member@example.com",
-      projectRole: "contributor",
     } as never);
 
     const result = await sendProjectInvitation({
@@ -219,42 +209,29 @@ describe("sendProjectInvitation", () => {
       isWorkspaceAdmin: false,
     });
 
-    expect(result.mode).toBe("grant");
-    expect(addProjectGrant).toHaveBeenCalled();
-    expect(createProjectInvitation).not.toHaveBeenCalled();
-  });
-
-  it("invites unregistered emails so they can sign up", async () => {
-    vi.mocked(findUserByEmail).mockResolvedValue(null);
-    vi.mocked(createProjectInvitation).mockResolvedValue({
-      id: "inv-2",
-      workspaceId,
-      projectId,
-      email: "unknown@example.com",
-      projectRole: "viewer",
-      status: "pending",
-      invitedBy: actorId,
-      expiresAt: new Date(Date.now() + 86400000),
-      acceptedAt: null,
-      revokedAt: null,
-      lastResentAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as never);
-
-    const result = await sendProjectInvitation({
-      workspaceId,
-      projectId,
-      email: "unknown@example.com",
-      projectRole: "viewer",
-      actorId,
-      actorProjectRole: "project_admin",
-      isWorkspaceAdmin: true,
-    });
-
-    expect(result.mode).toBe("invitation");
+    expect(result.invitation.email).toBe("member@example.com");
     expect(createProjectInvitation).toHaveBeenCalled();
     expect(sendCampaignEmail).toHaveBeenCalled();
+    expect(createProjectGrant).not.toHaveBeenCalled();
+  });
+
+  it("rejects unregistered emails", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+
+    await expect(
+      sendProjectInvitation({
+        workspaceId,
+        projectId,
+        email: "unknown@example.com",
+        projectRole: "viewer",
+        actorId,
+        actorProjectRole: "project_admin",
+        isWorkspaceAdmin: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "No EvoCRM account found for that email.",
+    });
   });
 });
 

@@ -58,8 +58,10 @@ vi.mock("@/server/services/project-invitation-tokens", () => ({
 }));
 
 import { sendCampaignEmail } from "@/server/email/resend";
-import { findMembership } from "@/server/repositories/memberships";
-import { findActiveProjectGrant } from "@/server/repositories/project-grants";
+import {
+  createProjectGrant,
+  findActiveProjectGrant,
+} from "@/server/repositories/project-grants";
 import {
   createProjectInvitation,
   findPendingInvitation,
@@ -90,7 +92,6 @@ describe("sendProjectInvitation (email accept before grant)", () => {
     } as never);
     vi.mocked(findPendingInvitation).mockResolvedValue(null);
     vi.mocked(findActiveProjectGrant).mockResolvedValue(null);
-    vi.mocked(findMembership).mockResolvedValue(null);
     vi.mocked(sendCampaignEmail).mockResolvedValue({ success: true });
     vi.mocked(createProjectInvitation).mockResolvedValue({
       id: "inv-1",
@@ -132,10 +133,7 @@ describe("sendProjectInvitation (email accept before grant)", () => {
       isWorkspaceAdmin: false,
     });
 
-    expect(result.mode).toBe("invitation");
-    if (result.mode === "invitation") {
-      expect(result.invitation.email).toBe("teammate@example.com");
-    }
+    expect(result.invitation.email).toBe("teammate@example.com");
     expect(createProjectInvitation).toHaveBeenCalled();
     expect(sendCampaignEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -145,41 +143,26 @@ describe("sendProjectInvitation (email accept before grant)", () => {
     );
     const emailCall = vi.mocked(sendCampaignEmail).mock.calls[0]?.[0];
     expect(emailCall?.html).toContain("/invitations/accept?token=raw-token");
-    expect(findActiveProjectGrant).toHaveBeenCalled();
+    expect(createProjectGrant).not.toHaveBeenCalled();
   });
 
-  it("invites unregistered emails so they can sign up via accept link", async () => {
-    vi.mocked(createProjectInvitation).mockResolvedValue({
-      id: "inv-2",
-      workspaceId: "ws-1",
-      projectId: "proj-1",
-      email: "unknown@example.com",
-      projectRole: "viewer",
-      status: "pending",
-      invitedBy: "actor-1",
-      expiresAt: new Date("2026-12-01"),
-      acceptedAt: null,
-      revokedAt: null,
-      lastResentAt: null,
-      createdAt: new Date("2026-01-01"),
-      updatedAt: new Date("2026-01-01"),
-      message: null,
-      tokenHash: "hashed-token",
-    } as never);
-
-    const result = await sendProjectInvitation({
-      workspaceId: "ws-1",
-      projectId: "proj-1",
-      email: "unknown@example.com",
-      projectRole: "viewer",
-      actorId: "actor-1",
-      actorProjectRole: "project_admin",
-      isWorkspaceAdmin: true,
+  it("rejects unknown emails with a neutral account-not-found error", async () => {
+    await expect(
+      sendProjectInvitation({
+        workspaceId: "ws-1",
+        projectId: "proj-1",
+        email: "unknown@example.com",
+        projectRole: "viewer",
+        actorId: "actor-1",
+        actorProjectRole: "project_admin",
+        isWorkspaceAdmin: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "No EvoCRM account found for that email.",
     });
-
-    expect(result.mode).toBe("invitation");
-    expect(createProjectInvitation).toHaveBeenCalled();
-    expect(sendCampaignEmail).toHaveBeenCalled();
+    expect(createProjectInvitation).not.toHaveBeenCalled();
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
   });
 
   it("blocks self-invite", async () => {
