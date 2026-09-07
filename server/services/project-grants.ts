@@ -6,6 +6,7 @@ import { AppError } from "@/server/errors";
 import {
   countActiveProjectAdmins,
   createProjectGrant,
+  findActiveProjectGrant,
   findActiveProjectGrantsForProject,
   findProjectGrant,
   reactivateProjectGrant,

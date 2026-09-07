@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ export function AcceptInvitationClient() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"idle" | "accepting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [result, setResult] = useState<{
     workspaceId: string;
     projectId: string;
@@ -20,11 +19,19 @@ export function AcceptInvitationClient() {
     workspaceSlug: string | null;
   } | null>(null);
 
-  const acceptCallbackPath = token
-    ? `/invitations/accept?token=${encodeURIComponent(token)}`
-    : "/invitations/accept";
-  const loginHref = `/login?callbackUrl=${encodeURIComponent(acceptCallbackPath)}`;
-  const signupHref = `/signup?callbackUrl=${encodeURIComponent(acceptCallbackPath)}`;
+  const loginHref = useMemo(() => {
+    const callback = token
+      ? `/invitations/accept?token=${encodeURIComponent(token)}`
+      : "/invitations/accept";
+    return `/login?callbackUrl=${encodeURIComponent(callback)}`;
+  }, [token]);
+
+  const signupHref = useMemo(() => {
+    const callback = token
+      ? `/invitations/accept?token=${encodeURIComponent(token)}`
+      : "/invitations/accept";
+    return `/signup?callbackUrl=${encodeURIComponent(callback)}`;
+  }, [token]);
 
   useEffect(() => {
     if (!PROJECT_SHARING_ENABLED || !token || status !== "idle") {
@@ -34,7 +41,6 @@ export function AcceptInvitationClient() {
     async function accept() {
       setStatus("accepting");
       setErrorMessage(null);
-      setErrorCode(null);
 
       try {
         const response = await fetch("/api/invitations/accept", {
@@ -46,7 +52,6 @@ export function AcceptInvitationClient() {
 
         if (!response.ok) {
           const code = payload.error?.code ?? null;
-          setErrorCode(code);
           if (code === "UNAUTHENTICATED") {
             window.location.href = loginHref;
             return;
@@ -125,14 +130,9 @@ export function AcceptInvitationClient() {
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             {errorMessage ?? "Invalid invitation link."}
           </p>
-          <div className="flex flex-col gap-2 items-center">
-            <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
-              Sign in
-            </Button>
-            <Button variant="ghost" onClick={() => (window.location.href = signupHref)}>
-              Create an account
-            </Button>
-          </div>
+          <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
+            Sign in with the invited email
+          </Button>
         </>
       ) : (
         <>
