@@ -23,6 +23,11 @@ vi.mock("@/server/repositories/project-grants", () => ({
   createProjectGrant: vi.fn(),
 }));
 
+vi.mock("@/server/permissions/require-project-access", () => ({
+  requireProjectAccess: vi.fn(),
+  resolveAllowedProjectIds: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -34,6 +39,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { createProjectGrant } from "@/server/repositories/project-grants";
 import {
   archiveProject,
@@ -69,6 +75,10 @@ function mockKnownCompany() {
 describe("project service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(requireProjectAccess).mockResolvedValue({
+      projectRole: "project_admin",
+      isWorkspaceAdmin: true,
+    } as never);
     vi.mocked(createProjectGrant).mockResolvedValue({
       id: "grant-1",
       workspaceId: "ws-1",
@@ -138,6 +148,13 @@ describe("project service", () => {
       }),
     );
     expect(project.createdBy).toBe("user-1");
+    expect(createProjectGrant).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      projectId: "project-1",
+      userId: "user-1",
+      projectRole: "project_admin",
+      grantedBy: "user-1",
+    });
     expect(createProject).toHaveBeenCalledWith(
       expect.objectContaining({
         city: "Geneva",
