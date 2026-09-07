@@ -101,6 +101,10 @@ describe("acceptProjectInvitation", () => {
         projectRole: "contributor",
       }),
     );
+    expect(markInvitationAccepted).toHaveBeenCalledWith("inv-1", "user-2");
+    const grantOrder = vi.mocked(createProjectGrant).mock.invocationCallOrder[0]!;
+    const acceptOrder = vi.mocked(markInvitationAccepted).mock.invocationCallOrder[0]!;
+    expect(grantOrder).toBeLessThan(acceptOrder);
   });
 
   it("rejects when signed-in email does not match the invite", async () => {
@@ -115,6 +119,7 @@ describe("acceptProjectInvitation", () => {
       message: expect.stringContaining("different email"),
     });
     expect(createProjectGrant).not.toHaveBeenCalled();
+    expect(markInvitationAccepted).not.toHaveBeenCalled();
   });
 
   it("adds workspace membership when the invitee is not yet a member", async () => {
@@ -138,5 +143,40 @@ describe("acceptProjectInvitation", () => {
       }),
     );
     expect(createProjectGrant).toHaveBeenCalled();
+    expect(markInvitationAccepted).toHaveBeenCalled();
+  });
+
+  it("leaves the invitation pending when grant creation fails so accept can be retried", async () => {
+    vi.mocked(createProjectGrant).mockRejectedValue(new Error("db write failed"));
+
+    await expect(
+      acceptProjectInvitation({
+        token: "token",
+        userId: "user-2",
+        userEmail: "teammate@example.com",
+      }),
+    ).rejects.toThrow("db write failed");
+
+    expect(createProjectGrant).toHaveBeenCalled();
+    expect(markInvitationAccepted).not.toHaveBeenCalled();
+  });
+
+  it("leaves the invitation pending when membership provisioning fails", async () => {
+    vi.mocked(findMembership).mockResolvedValue(null);
+    vi.mocked(findRoleByWorkspaceAndKey).mockResolvedValue(null);
+
+    await expect(
+      acceptProjectInvitation({
+        token: "token",
+        userId: "user-2",
+        userEmail: "teammate@example.com",
+      }),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("viewer role"),
+    });
+
+    expect(createProjectGrant).not.toHaveBeenCalled();
+    expect(markInvitationAccepted).not.toHaveBeenCalled();
   });
 });

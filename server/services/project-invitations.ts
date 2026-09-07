@@ -368,11 +368,8 @@ export async function acceptProjectInvitation(input: {
     );
   }
 
-  const accepted = await markInvitationAccepted(invitation.id, input.userId);
-  if (!accepted) {
-    throw new AppError("CONFLICT", "Invitation could not be accepted. It may have been revoked.");
-  }
-
+  // Provision access before consuming the token so a failed membership/grant
+  // write leaves the invitation pending and retryable.
   let membership = await findMembership(input.userId, invitation.workspaceId);
 
   if (membership?.status === "suspended") {
@@ -423,16 +420,11 @@ export async function acceptProjectInvitation(input: {
     input.userId,
   );
 
-  if (existingGrant && existingGrant.status === "active") {
-    return {
-      workspaceId: invitation.workspaceId,
-      projectId: invitation.projectId,
-      projectRole: existingGrant.projectRole,
-      workspaceSlug,
-    };
-  }
+  let projectRole: ProjectRoleKey = invitation.projectRole;
 
-  if (existingGrant && existingGrant.status === "removed") {
+  if (existingGrant?.status === "active") {
+    projectRole = existingGrant.projectRole;
+  } else if (existingGrant?.status === "removed") {
     await reactivateProjectGrant(
       invitation.workspaceId,
       invitation.projectId,
@@ -450,22 +442,42 @@ export async function acceptProjectInvitation(input: {
     });
   }
 
-  await createAuditLog({
-    workspaceId: invitation.workspaceId,
-    actorId: input.userId,
-    action: "project_invitation.accepted",
-    entityType: "project_invitation",
-    entityId: invitation.id,
-    after: {
-      projectId: invitation.projectId,
-      projectRole: invitation.projectRole,
-    },
-  });
+  // Consume the token only after membership + grant writes succeed.
+  // Conditional update (status=pending) makes concurrent accepts safe to retry.
+  const accepted = await markInvitationAccepted(invitation.id, input.userId);
+  if (!accepted) {
+    // Another request may have finished accept, or the invite was revoked mid-flight.
+    // Re-check: if grant is active, treat as success (idempotent retry).
+    const grantAfterRace = await findProjectGrant(
+      invitation.workspaceId,
+      invitation.projectId,
+      input.userId,
+    );
+    if (!grantAfterRace || grantAfterRace.status !== "active") {
+      throw new AppError(
+        "CONFLICT",
+        "Invitation could not be accepted. It may have been revoked.",
+      );
+    }
+    projectRole = grantAfterRace.projectRole;
+  } else {
+    await createAuditLog({
+      workspaceId: invitation.workspaceId,
+      actorId: input.userId,
+      action: "project_invitation.accepted",
+      entityType: "project_invitation",
+      entityId: invitation.id,
+      after: {
+        projectId: invitation.projectId,
+        projectRole: invitation.projectRole,
+      },
+    });
+  }
 
   return {
     workspaceId: invitation.workspaceId,
     projectId: invitation.projectId,
-    projectRole: invitation.projectRole,
+    projectRole,
     workspaceSlug,
   };
 }

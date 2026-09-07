@@ -316,5 +316,25 @@ describe("acceptProjectInvitation", () => {
         userEmail: "invitee@example.com",
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(markInvitationAccepted).not.toHaveBeenCalled();
+    expect(createProjectGrant).not.toHaveBeenCalled();
+  });
+
+  it("does not consume the invite token when grant creation fails", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "mem-1",
+      status: "active",
+    } as never);
+    vi.mocked(createProjectGrant).mockRejectedValue(new Error("grant write failed"));
+
+    await expect(
+      acceptProjectInvitation({
+        token: "raw-token",
+        userId: "user-1",
+        userEmail: "invitee@example.com",
+      }),
+    ).rejects.toThrow("grant write failed");
+
+    expect(markInvitationAccepted).not.toHaveBeenCalled();
   });
 });
