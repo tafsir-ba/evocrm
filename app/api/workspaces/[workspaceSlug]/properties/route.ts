@@ -25,7 +25,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "property:read");
+    const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug, "property:read");
 
     const url = new URL(request.url);
     const queryResult = validateSearchParams(propertyListQuerySchema, url.searchParams);
@@ -35,24 +35,28 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
-    const { properties, total } = await listPropertiesForWorkspace(workspace.id, {
-      page: query.page,
-      pageSize: query.pageSize,
-      includeArchived: query.includeArchived,
-      search: query.search,
-      statusId: query.statusId,
-      typeId: query.typeId,
-      projectId: query.projectId,
-      assignedTo: query.assignedTo,
-      ownerId: query.ownerId,
-      tagId: query.tagId,
-      city: query.city,
-      country: query.country,
-      minPrice: query.minPrice,
-      maxPrice: query.maxPrice,
-      createdFrom: query.createdFrom,
-      createdTo: query.createdTo,
-    });
+    const { properties, total } = await listPropertiesForWorkspace(
+      workspace.id,
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+        includeArchived: query.includeArchived,
+        search: query.search,
+        statusId: query.statusId,
+        typeId: query.typeId,
+        projectId: query.projectId,
+        assignedTo: query.assignedTo,
+        ownerId: query.ownerId,
+        tagId: query.tagId,
+        city: query.city,
+        country: query.country,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        createdFrom: query.createdFrom,
+        createdTo: query.createdTo,
+      },
+      userId,
+    );
 
     return paginatedResponse(
       properties,

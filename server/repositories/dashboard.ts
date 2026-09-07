@@ -35,6 +35,7 @@ function withOptionalProjectScope(
   workspaceId: string,
   filter: Record<string, unknown>,
   projectId?: string,
+  projectIds?: string[],
 ): Record<string, unknown> {
   // Aggregations do not cast string IDs the way find/countDocuments do.
   // Always match ObjectId fields with ObjectId values (same pattern as projects.ts).
@@ -47,6 +48,13 @@ function withOptionalProjectScope(
     return { ...scoped, projectId: new Types.ObjectId(projectId) };
   }
 
+  if (projectIds !== undefined) {
+    return {
+      ...scoped,
+      projectId: { $in: projectIds.map((id) => new Types.ObjectId(id)) },
+    };
+  }
+
   return scoped;
 }
 
@@ -56,6 +64,7 @@ export async function countLeadsCreatedInRange(
   to: Date,
   projectId?: string,
   acquisition: LeadAcquisitionKind | "all" = "genuine_inbound",
+  projectIds?: string[],
 ): Promise<number> {
   await connectDb();
   return LeadModel.countDocuments(
@@ -67,6 +76,7 @@ export async function countLeadsCreatedInRange(
           createdAt: { $gte: from, $lte: to },
         },
         projectId,
+        projectIds,
       ),
       acquisition,
     ),
@@ -78,14 +88,16 @@ export async function countLegacyImportedLeadsCreatedInRange(
   from: Date,
   to: Date,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
-  return countLeadsCreatedInRange(workspaceId, from, to, projectId, "legacy_import");
+  return countLeadsCreatedInRange(workspaceId, from, to, projectId, "legacy_import", projectIds);
 }
 
 export async function countOpportunitiesByStatusIds(
   workspaceId: string,
   statusIds: string[],
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
   if (statusIds.length === 0) {
     return 0;
@@ -100,6 +112,7 @@ export async function countOpportunitiesByStatusIds(
         statusId: { $in: toObjectIdArray(statusIds) },
       },
       projectId,
+      projectIds,
     ),
   );
 }
@@ -110,6 +123,7 @@ export async function countWonOpportunitiesInRange(
   from: Date,
   to: Date,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
   if (wonStatusIds.length === 0) {
     return 0;
@@ -128,6 +142,7 @@ export async function countWonOpportunitiesInRange(
         ],
       },
       projectId,
+      projectIds,
     ),
   );
 }
@@ -138,6 +153,7 @@ export async function countLostOpportunitiesInRange(
   from: Date,
   to: Date,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
   if (lostStatusIds.length === 0) {
     return 0;
@@ -156,6 +172,7 @@ export async function countLostOpportunitiesInRange(
         ],
       },
       projectId,
+      projectIds,
     ),
   );
 }
@@ -165,6 +182,7 @@ export async function sumOpportunityValuesByCurrency(
   statusIds: string[],
   dateFilter?: { from: Date; to: Date; field: "won" | "lost" },
   projectId?: string,
+  projectIds?: string[],
 ): Promise<CurrencySum[]> {
   if (statusIds.length === 0) {
     return [];
@@ -190,7 +208,7 @@ export async function sumOpportunityValuesByCurrency(
   }
 
   const results = await OpportunityModel.aggregate<CurrencySum>([
-    { $match: withOptionalProjectScope(workspaceId, match, projectId) },
+    { $match: withOptionalProjectScope(workspaceId, match, projectId, projectIds) },
     {
       $group: {
         _id: "$currency",
@@ -219,6 +237,7 @@ export async function countActivitiesDueToday(
   dayStart: Date,
   dayEnd: Date,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
   if (pendingStatusIds.length === 0) {
     return 0;
@@ -234,6 +253,7 @@ export async function countActivitiesDueToday(
         dueDate: { $gte: dayStart, $lte: dayEnd },
       },
       projectId,
+      projectIds,
     ),
   );
 }
@@ -243,6 +263,7 @@ export async function countOverdueActivities(
   pendingStatusIds: string[],
   now: Date,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<number> {
   if (pendingStatusIds.length === 0) {
     return 0;
@@ -258,6 +279,7 @@ export async function countOverdueActivities(
         dueDate: { $ne: null, $lt: now },
       },
       projectId,
+      projectIds,
     ),
   );
 }
@@ -268,6 +290,7 @@ export async function groupLeadsBySource(
   to: Date,
   projectId?: string,
   acquisition: LeadAcquisitionKind | "all" = "genuine_inbound",
+  projectIds?: string[],
 ): Promise<GroupCount[]> {
   await connectDb();
 
@@ -281,6 +304,7 @@ export async function groupLeadsBySource(
             createdAt: { $gte: from, $lte: to },
           },
           projectId,
+          projectIds,
         ),
         acquisition,
       ),
@@ -312,6 +336,7 @@ export async function groupLeadsBySource(
 export async function groupPropertiesByStatus(
   workspaceId: string,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<GroupCount[]> {
   await connectDb();
 
@@ -323,6 +348,7 @@ export async function groupPropertiesByStatus(
           archivedAt: null,
         },
         projectId,
+        projectIds,
       ),
     },
     {
@@ -346,6 +372,7 @@ export async function groupPropertiesByStatus(
 export async function groupOpportunitiesByStatus(
   workspaceId: string,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<Array<GroupCount & { values: CurrencySum[] }>> {
   await connectDb();
 
@@ -361,6 +388,7 @@ export async function groupOpportunitiesByStatus(
           archivedAt: null,
         },
         projectId,
+        projectIds,
       ),
     },
     {
@@ -421,6 +449,7 @@ function toIdSet(ids: Array<Types.ObjectId | string>): Set<string> {
 export async function getCmpReconciliation(
   workspaceId: string,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<CmpReconciliationResult> {
   await connectDb();
   const workspaceObjectId = new Types.ObjectId(workspaceId);
@@ -437,7 +466,9 @@ export async function getCmpReconciliation(
   );
   const scopedCmpProjects = projectId
     ? cmpProjects.filter((project) => project._id.toString() === projectId)
-    : cmpProjects;
+    : projectIds !== undefined
+      ? cmpProjects.filter((project) => projectIds.includes(project._id.toString()))
+      : cmpProjects;
   const cmpProjectIds = scopedCmpProjects.map((project) => project._id);
 
   const sourceMatch = withOptionalProjectScope(
@@ -447,6 +478,7 @@ export async function getCmpReconciliation(
       ...cmpSourceCohortMongoFilter(),
     },
     projectId,
+    projectIds,
   );
 
   const sourceIds = toIdSet(await LeadModel.distinct("_id", sourceMatch));

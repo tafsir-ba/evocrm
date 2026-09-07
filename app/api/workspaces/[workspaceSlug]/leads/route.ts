@@ -25,7 +25,10 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "lead:read");
+    const { workspace, userId } = await requireWorkspaceApiAccess(
+      workspaceSlug,
+      "lead:read",
+    );
 
     const url = new URL(request.url);
     const queryResult = validateSearchParams(leadListQuerySchema, url.searchParams);
@@ -35,32 +38,35 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
-    const { leads, total } = await listLeadsForWorkspace(workspace.id, {
-      page: query.page,
-      pageSize: query.pageSize,
-      includeArchived: query.includeArchived,
-      search: query.search,
-      projectId: query.projectId,
-      companyId: query.companyId,
-      includeAssociated: query.includeAssociated,
-      statusId: query.statusId,
-      sourceId: query.sourceId,
-      assignedTo: query.assignedTo,
-      ownerId: query.ownerId,
-      tagId: query.tagId,
-      propertyTypeInterest: query.propertyTypeInterest,
-      transactionIntent: query.transactionIntent,
-      usagePurpose: query.usagePurpose,
-      industry: query.industry,
-      jobTitle: query.jobTitle,
-      stateRegion: query.stateRegion,
-      integrationId: query.integrationId,
-      utmCampaign: query.utmCampaign,
-      createdFrom: query.createdFrom,
-      createdTo: query.createdTo,
-      acquisition: query.acquisition,
-    });
-
+    const { leads, total } = await listLeadsForWorkspace(
+      workspace.id,
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+        includeArchived: query.includeArchived,
+        search: query.search,
+        projectId: query.projectId,
+        companyId: query.companyId,
+        includeAssociated: query.includeAssociated,
+        statusId: query.statusId,
+        sourceId: query.sourceId,
+        assignedTo: query.assignedTo,
+        ownerId: query.ownerId,
+        tagId: query.tagId,
+        propertyTypeInterest: query.propertyTypeInterest,
+        transactionIntent: query.transactionIntent,
+        usagePurpose: query.usagePurpose,
+        industry: query.industry,
+        jobTitle: query.jobTitle,
+        stateRegion: query.stateRegion,
+        integrationId: query.integrationId,
+        utmCampaign: query.utmCampaign,
+        createdFrom: query.createdFrom,
+        createdTo: query.createdTo,
+        acquisition: query.acquisition,
+      },
+      userId,
+    );
     return paginatedResponse(
       leads,
       buildPaginationMeta(query.page, query.pageSize, total),

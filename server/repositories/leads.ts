@@ -130,6 +130,7 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
 export type LeadListFilter = {
   includeArchived?: boolean;
   projectId?: string;
+  projectIds?: string[];
   companyId?: string;
   includeAssociated?: boolean;
   associatedLeadIds?: string[];
@@ -259,23 +260,27 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
 }
 
 function buildProjectScope(filter: LeadListFilter): {
-  projectId?: string;
+  projectId?: string | { $in: string[] };
   $or?: Array<Record<string, unknown>>;
 } {
-  if (!filter.projectId) {
-    return {};
+  if (filter.projectId) {
+    if (!filter.includeAssociated) {
+      return { projectId: filter.projectId };
+    }
+
+    const associatedIds = toObjectIdArray(filter.associatedLeadIds ?? []);
+    const clauses: Array<Record<string, unknown>> = [{ projectId: filter.projectId }];
+    if (associatedIds.length > 0) {
+      clauses.push({ _id: { $in: associatedIds } });
+    }
+    return { $or: clauses };
   }
 
-  if (!filter.includeAssociated) {
-    return { projectId: filter.projectId };
+  if (filter.projectIds !== undefined) {
+    return { projectId: { $in: filter.projectIds } };
   }
 
-  const associatedIds = toObjectIdArray(filter.associatedLeadIds ?? []);
-  const clauses: Array<Record<string, unknown>> = [{ projectId: filter.projectId }];
-  if (associatedIds.length > 0) {
-    clauses.push({ _id: { $in: associatedIds } });
-  }
-  return { $or: clauses };
+  return {};
 }
 
 function buildSearchOr(search: string | undefined): Array<Record<string, unknown>> | null {

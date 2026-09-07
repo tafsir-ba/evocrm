@@ -72,6 +72,7 @@ const TABS = [
   { key: "activities", label: "Activities", href: "activities" },
   { key: "dripping", label: "Dripping", href: "dripping" },
   { key: "settings", label: "Settings", href: "edit" },
+  { key: "share", label: "Share", href: "sharing" },
 ] as const;
 
 type ProjectDetailPanelProps = {
@@ -205,8 +206,8 @@ export function ProjectDetailPanel({
           }
 
           const baseHref =
-            tab.href === "edit"
-              ? workspacePath(workspaceSlug, "projects", projectId, "edit")
+            tab.href === "edit" || tab.href === "sharing"
+              ? workspacePath(workspaceSlug, "projects", projectId, tab.href)
               : withProjectIdQuery(workspaceNavPath(workspaceSlug, tab.href!), projectId);
 
           return (

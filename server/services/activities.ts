@@ -22,10 +22,11 @@ import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import { validateActiveProjectId } from "@/server/services/project-scope";
 import {
-  assertValidProjectFilter,
-  validateActiveProjectId,
-} from "@/server/services/project-scope";
+  applyUserProjectScope,
+  assertRecordProjectAccess,
+} from "@/server/services/apply-project-scope";
 import {
   applyActivityStatusBehavior,
   isActivityOverdue,
@@ -406,7 +407,7 @@ async function getPendingStatusIds(workspaceId: string): Promise<string[]> {
 
 function buildListFilterFromQuery(
   workspaceId: string,
-  query: ActivityListQuery,
+  query: ActivityListQuery & { projectIds?: string[] },
   currentUserId?: string,
 ): Promise<ActivityListFilter> {
   return (async () => {
@@ -415,6 +416,8 @@ function buildListFilterFromQuery(
       pageSize: query.pageSize,
       includeArchived: query.includeArchived,
       search: query.search,
+      projectId: query.projectId,
+      projectIds: query.projectIds,
       typeId: query.typeId,
       statusId: query.statusId,
       assignedTo: query.assignedTo,
@@ -465,8 +468,8 @@ export async function listActivitiesForWorkspace(
   query: ActivityListQuery,
   currentUserId?: string,
 ): Promise<{ activities: ActivityListItem[]; total: number }> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
-  const filter = await buildListFilterFromQuery(workspaceId, query, currentUserId);
+  const scopedQuery = await applyUserProjectScope(workspaceId, currentUserId, query);
+  const filter = await buildListFilterFromQuery(workspaceId, scopedQuery, currentUserId);
   const { activities, total } = await findActivities(workspaceId, filter);
   const enriched = await Promise.all(activities.map((activity) => enrichActivityListItem(activity)));
   return { activities: enriched, total };
@@ -475,12 +478,20 @@ export async function listActivitiesForWorkspace(
 export async function getActivityForWorkspace(
   workspaceId: string,
   activityId: string,
+  userId?: string,
 ): Promise<ActivityDetail> {
   const activity = await findActivityById(workspaceId, activityId);
 
   if (!activity) {
     throw new AppError("NOT_FOUND", "Activity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    userId,
+    activity.projectId,
+    "activity:read",
+  );
 
   return enrichActivityRecord(activity);
 }

@@ -26,7 +26,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "project:read",
     );
@@ -46,20 +46,24 @@ export async function GET(request: Request, context: RouteContext) {
       query.sort !== undefined;
 
     if (browsing) {
-      const { projects, total } = await listProjectsPageForWorkspace(workspace.id, {
-        includeArchived: query.includeArchived,
-        search: query.search,
-        assignedTo: query.assignedTo,
-        countryCode: query.countryCode,
-        cantonCode: query.cantonCode,
-        municipality: query.municipality,
-        withCounts: query.withCounts,
-        view: query.view,
-        sort: query.sort,
-        sortDir: query.sortDir,
-        page: query.page ?? 1,
-        pageSize: query.pageSize ?? 25,
-      });
+      const { projects, total } = await listProjectsPageForWorkspace(
+        workspace.id,
+        {
+          includeArchived: query.includeArchived,
+          search: query.search,
+          assignedTo: query.assignedTo,
+          countryCode: query.countryCode,
+          cantonCode: query.cantonCode,
+          municipality: query.municipality,
+          withCounts: query.withCounts,
+          view: query.view,
+          sort: query.sort,
+          sortDir: query.sortDir,
+          page: query.page ?? 1,
+          pageSize: query.pageSize ?? 25,
+        },
+        userId,
+      );
 
       return paginatedResponse(
         projects,
@@ -67,15 +71,19 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    const projects = await listProjectsForWorkspace(workspace.id, {
-      includeArchived: query.includeArchived,
-      search: query.search,
-      assignedTo: query.assignedTo,
-      countryCode: query.countryCode,
-      cantonCode: query.cantonCode,
-      municipality: query.municipality,
-      withCounts: query.withCounts,
-    });
+    const projects = await listProjectsForWorkspace(
+      workspace.id,
+      {
+        includeArchived: query.includeArchived,
+        search: query.search,
+        assignedTo: query.assignedTo,
+        countryCode: query.countryCode,
+        cantonCode: query.cantonCode,
+        municipality: query.municipality,
+        withCounts: query.withCounts,
+      },
+      userId,
+    );
 
     return successResponse({ projects });
   } catch (error) {

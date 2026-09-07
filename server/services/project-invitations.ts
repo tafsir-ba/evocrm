@@ -1,6 +1,9 @@
 import "server-only";
 
-import type { ProjectRoleKey } from "@/lib/project-sharing-roles";
+import {
+  canAssignProjectRole,
+  type ProjectRoleKey,
+} from "@/lib/project-sharing-roles";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { getEnv } from "@/server/env";
@@ -24,7 +27,12 @@ import {
 } from "@/server/repositories/project-grants";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserByEmail, findUserById } from "@/server/repositories/users";
-import { findMembership, createMembership } from "@/server/repositories/memberships";
+import {
+  findMembership,
+  createMembership,
+  reactivateMembership,
+  updateMembership,
+} from "@/server/repositories/memberships";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import {
   generateInvitationToken,
@@ -93,6 +101,8 @@ export async function sendProjectInvitation(input: {
   projectRole: ProjectRoleKey;
   actorId: string;
   message?: string;
+  actorProjectRole?: ProjectRoleKey;
+  isWorkspaceAdmin?: boolean;
 }): Promise<
   | { mode: "invitation"; invitation: InvitationListItem; isExistingMember: boolean }
   | { mode: "grant"; grant: Awaited<ReturnType<typeof import("@/server/services/project-grants").addProjectGrant>> }
@@ -112,6 +122,22 @@ export async function sendProjectInvitation(input: {
   }
 
   const normalizedEmail = input.email.toLowerCase().trim();
+
+  const actor = await findUserById(input.actorId);
+  if (actor?.email && actor.email.toLowerCase().trim() === normalizedEmail) {
+    throw new AppError("CONFLICT", "You cannot invite yourself to a project.");
+  }
+
+  if (
+    !input.isWorkspaceAdmin &&
+    input.actorProjectRole &&
+    !canAssignProjectRole(input.actorProjectRole, input.projectRole)
+  ) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "You cannot assign a project role higher than your own.",
+    );
+  }
 
   const existingUser = await findUserByEmail(normalizedEmail);
   const existingGrant = existingUser
@@ -338,6 +364,7 @@ export async function acceptProjectInvitation(input: {
   workspaceId: string;
   projectId: string;
   projectRole: ProjectRoleKey;
+  workspaceSlug: string | null;
 }> {
   const tokenHash = hashInvitationToken(input.token);
   const invitation = await findInvitationByTokenHash(tokenHash);
@@ -371,7 +398,14 @@ export async function acceptProjectInvitation(input: {
 
   let membership = await findMembership(input.userId, invitation.workspaceId);
 
-  if (!membership || membership.status === "removed") {
+  if (membership?.status === "suspended") {
+    throw new AppError(
+      "FORBIDDEN",
+      "Your workspace membership is suspended. Contact a workspace admin before accepting this invitation.",
+    );
+  }
+
+  if (!membership || membership.status === "removed" || membership.status === "invited") {
     const { findRoleByWorkspaceAndKey } = await import("@/server/repositories/roles");
     const viewerRole = await findRoleByWorkspaceAndKey(invitation.workspaceId, "viewer");
 
@@ -380,12 +414,16 @@ export async function acceptProjectInvitation(input: {
     }
 
     if (membership?.status === "removed") {
-      const { reactivateMembership } = await import("@/server/repositories/memberships");
       membership = await reactivateMembership({
         membershipId: membership.id,
         workspaceId: invitation.workspaceId,
         roleId: viewerRole.id,
         invitedBy: invitation.invitedBy,
+      });
+    } else if (membership?.status === "invited") {
+      membership = await updateMembership(membership.id, invitation.workspaceId, {
+        status: "active",
+        roleId: viewerRole.id,
       });
     } else {
       membership = await createMembership({
@@ -399,6 +437,9 @@ export async function acceptProjectInvitation(input: {
     }
   }
 
+  const workspace = await findWorkspaceById(invitation.workspaceId);
+  const workspaceSlug = workspace?.slug ?? null;
+
   const existingGrant = await findProjectGrant(
     invitation.workspaceId,
     invitation.projectId,
@@ -410,6 +451,7 @@ export async function acceptProjectInvitation(input: {
       workspaceId: invitation.workspaceId,
       projectId: invitation.projectId,
       projectRole: existingGrant.projectRole,
+      workspaceSlug,
     };
   }
 
@@ -447,6 +489,7 @@ export async function acceptProjectInvitation(input: {
     workspaceId: invitation.workspaceId,
     projectId: invitation.projectId,
     projectRole: invitation.projectRole,
+    workspaceSlug,
   };
 }
 

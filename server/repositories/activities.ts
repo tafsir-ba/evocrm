@@ -66,6 +66,7 @@ function toActivityRecord(document: ActivityDocument): ActivityRecord {
 export type ActivityListFilter = {
   includeArchived?: boolean;
   projectId?: string;
+  projectIds?: string[];
   search?: string;
   typeId?: string;
   statusId?: string;
@@ -98,6 +99,8 @@ function buildListQuery(filter: ActivityListFilter): Record<string, unknown> {
 
   if (filter.projectId) {
     query.projectId = filter.projectId;
+  } else if (filter.projectIds !== undefined) {
+    query.projectId = { $in: filter.projectIds };
   }
 
   if (filter.typeId) {

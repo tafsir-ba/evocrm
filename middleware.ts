@@ -21,12 +21,18 @@ export default auth((request) => {
 
   if (shouldRedirectUnauthenticatedToLogin(pathname, isLoggedIn)) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    const callbackUrl = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    loginUrl.searchParams.set("callbackUrl", callbackUrl);
     return NextResponse.redirect(loginUrl);
   }
 
   if (shouldRedirectAuthenticatedAwayFromAuthPages(pathname, isLoggedIn)) {
-    return NextResponse.redirect(new URL("/workspaces", request.url));
+    const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+    const destination =
+      callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+        ? callbackUrl
+        : "/workspaces";
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
   return NextResponse.next({

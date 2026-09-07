@@ -20,7 +20,10 @@ import { findProjectById } from "@/server/repositories/projects";
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import { assertValidProjectFilter } from "@/server/services/project-scope";
+import {
+  applyUserProjectScope,
+  assertRecordProjectAccess,
+} from "@/server/services/apply-project-scope";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
 import type {
@@ -523,9 +526,10 @@ async function buildListFilter(
 export async function listOpportunitiesForWorkspace(
   workspaceId: string,
   filter: OpportunityListServiceFilter = {},
+  userId?: string,
 ): Promise<{ opportunities: OpportunityListItem[]; total: number }> {
-  await assertValidProjectFilter(workspaceId, filter.projectId);
-  const resolvedFilter = await buildListFilter(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const resolvedFilter = await buildListFilter(workspaceId, scopedFilter);
   const { opportunities, total } = await findOpportunities(workspaceId, resolvedFilter);
 
   const enriched = await Promise.all(
@@ -538,12 +542,20 @@ export async function listOpportunitiesForWorkspace(
 export async function getOpportunityForWorkspace(
   workspaceId: string,
   opportunityId: string,
+  userId?: string,
 ): Promise<OpportunityDetail> {
   const opportunity = await findOpportunityById(workspaceId, opportunityId);
 
   if (!opportunity) {
     throw new AppError("NOT_FOUND", "Opportunity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    userId,
+    opportunity.projectId,
+    "opportunity:read",
+  );
 
   return enrichOpportunityRecord(opportunity);
 }
@@ -921,9 +933,10 @@ export async function archiveOpportunityForWorkspace(
 export async function listAllOpportunitiesForWorkspace(
   workspaceId: string,
   filter: Omit<OpportunityListServiceFilter, "page" | "pageSize"> = {},
+  userId?: string,
 ): Promise<OpportunityListItem[]> {
-  await assertValidProjectFilter(workspaceId, filter.projectId);
-  const resolvedFilter = await buildListFilter(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const resolvedFilter = await buildListFilter(workspaceId, scopedFilter);
   const opportunities = await findAllOpportunities(workspaceId, resolvedFilter);
 
   return Promise.all(

@@ -27,13 +27,32 @@ import {
 } from "@/server/services/dictionary-items";
 import { listActivitiesForWorkspace, enrichActivityListItem } from "@/server/services/activities";
 import { listOpportunitiesForWorkspace } from "@/server/services/opportunities";
-import { assertValidProjectFilter } from "@/server/services/project-scope";
+import { applyUserProjectScope } from "@/server/services/apply-project-scope";
 import {
   getDayBoundsInTimezone,
   resolveDashboardDateRange,
   type DashboardDateRange,
 } from "@/server/utils/workspace-date-range";
 import type { DashboardQuery } from "@/server/validation/dashboard";
+
+type DashboardProjectScope = {
+  projectId?: string;
+  projectIds?: string[];
+};
+
+async function resolveDashboardProjectScope(
+  workspaceId: string,
+  userId: string | undefined,
+  query: { projectId?: string },
+): Promise<DashboardProjectScope> {
+  const scoped = await applyUserProjectScope(workspaceId, userId, {
+    projectId: query.projectId,
+  });
+  return {
+    projectId: scoped.projectId,
+    projectIds: scoped.projectIds,
+  };
+}
 
 export type DashboardDictionaryItem = {
   id: string;
@@ -248,6 +267,7 @@ async function mapDueTodayActivityItems(
   dayEnd: Date,
   limit: number,
   projectId?: string,
+  projectIds?: string[],
 ): Promise<DashboardActivityItem[]> {
   const { activities } = await findActivities(workspaceId, {
     pendingStatusIds,
@@ -258,6 +278,7 @@ async function mapDueTodayActivityItems(
     pageSize: limit,
     includeArchived: false,
     projectId,
+    projectIds,
   });
 
   const enriched = await Promise.all(
@@ -270,11 +291,13 @@ async function mapDueTodayActivityItems(
 export async function getDashboardSummaryForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardSummaryResult> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
+  const scope = await resolveDashboardProjectScope(workspaceId, userId, query);
   const { timezone } = await resolveWorkspaceContext(workspaceId);
   const dateRange = resolveDashboardDateRange(query, timezone);
-  const projectId = query.projectId;
+  const projectId = scope.projectId;
+  const projectIds = scope.projectIds;
   const { openIds, wonIds, lostIds } = await resolveOpportunityStatusIds(workspaceId);
   const pendingStatusIds = await resolvePendingActivityStatusIds(workspaceId);
   const dayBounds = getDayBoundsInTimezone(dateRange.timezone);
@@ -291,12 +314,12 @@ export async function getDashboardSummaryForWorkspace(
     overdueActivities,
     cmpReconciliation,
   ] = await Promise.all([
-    countLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId, "genuine_inbound"),
-    countLegacyImportedLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId),
-    countOpportunitiesByStatusIds(workspaceId, openIds, projectId),
-    countWonOpportunitiesInRange(workspaceId, wonIds, dateRange.from, dateRange.to, projectId),
-    countLostOpportunitiesInRange(workspaceId, lostIds, dateRange.from, dateRange.to, projectId),
-    sumOpportunityValuesByCurrency(workspaceId, openIds, undefined, projectId),
+    countLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId, "genuine_inbound", projectIds),
+    countLegacyImportedLeadsCreatedInRange(workspaceId, dateRange.from, dateRange.to, projectId, projectIds),
+    countOpportunitiesByStatusIds(workspaceId, openIds, projectId, projectIds),
+    countWonOpportunitiesInRange(workspaceId, wonIds, dateRange.from, dateRange.to, projectId, projectIds),
+    countLostOpportunitiesInRange(workspaceId, lostIds, dateRange.from, dateRange.to, projectId, projectIds),
+    sumOpportunityValuesByCurrency(workspaceId, openIds, undefined, projectId, projectIds),
     sumOpportunityValuesByCurrency(
       workspaceId,
       wonIds,
@@ -306,6 +329,7 @@ export async function getDashboardSummaryForWorkspace(
         field: "won",
       },
       projectId,
+      projectIds,
     ),
     countActivitiesDueToday(
       workspaceId,
@@ -313,9 +337,10 @@ export async function getDashboardSummaryForWorkspace(
       dayBounds.start,
       dayBounds.end,
       projectId,
+      projectIds,
     ),
-    countOverdueActivities(workspaceId, pendingStatusIds, new Date(), projectId),
-    getCmpReconciliation(workspaceId, projectId),
+    countOverdueActivities(workspaceId, pendingStatusIds, new Date(), projectId, projectIds),
+    getCmpReconciliation(workspaceId, projectId, projectIds),
   ]);
 
   return {
@@ -338,13 +363,15 @@ export async function getDashboardSummaryForWorkspace(
 export async function getDashboardPipelineForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardPipelineResult> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
+  const scope = await resolveDashboardProjectScope(workspaceId, userId, query);
   const { timezone } = await resolveWorkspaceContext(workspaceId);
   const dateRange = resolveDashboardDateRange(query, timezone);
-  const projectId = query.projectId;
+  const projectId = scope.projectId;
+  const projectIds = scope.projectIds;
   const { items: stages, openIds } = await resolveOpportunityStatusIds(workspaceId);
-  const grouped = await groupOpportunitiesByStatus(workspaceId, projectId);
+  const grouped = await groupOpportunitiesByStatus(workspaceId, projectId, projectIds);
   const groupedMap = new Map(grouped.map((row) => [row.id, row]));
 
   const pipelineStages: DashboardPipelineStage[] = stages.map((stage) => {
@@ -357,7 +384,13 @@ export async function getDashboardPipelineForWorkspace(
     };
   });
 
-  const openValueRows = await sumOpportunityValuesByCurrency(workspaceId, openIds, undefined, projectId);
+  const openValueRows = await sumOpportunityValuesByCurrency(
+    workspaceId,
+    openIds,
+    undefined,
+    projectId,
+    projectIds,
+  );
 
   return {
     dateRange,
@@ -370,14 +403,23 @@ export async function getDashboardPipelineForWorkspace(
 export async function getDashboardSourcesForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardSourcesResult> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
+  const scope = await resolveDashboardProjectScope(workspaceId, userId, query);
   const { timezone } = await resolveWorkspaceContext(workspaceId);
   const dateRange = resolveDashboardDateRange(query, timezone);
-  const projectId = query.projectId;
+  const projectId = scope.projectId;
+  const projectIds = scope.projectIds;
   const [sourceItems, grouped] = await Promise.all([
     listDictionaryItemsForWorkspace(workspaceId, { type: "lead_source" }),
-    groupLeadsBySource(workspaceId, dateRange.from, dateRange.to, projectId, "genuine_inbound"),
+    groupLeadsBySource(
+      workspaceId,
+      dateRange.from,
+      dateRange.to,
+      projectId,
+      "genuine_inbound",
+      projectIds,
+    ),
   ]);
 
   const sourceMap = new Map(sourceItems.map((item) => [item.id, item]));
@@ -428,12 +470,14 @@ export async function getDashboardSourcesForWorkspace(
 export async function getDashboardPropertiesForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardPropertiesResult> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
-  const projectId = query.projectId;
+  const scope = await resolveDashboardProjectScope(workspaceId, userId, query);
+  const projectId = scope.projectId;
+  const projectIds = scope.projectIds;
   const [statusItems, grouped] = await Promise.all([
     listDictionaryItemsForWorkspace(workspaceId, { type: "property_status" }),
-    groupPropertiesByStatus(workspaceId, projectId),
+    groupPropertiesByStatus(workspaceId, projectId, projectIds),
   ]);
 
   const groupedMap = new Map(grouped.map((row) => [row.id, row.count]));
@@ -468,13 +512,15 @@ export async function getDashboardPropertiesForWorkspace(
 export async function getDashboardActivitiesForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardActivitiesResult> {
-  await assertValidProjectFilter(workspaceId, query.projectId);
+  const scope = await resolveDashboardProjectScope(workspaceId, userId, query);
   const { timezone } = await resolveWorkspaceContext(workspaceId);
   const dateRange = resolveDashboardDateRange(query, timezone);
   const pendingStatusIds = await resolvePendingActivityStatusIds(workspaceId);
   const limit = query.limit ?? DEFAULT_LIST_LIMIT;
-  const projectId = query.projectId;
+  const projectId = scope.projectId;
+  const projectIds = scope.projectIds;
   const now = new Date();
   const dayBounds = getDayBoundsInTimezone(dateRange.timezone, now);
 
@@ -486,8 +532,9 @@ export async function getDashboardActivitiesForWorkspace(
         dayBounds.start,
         dayBounds.end,
         projectId,
+        projectIds,
       ),
-      countOverdueActivities(workspaceId, pendingStatusIds, now, projectId),
+      countOverdueActivities(workspaceId, pendingStatusIds, now, projectId, projectIds),
       mapDueTodayActivityItems(
         workspaceId,
         pendingStatusIds,
@@ -495,21 +542,30 @@ export async function getDashboardActivitiesForWorkspace(
         dayBounds.end,
         limit,
         projectId,
+        projectIds,
       ),
-      listActivitiesForWorkspace(workspaceId, {
-        page: 1,
-        pageSize: limit,
-        includeArchived: false,
-        view: "overdue",
-        projectId,
-      }).then(({ activities }) => activities.map(mapActivityListItem)),
-      listActivitiesForWorkspace(workspaceId, {
-        page: 1,
-        pageSize: limit,
-        includeArchived: false,
-        view: "upcoming",
-        projectId,
-      }).then(({ activities }) => activities.map(mapActivityListItem)),
+      listActivitiesForWorkspace(
+        workspaceId,
+        {
+          page: 1,
+          pageSize: limit,
+          includeArchived: false,
+          view: "overdue",
+          projectId,
+        },
+        userId,
+      ).then(({ activities }) => activities.map(mapActivityListItem)),
+      listActivitiesForWorkspace(
+        workspaceId,
+        {
+          page: 1,
+          pageSize: limit,
+          includeArchived: false,
+          view: "upcoming",
+          projectId,
+        },
+        userId,
+      ).then(({ activities }) => activities.map(mapActivityListItem)),
     ]);
 
   return {
@@ -532,14 +588,18 @@ export async function getRecentOpportunitiesForWorkspace(
   workspaceId: string,
   limit: number = DEFAULT_LIST_LIMIT,
   projectId?: string,
+  userId?: string,
 ): Promise<DashboardRecentOpportunity[]> {
-  await assertValidProjectFilter(workspaceId, projectId);
-  const { opportunities } = await listOpportunitiesForWorkspace(workspaceId, {
-    page: 1,
-    pageSize: limit,
-    includeArchived: false,
-    projectId,
-  });
+  const { opportunities } = await listOpportunitiesForWorkspace(
+    workspaceId,
+    {
+      page: 1,
+      pageSize: limit,
+      includeArchived: false,
+      projectId,
+    },
+    userId,
+  );
 
   return opportunities.map((opportunity) => ({
     id: opportunity.id,
@@ -557,18 +617,20 @@ export async function getRecentOpportunitiesForWorkspace(
 export async function getDashboardForWorkspace(
   workspaceId: string,
   query: DashboardQuery = {},
+  userId?: string,
 ): Promise<DashboardFullResult> {
   const [summary, pipeline, activities, sources, properties, recentOpportunities] =
     await Promise.all([
-      getDashboardSummaryForWorkspace(workspaceId, query),
-      getDashboardPipelineForWorkspace(workspaceId, query),
-      getDashboardActivitiesForWorkspace(workspaceId, query),
-      getDashboardSourcesForWorkspace(workspaceId, query),
-      getDashboardPropertiesForWorkspace(workspaceId, query),
+      getDashboardSummaryForWorkspace(workspaceId, query, userId),
+      getDashboardPipelineForWorkspace(workspaceId, query, userId),
+      getDashboardActivitiesForWorkspace(workspaceId, query, userId),
+      getDashboardSourcesForWorkspace(workspaceId, query, userId),
+      getDashboardPropertiesForWorkspace(workspaceId, query, userId),
       getRecentOpportunitiesForWorkspace(
         workspaceId,
         query.limit ?? DEFAULT_LIST_LIMIT,
         query.projectId,
+        userId,
       ),
     ]);
 

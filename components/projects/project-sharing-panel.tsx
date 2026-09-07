@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,73 +9,65 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IconPlus, IconMail } from "@/lib/icons";
-import { PROJECT_ROLE_DISPLAY_DEFINITIONS } from "@/lib/project-sharing-roles";
+import { IconPlus } from "@/lib/icons";
+import {
+  canAssignProjectRole,
+  PROJECT_ROLE_DISPLAY_DEFINITIONS,
+  type ProjectRoleKey,
+} from "@/lib/project-sharing-roles";
 
 type GrantItem = {
   id: string;
   userId: string;
   userName: string | null;
   userEmail: string;
-  projectRole: string;
+  projectRole: ProjectRoleKey;
   projectRoleName: string;
   status: string;
-  createdAt: string;
-};
-
-type InvitationItem = {
-  id: string;
-  email: string;
-  projectRole: string;
-  projectRoleName: string;
-  status: string;
-  invitedByName: string | null;
-  expiresAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
-  lastResentAt: string | null;
   createdAt: string;
 };
 
 type SharingData = {
   grants: GrantItem[];
-  invitations: InvitationItem[];
+  canShare: boolean;
+  canManageGrants: boolean;
+  actorProjectRole: ProjectRoleKey;
 };
 
 type ProjectSharingPanelProps = {
   workspaceSlug: string;
   projectId: string;
-  canManage: boolean;
+  canShare: boolean;
+  canManageGrants: boolean;
+  actorProjectRole: ProjectRoleKey;
 };
-
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-const ROLE_OPTIONS = PROJECT_ROLE_DISPLAY_DEFINITIONS.map((r) => ({
-  key: r.key,
-  name: r.name,
-  description: r.description,
-}));
 
 export function ProjectSharingPanel({
   workspaceSlug,
   projectId,
-  canManage,
+  canShare,
+  canManageGrants,
+  actorProjectRole,
 }: ProjectSharingPanelProps) {
   const [data, setData] = useState<SharingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("contributor");
-  const [inviteMessage, setInviteMessage] = useState("");
-  const [inviteSending, setInviteSending] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareRole, setShareRole] = useState<ProjectRoleKey>("contributor");
+  const [sharing, setSharing] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}/projects/${projectId}/sharing`;
+
+  const roleOptions = useMemo(() => {
+    const effectiveRole = data?.actorProjectRole ?? actorProjectRole;
+    const manage = data?.canManageGrants ?? canManageGrants;
+    return PROJECT_ROLE_DISPLAY_DEFINITIONS.filter(
+      (role) => manage || canAssignProjectRole(effectiveRole, role.key),
+    );
+  }, [actorProjectRole, canManageGrants, data?.actorProjectRole, data?.canManageGrants]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -100,40 +92,42 @@ export function ProjectSharingPanel({
     void loadData();
   }, [loadData]);
 
-  async function handleSendInvite() {
-    if (!inviteEmail.trim()) return;
-    setInviteSending(true);
+  async function handleShare() {
+    if (!shareEmail.trim()) return;
+    setSharing(true);
     setActionError(null);
+    setSuccessMessage(null);
 
     try {
       const response = await fetch(apiBase, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail.trim(),
-          projectRole: inviteRole,
-          message: inviteMessage.trim() || undefined,
+          email: shareEmail.trim(),
+          projectRole: shareRole,
         }),
       });
       const payload = await response.json();
       if (!response.ok) {
-        setActionError(payload.error?.message ?? "Failed to send invitation.");
+        setActionError(payload.error?.message ?? "Could not share project.");
         return;
       }
 
-      setInviteOpen(false);
-      setInviteEmail("");
-      setInviteMessage("");
+      setShareOpen(false);
+      setShareEmail("");
+      setShareRole("contributor");
+      setSuccessMessage(payload.data?.message ?? "Access granted.");
       await loadData();
     } catch {
-      setActionError("Failed to send invitation.");
+      setActionError("Could not share project.");
     } finally {
-      setInviteSending(false);
+      setSharing(false);
     }
   }
 
   async function handleChangeRole(userId: string, projectRole: string) {
     setActionError(null);
+    setSuccessMessage(null);
     const response = await fetch(apiBase, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -149,6 +143,7 @@ export function ProjectSharingPanel({
 
   async function handleRemoveAccess(userId: string) {
     setActionError(null);
+    setSuccessMessage(null);
     const response = await fetch(apiBase, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -157,21 +152,6 @@ export function ProjectSharingPanel({
     if (!response.ok) {
       const body = await response.json();
       setActionError(body.error?.message ?? "Failed to remove access.");
-      return;
-    }
-    await loadData();
-  }
-
-  async function handleInvitationAction(invitationId: string, action: "resend" | "revoke") {
-    setActionError(null);
-    const response = await fetch(`${apiBase}/invitations/${invitationId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    if (!response.ok) {
-      const body = await response.json();
-      setActionError(body.error?.message ?? `Failed to ${action} invitation.`);
       return;
     }
     await loadData();
@@ -198,65 +178,87 @@ export function ProjectSharingPanel({
   }
 
   const grants = data?.grants ?? [];
-  const invitations = data?.invitations ?? [];
-  const pendingInvitations = invitations.filter((inv) => inv.status === "pending");
+  const showShare = data?.canShare ?? canShare;
+  const manageGrants = data?.canManageGrants ?? canManageGrants;
 
   return (
     <>
       <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">People & access</h3>
-          {canManage ? (
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <div>
+            <h3 className="text-[15px] font-semibold text-[var(--color-ink)]">
+              Share project
+            </h3>
+            <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
+              Grant access to a registered EvoCRM user by email. Access is applied immediately.
+            </p>
+          </div>
+          {showShare ? (
             <Button
               size="sm"
               leadingIcon={<IconPlus size={14} />}
-              onClick={() => setInviteOpen(true)}
+              onClick={() => {
+                setActionError(null);
+                setShareOpen(true);
+              }}
             >
-              Share
+              Share project
             </Button>
           ) : null}
         </div>
 
+        {successMessage ? (
+          <p className="text-[12.5px] text-[var(--color-success-fg,var(--color-brand-700))] mb-3">
+            {successMessage}
+          </p>
+        ) : null}
         {actionError ? (
           <p className="text-[12.5px] text-[var(--color-danger-fg)] mb-3">{actionError}</p>
         ) : null}
 
-        {grants.length === 0 && pendingInvitations.length === 0 ? (
+        {grants.length === 0 ? (
           <p className="text-[13px] text-[var(--color-ink-muted)] py-4 text-center">
-            No collaborators yet. Use Share to invite someone.
+            Only you have access so far. Share the project with a teammate by email.
           </p>
-        ) : null}
-
-        {grants.length > 0 ? (
-          <div className="space-y-2 mb-4">
+        ) : (
+          <div className="space-y-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
-              Active collaborators
+              People with access
             </p>
             {grants.map((grant) => (
-              <div key={grant.id} className="flex items-center justify-between gap-3 py-2 border-b border-[var(--color-line)] last:border-0">
+              <div
+                key={grant.id}
+                className="flex items-center justify-between gap-3 py-2 border-b border-[var(--color-line)] last:border-0"
+              >
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-[var(--color-ink)] truncate">
                     {grant.userName ?? grant.userEmail}
                   </p>
                   {grant.userName ? (
-                    <p className="text-[12px] text-[var(--color-ink-muted)] truncate">{grant.userEmail}</p>
+                    <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
+                      {grant.userEmail}
+                    </p>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {canManage ? (
+                  {manageGrants ? (
                     <select
                       value={grant.projectRole}
                       onChange={(e) => void handleChangeRole(grant.userId, e.target.value)}
                       className="h-7 rounded-md border border-[var(--color-line)] px-2 text-[12px] bg-white"
                     >
-                      {ROLE_OPTIONS.map((role) => (
-                        <option key={role.key} value={role.key}>{role.name}</option>
+                      {PROJECT_ROLE_DISPLAY_DEFINITIONS.map((role) => (
+                        <option key={role.key} value={role.key}>
+                          {role.name}
+                        </option>
                       ))}
                     </select>
                   ) : (
-                    <Badge tone="muted" size="sm">{grant.projectRoleName}</Badge>
+                    <Badge tone="muted" size="sm">
+                      {grant.projectRoleName}
+                    </Badge>
                   )}
-                  {canManage ? (
+                  {manageGrants ? (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -269,100 +271,66 @@ export function ProjectSharingPanel({
               </div>
             ))}
           </div>
-        ) : null}
-
-        {pendingInvitations.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
-              Pending invitations
-            </p>
-            {pendingInvitations.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-3 py-2 border-b border-[var(--color-line)] last:border-0">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-[var(--color-ink)] truncate">
-                    <IconMail size={13} className="inline mr-1.5 text-[var(--color-ink-muted)]" />
-                    {inv.email}
-                  </p>
-                  <p className="text-[12px] text-[var(--color-ink-muted)]">
-                    {inv.projectRoleName} · Expires {formatWhen(inv.expiresAt)}
-                    {inv.invitedByName ? ` · by ${inv.invitedByName}` : null}
-                  </p>
-                </div>
-                {canManage ? (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" onClick={() => void handleInvitationAction(inv.id, "resend")}>
-                      Resend
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void handleInvitationAction(inv.id, "revoke")}>
-                      Revoke
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
+        )}
       </Card>
 
       <Modal
-        open={inviteOpen}
+        open={shareOpen}
         onClose={() => {
-          if (!inviteSending) {
-            setInviteOpen(false);
+          if (!sharing) {
+            setShareOpen(false);
             setActionError(null);
           }
         }}
         title="Share project"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" disabled={inviteSending} onClick={() => setInviteOpen(false)}>
+            <Button
+              variant="secondary"
+              disabled={sharing}
+              onClick={() => setShareOpen(false)}
+            >
               Cancel
             </Button>
             <Button
-              disabled={inviteSending || !inviteEmail.trim()}
-              onClick={() => void handleSendInvite()}
+              disabled={sharing || !shareEmail.trim()}
+              onClick={() => void handleShare()}
             >
-              {inviteSending ? "Sending…" : "Send invite"}
+              {sharing ? "Sharing…" : "Grant access"}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            Enter the email of someone who already has an EvoCRM account. They get access right away.
+          </p>
           <div>
-            <Label htmlFor="invite-email">Email address</Label>
+            <Label htmlFor="share-email">Email address</Label>
             <Input
-              id="invite-email"
+              id="share-email"
               type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="collaborator@example.com"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              placeholder="teammate@company.com"
               autoFocus
+              autoComplete="email"
             />
           </div>
           <div>
-            <Label htmlFor="invite-role">Project role</Label>
+            <Label htmlFor="share-role">Project role</Label>
             <select
-              id="invite-role"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
+              id="share-role"
+              value={shareRole}
+              onChange={(e) => setShareRole(e.target.value as ProjectRoleKey)}
               className="w-full h-10 rounded-md border border-[var(--color-line)] px-3 text-[13.5px] bg-white"
             >
-              {ROLE_OPTIONS.map((role) => (
+              {roleOptions.map((role) => (
                 <option key={role.key} value={role.key}>
                   {role.name} — {role.description}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <Label htmlFor="invite-message">Personal message (optional)</Label>
-            <Input
-              id="invite-message"
-              value={inviteMessage}
-              onChange={(e) => setInviteMessage(e.target.value)}
-              placeholder="Looking forward to working together!"
-              maxLength={500}
-            />
           </div>
           {actionError ? (
             <p className="text-[12.5px] text-[var(--color-danger-fg)]">{actionError}</p>

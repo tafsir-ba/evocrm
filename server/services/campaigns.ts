@@ -37,7 +37,8 @@ import type {
   UpdateCampaignInput,
 } from "@/server/validation/campaigns";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import { assertValidProjectFilter, validateActiveProjectId } from "@/server/services/project-scope";
+import { validateActiveProjectId } from "@/server/services/project-scope";
+import { applyUserProjectScope } from "@/server/services/apply-project-scope";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignListItem = CampaignRecord & {
@@ -125,9 +126,10 @@ async function enrichCampaign(
 export async function listCampaignsForWorkspace(
   workspaceId: string,
   filter: CampaignListFilter = {},
+  userId?: string,
 ): Promise<{ campaigns: CampaignListItem[]; total: number }> {
-  await assertValidProjectFilter(workspaceId, filter.projectId);
-  const { campaigns, total } = await findCampaigns(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const { campaigns, total } = await findCampaigns(workspaceId, scopedFilter);
 
   const enriched = await Promise.all(
     campaigns.map((campaign) => enrichCampaign(workspaceId, campaign)),

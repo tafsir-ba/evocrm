@@ -43,7 +43,7 @@ export default async function SettingsPage({ params }: { params: Params }) {
     : await listTagsForWorkspace(workspace.id);
   const projects = access.permissionDenied
     ? []
-    : await listProjectsForWorkspace(workspace.id);
+    : await listProjectsForWorkspace(workspace.id, {}, access.user.id);
 
   const sections = [
     {

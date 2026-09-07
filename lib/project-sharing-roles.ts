@@ -12,7 +12,7 @@ export const PROJECT_ROLE_DISPLAY_DEFINITIONS: ProjectRoleDisplayDefinition[] = 
   {
     name: "Project Admin",
     key: "project_admin",
-    description: "Full project management including inviting collaborators",
+    description: "Manage roles and access; full project management",
   },
   {
     name: "Contributor",
@@ -25,3 +25,20 @@ export const PROJECT_ROLE_DISPLAY_DEFINITIONS: ProjectRoleDisplayDefinition[] = 
     description: "Read-only access to project data",
   },
 ];
+
+const PROJECT_ROLE_RANK: Record<ProjectRoleKey, number> = {
+  viewer: 0,
+  contributor: 1,
+  project_admin: 2,
+};
+
+export function projectRoleRank(role: ProjectRoleKey): number {
+  return PROJECT_ROLE_RANK[role];
+}
+
+export function canAssignProjectRole(
+  actorRole: ProjectRoleKey,
+  targetRole: ProjectRoleKey,
+): boolean {
+  return projectRoleRank(actorRole) >= projectRoleRank(targetRole);
+}

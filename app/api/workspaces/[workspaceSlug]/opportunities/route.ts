@@ -25,7 +25,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "opportunity:read",
     );
@@ -38,26 +38,30 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
-    const { opportunities, total } = await listOpportunitiesForWorkspace(workspace.id, {
-      page: query.page,
-      pageSize: query.pageSize,
-      includeArchived: query.includeArchived,
-      search: query.search,
-      projectId: query.projectId,
-      statusId: query.statusId,
-      leadId: query.leadId,
-      propertyId: query.propertyId,
-      assignedTo: query.assignedTo,
-      ownerId: query.ownerId,
-      tagId: query.tagId,
-      behavior: query.behavior,
-      expectedCloseFrom: query.expectedCloseFrom,
-      expectedCloseTo: query.expectedCloseTo,
-      createdFrom: query.createdFrom,
-      createdTo: query.createdTo,
-      closedFrom: query.closedFrom,
-      closedTo: query.closedTo,
-    });
+    const { opportunities, total } = await listOpportunitiesForWorkspace(
+      workspace.id,
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+        includeArchived: query.includeArchived,
+        search: query.search,
+        projectId: query.projectId,
+        statusId: query.statusId,
+        leadId: query.leadId,
+        propertyId: query.propertyId,
+        assignedTo: query.assignedTo,
+        ownerId: query.ownerId,
+        tagId: query.tagId,
+        behavior: query.behavior,
+        expectedCloseFrom: query.expectedCloseFrom,
+        expectedCloseTo: query.expectedCloseTo,
+        createdFrom: query.createdFrom,
+        createdTo: query.createdTo,
+        closedFrom: query.closedFrom,
+        closedTo: query.closedTo,
+      },
+      userId,
+    );
 
     return paginatedResponse(
       opportunities,

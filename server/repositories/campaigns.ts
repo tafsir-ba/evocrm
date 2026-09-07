@@ -90,6 +90,7 @@ export type CampaignListFilter = {
   status?: CampaignRecord["status"];
   audienceType?: CampaignRecord["audienceType"];
   projectId?: string;
+  projectIds?: string[];
   search?: string;
   page?: number;
   pageSize?: number;
@@ -115,6 +116,11 @@ function buildListQuery(filter: CampaignListFilter): Record<string, unknown> {
     query.$or = [
       { projectIds: { $size: 0 } },
       { projectIds: filter.projectId },
+    ];
+  } else if (filter.projectIds !== undefined) {
+    query.$or = [
+      { projectIds: { $size: 0 } },
+      { projectIds: { $in: filter.projectIds } },
     ];
   }
 

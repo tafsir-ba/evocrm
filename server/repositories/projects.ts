@@ -122,10 +122,16 @@ export type ProjectListFilter = {
   sortDir?: ProjectBrowserSortDir;
   page?: number;
   pageSize?: number;
+  /** When set, restrict results to these project IDs (empty = no matches). */
+  ids?: string[];
 };
 
 function buildListQuery(filter: ProjectListFilter): Record<string, unknown> {
   const query: Record<string, unknown> = {};
+
+  if (filter.ids !== undefined) {
+    query._id = { $in: filter.ids };
+  }
 
   if (filter.view === "archived") {
     query.archivedAt = { $ne: null };

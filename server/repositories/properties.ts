@@ -94,6 +94,7 @@ export type PropertyListFilter = {
   statusId?: string;
   typeId?: string;
   projectId?: string;
+  projectIds?: string[];
   assignedTo?: string;
   ownerId?: string;
   tagId?: string;
@@ -122,6 +123,8 @@ function buildListQuery(filter: PropertyListFilter): Record<string, unknown> {
   }
   if (filter.projectId) {
     query.projectId = filter.projectId;
+  } else if (filter.projectIds !== undefined) {
+    query.projectId = { $in: filter.projectIds };
   }
   if (filter.assignedTo) {
     query.assignedTo = filter.assignedTo;

@@ -32,13 +32,18 @@ export type PipelineResult = {
 export async function getPipelineForWorkspace(
   workspaceId: string,
   filter: Omit<OpportunityListFilter, "page" | "pageSize" | "includeArchived"> = {},
+  userId?: string,
 ): Promise<PipelineResult> {
   const [stages, opportunities, workspace] = await Promise.all([
     listDictionaryItemsForWorkspace(workspaceId, { type: "opportunity_status" }),
-    listAllOpportunitiesForWorkspace(workspaceId, {
-      ...filter,
-      includeArchived: false,
-    }),
+    listAllOpportunitiesForWorkspace(
+      workspaceId,
+      {
+        ...filter,
+        includeArchived: false,
+      },
+      userId,
+    ),
     findWorkspaceById(workspaceId),
   ]);
 

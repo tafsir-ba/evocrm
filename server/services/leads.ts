@@ -42,10 +42,11 @@ import {
   evaluateCampaignAutoEnrollmentForLead,
   logAutoEnrollmentFailure,
 } from "@/server/services/campaign-auto-enrollment";
+import { validateActiveProjectId } from "@/server/services/project-scope";
 import {
-  assertValidProjectFilter,
-  validateActiveProjectId,
-} from "@/server/services/project-scope";
+  applyUserProjectScope,
+  assertRecordProjectAccess,
+} from "@/server/services/apply-project-scope";
 import type {
   BulkDeleteLeadsInput,
   CreateLeadInput,
@@ -483,9 +484,10 @@ async function resolveListFilter(
 export async function listLeadsForWorkspace(
   workspaceId: string,
   filter: LeadListFilter = {},
+  userId?: string,
 ): Promise<{ leads: LeadListItem[]; total: number }> {
-  await assertValidProjectFilter(workspaceId, filter.projectId);
-  const listFilter = await resolveListFilter(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const listFilter = await resolveListFilter(workspaceId, scopedFilter);
   const { leads, total } = await findLeads(workspaceId, listFilter);
   const membershipsByLead = await loadMembershipsByLeadIds(
     workspaceId,
@@ -520,12 +522,15 @@ export async function listLeadsForWorkspace(
 export async function getLeadForWorkspace(
   workspaceId: string,
   leadId: string,
+  userId?: string,
 ): Promise<LeadDetail> {
   const lead = await findLeadById(workspaceId, leadId);
 
   if (!lead) {
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
+
+  await assertRecordProjectAccess(workspaceId, userId, lead.projectId, "lead:read");
 
   return enrichLeadRecord(lead);
 }

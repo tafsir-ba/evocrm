@@ -13,7 +13,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "dashboard:read",
     );
@@ -25,7 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
       throw queryResult.error;
     }
 
-    const dashboard = await getDashboardForWorkspace(workspace.id, queryResult.data);
+    const dashboard = await getDashboardForWorkspace(workspace.id, queryResult.data, userId);
 
     return successResponse(dashboard);
   } catch (error) {

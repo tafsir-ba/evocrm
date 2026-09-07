@@ -17,7 +17,10 @@ import {
 import { findTagById } from "@/server/repositories/tags";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
-import { assertValidProjectFilter } from "@/server/services/project-scope";
+import {
+  applyUserProjectScope,
+  assertRecordProjectAccess,
+} from "@/server/services/apply-project-scope";
 import type { CreatePropertyInput, UpdatePropertyInput } from "@/server/validation/properties";
 
 export type PropertyDictionarySummary = {
@@ -324,9 +327,10 @@ function propertySnapshot(property: PropertyRecord): Record<string, unknown> {
 export async function listPropertiesForWorkspace(
   workspaceId: string,
   filter: PropertyListFilter = {},
+  userId?: string,
 ): Promise<{ properties: PropertyListItem[]; total: number }> {
-  await assertValidProjectFilter(workspaceId, filter.projectId);
-  const { properties, total } = await findProperties(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const { properties, total } = await findProperties(workspaceId, scopedFilter);
 
   const enriched = await Promise.all(
     properties.map((property) => enrichPropertyListItem(property)),
@@ -338,12 +342,20 @@ export async function listPropertiesForWorkspace(
 export async function getPropertyForWorkspace(
   workspaceId: string,
   propertyId: string,
+  userId?: string,
 ): Promise<PropertyDetail> {
   const property = await findPropertyById(workspaceId, propertyId);
 
   if (!property) {
     throw new AppError("NOT_FOUND", "Property not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    userId,
+    property.projectId,
+    "property:read",
+  );
 
   return enrichPropertyRecord(property);
 }

@@ -15,9 +15,14 @@ import {
 } from "@/lib/project-operating-record";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import {
+  requireProjectAccess,
+  resolveAllowedProjectIds,
+} from "@/server/permissions/require-project-access";
 import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findLeads, findLeadsByCompanyIds } from "@/server/repositories/leads";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
+import { createProjectGrant } from "@/server/repositories/project-grants";
 import {
   archiveProject,
   createProject,
@@ -218,15 +223,25 @@ async function withCompanyPeople(
 export async function listProjectsForWorkspace(
   workspaceId: string,
   filter: ProjectListFilter = {},
+  userId?: string,
 ): Promise<ProjectListItem[]> {
-  return withCompanyNamesForProjects(workspaceId, await findProjects(workspaceId, filter));
+  const scopedFilter = await applyProjectListScope(workspaceId, filter, userId);
+  if (scopedFilter === null) {
+    return [];
+  }
+  return withCompanyNamesForProjects(workspaceId, await findProjects(workspaceId, scopedFilter));
 }
 
 export async function listProjectsPageForWorkspace(
   workspaceId: string,
   filter: ProjectListFilter = {},
+  userId?: string,
 ): Promise<{ projects: ProjectListItem[]; total: number }> {
-  const result = await findProjectsPage(workspaceId, filter);
+  const scopedFilter = await applyProjectListScope(workspaceId, filter, userId);
+  if (scopedFilter === null) {
+    return { projects: [], total: 0 };
+  }
+  const result = await findProjectsPage(workspaceId, scopedFilter);
   return {
     projects: await withCompanyNamesForProjects(workspaceId, result.projects),
     total: result.total,
@@ -236,7 +251,12 @@ export async function listProjectsPageForWorkspace(
 export async function getProjectForWorkspace(
   workspaceId: string,
   projectId: string,
+  userId?: string,
 ): Promise<ProjectDetailRecord> {
+  if (userId) {
+    await requireProjectAccess(workspaceId, userId, projectId, "project:read");
+  }
+
   const project = await findProjectById(workspaceId, projectId);
 
   if (!project) {
@@ -244,6 +264,35 @@ export async function getProjectForWorkspace(
   }
 
   return withCompanyPeople(workspaceId, await withCompanyNames(workspaceId, project));
+}
+
+async function applyProjectListScope(
+  workspaceId: string,
+  filter: ProjectListFilter,
+  userId?: string,
+): Promise<ProjectListFilter | null> {
+  if (!PROJECT_SHARING_ENABLED || !userId) {
+    return filter;
+  }
+
+  const allowedIds = await resolveAllowedProjectIds(workspaceId, userId);
+  if (allowedIds === null) {
+    return filter;
+  }
+
+  if (allowedIds.length === 0) {
+    return null;
+  }
+
+  if (filter.ids && filter.ids.length > 0) {
+    const intersection = filter.ids.filter((id) => allowedIds.includes(id));
+    if (intersection.length === 0) {
+      return null;
+    }
+    return { ...filter, ids: intersection };
+  }
+
+  return { ...filter, ids: allowedIds };
 }
 
 export async function createProjectForWorkspace(
@@ -307,6 +356,18 @@ export async function createProjectForWorkspace(
     entityId: project.id,
     after: projectSnapshot(project),
   });
+
+  try {
+    await createProjectGrant({
+      workspaceId,
+      projectId: project.id,
+      userId: actorId,
+      projectRole: "project_admin",
+      grantedBy: actorId,
+    });
+  } catch {
+    // Duplicate grant (e.g. retry) is fine — creator already has access.
+  }
 
   return project;
 }

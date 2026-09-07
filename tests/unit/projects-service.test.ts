@@ -19,6 +19,10 @@ vi.mock("@/server/repositories/dictionary-items", () => ({
   findDictionaryItemById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/project-grants", () => ({
+  createProjectGrant: vi.fn(),
+}));
+
 vi.mock("@/server/repositories/memberships", () => ({
   findMembership: vi.fn(),
 }));
@@ -30,6 +34,7 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
+import { createProjectGrant } from "@/server/repositories/project-grants";
 import {
   archiveProject,
   createProject,
@@ -64,6 +69,19 @@ function mockKnownCompany() {
 describe("project service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(createProjectGrant).mockResolvedValue({
+      id: "grant-1",
+      workspaceId: "ws-1",
+      projectId: "project-1",
+      userId: "user-1",
+      projectRole: "project_admin",
+      status: "active",
+      grantedBy: "user-1",
+      revokedBy: null,
+      revokedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   });
 
   it("rejects a standard create without a primary company", async () => {

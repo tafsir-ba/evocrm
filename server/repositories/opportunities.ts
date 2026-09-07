@@ -70,6 +70,7 @@ function toOpportunityRecord(document: OpportunityDocument): OpportunityRecord {
 export type OpportunityListFilter = {
   includeArchived?: boolean;
   projectId?: string;
+  projectIds?: string[];
   search?: string;
   searchLeadIds?: string[];
   searchPropertyIds?: string[];
@@ -100,6 +101,8 @@ function buildListQuery(filter: OpportunityListFilter): Record<string, unknown> 
 
   if (filter.projectId) {
     query.projectId = filter.projectId;
+  } else if (filter.projectIds !== undefined) {
+    query.projectId = { $in: filter.projectIds };
   }
 
   if (filter.statusId) {

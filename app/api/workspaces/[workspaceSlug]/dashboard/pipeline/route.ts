@@ -11,7 +11,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "dashboard:read",
     );
@@ -26,6 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
     const pipeline = await getDashboardPipelineForWorkspace(
       workspace.id,
       queryResult.data,
+      userId,
     );
 
     return successResponse(pipeline);

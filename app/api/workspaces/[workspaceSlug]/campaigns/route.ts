@@ -25,7 +25,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "campaign:read",
     );
@@ -38,15 +38,19 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
-    const { campaigns, total } = await listCampaignsForWorkspace(workspace.id, {
-      page: query.page,
-      pageSize: query.pageSize,
-      includeArchived: query.includeArchived,
-      status: query.status,
-      audienceType: query.audienceType,
-      projectId: query.projectId,
-      search: query.search,
-    });
+    const { campaigns, total } = await listCampaignsForWorkspace(
+      workspace.id,
+      {
+        page: query.page,
+        pageSize: query.pageSize,
+        includeArchived: query.includeArchived,
+        status: query.status,
+        audienceType: query.audienceType,
+        projectId: query.projectId,
+        search: query.search,
+      },
+      userId,
+    );
 
     return paginatedResponse(
       campaigns,

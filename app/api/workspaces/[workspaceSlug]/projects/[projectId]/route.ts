@@ -6,6 +6,7 @@ import {
   getProjectForWorkspace,
   updateProjectForWorkspace,
 } from "@/server/services/projects";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
@@ -15,12 +16,13 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, projectId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "project:read",
     );
 
-    const project = await getProjectForWorkspace(workspace.id, projectId);
+    await requireProjectAccess(workspace.id, userId, projectId, "project:read");
+    const project = await getProjectForWorkspace(workspace.id, projectId, userId);
 
     return successResponse({ project });
   } catch (error) {
@@ -35,6 +37,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       workspaceSlug,
       "project:update",
     );
+
+    await requireProjectAccess(workspace.id, userId, projectId);
 
     const body: unknown = await request.json();
     const input = parseRequestOrThrow(updateProjectInputSchema, body);
@@ -59,6 +63,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       workspaceSlug,
       "project:archive",
     );
+
+    await requireProjectAccess(workspace.id, userId, projectId);
 
     const project = await archiveProjectForWorkspace(
       workspace.id,
