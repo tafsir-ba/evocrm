@@ -130,9 +130,14 @@ export function AcceptInvitationClient() {
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             {errorMessage ?? "Invalid invitation link."}
           </p>
-          <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
-            Sign in with the invited email
-          </Button>
+          <div className="flex flex-col gap-2 items-center">
+            <Button variant="secondary" onClick={() => (window.location.href = loginHref)}>
+              Sign in with the invited email
+            </Button>
+            <Button variant="ghost" onClick={() => (window.location.href = signupHref)}>
+              Create an account
+            </Button>
+          </div>
         </>
       ) : (
         <>
