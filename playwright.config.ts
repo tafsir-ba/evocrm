@@ -36,6 +36,9 @@ export default defineConfig({
         process.env.MONGODB_URI ?? "mongodb://localhost:27017/evocrm_e2e",
       NEXTAUTH_URL: "http://localhost:3000",
       NEXTAUTH_SECRET: "e2e-test-secret",
+      // Enables Google provider button on login/signup (OAuth itself is not exercised in CI).
+      GOOGLE_CLIENT_ID: "e2e-google-client-id",
+      GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
       CRON_SECRET: "e2e-cron-secret",
     },
   },

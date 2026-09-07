@@ -1,11 +1,16 @@
 import Link from "next/link";
 
+import { AuthMethodDivider } from "@/components/auth/auth-method-divider";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { SignupForm } from "@/components/auth/signup-form";
+import { isGoogleAuthConfigured } from "@/auth.config";
 import { IconLogo } from "@/lib/icons";
 
 export const metadata = { title: "Create account — EvoHome CRM" };
 
 export default function SignupPage() {
+  const googleEnabled = isGoogleAuthConfigured();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-canvas)] p-6 sm:p-10">
       <div className="w-full max-w-[400px]">
@@ -30,17 +35,31 @@ export default function SignupPage() {
           Create your account
         </h1>
         <p className="text-[13.5px] text-[var(--color-ink-muted)] mt-1.5">
-          For QA and staging access. Use a strong password — minimum 12 characters
-          with at least one letter and one number.
+          {googleEnabled
+            ? "Sign up with Google or create an email and password account."
+            : "Create an account with your email and a strong password — minimum 12 characters with at least one letter and one number."}
         </p>
 
-        <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-white p-6">
+        {googleEnabled && <GoogleSignInButton callbackUrl="/workspaces" />}
+
+        {googleEnabled && <AuthMethodDivider label="Or with email" />}
+
+        <div
+          className={
+            googleEnabled
+              ? undefined
+              : "mt-6 rounded-xl border border-[var(--color-line)] bg-white p-6"
+          }
+        >
           <SignupForm />
         </div>
 
         <p className="text-[13px] text-[var(--color-ink-muted)] mt-6 text-center">
           Already have an account?{" "}
-          <Link href="/login" className="text-[var(--color-brand-700)] hover:underline focus-ring rounded">
+          <Link
+            href="/login"
+            className="text-[var(--color-brand-700)] hover:underline focus-ring rounded"
+          >
             Sign in
           </Link>
         </p>

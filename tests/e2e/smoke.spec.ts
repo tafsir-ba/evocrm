@@ -30,6 +30,16 @@ test.describe("Public routes", () => {
     await expect(
       page.getByRole("heading", { name: /create your account/i }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /continue with google/i }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/full name/i)).toBeVisible();
+    await expect(page.getByLabel(/work email/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    await expect(page.getByLabel(/confirm password/i)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /create account/i }),
+    ).toBeVisible();
   });
 
   test("unsubscribe page requires token query param", async ({ page }) => {

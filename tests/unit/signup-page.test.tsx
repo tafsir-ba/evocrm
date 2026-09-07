@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { AuthMethodDivider } from "@/components/auth/auth-method-divider";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { SignupForm } from "@/components/auth/signup-form";
 
 vi.mock("next-auth/react", () => ({
@@ -20,6 +22,24 @@ describe("signup page auth UI", () => {
     expect(screen.getByText(/min 12 chars, 1 letter, 1 number/i)).toBeInTheDocument();
     expect(document.getElementById("signup-password")).toBeInTheDocument();
     expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /create account/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders Google continue button for self-serve signup", () => {
+    render(
+      <>
+        <GoogleSignInButton callbackUrl="/workspaces" />
+        <AuthMethodDivider label="Or with email" />
+        <SignupForm />
+      </>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /continue with google/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/or with email/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /create account/i }),
     ).toBeInTheDocument();

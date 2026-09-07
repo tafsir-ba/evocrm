@@ -71,7 +71,7 @@ export function SignupForm() {
           id="signup-name"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="QA User"
+          placeholder="Alex Rivera"
           autoComplete="name"
           required
           minLength={2}
@@ -84,7 +84,7 @@ export function SignupForm() {
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="qa@example.com"
+          placeholder="you@company.com"
           autoComplete="email"
           required
         />

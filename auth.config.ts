@@ -41,17 +41,30 @@ function getAuthSecret(): string {
   });
 }
 
+/**
+ * Google OAuth is available when both client ID and secret are configured.
+ * Email/password signup and login work independently of Google.
+ */
+export function isGoogleAuthConfigured(
+  env: Pick<
+    import("@/server/env").Env,
+    "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET"
+  > = getEnv(),
+): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
+
 function getAuthProviders() {
   const env = getEnv();
 
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+  if (!isGoogleAuthConfigured(env)) {
     return [];
   }
 
   return [
     Google({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      clientId: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
           prompt: "select_account",

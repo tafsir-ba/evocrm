@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAuthSecret } from "@/auth.config";
+import { isGoogleAuthConfigured, resolveAuthSecret } from "@/auth.config";
 
 describe("resolveAuthSecret", () => {
   it("uses configured secret when present", () => {
@@ -49,5 +49,37 @@ describe("resolveAuthSecret", () => {
         NEXTAUTH_SECRET: undefined,
       }),
     ).toThrow(/NEXTAUTH_SECRET is required in production/);
+  });
+});
+
+describe("isGoogleAuthConfigured", () => {
+  it("is true when both Google client id and secret are set", () => {
+    expect(
+      isGoogleAuthConfigured({
+        GOOGLE_CLIENT_ID: "google-id",
+        GOOGLE_CLIENT_SECRET: "google-secret",
+      }),
+    ).toBe(true);
+  });
+
+  it("is false when either Google credential is missing", () => {
+    expect(
+      isGoogleAuthConfigured({
+        GOOGLE_CLIENT_ID: undefined,
+        GOOGLE_CLIENT_SECRET: "google-secret",
+      }),
+    ).toBe(false);
+    expect(
+      isGoogleAuthConfigured({
+        GOOGLE_CLIENT_ID: "google-id",
+        GOOGLE_CLIENT_SECRET: undefined,
+      }),
+    ).toBe(false);
+    expect(
+      isGoogleAuthConfigured({
+        GOOGLE_CLIENT_ID: undefined,
+        GOOGLE_CLIENT_SECRET: undefined,
+      }),
+    ).toBe(false);
   });
 });

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { isGoogleAuthConfigured } from "@/auth.config";
+import { AuthMethodDivider } from "@/components/auth/auth-method-divider";
 import { CredentialsLoginForm } from "@/components/auth/credentials-login-form";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { IconLogo } from "@/lib/icons";
@@ -22,6 +24,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { callbackUrl, error } = await searchParams;
   const redirectTo = callbackUrl ?? "/workspaces";
+  const googleEnabled = isGoogleAuthConfigured();
   const authErrorMessage = error
     ? (AUTH_ERROR_MESSAGES[error] ?? AUTH_ERROR_MESSAGES.Default)
     : null;
@@ -100,7 +103,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Welcome back
           </h1>
           <p className="text-[13.5px] text-[var(--color-ink-muted)] mt-1.5">
-            Use Google or email/password to access your workspace.
+            {googleEnabled
+              ? "Use Google or email/password to access your workspace."
+              : "Sign in with your email and password to access your workspace."}
           </p>
 
           {authErrorMessage && (
@@ -112,17 +117,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </p>
           )}
 
-          <GoogleSignInButton callbackUrl={redirectTo} />
+          {googleEnabled && <GoogleSignInButton callbackUrl={redirectTo} />}
 
-          <div className="my-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-[var(--color-line)]" />
-            <span className="text-[11.5px] uppercase tracking-[0.14em] text-[var(--color-ink-faint)] font-semibold">
-              Or with email
-            </span>
-            <div className="flex-1 h-px bg-[var(--color-line)]" />
+          {googleEnabled && <AuthMethodDivider label="Or with email" />}
+
+          <div className={googleEnabled ? undefined : "mt-6"}>
+            <CredentialsLoginForm callbackUrl={redirectTo} />
           </div>
-
-          <CredentialsLoginForm callbackUrl={redirectTo} />
 
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-6 text-center">
             New to EvoHome?{" "}
