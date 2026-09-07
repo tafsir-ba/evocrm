@@ -161,7 +161,7 @@ export function NotificationsMenu() {
           />
           <div
             role="menu"
-            className="absolute right-0 top-[44px] z-50 w-[340px] rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
+            className="absolute right-0 top-[44px] z-50 w-[min(340px,calc(100vw-1rem))] rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
           >
             <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] px-3 py-2.5">
               <p className="text-[13px] font-semibold text-[var(--color-ink)]">Notifications</p>

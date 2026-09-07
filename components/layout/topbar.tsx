@@ -39,89 +39,91 @@ export function Topbar({
     .join("") || "U";
 
   return (
-    <header className="h-[60px] bg-white border-b border-[var(--color-line)] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 sticky top-0 z-30 min-w-0">
+    <header className="sticky top-0 z-30 flex h-[60px] min-w-0 items-center gap-1.5 border-b border-[var(--color-line)] bg-white px-2.5 sm:gap-3 sm:px-4 lg:px-6">
       <button
         onClick={onOpenMobileNav}
-        className="lg:hidden inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-[var(--color-muted)] focus-ring"
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-muted)] focus-ring lg:hidden"
         aria-label="Open navigation"
       >
         <IconMenu size={18} />
       </button>
 
-      <GlobalSearch />
-
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="h-8 min-w-0 max-w-[9.5rem] flex-1 sm:max-w-[280px]" />}>
         <ProjectFilter />
       </Suspense>
 
-      <NotificationsMenu />
+      <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
+        <GlobalSearch />
 
-      <div className="relative">
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="inline-flex items-center gap-2 h-9 pl-1 pr-2 rounded-md hover:bg-[var(--color-muted)] focus-ring"
-        >
-          <Avatar
-            user={{
-              id: user.id,
-              name: displayName,
-              initials,
-            }}
-            size={26}
-          />
-          <span className="hidden sm:inline text-[13px] font-medium text-[var(--color-ink)] max-w-[120px] truncate">
-            {displayName}
-          </span>
-          <IconChevronDown size={14} className="text-[var(--color-ink-muted)]" />
-        </button>
-        {menuOpen && (
-          <>
-            <button
-              aria-label="Close menu"
-              onClick={() => setMenuOpen(false)}
-              className="fixed inset-0 z-40 cursor-default"
+        <NotificationsMenu />
+
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md pl-1 pr-1.5 hover:bg-[var(--color-muted)] focus-ring sm:gap-2 sm:pr-2"
+          >
+            <Avatar
+              user={{
+                id: user.id,
+                name: displayName,
+                initials,
+              }}
+              size={26}
             />
-            <div
-              className={cn(
-                "absolute right-0 top-[44px] z-50 w-[228px] rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)] p-1.5",
-              )}
-            >
-              <div className="px-2.5 py-2 border-b border-[var(--color-line)] mb-1">
-                <p className="text-[13px] font-semibold text-[var(--color-ink)]">
-                  {displayName}
-                </p>
-                <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
-                  {user.email}
-                </p>
-              </div>
-              <MenuItem icon={<IconUser size={15} />}>My profile</MenuItem>
-              <MenuItem icon={<IconSettings size={15} />} href="/workspaces">
-                All workspaces
-              </MenuItem>
-              {canAccessSettings && (
-                <MenuItem
-                  icon={<IconSettings size={15} />}
-                  href={workspaceNavPath(workspace.slug, "settings")}
-                >
-                  Workspace settings
-                </MenuItem>
-              )}
-              {isPlatformAdmin && (
-                <MenuItem icon={<IconShield size={15} />} href="/admin">
-                  Platform admin
-                </MenuItem>
-              )}
-              <div className="my-1 border-t border-[var(--color-line)]" />
-              <MenuItem
-                icon={<IconLogout size={15} />}
-                tone="danger"
-                onClick={() => signOut({ callbackUrl: "/login" })}
+            <span className="hidden max-w-[120px] truncate text-[13px] font-medium text-[var(--color-ink)] sm:inline">
+              {displayName}
+            </span>
+            <IconChevronDown size={14} className="hidden text-[var(--color-ink-muted)] sm:block" />
+          </button>
+          {menuOpen && (
+            <>
+              <button
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-40 cursor-default"
+              />
+              <div
+                className={cn(
+                  "absolute right-0 top-[44px] z-50 w-[min(228px,calc(100vw-1rem))] rounded-lg border border-[var(--color-line)] bg-white p-1.5 shadow-[var(--shadow-lg)]",
+                )}
               >
-                Sign out
-              </MenuItem>
-            </div>
-          </>
-        )}
+                <div className="mb-1 border-b border-[var(--color-line)] px-2.5 py-2">
+                  <p className="text-[13px] font-semibold text-[var(--color-ink)]">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
+                    {user.email}
+                  </p>
+                </div>
+                <MenuItem icon={<IconUser size={15} />}>My profile</MenuItem>
+                <MenuItem icon={<IconSettings size={15} />} href="/workspaces">
+                  All workspaces
+                </MenuItem>
+                {canAccessSettings && (
+                  <MenuItem
+                    icon={<IconSettings size={15} />}
+                    href={workspaceNavPath(workspace.slug, "settings")}
+                  >
+                    Workspace settings
+                  </MenuItem>
+                )}
+                {isPlatformAdmin && (
+                  <MenuItem icon={<IconShield size={15} />} href="/admin">
+                    Platform admin
+                  </MenuItem>
+                )}
+                <div className="my-1 border-t border-[var(--color-line)]" />
+                <MenuItem
+                  icon={<IconLogout size={15} />}
+                  tone="danger"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                >
+                  Sign out
+                </MenuItem>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

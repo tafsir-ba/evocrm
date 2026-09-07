@@ -15,7 +15,7 @@ import {
 
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import { Input } from "@/components/ui/input";
-import { IconSearch } from "@/lib/icons";
+import { IconClose, IconSearch } from "@/lib/icons";
 import { appendProjectIdToSearchParams } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -39,16 +39,19 @@ export function GlobalSearch() {
   return (
     <Suspense
       fallback={
-        <div className="relative flex-1 min-w-0 max-w-md">
-          <Input
-            placeholder="Search leads, properties, activities…"
-            leadingIcon={<IconSearch size={15} />}
-            trailingIcon={<span className="kbd hidden sm:inline">⌘K</span>}
-            fieldSize="sm"
-            disabled
-            aria-hidden
-          />
-        </div>
+        <>
+          <div className="hidden md:block relative flex-1 min-w-0 max-w-md">
+            <Input
+              placeholder="Search leads, properties, activities…"
+              leadingIcon={<IconSearch size={15} />}
+              trailingIcon={<span className="kbd hidden sm:inline">⌘K</span>}
+              fieldSize="sm"
+              disabled
+              aria-hidden
+            />
+          </div>
+          <div className="md:hidden h-9 w-9 shrink-0" aria-hidden />
+        </>
       }
     >
       <GlobalSearchInner />
@@ -66,6 +69,7 @@ function GlobalSearchInner() {
   const requestIdRef = useRef(0);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -205,16 +209,15 @@ function GlobalSearchInner() {
         return;
       }
 
-      const input =
-        inputRef.current ??
-        containerRef.current?.querySelector<HTMLInputElement>("input");
-      if (!input || input.offsetParent === null) {
-        return;
-      }
-
       event.preventDefault();
-      input.focus();
+      setMobileExpanded(true);
       setOpen(true);
+      window.requestAnimationFrame(() => {
+        const input =
+          inputRef.current ??
+          containerRef.current?.querySelector<HTMLInputElement>("input");
+        input?.focus();
+      });
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -225,6 +228,7 @@ function GlobalSearchInner() {
     function onPointerDown(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        setMobileExpanded(false);
       }
     }
 
@@ -234,6 +238,7 @@ function GlobalSearchInner() {
 
   function navigateToHit(hit: SearchHit) {
     setOpen(false);
+    setMobileExpanded(false);
     setQuery("");
     setHits([]);
     router.push(hit.href);
@@ -256,6 +261,9 @@ function GlobalSearchInner() {
 
     if (event.key === "Escape") {
       setOpen(false);
+      if (mobileExpanded) {
+        setMobileExpanded(false);
+      }
       return;
     }
 
@@ -272,11 +280,76 @@ function GlobalSearchInner() {
     }
   }
 
+  useEffect(() => {
+    if (!mobileExpanded) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mobileExpanded]);
+
   const showPanel = open && query.trim().length >= 2;
 
-  return (
-    <div ref={containerRef} className="relative flex-1 min-w-0 max-w-md">
-      <form onSubmit={handleSubmit}>
+  function renderResultsPanel() {
+    if (!showPanel) {
+      return null;
+    }
+
+    return (
+      <div
+        id={listId}
+        role="listbox"
+        className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
+      >
+        {loading ? (
+          <p className="px-3 py-2.5 text-[13px] text-[var(--color-ink-muted)]">Searching…</p>
+        ) : error ? (
+          <p className="px-3 py-2.5 text-[13px] text-[var(--color-danger-fg)]">{error}</p>
+        ) : hits.length === 0 ? (
+          <p className="px-3 py-2.5 text-[13px] text-[var(--color-ink-muted)]">
+            No matches for “{query.trim()}”.
+          </p>
+        ) : (
+          <ul className="max-h-80 overflow-y-auto py-1">
+            {hits.map((hit, index) => (
+              <li key={`${hit.type}-${hit.id}`} role="option" aria-selected={index === activeIndex}>
+                <Link
+                  href={hit.href}
+                  className={cn(
+                    "flex items-start gap-3 px-3 py-2 text-left hover:bg-[var(--color-muted)] focus-ring",
+                    index === activeIndex && "bg-[var(--color-muted)]",
+                  )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateToHit(hit);
+                  }}
+                  onMouseEnter={() => setActiveIndex(index)}
+                >
+                  <span className="mt-0.5 rounded bg-[var(--color-canvas)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                    {TYPE_LABEL[hit.type]}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-medium text-[var(--color-ink)]">
+                      {hit.label}
+                    </span>
+                    <span className="block truncate text-[12px] text-[var(--color-ink-muted)]">
+                      {hit.meta}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  function renderSearchField(placeholder: string) {
+    return (
+      <form onSubmit={handleSubmit} className="min-w-0 flex-1">
         <Input
           value={query}
           onChange={(event) => {
@@ -288,9 +361,9 @@ function GlobalSearchInner() {
             setOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Search leads, properties, activities…"
+          placeholder={placeholder}
           leadingIcon={<IconSearch size={15} />}
-          trailingIcon={<span className="kbd hidden sm:inline">⌘K</span>}
+          trailingIcon={<span className="kbd hidden lg:inline">⌘K</span>}
           fieldSize="sm"
           role="combobox"
           aria-expanded={showPanel}
@@ -299,55 +372,54 @@ function GlobalSearchInner() {
           autoComplete="off"
         />
       </form>
+    );
+  }
 
-      {showPanel ? (
-        <div
-          id={listId}
-          role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
+  return (
+    <>
+      <div
+        ref={mobileExpanded ? undefined : containerRef}
+        className="relative hidden min-w-0 max-w-md flex-1 md:block"
+      >
+        {renderSearchField("Search leads, properties, activities…")}
+        {renderResultsPanel()}
+      </div>
+
+      <div className="relative shrink-0 md:hidden">
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] focus-ring"
+          aria-label="Open search"
+          aria-expanded={mobileExpanded}
+          onClick={() => {
+            setMobileExpanded(true);
+            setOpen(true);
+          }}
         >
-          {loading ? (
-            <p className="px-3 py-2.5 text-[13px] text-[var(--color-ink-muted)]">Searching…</p>
-          ) : error ? (
-            <p className="px-3 py-2.5 text-[13px] text-[var(--color-danger-fg)]">{error}</p>
-          ) : hits.length === 0 ? (
-            <p className="px-3 py-2.5 text-[13px] text-[var(--color-ink-muted)]">
-              No matches for “{query.trim()}”.
-            </p>
-          ) : (
-            <ul className="max-h-80 overflow-y-auto py-1">
-              {hits.map((hit, index) => (
-                <li key={`${hit.type}-${hit.id}`} role="option" aria-selected={index === activeIndex}>
-                  <Link
-                    href={hit.href}
-                    className={cn(
-                      "flex items-start gap-3 px-3 py-2 text-left hover:bg-[var(--color-muted)] focus-ring",
-                      index === activeIndex && "bg-[var(--color-muted)]",
-                    )}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateToHit(hit);
-                    }}
-                    onMouseEnter={() => setActiveIndex(index)}
-                  >
-                    <span className="mt-0.5 rounded bg-[var(--color-canvas)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-                      {TYPE_LABEL[hit.type]}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium text-[var(--color-ink)]">
-                        {hit.label}
-                      </span>
-                      <span className="block truncate text-[12px] text-[var(--color-ink-muted)]">
-                        {hit.meta}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
-    </div>
+          <IconSearch size={17} />
+        </button>
+
+        {mobileExpanded ? (
+          <div
+            ref={containerRef}
+            className="fixed inset-x-0 top-0 z-[60] flex h-[60px] items-center gap-2 border-b border-[var(--color-line)] bg-white px-2.5 shadow-[var(--shadow-md)]"
+          >
+            {renderSearchField("Search leads, properties, activities…")}
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] focus-ring"
+              aria-label="Close search"
+              onClick={() => {
+                setMobileExpanded(false);
+                setOpen(false);
+              }}
+            >
+              <IconClose size={16} />
+            </button>
+            {renderResultsPanel()}
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }

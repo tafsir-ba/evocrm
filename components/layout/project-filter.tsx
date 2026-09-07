@@ -126,8 +126,8 @@ export function ProjectFilter() {
   }
 
   return (
-    <div className="mr-1 flex min-w-0 max-w-[42vw] items-center gap-1.5 sm:mr-2 sm:max-w-[min(100%,280px)] sm:gap-2">
-      <span className="hidden shrink-0 text-[12px] text-[var(--color-ink-muted)] sm:inline">
+    <div className="flex min-w-0 max-w-[9.5rem] flex-1 items-center gap-1.5 sm:mr-1 sm:max-w-[min(100%,280px)] sm:gap-2 md:flex-none">
+      <span className="hidden shrink-0 text-[12px] text-[var(--color-ink-muted)] md:inline">
         Project
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -137,16 +137,16 @@ export function ProjectFilter() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Find…"
           aria-label="Search projects in the workspace filter"
-          className="h-8 w-[4.75rem] rounded-md border border-[var(--color-line)] bg-white px-2 text-[12px] text-[var(--color-ink-soft)] focus-ring sm:w-[7rem]"
+          className="hidden h-8 w-[7rem] shrink-0 rounded-md border border-[var(--color-line)] bg-white px-2 text-[12px] text-[var(--color-ink-soft)] focus-ring md:block"
         />
         <div className="relative min-w-0 flex-1">
           <select
             value={selectedProjectId ?? ""}
             onChange={(event) => onChange(event.target.value)}
-            className="h-8 w-full max-w-full appearance-none rounded-md border border-[var(--color-line)] bg-white pl-2.5 pr-7 text-[13px] text-[var(--color-ink-soft)] focus-ring"
+            className="h-8 w-full max-w-full appearance-none truncate rounded-md border border-[var(--color-line)] bg-white pl-2.5 pr-7 text-[13px] text-[var(--color-ink-soft)] focus-ring"
             aria-label="Filter by project"
           >
-            <option value="">All Projects</option>
+            <option value="">All projects</option>
             {options.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}

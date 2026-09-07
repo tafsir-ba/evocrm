@@ -630,8 +630,8 @@ export function LeadsPanel({
         <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
       )}
 
-      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
-        <div className="flex-1 min-w-[200px] max-w-md">
+      <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
+        <div className="w-full min-w-0 sm:max-w-md sm:flex-1 sm:min-w-[200px]">
           <Input
             placeholder="Search leads by name, email or phone…"
             aria-label="Search leads by name, email or phone"
@@ -643,7 +643,7 @@ export function LeadsPanel({
             fieldSize="sm"
           />
         </div>
-        <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+        <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
           <input
             type="checkbox"
             checked={showArchived}
@@ -655,7 +655,7 @@ export function LeadsPanel({
           Show archived
         </label>
         {projectId ? (
-          <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+          <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
             <input
               type="checkbox"
               checked={includeAssociated}
@@ -669,7 +669,7 @@ export function LeadsPanel({
         ) : null}
         <Select
           fieldSize="sm"
-          className="w-auto min-w-[140px]"
+          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
           aria-label="Filter by status"
           value={statusFilter}
           onChange={(event) => {
@@ -686,7 +686,7 @@ export function LeadsPanel({
         </Select>
         <Select
           fieldSize="sm"
-          className="w-auto min-w-[140px]"
+          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
           aria-label="Filter by source"
           value={sourceFilter}
           onChange={(event) => {
@@ -703,7 +703,7 @@ export function LeadsPanel({
         </Select>
         <Select
           fieldSize="sm"
-          className="w-auto min-w-[140px]"
+          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
           aria-label="Filter by assignee"
           value={assignedFilter}
           onChange={(event) => {
