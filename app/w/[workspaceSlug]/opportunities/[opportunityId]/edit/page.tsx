@@ -54,6 +54,8 @@ export default async function EditOpportunityPage({ params }: { params: Params }
         mode="edit"
         opportunityId={opportunityId}
         initialValues={{
+          leadId: opportunity.leadId,
+          propertyId: opportunity.propertyId,
           value: opportunity.value?.toString() ?? "",
           currency: opportunity.currency,
           expectedCloseDate: opportunity.expectedCloseDate

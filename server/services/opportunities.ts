@@ -234,7 +234,13 @@ function assertMatchingOpportunityProjects(
   if (leadProjectId !== propertyProjectId) {
     throw new AppError(
       "VALIDATION_ERROR",
-      "Lead and property must belong to the same project.",
+      "Lead and property must belong to the same project. Pick a property from the lead’s project (or vice versa).",
+      {
+        details: {
+          leadProjectId,
+          propertyProjectId,
+        },
+      },
     );
   }
 
@@ -705,10 +711,19 @@ export async function updateOpportunityForWorkspace(
   if (input.leadId !== undefined || input.propertyId !== undefined) {
     const lead = await validateLeadForOpportunity(workspaceId, nextLeadId);
     const property = await validatePropertyForOpportunity(workspaceId, nextPropertyId);
-    updatePayload.projectId = assertMatchingOpportunityProjects(
+    const nextProjectId = assertMatchingOpportunityProjects(
       lead.projectId,
       property.projectId,
     );
+    updatePayload.projectId = nextProjectId;
+    if (nextProjectId !== existing.projectId) {
+      await requireProjectAccess(
+        workspaceId,
+        actorId,
+        nextProjectId,
+        "opportunity:update",
+      );
+    }
   }
 
   if (input.ownerId !== undefined) updatePayload.ownerId = input.ownerId;

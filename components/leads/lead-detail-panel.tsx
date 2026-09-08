@@ -34,9 +34,11 @@ import {
   IconMail,
   IconMapPin,
   IconPhone,
+  IconPlus,
   IconSparkles,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import { createOpportunityHref } from "@/lib/opportunity-link-flow";
 import { EnrichedField } from "@/components/leads/enriched-field";
 import { EnrichmentCandidateList } from "@/components/leads/lead-enrichment-candidates";
 import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
@@ -675,6 +677,13 @@ export function LeadDetailPanel({
         }`}
         actions={
           <>
+            {canCreateOpportunity && !lead.archivedAt && (
+              <Link
+                href={createOpportunityHref(workspaceSlug, { leadId, lockLead: true })}
+              >
+                <Button leadingIcon={<IconPlus size={14} />}>Link to property</Button>
+              </Link>
+            )}
             {canEnrich && enrichmentEnabled && !lead.archivedAt && (
               <Button
                 variant="outline"

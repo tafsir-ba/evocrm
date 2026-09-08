@@ -53,6 +53,16 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/permissions/require-project-access", () => ({
+  requireProjectAccess: vi.fn(),
+  resolveAllowedProjectIds: vi.fn(),
+}));
+
+vi.mock("@/server/services/apply-project-scope", () => ({
+  applyUserProjectScope: vi.fn(async (_ws, _user, filter) => filter),
+  assertRecordProjectAccess: vi.fn(),
+}));
+
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findLeadById } from "@/server/repositories/leads";
 import { findPropertyById } from "@/server/repositories/properties";
@@ -69,7 +79,9 @@ import {
   archiveOpportunityForWorkspace,
   createOpportunityForWorkspace,
   moveOpportunityStageForWorkspace,
+  updateOpportunityForWorkspace,
 } from "@/server/services/opportunities";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 
 const baseOpportunity = {
   id: "opp-1",
@@ -462,5 +474,153 @@ describe("opportunity service", () => {
     await archiveOpportunityForWorkspace("ws-1", "opp-1", "user-1");
 
     expect(archiveOpportunity).toHaveBeenCalledWith("ws-1", "opp-1");
+  });
+
+  it("rejects create when lead and property are in different projects", async () => {
+    vi.mocked(findPropertyById).mockResolvedValue({
+      id: "prop-1",
+      workspaceId: "ws-1",
+      projectId: "project-other",
+      archivedAt: null,
+      title: "Villa",
+      reference: "V-1",
+      currency: "CHF",
+      statusId: "property-status",
+      typeId: null,
+      ownerId: null,
+      assignedTo: null,
+      price: null,
+      address: null,
+      city: null,
+      country: null,
+      rooms: null,
+      bedrooms: null,
+      bathrooms: null,
+      surface: null,
+      totalSurface: null,
+      balconyTerraceSurface: null,
+      floor: null,
+      building: null,
+      lot: null,
+      description: null,
+      features: [],
+      tags: [],
+      attributes: {},
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+
+    await expect(
+      createOpportunityForWorkspace("ws-1", "user-1", {
+        leadId: "lead-1",
+        propertyId: "prop-1",
+        statusId: "status-open",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringContaining("same project"),
+    });
+  });
+
+  it("requires destination project access when edit relinks to another project", async () => {
+    vi.mocked(findOpportunityById).mockResolvedValue(baseOpportunity);
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-2",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      projectId: "project-2",
+      archivedAt: null,
+      fullName: "Jane Doe",
+      firstName: "Jane",
+      lastName: "Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      statusId: "lead-status",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "unknown",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+    vi.mocked(findPropertyById).mockResolvedValue({
+      id: "prop-2",
+      workspaceId: "ws-1",
+      projectId: "project-2",
+      archivedAt: null,
+      title: "Apt",
+      reference: "A-1",
+      currency: "EUR",
+      statusId: "property-status",
+      typeId: null,
+      ownerId: null,
+      assignedTo: null,
+      price: null,
+      address: null,
+      city: null,
+      country: null,
+      rooms: null,
+      bedrooms: null,
+      bathrooms: null,
+      surface: null,
+      totalSurface: null,
+      balconyTerraceSurface: null,
+      floor: null,
+      building: null,
+      lot: null,
+      description: null,
+      features: [],
+      tags: [],
+      attributes: {},
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+    vi.mocked(updateOpportunity).mockResolvedValue({
+      ...baseOpportunity,
+      leadId: "lead-2",
+      propertyId: "prop-2",
+      projectId: "project-2",
+    });
+    vi.mocked(requireProjectAccess).mockResolvedValue({} as never);
+
+    await updateOpportunityForWorkspace("ws-1", "opp-1", "user-1", {
+      leadId: "lead-2",
+      propertyId: "prop-2",
+    });
+
+    expect(requireProjectAccess).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      "project-2",
+      "opportunity:update",
+    );
+    expect(updateOpportunity).toHaveBeenCalledWith(
+      "ws-1",
+      "opp-1",
+      expect.objectContaining({
+        leadId: "lead-2",
+        propertyId: "prop-2",
+        projectId: "project-2",
+      }),
+    );
   });
 });

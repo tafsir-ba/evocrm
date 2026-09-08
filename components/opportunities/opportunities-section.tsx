@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { createOpportunityHref } from "@/lib/opportunity-link-flow";
 import { IconPlus } from "@/lib/icons";
 import { formatDate, formatPrice } from "@/lib/format-price";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -33,20 +34,6 @@ type OpportunitiesSectionProps = {
   canCreate: boolean;
 };
 
-function createOpportunityPath(
-  workspaceSlug: string,
-  leadId?: string,
-  propertyId?: string,
-): string {
-  const params = new URLSearchParams();
-  if (leadId) params.set("leadId", leadId);
-  if (propertyId) params.set("propertyId", propertyId);
-  const query = params.toString();
-  return query
-    ? `${workspacePath(workspaceSlug, "opportunities", "new")}?${query}`
-    : workspacePath(workspaceSlug, "opportunities", "new");
-}
-
 export function OpportunitiesSection({
   workspaceSlug,
   defaultCurrency: _defaultCurrency,
@@ -60,7 +47,17 @@ export function OpportunitiesSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const createHref = createOpportunityPath(workspaceSlug, leadId, propertyId);
+  const createHref = createOpportunityHref(workspaceSlug, {
+    leadId,
+    propertyId,
+    lockLead: Boolean(leadId),
+    lockProperty: Boolean(propertyId),
+  });
+  const createLabel = leadId
+    ? "Link to property"
+    : propertyId
+      ? "Link to lead"
+      : "Create opportunity";
 
   const loadOpportunities = useCallback(async () => {
     if (!canRead) {
@@ -138,29 +135,29 @@ export function OpportunitiesSection({
 
   return (
     <div className="px-5 pb-5">
-      {canCreate && (
+      {canCreate && opportunities.length > 0 && (
         <div className="mb-4 flex justify-end">
           <Button
             size="sm"
             leadingIcon={<IconPlus size={13} />}
             onClick={() => router.push(createHref)}
           >
-            Create opportunity
+            {createLabel}
           </Button>
         </div>
       )}
 
       {opportunities.length === 0 ? (
         <EmptyState
-          title="No opportunities linked"
+          title="No opportunities yet"
           description={
             leadId
-              ? "When this lead is matched to a property, an opportunity will appear here."
-              : "When a lead is matched to this property, an opportunity will appear here."
+              ? "Create an opportunity to link this lead to a property in the same project."
+              : "Create an opportunity to link this property to a lead in the same project."
           }
           primaryAction={
             canCreate
-              ? { label: "Create opportunity", onClick: () => router.push(createHref) }
+              ? { label: createLabel, onClick: () => router.push(createHref) }
               : undefined
           }
         />
