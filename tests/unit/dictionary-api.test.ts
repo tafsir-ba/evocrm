@@ -30,7 +30,7 @@ describe("dictionary API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
