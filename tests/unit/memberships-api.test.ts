@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/memberships", () => ({
@@ -24,7 +24,7 @@ import {
 } from "@/app/api/workspaces/[workspaceSlug]/memberships/route";
 import { PATCH as patchMembership } from "@/app/api/workspaces/[workspaceSlug]/memberships/[membershipId]/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { listMembershipsForWorkspace } from "@/server/services/memberships";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -43,7 +43,15 @@ describe("memberships API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -52,6 +60,9 @@ describe("memberships API", () => {
         status: "active",
         permissions: ["settings:read", "users:manage"],
       },
+      permissions: ["settings:read", "users:manage"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listMembershipsForWorkspace).mockResolvedValue([
       {
@@ -90,7 +101,7 @@ describe("memberships API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -107,7 +118,7 @@ describe("memberships API", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "users:manage");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "users:manage");
   });
 
   it("requires users:manage for PATCH", async () => {
@@ -119,7 +130,7 @@ describe("memberships API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -144,7 +155,15 @@ describe("memberships API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -153,6 +172,9 @@ describe("memberships API", () => {
         status: "active",
         permissions: ["users:manage"],
       },
+      permissions: ["users:manage"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
 
     const response = await patchMembership(

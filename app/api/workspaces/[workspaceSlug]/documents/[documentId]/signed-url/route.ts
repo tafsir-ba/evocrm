@@ -9,7 +9,7 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, documentId } = await context.params;
-    const { userId, workspace, membership } = await requireWorkspaceApiAccess(
+    const { userId, workspace, permissions } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:read",
     );
@@ -18,7 +18,7 @@ export async function POST(_request: Request, context: RouteContext) {
       workspace.id,
       userId,
       documentId,
-      membership.permissions,
+      permissions,
     );
 
     return successResponse(signedUrl);

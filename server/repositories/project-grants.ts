@@ -79,6 +79,20 @@ export async function findActiveProjectGrantsForUser(
   return docs.map(toProjectGrantRecord);
 }
 
+/** All active project grants for a user across every workspace. */
+export async function findActiveProjectGrantsAcrossWorkspaces(
+  userId: string,
+): Promise<ProjectGrantRecord[]> {
+  await connectDb();
+  const docs = await ProjectGrantModel.find({
+    userId,
+    status: "active",
+  })
+    .sort({ createdAt: -1 })
+    .lean<ProjectGrantDocument[]>();
+  return docs.map(toProjectGrantRecord);
+}
+
 export async function findActiveProjectGrantsForProject(
   workspaceId: string,
   projectId: string,

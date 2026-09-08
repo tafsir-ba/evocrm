@@ -11,7 +11,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { userId, workspace, membership } = await requireWorkspaceApiAccess(
+    const { userId, workspace, permissions } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:create",
     );
@@ -22,7 +22,7 @@ export async function POST(request: Request, context: RouteContext) {
     const upload = await createDocumentUploadUrlForWorkspace(
       workspace.id,
       userId,
-      membership.permissions,
+      permissions,
       input,
     );
 

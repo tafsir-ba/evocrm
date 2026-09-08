@@ -5,6 +5,7 @@ import {
   addLeadProjectMembership,
   listLeadProjectMemberships,
 } from "@/server/services/lead-project-memberships";
+import { getLeadForWorkspace } from "@/server/services/leads";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
@@ -14,7 +15,8 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "lead:read");
+    const { workspace, userId } = await requireWorkspaceApiAccess(workspaceSlug, "lead:read");
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const memberships = await listLeadProjectMemberships(workspace.id, leadId);
     return successResponse({ memberships });
   } catch (error) {
@@ -29,6 +31,7 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:update",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const body: unknown = await request.json();
     const input = parseRequestOrThrow(createLeadProjectMembershipInputSchema, body);
     const memberships = await addLeadProjectMembership({

@@ -1,6 +1,6 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
 import { getReassignmentSummary } from "@/server/services/reassignment";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; membershipId: string }>;
@@ -9,7 +9,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, membershipId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "users:manage",
     );

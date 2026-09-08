@@ -10,7 +10,7 @@ import {
   addMembershipToWorkspace,
   listMembershipsForWorkspace,
 } from "@/server/services/memberships";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string }>;
@@ -19,12 +19,12 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(
+    const { workspace, permissions } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:read",
     );
 
-    const canManage = hasPermission(membership.permissions, "users:manage");
+    const canManage = hasPermission(permissions, "users:manage");
 
     const url = new URL(request.url);
     const queryResult = validateSearchParams(
@@ -49,7 +49,7 @@ export async function GET(request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "users:manage",
     );

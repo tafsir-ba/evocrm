@@ -2,7 +2,7 @@ import { handleRouteError, successResponse } from "@/server/api/responses";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { reassignRecordsInputSchema } from "@/server/validation/reassignment";
 import { reassignMembershipRecords } from "@/server/services/reassignment";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; membershipId: string }>;
@@ -11,7 +11,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, membershipId } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "users:manage",
     );

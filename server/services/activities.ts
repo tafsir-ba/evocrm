@@ -27,6 +27,7 @@ import {
   applyUserProjectScope,
   assertRecordProjectAccess,
 } from "@/server/services/apply-project-scope";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import {
   applyActivityStatusBehavior,
   isActivityOverdue,
@@ -507,6 +508,12 @@ export async function createActivityForWorkspace(
   await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assigned to");
 
   const relationships = await resolveRelationships(workspaceId, input);
+  await requireProjectAccess(
+    workspaceId,
+    actorId,
+    relationships.projectId,
+    "activity:create",
+  );
   const behaviorEffects = applyActivityStatusBehavior(status);
 
   const assignedTo = input.assignedTo ?? actorId;
@@ -551,6 +558,13 @@ export async function updateActivityForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Activity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "activity:update",
+  );
 
   const before = activitySnapshot(existing);
   const updatePayload: Parameters<typeof updateActivity>[2] = {};
@@ -759,6 +773,13 @@ export async function archiveActivityForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Activity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "activity:archive",
+  );
 
   const before = activitySnapshot(existing);
   const archived = await archiveActivity(workspaceId, activityId);

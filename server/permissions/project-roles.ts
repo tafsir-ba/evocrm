@@ -38,7 +38,6 @@ const PROJECT_ADMIN_PERMISSIONS = validatePermissions([
   "document:read",
   "document:archive",
   "campaign:read",
-  "settings:read",
 ]);
 
 const CONTRIBUTOR_PERMISSIONS = validatePermissions([

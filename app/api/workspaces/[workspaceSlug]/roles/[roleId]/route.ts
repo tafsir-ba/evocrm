@@ -5,7 +5,7 @@ import {
   deleteCustomRole,
   updateCustomRole,
 } from "@/server/services/roles";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; roleId: string }>;
@@ -14,7 +14,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, roleId } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "roles:manage",
     );
@@ -37,7 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, roleId } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "roles:manage",
     );

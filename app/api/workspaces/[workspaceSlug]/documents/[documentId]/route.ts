@@ -12,7 +12,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, documentId } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(
+    const { workspace, permissions, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:read",
     );
@@ -20,7 +20,8 @@ export async function GET(_request: Request, context: RouteContext) {
     const document = await getDocumentForWorkspace(
       workspace.id,
       documentId,
-      membership.permissions,
+      permissions,
+      userId,
     );
 
     return successResponse({ document });
@@ -32,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, documentId } = await context.params;
-    const { userId, workspace, membership } = await requireWorkspaceApiAccess(
+    const { userId, workspace, permissions } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:archive",
     );
@@ -41,7 +42,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       workspace.id,
       userId,
       documentId,
-      membership.permissions,
+      permissions,
     );
 
     return successResponse({ document });

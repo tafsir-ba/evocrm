@@ -35,7 +35,11 @@ export default async function EditCampaignPage({ params }: { params: Params }) {
   let campaign;
 
   try {
-    campaign = await getCampaignForWorkspace(access.context.workspace.id, campaignId);
+    campaign = await getCampaignForWorkspace(
+      access.context.workspace.id,
+      campaignId,
+      access.user.id,
+    );
   } catch {
     return (
       <PageContainer>

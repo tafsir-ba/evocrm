@@ -42,6 +42,11 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/permissions/require-project-access", () => ({
+  resolveAllowedProjectIds: vi.fn(),
+  requireProjectAccess: vi.fn(),
+}));
+
 vi.mock("@/server/services/document-upload-token", () => ({
   createDocumentUploadToken: vi.fn(() => ({
     uploadId: "signed-upload-token",
@@ -63,6 +68,10 @@ vi.mock("@/server/services/document-upload-token", () => ({
 }));
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
+import {
+  requireProjectAccess,
+  resolveAllowedProjectIds,
+} from "@/server/permissions/require-project-access";
 import {
   archiveDocument,
   createDocument,
@@ -120,16 +129,21 @@ const sampleDocument = {
 describe("documents service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveAllowedProjectIds).mockResolvedValue(null);
+    vi.mocked(requireProjectAccess).mockResolvedValue({} as never);
     vi.mocked(findLeadById).mockResolvedValue({
       id: "lead-1",
+      projectId: "proj-1",
       archivedAt: null,
     } as never);
     vi.mocked(findPropertyById).mockResolvedValue({
       id: "property-1",
+      projectId: "proj-1",
       archivedAt: null,
     } as never);
     vi.mocked(findOpportunityById).mockResolvedValue({
       id: "opp-1",
+      projectId: "proj-1",
       archivedAt: null,
     } as never);
     vi.mocked(generateUploadSignedUrl).mockResolvedValue({

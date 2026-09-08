@@ -296,6 +296,74 @@ async function applyProjectListScope(
   return { ...filter, ids: allowedIds };
 }
 
+export type SharedProjectListItem = {
+  id: string;
+  name: string;
+  reference: string | null;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  projectRole: string;
+  archivedAt: string | null;
+};
+
+/**
+ * Projects shared with the user via ProjectGrant in workspaces they do not
+ * need to join. Used for discovery in the recipient's normal Projects nav.
+ */
+export async function listSharedProjectsForUser(
+  userId: string,
+  options?: { excludeWorkspaceId?: string },
+): Promise<SharedProjectListItem[]> {
+  const { findActiveProjectGrantsAcrossWorkspaces } = await import(
+    "@/server/repositories/project-grants"
+  );
+  const { findWorkspaceById } = await import("@/server/repositories/workspaces");
+  const { findActiveMembershipsForUser } = await import(
+    "@/server/repositories/memberships"
+  );
+
+  const grants = await findActiveProjectGrantsAcrossWorkspaces(userId);
+  if (grants.length === 0) {
+    return [];
+  }
+
+  const memberships = await findActiveMembershipsForUser(userId);
+  const memberWorkspaceIds = new Set(memberships.map((m) => m.workspaceId));
+
+  const items: SharedProjectListItem[] = [];
+
+  for (const grant of grants) {
+    if (options?.excludeWorkspaceId && grant.workspaceId === options.excludeWorkspaceId) {
+      continue;
+    }
+    // Only surface projects from workspaces the user is NOT a member of —
+    // in-workspace grants already appear in that workspace's project list.
+    if (memberWorkspaceIds.has(grant.workspaceId)) {
+      continue;
+    }
+
+    const workspace = await findWorkspaceById(grant.workspaceId);
+    const project = await findProjectById(grant.workspaceId, grant.projectId);
+    if (!workspace || !project || project.archivedAt) {
+      continue;
+    }
+
+    items.push({
+      id: project.id,
+      name: project.name,
+      reference: project.reference,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      workspaceSlug: workspace.slug,
+      projectRole: grant.projectRole,
+      archivedAt: null,
+    });
+  }
+
+  return items.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function createProjectForWorkspace(
   workspaceId: string,
   actorId: string,

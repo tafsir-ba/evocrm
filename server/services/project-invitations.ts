@@ -29,9 +29,6 @@ import { findProjectById } from "@/server/repositories/projects";
 import { findUserByEmail, findUserById } from "@/server/repositories/users";
 import {
   findMembership,
-  createMembership,
-  reactivateMembership,
-  updateMembership,
 } from "@/server/repositories/memberships";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import {
@@ -368,47 +365,15 @@ export async function acceptProjectInvitation(input: {
     );
   }
 
-  // Provision access before consuming the token so a failed membership/grant
-  // write leaves the invitation pending and retryable.
-  let membership = await findMembership(input.userId, invitation.workspaceId);
+  // Project-only sharing: never create/reactivate WorkspaceMembership.
+  // Suspended members of the inviter workspace remain blocked.
+  const membership = await findMembership(input.userId, invitation.workspaceId);
 
   if (membership?.status === "suspended") {
     throw new AppError(
       "FORBIDDEN",
       "Your workspace membership is suspended. Contact a workspace admin before accepting this invitation.",
     );
-  }
-
-  if (!membership || membership.status === "removed" || membership.status === "invited") {
-    const { findRoleByWorkspaceAndKey } = await import("@/server/repositories/roles");
-    const viewerRole = await findRoleByWorkspaceAndKey(invitation.workspaceId, "viewer");
-
-    if (!viewerRole) {
-      throw new AppError("INTERNAL_ERROR", "Could not resolve workspace viewer role.");
-    }
-
-    if (membership?.status === "removed") {
-      membership = await reactivateMembership({
-        membershipId: membership.id,
-        workspaceId: invitation.workspaceId,
-        roleId: viewerRole.id,
-        invitedBy: invitation.invitedBy,
-      });
-    } else if (membership?.status === "invited") {
-      membership = await updateMembership(membership.id, invitation.workspaceId, {
-        status: "active",
-        roleId: viewerRole.id,
-      });
-    } else {
-      membership = await createMembership({
-        userId: input.userId,
-        workspaceId: invitation.workspaceId,
-        roleId: viewerRole.id,
-        status: "active",
-        invitedBy: invitation.invitedBy,
-        joinedAt: new Date(),
-      });
-    }
   }
 
   const workspace = await findWorkspaceById(invitation.workspaceId);

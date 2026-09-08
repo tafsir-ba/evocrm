@@ -5,7 +5,7 @@ import {
   inactivateDictionaryItemForWorkspace,
   updateDictionaryItemForWorkspace,
 } from "@/server/services/dictionary-items";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; itemId: string }>;
@@ -14,7 +14,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, itemId } = await context.params;
-    const { userId, workspace } = await requireWorkspaceApiAccess(
+    const { userId, workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, itemId } = await context.params;
-    const { userId, workspace } = await requireWorkspaceApiAccess(
+    const { userId, workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );

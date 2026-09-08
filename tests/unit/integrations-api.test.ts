@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/integrations", () => ({
@@ -35,7 +35,7 @@ import {
 } from "@/app/api/workspaces/[workspaceSlug]/integrations/route";
 import { POST as captureWebsiteLead } from "@/app/api/integrations/website/leads/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveIntegrationForWorkspace,
   createIntegrationForWorkspace,
@@ -66,7 +66,15 @@ describe("integrations API", () => {
     resetWebsiteLeadRateLimitStoreForTests();
     vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1", email: "a@b.com" } });
     vi.mocked(resolveWorkspace).mockResolvedValue(workspace);
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -75,6 +83,9 @@ describe("integrations API", () => {
         status: "active",
         permissions: ["settings:read", "settings:update"],
       },
+      permissions: ["settings:read", "settings:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
   });
 
@@ -390,7 +401,7 @@ describe("integrations API", () => {
   });
 
   it("requires settings:update to create integrations", async () => {
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -404,11 +415,11 @@ describe("integrations API", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:update");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
   });
 
   it("requires settings:update to rotate API keys", async () => {
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -420,6 +431,6 @@ describe("integrations API", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:update");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
   });
 });

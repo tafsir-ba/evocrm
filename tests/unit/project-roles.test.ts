@@ -41,13 +41,17 @@ describe("project role definitions", () => {
     expect(permissions).not.toContain("roles:manage");
   });
 
-  it("project admin cannot manage workspace billing/roles/users", () => {
+  it("project admin cannot manage workspace billing/roles/users/settings", () => {
     const permissions = getProjectRolePermissions("project_admin");
     expect(permissions).not.toContain("billing:manage");
     expect(permissions).not.toContain("roles:manage");
     expect(permissions).not.toContain("users:manage");
+    expect(permissions).not.toContain("settings:read");
+    expect(permissions).not.toContain("settings:update");
+    expect(permissions).not.toContain("project:create");
   });
 });
+
 
 describe("resolveEffectiveProjectPermissions", () => {
   it("intersects workspace permissions with project role permissions", () => {

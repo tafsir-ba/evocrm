@@ -15,7 +15,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(
+    const { workspace, permissions, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:read",
     );
@@ -31,7 +31,8 @@ export async function GET(request: Request, context: RouteContext) {
     const { documents, total } = await listDocumentsForWorkspace(
       workspace.id,
       query,
-      membership.permissions,
+      permissions,
+      userId,
     );
 
     return paginatedResponse(

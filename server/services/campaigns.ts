@@ -38,7 +38,7 @@ import type {
 } from "@/server/validation/campaigns";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
 import { validateActiveProjectId } from "@/server/services/project-scope";
-import { applyUserProjectScope } from "@/server/services/apply-project-scope";
+import { applyUserProjectScope, assertMultiProjectRecordAccess } from "@/server/services/apply-project-scope";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
 
 export type CampaignListItem = CampaignRecord & {
@@ -141,12 +141,20 @@ export async function listCampaignsForWorkspace(
 export async function getCampaignForWorkspace(
   workspaceId: string,
   campaignId: string,
+  userId?: string,
 ): Promise<CampaignDetail> {
   const campaign = await findCampaignById(workspaceId, campaignId);
 
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
 
   return enrichCampaign(workspaceId, campaign);
 }

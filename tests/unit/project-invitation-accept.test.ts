@@ -34,7 +34,10 @@ vi.mock("@/server/services/project-invitation-tokens", () => ({
   hashInvitationToken: (token: string) => `hash:${token}`,
 }));
 
-import { createMembership, findMembership } from "@/server/repositories/memberships";
+import {
+  createMembership,
+  findMembership,
+} from "@/server/repositories/memberships";
 import {
   createProjectGrant,
   findProjectGrant,
@@ -43,11 +46,10 @@ import {
   findInvitationByTokenHash,
   markInvitationAccepted,
 } from "@/server/repositories/project-invitations";
-import { findRoleByWorkspaceAndKey } from "@/server/repositories/roles";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { acceptProjectInvitation } from "@/server/services/project-invitations";
 
-describe("acceptProjectInvitation", () => {
+describe("acceptProjectInvitation (project-only)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(findInvitationByTokenHash).mockResolvedValue({
@@ -71,10 +73,7 @@ describe("acceptProjectInvitation", () => {
       id: "inv-1",
       status: "accepted",
     } as never);
-    vi.mocked(findMembership).mockResolvedValue({
-      id: "mem-1",
-      status: "active",
-    } as never);
+    vi.mocked(findMembership).mockResolvedValue(null);
     vi.mocked(findProjectGrant).mockResolvedValue(null);
     vi.mocked(createProjectGrant).mockResolvedValue({
       id: "grant-1",
@@ -86,7 +85,7 @@ describe("acceptProjectInvitation", () => {
     } as never);
   });
 
-  it("creates a ProjectGrant only after authenticated accept with matching email", async () => {
+  it("creates a ProjectGrant without creating workspace membership", async () => {
     const result = await acceptProjectInvitation({
       token: "token",
       userId: "user-2",
@@ -101,6 +100,7 @@ describe("acceptProjectInvitation", () => {
         projectRole: "contributor",
       }),
     );
+    expect(createMembership).not.toHaveBeenCalled();
     expect(markInvitationAccepted).toHaveBeenCalledWith("inv-1", "user-2");
     const grantOrder = vi.mocked(createProjectGrant).mock.invocationCallOrder[0]!;
     const acceptOrder = vi.mocked(markInvitationAccepted).mock.invocationCallOrder[0]!;
@@ -119,14 +119,14 @@ describe("acceptProjectInvitation", () => {
       message: expect.stringContaining("different email"),
     });
     expect(createProjectGrant).not.toHaveBeenCalled();
+    expect(createMembership).not.toHaveBeenCalled();
     expect(markInvitationAccepted).not.toHaveBeenCalled();
   });
 
-  it("adds workspace membership when the invitee is not yet a member", async () => {
-    vi.mocked(findMembership).mockResolvedValue(null);
-    vi.mocked(findRoleByWorkspaceAndKey).mockResolvedValue({
-      id: "role-viewer",
-      key: "viewer",
+  it("does not reactivate or modify membership for removed members", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "mem-1",
+      status: "removed",
     } as never);
 
     await acceptProjectInvitation({
@@ -135,15 +135,8 @@ describe("acceptProjectInvitation", () => {
       userEmail: "teammate@example.com",
     });
 
-    expect(createMembership).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-2",
-        roleId: "role-viewer",
-        status: "active",
-      }),
-    );
+    expect(createMembership).not.toHaveBeenCalled();
     expect(createProjectGrant).toHaveBeenCalled();
-    expect(markInvitationAccepted).toHaveBeenCalled();
   });
 
   it("leaves the invitation pending when grant creation fails so accept can be retried", async () => {
@@ -159,24 +152,6 @@ describe("acceptProjectInvitation", () => {
 
     expect(createProjectGrant).toHaveBeenCalled();
     expect(markInvitationAccepted).not.toHaveBeenCalled();
-  });
-
-  it("leaves the invitation pending when membership provisioning fails", async () => {
-    vi.mocked(findMembership).mockResolvedValue(null);
-    vi.mocked(findRoleByWorkspaceAndKey).mockResolvedValue(null);
-
-    await expect(
-      acceptProjectInvitation({
-        token: "token",
-        userId: "user-2",
-        userEmail: "teammate@example.com",
-      }),
-    ).rejects.toMatchObject({
-      code: "INTERNAL_ERROR",
-      message: expect.stringContaining("viewer role"),
-    });
-
-    expect(createProjectGrant).not.toHaveBeenCalled();
-    expect(markInvitationAccepted).not.toHaveBeenCalled();
+    expect(createMembership).not.toHaveBeenCalled();
   });
 });

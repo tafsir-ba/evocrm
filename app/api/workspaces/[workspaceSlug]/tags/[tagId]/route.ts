@@ -5,7 +5,7 @@ import {
   archiveTagForWorkspace,
   updateTagForWorkspace,
 } from "@/server/services/tags";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; tagId: string }>;
@@ -14,7 +14,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, tagId } = await context.params;
-    const { userId, workspace } = await requireWorkspaceApiAccess(
+    const { userId, workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, tagId } = await context.params;
-    const { userId, workspace } = await requireWorkspaceApiAccess(
+    const { userId, workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );

@@ -2,7 +2,7 @@ import { handleRouteError, successResponse } from "@/server/api/responses";
 import { validateSearchParams } from "@/server/validation/request";
 import { integrationLogListQuerySchema } from "@/server/validation/integrations";
 import { listIntegrationLogsForWorkspace } from "@/server/services/integrations";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; integrationId: string }>;
@@ -11,7 +11,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, integrationId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:read",
     );

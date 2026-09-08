@@ -6,16 +6,22 @@ import {
   hasPermission,
   isValidPermission,
 } from "@/server/permissions/permissions";
-
-import { requireMembership } from "./require-membership";
+import {
+  isWorkspaceWidePermission,
+  resolveWorkspaceAccess,
+} from "@/server/permissions/resolve-workspace-access";
 import type { WorkspaceMembership } from "./types";
 
 export type AuthorizedContext = {
-  membership: WorkspaceMembership;
+  membership: WorkspaceMembership | null;
+  permissions: PermissionKey[];
+  accessMode: "member" | "shared_project";
 };
 
 /**
  * Require a specific permission key within the resolved workspace context.
+ * Supports project-grant-only collaborators (no WorkspaceMembership) for
+ * project-scoped permissions only — never workspace administration.
  */
 export async function requirePermission(
   workspaceId: string,
@@ -28,11 +34,22 @@ export async function requirePermission(
     });
   }
 
-  const membership = await requireMembership(workspaceId, userId);
+  const access = await resolveWorkspaceAccess(workspaceId, userId);
 
-  if (!hasPermission(membership.permissions, permissionKey as PermissionKey)) {
+  if (access.mode === "shared_project" && isWorkspaceWidePermission(permissionKey)) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "Project sharing does not grant workspace administration access.",
+    );
+  }
+
+  if (!hasPermission(access.permissions, permissionKey as PermissionKey)) {
     throw new AppError("PERMISSION_DENIED", "Permission denied.");
   }
 
-  return { membership };
+  return {
+    membership: access.membership,
+    permissions: access.permissions,
+    accessMode: access.mode,
+  };
 }
