@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  EntityCombobox,
+  type EntityComboboxOption,
+  type EntityComboboxSearchResult,
+} from "@/components/domain/entity-combobox";
 import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
 import { CurrencySelect } from "@/components/domain/locale-selectors";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
@@ -12,6 +18,16 @@ import {
 } from "@/components/layout/focused-form-layout";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { isTerminalLostBehavior } from "@/lib/dictionary-form-helpers";
+import {
+  buildOpportunityPeerEmptyMessage,
+  buildSameProjectHint,
+  createPeerEscapeHref,
+  mapLeadApiRecord,
+  mapPropertyApiRecord,
+  toComboboxOption,
+  validateOpportunitySameProject,
+  type OpportunityLinkEntity,
+} from "@/lib/opportunity-link-flow";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -21,19 +37,6 @@ type DictionaryItem = {
   key: string;
   behavior?: string;
   isDefault?: boolean;
-};
-
-type LeadOption = {
-  id: string;
-  fullName: string;
-  email: string | null;
-};
-
-type PropertyOption = {
-  id: string;
-  title: string;
-  reference: string | null;
-  currency: string;
 };
 
 export type OpportunityFormValues = {
@@ -95,11 +98,15 @@ export function OpportunityFormPage({
   });
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [lostReasons, setLostReasons] = useState<DictionaryItem[]>([]);
-  const [leads, setLeads] = useState<LeadOption[]>([]);
-  const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
+  const [selectedLead, setSelectedLead] = useState<OpportunityLinkEntity | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<OpportunityLinkEntity | null>(
+    null,
+  );
+  const [peerTotal, setPeerTotal] = useState<number | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [hydratingLinks, setHydratingLinks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hydratedInitialValues = useRef(Boolean(initialValues));
@@ -108,24 +115,25 @@ export function OpportunityFormPage({
   const formId = mode === "create" ? "create-opportunity-form" : "edit-opportunity-form";
   const isEdit = mode === "edit";
 
+  const activeProjectId =
+    selectedLead?.projectId ?? selectedProperty?.projectId ?? null;
+  const activeProjectName =
+    selectedLead?.projectName ?? selectedProperty?.projectName ?? null;
+  const lockedSide: "lead" | "property" | null = selectedLead
+    ? "lead"
+    : selectedProperty
+      ? "property"
+      : null;
+
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const requests = [
+      const responses = await Promise.all([
         fetch(`${apiBase}/dictionary-items?type=opportunity_status`),
         fetch(`${apiBase}/tags?entityType=opportunity`),
         fetch(`${apiBase}/members`),
-      ];
-
-      if (!isEdit) {
-        requests.push(
-          fetch(`${apiBase}/dictionary-items?type=lost_reason`),
-          fetch(`${apiBase}/leads?pageSize=100`),
-          fetch(`${apiBase}/properties?pageSize=100`),
-        );
-      }
-
-      const responses = await Promise.all(requests);
+        fetch(`${apiBase}/dictionary-items?type=lost_reason`),
+      ]);
       const payloads = await Promise.all(responses.map((response) => response.json()));
 
       if (responses[0].ok) {
@@ -137,22 +145,13 @@ export function OpportunityFormPage({
       if (responses[2].ok) {
         setMembers(payloads[2].data.members as MemberSelectorMember[]);
       }
-
-      if (!isEdit) {
-        if (responses[3]?.ok) {
-          setLostReasons(payloads[3].data.items as DictionaryItem[]);
-        }
-        if (responses[4]?.ok) {
-          setLeads(payloads[4].data as LeadOption[]);
-        }
-        if (responses[5]?.ok) {
-          setProperties(payloads[5].data as PropertyOption[]);
-        }
+      if (responses[3].ok) {
+        setLostReasons(payloads[3].data.items as DictionaryItem[]);
       }
     } finally {
       setLoadingOptions(false);
     }
-  }, [apiBase, isEdit]);
+  }, [apiBase]);
 
   useEffect(() => {
     void loadOptions();
@@ -163,8 +162,6 @@ export function OpportunityFormPage({
       return;
     }
 
-    // Hydrate once from server props. Re-applying on every initialValues
-    // identity change wipes expectedCloseDate entered before save.
     hydratedInitialValues.current = true;
     setForm({
       ...emptyForm(defaultCurrency),
@@ -184,17 +181,225 @@ export function OpportunityFormPage({
     }
   }, [form.statusId, isEdit, statuses]);
 
-  const selectedStatus = statuses.find((status) => status.id === form.statusId);
-  const requiresLostReason = !isEdit && isTerminalLostBehavior(selectedStatus?.behavior);
+  useEffect(() => {
+    const leadId = form.leadId;
+    const propertyId = form.propertyId;
+    if (!leadId && !propertyId) {
+      return;
+    }
 
-  function handlePropertyChange(propertyId: string) {
-    const property = properties.find((item) => item.id === propertyId);
+    let cancelled = false;
+
+    async function hydrateLinkedEntities() {
+      setHydratingLinks(true);
+      try {
+        const [leadResponse, propertyResponse] = await Promise.all([
+          leadId ? fetch(`${apiBase}/leads/${leadId}`) : Promise.resolve(null),
+          propertyId
+            ? fetch(`${apiBase}/properties/${propertyId}`)
+            : Promise.resolve(null),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (leadResponse?.ok) {
+          const body = (await leadResponse.json()) as {
+            data: { lead: Parameters<typeof mapLeadApiRecord>[0] };
+          };
+          setSelectedLead(mapLeadApiRecord(body.data.lead));
+        }
+
+        if (propertyResponse?.ok) {
+          const body = (await propertyResponse.json()) as {
+            data: { property: Parameters<typeof mapPropertyApiRecord>[0] };
+          };
+          setSelectedProperty(mapPropertyApiRecord(body.data.property));
+        }
+      } finally {
+        if (!cancelled) {
+          setHydratingLinks(false);
+        }
+      }
+    }
+
+    void hydrateLinkedEntities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, form.leadId, form.propertyId]);
+
+  const searchLeads = useCallback(
+    async (query: string): Promise<EntityComboboxSearchResult> => {
+      const params = new URLSearchParams({ pageSize: "50" });
+      const trimmed = query.trim();
+      if (trimmed) params.set("search", trimmed);
+      if (selectedProperty?.projectId) {
+        params.set("projectId", selectedProperty.projectId);
+      }
+
+      const response = await fetch(`${apiBase}/leads?${params.toString()}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error?.message ?? "Failed to search leads.");
+      }
+
+      const body = (await response.json()) as {
+        data: Array<Parameters<typeof mapLeadApiRecord>[0]>;
+        pagination?: { total?: number };
+      };
+      const mapped = body.data.map(mapLeadApiRecord);
+      const total = body.pagination?.total ?? mapped.length;
+      setPeerTotal(selectedProperty?.projectId ? total : null);
+      return {
+        options: mapped.map(toComboboxOption),
+        total,
+      };
+    },
+    [apiBase, selectedProperty?.projectId],
+  );
+
+  const searchProperties = useCallback(
+    async (query: string): Promise<EntityComboboxSearchResult> => {
+      const params = new URLSearchParams({ pageSize: "50" });
+      const trimmed = query.trim();
+      if (trimmed) params.set("search", trimmed);
+      if (selectedLead?.projectId) {
+        params.set("projectId", selectedLead.projectId);
+      }
+
+      const response = await fetch(`${apiBase}/properties?${params.toString()}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error?.message ?? "Failed to search properties.");
+      }
+
+      const body = (await response.json()) as {
+        data: Array<Parameters<typeof mapPropertyApiRecord>[0]>;
+        pagination?: { total?: number };
+      };
+      const mapped = body.data.map(mapPropertyApiRecord);
+      const total = body.pagination?.total ?? mapped.length;
+      setPeerTotal(selectedLead?.projectId ? total : null);
+      return {
+        options: mapped.map(toComboboxOption),
+        total,
+      };
+    },
+    [apiBase, selectedLead?.projectId],
+  );
+
+  function handleLeadChange(option: EntityComboboxOption | null) {
+    if (!option) {
+      setSelectedLead(null);
+      setForm((current) => ({ ...current, leadId: "" }));
+      if (!selectedProperty) {
+        setPeerTotal(null);
+      }
+      return;
+    }
+
+    const entity = mapLeadApiRecord({
+      id: option.id,
+      fullName: option.label,
+      email: option.meta?.split(" · ")[0] ?? null,
+      projectId: option.projectId,
+      project: option.projectId
+        ? { id: option.projectId, name: option.projectName ?? "Project" }
+        : null,
+    });
+    setSelectedLead({
+      ...entity,
+      projectName: option.projectName ?? entity.projectName,
+      meta: option.meta,
+    });
+    setForm((current) => ({ ...current, leadId: option.id }));
+
+    if (
+      selectedProperty &&
+      option.projectId &&
+      selectedProperty.projectId &&
+      option.projectId !== selectedProperty.projectId
+    ) {
+      setSelectedProperty(null);
+      setForm((current) => ({ ...current, propertyId: "" }));
+      setPeerTotal(null);
+    }
+  }
+
+  function handlePropertyChange(option: EntityComboboxOption | null) {
+    if (!option) {
+      setSelectedProperty(null);
+      setForm((current) => ({ ...current, propertyId: "" }));
+      if (!selectedLead) {
+        setPeerTotal(null);
+      }
+      return;
+    }
+
+    const currency =
+      typeof option.data?.currency === "string" ? option.data.currency : undefined;
+    const entity = mapPropertyApiRecord({
+      id: option.id,
+      title: option.label,
+      reference: option.meta?.split(" · ")[0] ?? null,
+      currency,
+      projectId: option.projectId,
+      project: option.projectId
+        ? { id: option.projectId, name: option.projectName ?? "Project" }
+        : null,
+    });
+    setSelectedProperty({
+      ...entity,
+      projectName: option.projectName ?? entity.projectName,
+      meta: option.meta,
+      currency,
+    });
     setForm((current) => ({
       ...current,
-      propertyId,
-      currency: property?.currency ?? current.currency,
+      propertyId: option.id,
+      currency: currency ?? current.currency,
     }));
+
+    if (
+      selectedLead &&
+      option.projectId &&
+      selectedLead.projectId &&
+      option.projectId !== selectedLead.projectId
+    ) {
+      setSelectedLead(null);
+      setForm((current) => ({ ...current, leadId: "" }));
+      setPeerTotal(null);
+    }
   }
+
+  const selectedStatus = statuses.find((status) => status.id === form.statusId);
+  const requiresLostReason =
+    (!isEdit || Boolean(form.lostReasonId)) &&
+    isTerminalLostBehavior(selectedStatus?.behavior);
+
+  const projectHint = buildSameProjectHint({
+    lockedSide,
+    projectName: activeProjectName,
+    peerTotal,
+  });
+
+  const leadEmptyMessage = selectedProperty?.projectId
+    ? buildOpportunityPeerEmptyMessage({
+        side: "lead",
+        projectName: selectedProperty.projectName,
+        total: peerTotal,
+      })
+    : "No matching leads.";
+  const propertyEmptyMessage = selectedLead?.projectId
+    ? buildOpportunityPeerEmptyMessage({
+        side: "property",
+        projectName: selectedLead.projectName,
+        total: peerTotal,
+      })
+    : "No matching properties.";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -202,15 +407,25 @@ export function OpportunityFormPage({
     setError(null);
 
     try {
-      if (isEdit) {
-        const formData = new FormData(event.currentTarget);
-        const expectedCloseDate =
-          String(formData.get("expectedCloseDate") ?? "").trim() || null;
+      const sameProjectError = validateOpportunitySameProject(
+        selectedLead?.projectId,
+        selectedProperty?.projectId,
+      );
+      if (sameProjectError) {
+        throw new Error(sameProjectError);
+      }
 
+      const formData = new FormData(event.currentTarget);
+      const expectedCloseDate =
+        String(formData.get("expectedCloseDate") ?? "").trim() || null;
+
+      if (isEdit) {
         const response = await fetch(`${apiBase}/opportunities/${opportunityId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            leadId: form.leadId,
+            propertyId: form.propertyId,
             value: form.value ? Number(form.value) : null,
             currency: form.currency,
             expectedCloseDate,
@@ -227,9 +442,6 @@ export function OpportunityFormPage({
 
         router.push(workspacePath(workspaceSlug, "opportunities", opportunityId!));
       } else {
-        const formData = new FormData(event.currentTarget);
-        const expectedCloseDate = String(formData.get("expectedCloseDate") ?? "").trim();
-
         const payload: Record<string, unknown> = {
           leadId: form.leadId,
           propertyId: form.propertyId,
@@ -280,64 +492,107 @@ export function OpportunityFormPage({
     }
   }
 
+  const leadDisabled = loadingOptions || hydratingLinks || lockLead;
+  const propertyDisabled = loadingOptions || hydratingLinks || lockProperty;
+
   return (
     <FocusedFormLayout
       title={isEdit ? "Edit opportunity" : "New opportunity"}
       description={
         isEdit
-          ? "Update value, timeline, assignment, and tags."
-          : "Link a lead to a property and set the initial stage."
+          ? "Update the linked lead/property, value, timeline, assignment, and tags."
+          : "Link a lead to a property in the same project and set the initial stage."
       }
       back={back}
       maxWidth="3xl"
     >
       <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+        <div>
+          <Label htmlFor="opp-lead" required>
+            Lead
+          </Label>
+          <EntityCombobox
+            id="opp-lead"
+            aria-label="Lead"
+            value={form.leadId}
+            selectedOption={selectedLead ? toComboboxOption(selectedLead) : null}
+            onChange={handleLeadChange}
+            onSearch={searchLeads}
+            disabled={leadDisabled}
+            placeholder="Search leads by name or email…"
+            emptyMessage={leadEmptyMessage}
+            hint={
+              selectedProperty?.projectId ? (
+                <>
+                  {projectHint}
+                  {peerTotal === 0 && activeProjectId ? (
+                    <>
+                      {" "}
+                      <Link
+                        href={createPeerEscapeHref({
+                          workspaceSlug,
+                          side: "lead",
+                          projectId: activeProjectId,
+                        })}
+                        className="font-medium text-[var(--color-brand-700)] hover:underline"
+                      >
+                        Create new lead
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "Search across the workspace. Selecting a lead scopes properties to its project."
+              )
+            }
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="opp-property" required>
+            Property
+          </Label>
+          <EntityCombobox
+            id="opp-property"
+            aria-label="Property"
+            value={form.propertyId}
+            selectedOption={
+              selectedProperty ? toComboboxOption(selectedProperty) : null
+            }
+            onChange={handlePropertyChange}
+            onSearch={searchProperties}
+            disabled={propertyDisabled}
+            placeholder="Search properties by title or reference…"
+            emptyMessage={propertyEmptyMessage}
+            hint={
+              selectedLead?.projectId ? (
+                <>
+                  {projectHint}
+                  {peerTotal === 0 && activeProjectId ? (
+                    <>
+                      {" "}
+                      <Link
+                        href={createPeerEscapeHref({
+                          workspaceSlug,
+                          side: "property",
+                          projectId: activeProjectId,
+                        })}
+                        className="font-medium text-[var(--color-brand-700)] hover:underline"
+                      >
+                        Create new property
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "Search across the workspace. Selecting a property scopes leads to its project."
+              )
+            }
+          />
+        </div>
+
         {!isEdit && (
           <>
-            <div>
-              <Label htmlFor="opp-lead" required>
-                Lead
-              </Label>
-              <Select
-                id="opp-lead"
-                value={form.leadId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, leadId: event.target.value }))
-                }
-                required
-                disabled={loadingOptions || lockLead}
-              >
-                <option value="">Select lead…</option>
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.fullName}
-                    {lead.email ? ` (${lead.email})` : ""}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="opp-property" required>
-                Property
-              </Label>
-              <Select
-                id="opp-property"
-                value={form.propertyId}
-                onChange={(event) => handlePropertyChange(event.target.value)}
-                required
-                disabled={loadingOptions || lockProperty}
-              >
-                <option value="">Select property…</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.title}
-                    {property.reference ? ` · ${property.reference}` : ""}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
             <div>
               <Label htmlFor="opp-status" required>
                 Stage
@@ -370,7 +625,10 @@ export function OpportunityFormPage({
                     id="opp-lost-reason"
                     value={form.lostReasonId}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, lostReasonId: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        lostReasonId: event.target.value,
+                      }))
                     }
                     required
                   >
@@ -488,7 +746,10 @@ export function OpportunityFormPage({
           submitting={submitting}
           submitDisabled={
             loadingOptions ||
-            (!isEdit && (!form.leadId || !form.propertyId || !form.statusId))
+            hydratingLinks ||
+            !form.leadId ||
+            !form.propertyId ||
+            (!isEdit && !form.statusId)
           }
         />
       </form>

@@ -11,11 +11,19 @@ import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspac
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string }>;
+type SearchParams = Promise<{ projectId?: string }>;
 
 export const metadata = { title: "New property — EvoHome CRM" };
 
-export default async function NewPropertyPage({ params }: { params: Params }) {
+export default async function NewPropertyPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug } = await params;
+  const { projectId } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -56,6 +64,7 @@ export default async function NewPropertyPage({ params }: { params: Params }) {
           workspaceSlug={workspaceSlug}
           defaultCurrency={access.context.workspace.defaultCurrency}
           mode="create"
+          initialValues={projectId ? { projectId } : undefined}
           canCreateDocument={hasPermission(permissions, "document:create")}
           cancelHref={workspacePath(workspaceSlug, "properties")}
           back={{ href: workspacePath(workspaceSlug, "properties"), label: "Back to properties" }}

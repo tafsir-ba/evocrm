@@ -71,7 +71,7 @@ type LeadFormPageProps = {
   workspaceSlug: string;
   mode: "create" | "edit";
   leadId?: string;
-  initialValues?: LeadFormInitialValues;
+  initialValues?: Partial<LeadFormInitialValues>;
   cancelHref: string;
   back?: { href: string; label?: string };
 };
@@ -116,7 +116,10 @@ export function LeadFormPage({
 }: LeadFormPageProps) {
   const router = useRouter();
   const scopedProjectId = useWorkspaceProjectFilter();
-  const [form, setForm] = useState<LeadFormInitialValues>(initialValues ?? emptyForm);
+  const [form, setForm] = useState<LeadFormInitialValues>({
+    ...emptyForm,
+    ...initialValues,
+  });
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
@@ -210,7 +213,7 @@ export function LeadFormPage({
 
   useEffect(() => {
     if (initialValues) {
-      setForm(initialValues);
+      setForm((current) => ({ ...current, ...initialValues }));
     }
   }, [initialValues]);
 

@@ -9,11 +9,19 @@ import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspac
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string }>;
+type SearchParams = Promise<{ projectId?: string }>;
 
 export const metadata = { title: "New lead — EvoHome CRM" };
 
-export default async function NewLeadPage({ params }: { params: Params }) {
+export default async function NewLeadPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug } = await params;
+  const { projectId } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -53,6 +61,7 @@ export default async function NewLeadPage({ params }: { params: Params }) {
         <LeadFormPage
           workspaceSlug={workspaceSlug}
           mode="create"
+          initialValues={projectId ? { projectId } : undefined}
           cancelHref={workspacePath(workspaceSlug, "leads")}
           back={{ href: workspacePath(workspaceSlug, "leads"), label: "Back to leads" }}
         />

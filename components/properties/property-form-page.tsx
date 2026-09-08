@@ -49,7 +49,7 @@ type PropertyFormPageProps = {
   defaultCurrency: string;
   mode: "create" | "edit";
   propertyId?: string;
-  initialValues?: PropertyFormInitialValues;
+  initialValues?: Partial<PropertyFormInitialValues>;
   cancelHref: string;
   back?: { href: string; label?: string };
   canCreateDocument?: boolean;
@@ -94,9 +94,10 @@ export function PropertyFormPage({
 }: PropertyFormPageProps) {
   const router = useRouter();
   const scopedProjectId = useWorkspaceProjectFilter();
-  const [form, setForm] = useState<PropertyFormInitialValues>(
-    initialValues ?? emptyForm(defaultCurrency),
-  );
+  const [form, setForm] = useState<PropertyFormInitialValues>({
+    ...emptyForm(defaultCurrency),
+    ...initialValues,
+  });
   const [queuedPhotos, setQueuedPhotos] = useState<PropertyPhotoDraft[]>([]);
   const queuedPhotosRef = useRef(queuedPhotos);
   queuedPhotosRef.current = queuedPhotos;
@@ -174,7 +175,7 @@ export function PropertyFormPage({
 
   useEffect(() => {
     if (initialValues) {
-      setForm(initialValues);
+      setForm((current) => ({ ...current, ...initialValues }));
     }
   }, [initialValues]);
 

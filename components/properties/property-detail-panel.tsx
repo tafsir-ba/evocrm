@@ -19,14 +19,8 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { formatSurfaceValue } from "@/lib/surface-unit";
-import {
-  IconBath,
-  IconBed,
-  IconBuilding,
-  IconCalendar,
-  IconMapPin,
-  IconRuler,
-} from "@/lib/icons";
+import { IconBath, IconBed, IconBuilding, IconCalendar, IconMapPin, IconPlus, IconRuler } from "@/lib/icons";
+import { createOpportunityHref } from "@/lib/opportunity-link-flow";
 import { workspacePath } from "@/lib/workspace-paths";
 import { PROPERTY_PHOTO_UPLOAD_WARNING_KEY } from "@/lib/property-media";
 
@@ -279,6 +273,11 @@ export function PropertyDetailPanel({
           .join(" · ")}
         actions={
           <>
+            {canCreateOpportunity && (
+              <Link href={createOpportunityHref(workspaceSlug, { propertyId })}>
+                <Button leadingIcon={<IconPlus size={14} />}>Link to lead</Button>
+              </Link>
+            )}
             {canUpdate && (
               <Link href={workspacePath(workspaceSlug, "properties", propertyId, "edit")}>
                 <Button variant="secondary">Edit</Button>
