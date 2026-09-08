@@ -47,7 +47,12 @@ export function OpportunitiesSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const createHref = createOpportunityHref(workspaceSlug, { leadId, propertyId });
+  const createHref = createOpportunityHref(workspaceSlug, {
+    leadId,
+    propertyId,
+    lockLead: Boolean(leadId),
+    lockProperty: Boolean(propertyId),
+  });
   const createLabel = leadId
     ? "Link to property"
     : propertyId

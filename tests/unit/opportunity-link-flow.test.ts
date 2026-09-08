@@ -5,19 +5,21 @@ import {
   buildSameProjectHint,
   createOpportunityHref,
   createPeerEscapeHref,
+  isSafeOpportunityReturnTo,
   mapLeadApiRecord,
   mapPropertyApiRecord,
+  resolveOpportunityReturnTo,
   validateOpportunitySameProject,
 } from "@/lib/opportunity-link-flow";
 
 describe("opportunity link flow helpers", () => {
   it("builds contextual create href with lead or property lock", () => {
-    expect(createOpportunityHref("demo", { leadId: "lead-1" })).toBe(
-      "/w/demo/opportunities/new?leadId=lead-1",
+    expect(createOpportunityHref("demo", { leadId: "lead-1", lockLead: true })).toBe(
+      "/w/demo/opportunities/new?leadId=lead-1&lockLead=1",
     );
-    expect(createOpportunityHref("demo", { propertyId: "prop-1" })).toBe(
-      "/w/demo/opportunities/new?propertyId=prop-1",
-    );
+    expect(
+      createOpportunityHref("demo", { propertyId: "prop-1", lockProperty: true }),
+    ).toBe("/w/demo/opportunities/new?propertyId=prop-1&lockProperty=1");
   });
 
   it("maps API records with project metadata for combobox options", () => {
@@ -74,14 +76,58 @@ describe("opportunity link flow helpers", () => {
     ).toBe('Project “Riviera” · 2 properties');
   });
 
-  it("builds escape links that prefill projectId", () => {
+  it("builds escape links that preserve return context for the locked peer", () => {
+    const href = createPeerEscapeHref({
+      workspaceSlug: "demo",
+      side: "property",
+      projectId: "proj-1",
+      lockedLeadId: "lead-1",
+    });
+    const url = new URL(href, "http://local.invalid");
+    expect(url.pathname).toBe("/w/demo/properties/new");
+    expect(url.searchParams.get("projectId")).toBe("proj-1");
+    expect(url.searchParams.get("returnTo")).toBe(
+      "/w/demo/opportunities/new?leadId=lead-1&lockLead=1",
+    );
+  });
+
+  it("returns to New Opportunity with locked peer plus newly created entity", () => {
+    const escapeHref = createPeerEscapeHref({
+      workspaceSlug: "demo",
+      side: "property",
+      projectId: "proj-1",
+      lockedLeadId: "lead-1",
+    });
+    const returnTo = new URL(escapeHref, "http://local.invalid").searchParams.get(
+      "returnTo",
+    );
+    expect(returnTo).toBeTruthy();
+    expect(isSafeOpportunityReturnTo(returnTo!, "demo")).toBe(true);
+    expect(isSafeOpportunityReturnTo("https://evil.example/phish", "demo")).toBe(
+      false,
+    );
+    expect(isSafeOpportunityReturnTo("/w/other/opportunities/new", "demo")).toBe(
+      false,
+    );
+
     expect(
-      createPeerEscapeHref({
-        workspaceSlug: "demo",
-        side: "property",
-        projectId: "proj-1",
-      }),
-    ).toBe("/w/demo/properties/new?projectId=proj-1");
+      resolveOpportunityReturnTo(returnTo!, "demo", { propertyId: "prop-new" }),
+    ).toBe(
+      "/w/demo/opportunities/new?leadId=lead-1&lockLead=1&propertyId=prop-new",
+    );
+
+    const fromLeadEscape = createPeerEscapeHref({
+      workspaceSlug: "demo",
+      side: "lead",
+      projectId: "proj-1",
+      lockedPropertyId: "prop-1",
+    });
+    const leadReturnTo = new URL(fromLeadEscape, "http://local.invalid").searchParams.get(
+      "returnTo",
+    )!;
+    expect(resolveOpportunityReturnTo(leadReturnTo, "demo", { leadId: "lead-new" })).toBe(
+      "/w/demo/opportunities/new?propertyId=prop-1&lockProperty=1&leadId=lead-new",
+    );
   });
 
   it("validates same-project pairing before submit", () => {

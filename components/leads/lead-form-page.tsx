@@ -31,6 +31,7 @@ import {
   type UsagePurpose,
 } from "@/lib/lead-preferences";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
+import { resolveOpportunityReturnTo } from "@/lib/opportunity-link-flow";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -72,6 +73,8 @@ type LeadFormPageProps = {
   mode: "create" | "edit";
   leadId?: string;
   initialValues?: Partial<LeadFormInitialValues>;
+  /** When set (create mode), redirect back into the opportunity flow after save. */
+  returnTo?: string;
   cancelHref: string;
   back?: { href: string; label?: string };
 };
@@ -111,6 +114,7 @@ export function LeadFormPage({
   mode,
   leadId,
   initialValues,
+  returnTo,
   cancelHref,
   back,
 }: LeadFormPageProps) {
@@ -352,7 +356,16 @@ export function LeadFormPage({
       }
 
       const savedLeadId = isEdit ? leadId : body.data.lead?.id;
-      if (savedLeadId) {
+      const opportunityReturnTo =
+        !isEdit && returnTo && savedLeadId
+          ? resolveOpportunityReturnTo(returnTo, workspaceSlug, {
+              leadId: savedLeadId,
+            })
+          : null;
+      if (opportunityReturnTo) {
+        router.push(opportunityReturnTo);
+        router.refresh();
+      } else if (savedLeadId) {
         router.push(workspacePath(workspaceSlug, "leads", savedLeadId));
         router.refresh();
       } else {

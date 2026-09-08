@@ -12,11 +12,18 @@ export type OpportunityLinkEntity = {
 
 export function createOpportunityHref(
   workspaceSlug: string,
-  options?: { leadId?: string; propertyId?: string },
+  options?: {
+    leadId?: string;
+    propertyId?: string;
+    lockLead?: boolean;
+    lockProperty?: boolean;
+  },
 ): string {
   const params = new URLSearchParams();
   if (options?.leadId) params.set("leadId", options.leadId);
   if (options?.propertyId) params.set("propertyId", options.propertyId);
+  if (options?.lockLead) params.set("lockLead", "1");
+  if (options?.lockProperty) params.set("lockProperty", "1");
   const query = params.toString();
   return query
     ? `${workspacePath(workspaceSlug, "opportunities", "new")}?${query}`
@@ -107,16 +114,80 @@ export function buildSameProjectHint(args: {
   return `Project “${args.projectName}” · ${args.peerTotal} ${noun}`;
 }
 
+export function isSafeWorkspaceReturnTo(
+  returnTo: string,
+  workspaceSlug: string,
+): boolean {
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) {
+    return false;
+  }
+  if (returnTo.includes("://") || returnTo.includes("\\")) {
+    return false;
+  }
+  const workspacePrefix = `/w/${workspaceSlug}/`;
+  if (!returnTo.startsWith(workspacePrefix)) {
+    return false;
+  }
+  return true;
+}
+
+export function isSafeOpportunityReturnTo(
+  returnTo: string,
+  workspaceSlug: string,
+): boolean {
+  if (!isSafeWorkspaceReturnTo(returnTo, workspaceSlug)) {
+    return false;
+  }
+  const url = new URL(returnTo, "http://local.invalid");
+  return url.pathname === workspacePath(workspaceSlug, "opportunities", "new");
+}
+
+/**
+ * After creating a lead/property from an opportunity empty-state escape,
+ * merge the new entity id into the encoded returnTo URL while keeping the
+ * original locked peer and lock flags intact.
+ */
+export function resolveOpportunityReturnTo(
+  returnTo: string,
+  workspaceSlug: string,
+  created: { leadId?: string; propertyId?: string },
+): string | null {
+  if (!isSafeOpportunityReturnTo(returnTo, workspaceSlug)) {
+    return null;
+  }
+  const url = new URL(returnTo, "http://local.invalid");
+  if (created.leadId) {
+    url.searchParams.set("leadId", created.leadId);
+  }
+  if (created.propertyId) {
+    url.searchParams.set("propertyId", created.propertyId);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 export function createPeerEscapeHref(args: {
   workspaceSlug: string;
   side: "lead" | "property";
   projectId: string;
+  lockedLeadId?: string;
+  lockedPropertyId?: string;
 }): string {
   const base =
     args.side === "property"
       ? workspacePath(args.workspaceSlug, "properties", "new")
       : workspacePath(args.workspaceSlug, "leads", "new");
-  return `${base}?projectId=${encodeURIComponent(args.projectId)}`;
+
+  const returnTo = createOpportunityHref(args.workspaceSlug, {
+    leadId: args.lockedLeadId,
+    propertyId: args.lockedPropertyId,
+    lockLead: Boolean(args.lockedLeadId),
+    lockProperty: Boolean(args.lockedPropertyId),
+  });
+
+  const params = new URLSearchParams();
+  params.set("projectId", args.projectId);
+  params.set("returnTo", returnTo);
+  return `${base}?${params.toString()}`;
 }
 
 export function validateOpportunitySameProject(

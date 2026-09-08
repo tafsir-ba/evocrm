@@ -6,9 +6,18 @@ import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspac
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string }>;
-type SearchParams = Promise<{ leadId?: string; propertyId?: string }>;
+type SearchParams = Promise<{
+  leadId?: string;
+  propertyId?: string;
+  lockLead?: string;
+  lockProperty?: string;
+}>;
 
 export const metadata = { title: "New opportunity — EvoHome CRM" };
+
+function isTruthyFlag(value: string | undefined): boolean {
+  return value === "1" || value === "true";
+}
 
 export default async function NewOpportunityPage({
   params,
@@ -18,7 +27,7 @@ export default async function NewOpportunityPage({
   searchParams: SearchParams;
 }) {
   const { workspaceSlug } = await params;
-  const { leadId, propertyId } = await searchParams;
+  const { leadId, propertyId, lockLead, lockProperty } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -46,6 +55,13 @@ export default async function NewOpportunityPage({
   }
 
   const defaultCurrency = access.context.workspace.defaultCurrency;
+  // Explicit lock flags preserve return-from-create flow: original peer stays
+  // locked while the newly created peer is only preselected. Fall back to
+  // single-id contextual CTAs when no flag is present.
+  const shouldLockLead =
+    isTruthyFlag(lockLead) || (Boolean(leadId) && !propertyId);
+  const shouldLockProperty =
+    isTruthyFlag(lockProperty) || (Boolean(propertyId) && !leadId);
   const cancelHref = leadId
     ? workspacePath(workspaceSlug, "leads", leadId)
     : propertyId
@@ -62,8 +78,8 @@ export default async function NewOpportunityPage({
           leadId: leadId ?? "",
           propertyId: propertyId ?? "",
         }}
-        lockLead={Boolean(leadId)}
-        lockProperty={Boolean(propertyId)}
+        lockLead={shouldLockLead}
+        lockProperty={shouldLockProperty}
         cancelHref={cancelHref}
         back={{
           href: cancelHref,

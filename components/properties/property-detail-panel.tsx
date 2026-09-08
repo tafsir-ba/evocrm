@@ -274,7 +274,7 @@ export function PropertyDetailPanel({
         actions={
           <>
             {canCreateOpportunity && (
-              <Link href={createOpportunityHref(workspaceSlug, { propertyId })}>
+              <Link href={createOpportunityHref(workspaceSlug, { propertyId, lockProperty: true })}>
                 <Button leadingIcon={<IconPlus size={14} />}>Link to lead</Button>
               </Link>
             )}

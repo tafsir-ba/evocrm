@@ -31,6 +31,7 @@ import {
   type PropertyPhotoDraft,
   uploadPropertyPhotos,
 } from "@/lib/property-media";
+import { resolveOpportunityReturnTo } from "@/lib/opportunity-link-flow";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -50,6 +51,8 @@ type PropertyFormPageProps = {
   mode: "create" | "edit";
   propertyId?: string;
   initialValues?: Partial<PropertyFormInitialValues>;
+  /** When set (create mode), redirect back into the opportunity flow after save. */
+  returnTo?: string;
   cancelHref: string;
   back?: { href: string; label?: string };
   canCreateDocument?: boolean;
@@ -88,6 +91,7 @@ export function PropertyFormPage({
   mode,
   propertyId,
   initialValues,
+  returnTo,
   cancelHref,
   back,
   canCreateDocument = false,
@@ -318,7 +322,17 @@ export function PropertyFormPage({
       }
 
       if (savedPropertyId) {
-        router.push(workspacePath(workspaceSlug, "properties", savedPropertyId));
+        const opportunityReturnTo =
+          !isEdit && returnTo
+            ? resolveOpportunityReturnTo(returnTo, workspaceSlug, {
+                propertyId: savedPropertyId,
+              })
+            : null;
+        if (opportunityReturnTo) {
+          router.push(opportunityReturnTo);
+        } else {
+          router.push(workspacePath(workspaceSlug, "properties", savedPropertyId));
+        }
         router.refresh();
       } else {
         router.push(workspacePath(workspaceSlug, "properties"));

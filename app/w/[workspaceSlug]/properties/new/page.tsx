@@ -6,12 +6,13 @@ import {
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isSafeOpportunityReturnTo } from "@/lib/opportunity-link-flow";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string }>;
-type SearchParams = Promise<{ projectId?: string }>;
+type SearchParams = Promise<{ projectId?: string; returnTo?: string }>;
 
 export const metadata = { title: "New property — EvoHome CRM" };
 
@@ -23,7 +24,7 @@ export default async function NewPropertyPage({
   searchParams: SearchParams;
 }) {
   const { workspaceSlug } = await params;
-  const { projectId } = await searchParams;
+  const { projectId, returnTo: rawReturnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -50,6 +51,12 @@ export default async function NewPropertyPage({
     );
   }
 
+  const returnTo =
+    rawReturnTo && isSafeOpportunityReturnTo(rawReturnTo, workspaceSlug)
+      ? rawReturnTo
+      : undefined;
+  const cancelHref = returnTo ?? workspacePath(workspaceSlug, "properties");
+
   return (
     <PageContainer>
       <Suspense
@@ -65,9 +72,13 @@ export default async function NewPropertyPage({
           defaultCurrency={access.context.workspace.defaultCurrency}
           mode="create"
           initialValues={projectId ? { projectId } : undefined}
+          returnTo={returnTo}
           canCreateDocument={hasPermission(permissions, "document:create")}
-          cancelHref={workspacePath(workspaceSlug, "properties")}
-          back={{ href: workspacePath(workspaceSlug, "properties"), label: "Back to properties" }}
+          cancelHref={cancelHref}
+          back={{
+            href: cancelHref,
+            label: returnTo ? "Back to opportunity" : "Back to properties",
+          }}
         />
       </Suspense>
     </PageContainer>

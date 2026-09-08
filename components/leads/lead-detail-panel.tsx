@@ -679,7 +679,7 @@ export function LeadDetailPanel({
           <>
             {canCreateOpportunity && !lead.archivedAt && (
               <Link
-                href={createOpportunityHref(workspaceSlug, { leadId })}
+                href={createOpportunityHref(workspaceSlug, { leadId, lockLead: true })}
               >
                 <Button leadingIcon={<IconPlus size={14} />}>Link to property</Button>
               </Link>

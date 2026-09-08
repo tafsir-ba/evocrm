@@ -533,6 +533,8 @@ export function OpportunityFormPage({
                           workspaceSlug,
                           side: "lead",
                           projectId: activeProjectId,
+                          lockedPropertyId:
+                            form.propertyId || selectedProperty?.id || undefined,
                         })}
                         className="font-medium text-[var(--color-brand-700)] hover:underline"
                       >
@@ -576,6 +578,7 @@ export function OpportunityFormPage({
                           workspaceSlug,
                           side: "property",
                           projectId: activeProjectId,
+                          lockedLeadId: form.leadId || selectedLead?.id || undefined,
                         })}
                         className="font-medium text-[var(--color-brand-700)] hover:underline"
                       >

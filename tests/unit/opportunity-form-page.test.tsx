@@ -183,4 +183,69 @@ describe("OpportunityFormPage", () => {
     expect(screen.getByRole("combobox", { name: "Lead" })).not.toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Property" })).not.toBeDisabled();
   });
+
+  it("escape CTA encodes returnTo so create flow can restore the locked peer", async () => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("/dictionary-items?type=opportunity_status")) {
+        return jsonResponse({
+          items: [{ id: "status-1", label: "New", isDefault: true, behavior: "open" }],
+        });
+      }
+      if (url.includes("/dictionary-items?type=lost_reason")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url.includes("/tags?")) {
+        return jsonResponse({ tags: [] });
+      }
+      if (url.includes("/members")) {
+        return jsonResponse({ members: [] });
+      }
+      if (url.includes("/leads/lead-1")) {
+        return jsonResponse({
+          lead: {
+            id: "lead-1",
+            fullName: "Ada Lovelace",
+            email: "ada@example.com",
+            projectId: "proj-1",
+            project: { id: "proj-1", name: "Riviera" },
+          },
+        });
+      }
+      if (url.includes("/properties?") && url.includes("projectId=proj-1")) {
+        return jsonResponse([], {
+          pagination: { total: 0, page: 1, pageSize: 50, totalPages: 0 },
+        });
+      }
+      return jsonResponse({});
+    }) as typeof fetch;
+
+    render(
+      <OpportunityFormPage
+        workspaceSlug="demo"
+        defaultCurrency="CHF"
+        mode="create"
+        initialValues={{ leadId: "lead-1" }}
+        lockLead
+        cancelHref="/w/demo/leads/lead-1"
+      />,
+    );
+
+    expect(await screen.findByDisplayValue("Ada Lovelace")).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Property" }));
+
+    const createProperty = await screen.findByRole("link", {
+      name: "Create new property",
+    });
+    const href = createProperty.getAttribute("href") ?? "";
+    const url = new URL(href, "http://local.invalid");
+    expect(url.pathname).toBe("/w/demo/properties/new");
+    expect(url.searchParams.get("projectId")).toBe("proj-1");
+    expect(url.searchParams.get("returnTo")).toBe(
+      "/w/demo/opportunities/new?leadId=lead-1&lockLead=1",
+    );
+  });
 });

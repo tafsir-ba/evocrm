@@ -4,12 +4,13 @@ import { LeadFormPage } from "@/components/leads/lead-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isSafeOpportunityReturnTo } from "@/lib/opportunity-link-flow";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string }>;
-type SearchParams = Promise<{ projectId?: string }>;
+type SearchParams = Promise<{ projectId?: string; returnTo?: string }>;
 
 export const metadata = { title: "New lead — EvoHome CRM" };
 
@@ -21,7 +22,7 @@ export default async function NewLeadPage({
   searchParams: SearchParams;
 }) {
   const { workspaceSlug } = await params;
-  const { projectId } = await searchParams;
+  const { projectId, returnTo: rawReturnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -48,6 +49,12 @@ export default async function NewLeadPage({
     );
   }
 
+  const returnTo =
+    rawReturnTo && isSafeOpportunityReturnTo(rawReturnTo, workspaceSlug)
+      ? rawReturnTo
+      : undefined;
+  const cancelHref = returnTo ?? workspacePath(workspaceSlug, "leads");
+
   return (
     <PageContainer>
       <Suspense
@@ -62,8 +69,12 @@ export default async function NewLeadPage({
           workspaceSlug={workspaceSlug}
           mode="create"
           initialValues={projectId ? { projectId } : undefined}
-          cancelHref={workspacePath(workspaceSlug, "leads")}
-          back={{ href: workspacePath(workspaceSlug, "leads"), label: "Back to leads" }}
+          returnTo={returnTo}
+          cancelHref={cancelHref}
+          back={{
+            href: cancelHref,
+            label: returnTo ? "Back to opportunity" : "Back to leads",
+          }}
         />
       </Suspense>
     </PageContainer>
