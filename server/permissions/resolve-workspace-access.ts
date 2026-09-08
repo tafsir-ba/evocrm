@@ -5,7 +5,6 @@ import { AppError } from "@/server/errors";
 import type { PermissionKey } from "@/server/permissions/permissions";
 import {
   getProjectRolePermissions,
-  resolveEffectiveProjectPermissions,
 } from "@/server/permissions/project-roles";
 import type { WorkspaceMembership } from "@/server/permissions/types";
 import {
@@ -50,7 +49,7 @@ export type ResolvedWorkspaceAccess = {
   membership: WorkspaceMembership | null;
   permissions: PermissionKey[];
   isWorkspaceAdmin: boolean;
-  /** Active grant project IDs when not a workspace admin. */
+  /** Active grant project IDs for shared_project mode; null for active members (unrestricted). */
   grantedProjectIds: string[] | null;
 };
 
@@ -92,7 +91,8 @@ async function isWorkspaceAdminMembership(
 
 /**
  * Resolve how a user may access a workspace.
- * - Active members: normal membership permissions (admins bypass project grants).
+ * - Active members: normal membership permissions and full workspace project scope.
+ *   ProjectGrant does not restrict their list/get scope.
  * - Non-members with ProjectGrant(s): project-only access; permissions come from grants.
  * - Otherwise: MEMBERSHIP_REQUIRED.
  */
@@ -112,23 +112,13 @@ export async function resolveWorkspaceAccess(
   if (rawMembership?.status === "active") {
     const membership = await toWorkspaceMembership(rawMembership);
     const isWorkspaceAdmin = await isWorkspaceAdminMembership(membership);
-    if (isWorkspaceAdmin) {
-      return {
-        mode: "member",
-        membership,
-        permissions: membership.permissions as PermissionKey[],
-        isWorkspaceAdmin: true,
-        grantedProjectIds: null,
-      };
-    }
-
-    const grants = await findActiveProjectGrantsForUser(workspaceId, userId);
     return {
       mode: "member",
       membership,
       permissions: membership.permissions as PermissionKey[],
-      isWorkspaceAdmin: false,
-      grantedProjectIds: grants.map((grant) => grant.projectId),
+      isWorkspaceAdmin,
+      // Active members are never list-scoped by ProjectGrant.
+      grantedProjectIds: null,
     };
   }
 
@@ -184,21 +174,37 @@ export async function requireProjectAccess(
     };
   }
 
+  // Active workspace members keep membership permissions for any project in the
+  // workspace. A ProjectGrant must not remove that access; grant role is only
+  // used as metadata when present.
+  if (access.mode === "member" && access.membership) {
+    const grant = await findActiveProjectGrant(workspaceId, projectId, userId);
+    const effectivePermissions = access.membership.permissions as PermissionKey[];
+
+    if (permission && !effectivePermissions.includes(permission)) {
+      throw new AppError("PERMISSION_DENIED", "Permission denied.");
+    }
+
+    return {
+      membership: access.membership,
+      accessMode: "member",
+      projectId,
+      projectRole: grant?.projectRole ?? "project_admin",
+      effectivePermissions,
+      isWorkspaceAdmin: false,
+    };
+  }
+
   const grant = await findActiveProjectGrant(workspaceId, projectId, userId);
   if (!grant) {
     throw new AppError("PERMISSION_DENIED", "You do not have access to this project.");
   }
 
   const effectivePermissions = filterProjectScopedPermissions(
-    access.mode === "shared_project" || !access.membership
-      ? getProjectRolePermissions(grant.projectRole)
-      : resolveEffectiveProjectPermissions(
-          access.membership.permissions,
-          grant.projectRole,
-        ),
+    getProjectRolePermissions(grant.projectRole),
   );
 
-  if (permission && isWorkspaceWidePermission(permission) && access.mode === "shared_project") {
+  if (permission && isWorkspaceWidePermission(permission)) {
     throw new AppError(
       "PERMISSION_DENIED",
       "Project sharing does not grant workspace administration access.",
@@ -221,15 +227,15 @@ export async function requireProjectAccess(
 
 /**
  * Resolve the list of project IDs a user may access in a workspace.
- * Workspace owners/admins get null (= all projects).
- * Members and grant-only collaborators get their active grant project IDs.
+ * - Active workspace members (any role): null (= all projects; membership permissions apply).
+ * - Grant-only collaborators (shared_project): their active grant project IDs.
  */
 export async function resolveAllowedProjectIds(
   workspaceId: string,
   userId: string,
 ): Promise<string[] | null> {
   const access = await resolveWorkspaceAccess(workspaceId, userId);
-  if (access.isWorkspaceAdmin) {
+  if (access.mode === "member") {
     return null;
   }
   return access.grantedProjectIds ?? [];

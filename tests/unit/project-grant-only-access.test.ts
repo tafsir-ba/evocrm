@@ -141,6 +141,94 @@ describe("project-grant-only workspace access", () => {
     await expect(resolveAllowedProjectIds("ws-1", "admin-1")).resolves.toBeNull();
   });
 
+  it("non-admin active member with zero grants retains full workspace project scope", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "mem-agent",
+      workspaceId: "ws-1",
+      userId: "agent-1",
+      roleId: "role-agent",
+      status: "active",
+    } as never);
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
+      id: "role-agent",
+      key: "agent",
+      isSystem: true,
+      permissions: ["lead:read", "lead:update", "project:read", "document:read"],
+    } as never);
+
+    const access = await resolveWorkspaceAccess("ws-1", "agent-1");
+
+    expect(access.mode).toBe("member");
+    expect(access.isWorkspaceAdmin).toBe(false);
+    expect(access.membership).not.toBeNull();
+    expect(access.grantedProjectIds).toBeNull();
+    expect(access.permissions).toContain("lead:read");
+    expect(findActiveProjectGrantsForUser).not.toHaveBeenCalled();
+    await expect(resolveAllowedProjectIds("ws-1", "agent-1")).resolves.toBeNull();
+  });
+
+  it("requireProjectAccess allows non-admin members without a ProjectGrant", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "mem-agent",
+      workspaceId: "ws-1",
+      userId: "agent-1",
+      roleId: "role-agent",
+      status: "active",
+    } as never);
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
+      id: "role-agent",
+      key: "agent",
+      isSystem: true,
+      permissions: ["lead:read", "lead:update", "project:read"],
+    } as never);
+    vi.mocked(findActiveProjectGrant).mockResolvedValue(null);
+
+    const access = await requireProjectAccess(
+      "ws-1",
+      "agent-1",
+      "proj-any",
+      "lead:read",
+    );
+
+    expect(access.accessMode).toBe("member");
+    expect(access.effectivePermissions).toContain("lead:read");
+    expect(access.effectivePermissions).toContain("lead:update");
+  });
+
+  it("member ProjectGrant does not remove membership permissions on a project", async () => {
+    vi.mocked(findMembership).mockResolvedValue({
+      id: "mem-agent",
+      workspaceId: "ws-1",
+      userId: "agent-1",
+      roleId: "role-agent",
+      status: "active",
+    } as never);
+    vi.mocked(findRoleByIdInWorkspace).mockResolvedValue({
+      id: "role-agent",
+      key: "agent",
+      isSystem: true,
+      permissions: ["lead:read", "lead:update", "lead:create", "project:read"],
+    } as never);
+    vi.mocked(findActiveProjectGrant).mockResolvedValue({
+      id: "g1",
+      projectRole: "viewer",
+      status: "active",
+    } as never);
+
+    const access = await requireProjectAccess(
+      "ws-1",
+      "agent-1",
+      "proj-1",
+      "lead:update",
+    );
+
+    expect(access.accessMode).toBe("member");
+    expect(access.projectRole).toBe("viewer");
+    // Viewer grant must not strip lead:update the member already has.
+    expect(access.effectivePermissions).toContain("lead:update");
+    expect(access.effectivePermissions).toContain("lead:create");
+  });
+
   it("rejects users with neither membership nor grants", async () => {
     vi.mocked(findMembership).mockResolvedValue(null);
     vi.mocked(findActiveProjectGrantsForUser).mockResolvedValue([]);

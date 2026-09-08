@@ -19,7 +19,8 @@ export type ProjectScopedFilter = {
 
 /**
  * Apply ProjectGrant scope when sharing is enabled.
- * Workspace owners/admins keep full access (allowedProjectIds === null).
+ * Only grant-only (shared_project) callers are narrowed to granted project IDs.
+ * Active workspace members keep full workspace scope (allowedProjectIds === null).
  */
 export async function applyUserProjectScope<T extends ProjectScopedFilter>(
   workspaceId: string,
@@ -59,9 +60,9 @@ export async function applyUserProjectScope<T extends ProjectScopedFilter>(
 }
 
 /**
- * Deny get-by-id access when the record belongs to a project outside the user's grants.
- * Project-scoped callers (grant-only / non-admin with grants) are also denied when the
- * record has no projectId — unscoped records are never visible via sharing alone.
+ * Deny get-by-id access when the record belongs to a project outside the caller's
+ * allowed project scope. Grant-only callers are denied for records with no projectId.
+ * Active workspace members are unrestricted by ProjectGrant.
  */
 export async function assertRecordProjectAccess(
   workspaceId: string,

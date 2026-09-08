@@ -103,6 +103,20 @@ describe("applyUserProjectScope", () => {
       applyUserProjectScope("ws-1", "user-1", { search: "villa" }),
     ).resolves.toEqual({ search: "villa" });
   });
+
+  it("leaves ordinary member filters unchanged when resolveAllowedProjectIds is null", async () => {
+    vi.mocked(resolveAllowedProjectIds).mockResolvedValue(null);
+
+    await expect(
+      applyUserProjectScope("ws-1", "agent-1", {
+        search: "duplex",
+        projectId: undefined,
+      }),
+    ).resolves.toEqual({
+      search: "duplex",
+      projectId: undefined,
+    });
+  });
 });
 
 describe("assertRecordProjectAccess", () => {

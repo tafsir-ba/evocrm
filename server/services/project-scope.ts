@@ -50,9 +50,9 @@ export async function assertValidProjectFilter(
 
 /**
  * Resolve effective project filter for a user.
- * If the user has full workspace access (owner/admin), returns the explicit filter or undefined.
- * If the user has project-scoped access, narrows to the intersection of their grants and the filter.
- * Throws if the user tries to access a project they don't have access to.
+ * Active workspace members (and admins) get unrestricted access (allowedProjectIds === null).
+ * Grant-only collaborators are narrowed to their ProjectGrant IDs.
+ * Throws if a grant-only user requests a project outside their grants.
  */
 export async function resolveProjectScopeForUser(
   workspaceId: string,
