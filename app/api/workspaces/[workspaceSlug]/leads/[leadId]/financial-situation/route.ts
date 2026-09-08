@@ -4,6 +4,7 @@ import {
   getFinancialSituationForLead,
   updateFinancialSituationForLead,
 } from "@/server/services/lead-financial-situation";
+import { getLeadForWorkspace } from "@/server/services/leads";
 import { emptyFinancialSnapshot } from "@/lib/lead-financial-situation";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { updateFinancialSituationSchema } from "@/server/validation/lead-financial-situation";
@@ -16,10 +17,11 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "lead:financial_read",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const payload = await getFinancialSituationForLead(
       workspace.id,
       leadId,
@@ -38,6 +40,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:financial_update",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const input = parseRequestOrThrow(updateFinancialSituationSchema, await request.json());
     const current = await getFinancialSituationForLead(
       workspace.id,
@@ -68,6 +71,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:financial_delete",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     await deleteFinancialSituationForLead({
       workspaceId: workspace.id,
       leadId,

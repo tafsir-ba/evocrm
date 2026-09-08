@@ -24,6 +24,10 @@ import {
 import { findLeads } from "@/server/repositories/leads";
 import { findFirstCampaignStep, findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findCampaignById } from "@/server/repositories/campaigns";
+import {
+  assertMultiProjectRecordAccess,
+  applyUserProjectScope,
+} from "@/server/services/apply-project-scope";
 import { listOpportunitiesForWorkspace } from "@/server/services/opportunities";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { findStepByOrder } from "@/server/repositories/campaign-steps";
@@ -246,12 +250,20 @@ export async function listEnrollmentCandidatesForWorkspace(
   workspaceId: string,
   campaignId: string,
   filter: { page?: number; pageSize?: number; search?: string } = {},
+  userId?: string,
 ): Promise<{ candidates: CampaignEnrollmentCandidate[]; total: number }> {
   const campaign = await findCampaignById(workspaceId, campaignId);
 
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
 
   if (campaign.status === "archived") {
     return { candidates: [], total: 0 };
@@ -265,12 +277,20 @@ export async function listEnrollmentCandidatesForWorkspace(
   const pageSize = filter.pageSize ?? 50;
 
   if (campaign.audienceType === "leads") {
-    const { leads, total } = await findLeads(workspaceId, {
+    const scopedFilter = await applyUserProjectScope<{
+      projectId?: string;
+      projectIds?: string[];
+      search?: string;
+      excludeIds?: string[];
+      page?: number;
+      pageSize?: number;
+    }>(workspaceId, userId, {
       search: filter.search,
       excludeIds: leadIds,
       page,
       pageSize,
     });
+    const { leads, total } = await findLeads(workspaceId, scopedFilter);
 
     return {
       candidates: leads.map((lead) => ({
@@ -286,12 +306,16 @@ export async function listEnrollmentCandidatesForWorkspace(
     };
   }
 
-  const { opportunities, total } = await listOpportunitiesForWorkspace(workspaceId, {
-    search: filter.search,
-    excludeIds: opportunityIds,
-    page,
-    pageSize,
-  });
+  const { opportunities, total } = await listOpportunitiesForWorkspace(
+    workspaceId,
+    {
+      search: filter.search,
+      excludeIds: opportunityIds,
+      page,
+      pageSize,
+    },
+    userId,
+  );
 
   return {
     candidates: opportunities.map((opportunity) => ({

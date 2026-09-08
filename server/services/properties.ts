@@ -21,6 +21,7 @@ import {
   applyUserProjectScope,
   assertRecordProjectAccess,
 } from "@/server/services/apply-project-scope";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import type { CreatePropertyInput, UpdatePropertyInput } from "@/server/validation/properties";
 
 export type PropertyDictionarySummary = {
@@ -366,6 +367,7 @@ export async function createPropertyForWorkspace(
   input: CreatePropertyInput,
   defaultCurrency: string,
 ): Promise<PropertyDetail> {
+  await requireProjectAccess(workspaceId, actorId, input.projectId);
   await validatePropertyStatusId(workspaceId, input.statusId);
   await validatePropertyTypeId(workspaceId, input.typeId);
   await validatePropertyProjectId(workspaceId, input.projectId);
@@ -434,6 +436,13 @@ export async function updatePropertyForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Property not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "property:update",
+  );
 
   if (input.statusId !== undefined) {
     await validatePropertyStatusId(workspaceId, input.statusId, existing.statusId);
@@ -616,6 +625,13 @@ export async function archivePropertyForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Property not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "property:archive",
+  );
 
   const archived = await archiveProperty(workspaceId, propertyId);
 

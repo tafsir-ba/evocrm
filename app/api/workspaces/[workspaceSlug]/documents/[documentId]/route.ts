@@ -12,7 +12,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, documentId } = await context.params;
-    const { workspace, permissions } = await requireWorkspaceApiAccess(
+    const { workspace, permissions, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "document:read",
     );
@@ -21,6 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
       workspace.id,
       documentId,
       permissions,
+      userId,
     );
 
     return successResponse({ document });

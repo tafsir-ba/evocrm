@@ -24,6 +24,7 @@ import {
   applyUserProjectScope,
   assertRecordProjectAccess,
 } from "@/server/services/apply-project-scope";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
 import type {
@@ -571,6 +572,7 @@ export async function createOpportunityForWorkspace(
     lead.projectId,
     property.projectId,
   );
+  await requireProjectAccess(workspaceId, actorId, projectId, "opportunity:create");
   const status = await validateOpportunityStatusId(workspaceId, input.statusId);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
   await validateOptionalAssignableMember(workspaceId, input.assignedTo, "Assignee");
@@ -645,6 +647,13 @@ export async function updateOpportunityForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Opportunity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "opportunity:update",
+  );
 
   if (input.leadId) {
     await validateLeadForOpportunity(workspaceId, input.leadId);
@@ -908,6 +917,13 @@ export async function archiveOpportunityForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Opportunity not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "opportunity:archive",
+  );
 
   const archived = await archiveOpportunity(workspaceId, opportunityId);
 

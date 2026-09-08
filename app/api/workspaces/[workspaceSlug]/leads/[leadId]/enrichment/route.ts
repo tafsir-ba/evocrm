@@ -4,6 +4,7 @@ import {
   revokeLeadEnrichment,
   startLeadEnrichment,
 } from "@/server/services/lead-enrichment";
+import { getLeadForWorkspace } from "@/server/services/leads";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { startLeadEnrichmentSchema } from "@/server/validation/lead-enrichment";
 import { hasPermission } from "@/server/permissions/permissions";
@@ -16,10 +17,11 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace, permissions } = await requireWorkspaceApiAccess(workspaceSlug, [
+    const { workspace, permissions, userId } = await requireWorkspaceApiAccess(workspaceSlug, [
       "lead:enrich",
       "lead:read",
     ]);
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const payload = await getLeadEnrichmentForLead(workspace.id, leadId);
     if (!hasPermission(permissions, "lead:enrich")) {
       return successResponse({
@@ -41,6 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:enrich",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     let raw: unknown = {};
     try {
       const text = await request.text();
@@ -68,6 +71,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       workspaceSlug,
       "lead:enrich_revoke",
     );
+    await getLeadForWorkspace(workspace.id, leadId, userId);
     const result = await revokeLeadEnrichment({
       workspaceId: workspace.id,
       leadId,

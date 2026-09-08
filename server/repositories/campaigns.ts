@@ -113,15 +113,14 @@ function buildListQuery(filter: CampaignListFilter): Record<string, unknown> {
   }
 
   if (filter.projectId) {
-    query.$or = [
-      { projectIds: { $size: 0 } },
-      { projectIds: filter.projectId },
-    ];
+    query.projectIds = filter.projectId;
   } else if (filter.projectIds !== undefined) {
-    query.$or = [
-      { projectIds: { $size: 0 } },
-      { projectIds: { $in: filter.projectIds } },
-    ];
+    // Empty allowlist means no accessible projects — match nothing.
+    if (filter.projectIds.length === 0) {
+      query._id = { $exists: false };
+    } else {
+      query.projectIds = { $in: filter.projectIds };
+    }
   }
 
   if (filter.search) {

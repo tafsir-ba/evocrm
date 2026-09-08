@@ -42,11 +42,12 @@ import {
   evaluateCampaignAutoEnrollmentForLead,
   logAutoEnrollmentFailure,
 } from "@/server/services/campaign-auto-enrollment";
-import { validateActiveProjectId } from "@/server/services/project-scope";
 import {
   applyUserProjectScope,
   assertRecordProjectAccess,
 } from "@/server/services/apply-project-scope";
+import { requireProjectAccess } from "@/server/permissions/require-project-access";
+import { validateActiveProjectId } from "@/server/services/project-scope";
 import type {
   BulkDeleteLeadsInput,
   CreateLeadInput,
@@ -547,6 +548,7 @@ export async function createLeadForWorkspace(
     intelligenceSource?: string;
   },
 ): Promise<LeadMutationResult> {
+  await requireProjectAccess(workspaceId, actorId, input.projectId, "lead:create");
   await validateActiveProjectId(workspaceId, input.projectId);
   await validateLeadStatusId(workspaceId, input.statusId);
   await validateLeadSourceId(workspaceId, input.sourceId);
@@ -688,6 +690,13 @@ export async function updateLeadForWorkspace(
   if (!existing || existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "lead:update",
+  );
 
   if (input.statusId !== undefined) {
     await validateLeadStatusId(workspaceId, input.statusId, existing.statusId);
@@ -943,6 +952,13 @@ export async function archiveLeadForWorkspace(
     throw new AppError("NOT_FOUND", "Lead not found.");
   }
 
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "lead:archive",
+  );
+
   const archived = await archiveLead(workspaceId, leadId);
 
   if (!archived) {
@@ -972,6 +988,13 @@ export async function restoreLeadForWorkspace(
   if (!existing || !existing.archivedAt) {
     throw new AppError("NOT_FOUND", "Archived lead not found.");
   }
+
+  await assertRecordProjectAccess(
+    workspaceId,
+    actorId,
+    existing.projectId,
+    "lead:archive",
+  );
 
   if (existing.projectId && existing.emailNormalized) {
     await assertUniqueEmail(

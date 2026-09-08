@@ -10,12 +10,12 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, campaignId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "campaign:read",
     );
 
-    const campaign = await getCampaignForWorkspace(workspace.id, campaignId);
+    const campaign = await getCampaignForWorkspace(workspace.id, campaignId, userId);
     const readiness = await evaluateCampaignReadiness(workspace.id, campaign);
 
     return successResponse({ readiness });

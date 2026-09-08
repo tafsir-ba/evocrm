@@ -1,8 +1,12 @@
 import "server-only";
 
 import { PROJECT_SHARING_ENABLED } from "@/lib/project-sharing-feature";
+import { AppError } from "@/server/errors";
 import type { PermissionKey } from "@/server/permissions/permissions";
-import { requireProjectAccess } from "@/server/permissions/require-project-access";
+import {
+  requireProjectAccess,
+  resolveAllowedProjectIds,
+} from "@/server/permissions/require-project-access";
 import {
   assertValidProjectFilter,
   resolveProjectScopeForUser,
@@ -56,6 +60,8 @@ export async function applyUserProjectScope<T extends ProjectScopedFilter>(
 
 /**
  * Deny get-by-id access when the record belongs to a project outside the user's grants.
+ * Project-scoped callers (grant-only / non-admin with grants) are also denied when the
+ * record has no projectId — unscoped records are never visible via sharing alone.
  */
 export async function assertRecordProjectAccess(
   workspaceId: string,
@@ -63,9 +69,62 @@ export async function assertRecordProjectAccess(
   projectId: string | null | undefined,
   permission?: PermissionKey,
 ): Promise<void> {
-  if (!PROJECT_SHARING_ENABLED || !userId || !projectId) {
+  if (!PROJECT_SHARING_ENABLED || !userId) {
+    return;
+  }
+
+  if (!projectId) {
+    const allowedProjectIds = await resolveAllowedProjectIds(workspaceId, userId);
+    if (allowedProjectIds !== null) {
+      throw new AppError(
+        "PERMISSION_DENIED",
+        "You do not have access to this record.",
+      );
+    }
     return;
   }
 
   await requireProjectAccess(workspaceId, userId, projectId, permission);
+}
+
+/**
+ * Enforce grant scope for multi-project records (e.g. campaigns).
+ * Workspace-wide records (empty projectIds) are denied for project-scoped callers.
+ */
+export async function assertMultiProjectRecordAccess(
+  workspaceId: string,
+  userId: string | undefined,
+  recordProjectIds: readonly string[],
+  permission?: PermissionKey,
+): Promise<void> {
+  if (!PROJECT_SHARING_ENABLED || !userId) {
+    return;
+  }
+
+  const allowedProjectIds = await resolveAllowedProjectIds(workspaceId, userId);
+  if (allowedProjectIds === null) {
+    return;
+  }
+
+  if (recordProjectIds.length === 0) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "You do not have access to this record.",
+    );
+  }
+
+  const matchingProjectId = recordProjectIds.find((projectId) =>
+    allowedProjectIds.includes(projectId),
+  );
+
+  if (!matchingProjectId) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "You do not have access to this project.",
+    );
+  }
+
+  if (permission) {
+    await requireProjectAccess(workspaceId, userId, matchingProjectId, permission);
+  }
 }

@@ -21,6 +21,7 @@ import {
   validateDocumentMimeType,
 } from "@/server/services/document-file-utils";
 import {
+  assertDocumentLinkedEntityProjectAccess,
   getEntityReadPermission,
   validateDocumentLinkedEntity,
 } from "@/server/services/document-linked-entities";
@@ -78,13 +79,20 @@ export async function listDocumentsForWorkspace(
   workspaceId: string,
   query: DocumentListQuery,
   permissions: readonly string[],
+  userId?: string,
 ): Promise<{ documents: DocumentListItem[]; total: number }> {
-  await validateDocumentLinkedEntity(
+  const linkedEntity = await validateDocumentLinkedEntity(
     workspaceId,
     query.linkedEntityType,
     query.linkedEntityId,
   );
   assertEntityReadAccess(permissions, query.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:read",
+  );
 
   const { documents, total } = await findDocuments(workspaceId, {
     includeArchived: query.includeArchived,
@@ -105,6 +113,7 @@ async function getAuthorizedDocumentRecord(
   workspaceId: string,
   documentId: string,
   permissions: readonly string[],
+  userId?: string,
   options?: { includeArchived?: boolean },
 ): Promise<DocumentRecord> {
   const document = await findDocumentById(workspaceId, documentId);
@@ -120,12 +129,18 @@ async function getAuthorizedDocumentRecord(
     throw new AppError("NOT_FOUND", "Document not found.");
   }
 
-  await validateDocumentLinkedEntity(
+  const linkedEntity = await validateDocumentLinkedEntity(
     workspaceId,
     document.linkedEntityType,
     document.linkedEntityId,
   );
   assertEntityReadAccess(permissions, document.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:read",
+  );
 
   return document;
 }
@@ -134,12 +149,14 @@ export async function getDocumentForWorkspace(
   workspaceId: string,
   documentId: string,
   permissions: readonly string[],
+  userId?: string,
   options?: { includeArchived?: boolean },
 ): Promise<DocumentDetail> {
   const document = await getAuthorizedDocumentRecord(
     workspaceId,
     documentId,
     permissions,
+    userId,
     options,
   );
 
@@ -157,12 +174,18 @@ export async function createDocumentUploadUrlForWorkspace(
   storageKey: string;
   expiresAt: string;
 }> {
-  await validateDocumentLinkedEntity(
+  const linkedEntity = await validateDocumentLinkedEntity(
     workspaceId,
     input.linkedEntityType,
     input.linkedEntityId,
   );
   assertEntityReadAccess(permissions, input.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:create",
+  );
 
   validateDocumentMimeType(input.mimeType);
   validateDocumentFileSize(input.fileSize);
@@ -234,12 +257,18 @@ export async function confirmDocumentUploadForWorkspace(
 
   assertStorageKeyMatchesWorkspace(workspaceId, input.storageKey);
 
-  await validateDocumentLinkedEntity(
+  const linkedEntity = await validateDocumentLinkedEntity(
     workspaceId,
     input.linkedEntityType,
     input.linkedEntityId,
   );
   assertEntityReadAccess(permissions, input.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:create",
+  );
 
   validateDocumentMimeType(input.mimeType);
   validateDocumentFileSize(input.fileSize);
@@ -298,7 +327,12 @@ export async function generateDocumentSignedUrlForWorkspace(
   documentId: string,
   permissions: readonly string[],
 ): Promise<{ url: string; expiresAt: string }> {
-  const document = await getAuthorizedDocumentRecord(workspaceId, documentId, permissions);
+  const document = await getAuthorizedDocumentRecord(
+    workspaceId,
+    documentId,
+    permissions,
+    userId,
+  );
 
   if (document.status !== "active" || document.archivedAt) {
     throw new AppError("NOT_FOUND", "Document not found.");
@@ -333,12 +367,18 @@ export async function archiveDocumentForWorkspace(
     throw new AppError("NOT_FOUND", "Document not found.");
   }
 
-  await validateDocumentLinkedEntity(
+  const linkedEntity = await validateDocumentLinkedEntity(
     workspaceId,
     existing.linkedEntityType,
     existing.linkedEntityId,
   );
   assertEntityReadAccess(permissions, existing.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:archive",
+  );
 
   const archived = await archiveDocument(workspaceId, documentId);
 
