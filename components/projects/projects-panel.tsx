@@ -55,6 +55,15 @@ type ProjectRecord = {
   counts?: ProjectCounts;
 };
 
+type SharedProjectRecord = {
+  id: string;
+  name: string;
+  reference: string | null;
+  workspaceName: string;
+  workspaceSlug: string;
+  projectRole: string;
+};
+
 type ProjectsPanelProps = {
   workspaceSlug: string;
   canCreate: boolean;
@@ -91,6 +100,7 @@ export function ProjectsPanel({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [sharedProjects, setSharedProjects] = useState<SharedProjectRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -227,12 +237,27 @@ export function ProjectsPanel({
       const parsed = readProjectsPayload(payload);
       setProjects(parsed.projects);
       setTotal(parsed.total);
+
+      try {
+        const sharedResponse = await fetch("/api/me/shared-projects");
+        if (sharedResponse.ok) {
+          const sharedPayload = await sharedResponse.json();
+          const shared = (sharedPayload.data?.projects ?? []) as SharedProjectRecord[];
+          setSharedProjects(
+            shared.filter((project) => project.workspaceSlug !== workspaceSlug),
+          );
+        } else {
+          setSharedProjects([]);
+        }
+      } catch {
+        setSharedProjects([]);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
       setLoading(false);
     }
-  }, [apiBase, cantonCode, countryCode, page, pageSize, search, sort, sortDir, view]);
+  }, [apiBase, cantonCode, countryCode, page, pageSize, search, sort, sortDir, view, workspaceSlug]);
 
   useEffect(() => {
     void loadProjects();
@@ -407,7 +432,7 @@ export function ProjectsPanel({
           description={error}
           primaryAction={{ label: "Retry", onClick: () => void loadProjects() }}
         />
-      ) : projects.length === 0 ? (
+      ) : projects.length === 0 && sharedProjects.length === 0 ? (
         <EmptyState
           title={search || view !== "all" ? "No matching projects" : "No projects yet"}
           description={
@@ -417,6 +442,8 @@ export function ProjectsPanel({
           }
         />
       ) : (
+        <div className="space-y-6">
+          {projects.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white">
           <ProjectsTable
             workspaceSlug={workspaceSlug}
@@ -457,6 +484,45 @@ export function ProjectsPanel({
               </button>
             </div>
           </div>
+        </div>
+          ) : null}
+
+          {sharedProjects.length > 0 ? (
+            <section className="space-y-2">
+              <div>
+                <h2 className="text-[14px] font-semibold text-[var(--color-ink)]">
+                  Shared with me
+                </h2>
+                <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                  Projects shared with you by email. Opening one does not add that workspace to
+                  your switcher.
+                </p>
+              </div>
+              <ul className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-white divide-y divide-[var(--color-line)]">
+                {sharedProjects.map((project) => (
+                  <li key={`${project.workspaceSlug}:${project.id}`}>
+                    <Link
+                      href={workspacePath(project.workspaceSlug, "projects", project.id)}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[var(--color-muted)]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[13.5px] font-medium text-[var(--color-ink)]">
+                          {project.name}
+                        </p>
+                        <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
+                          {project.workspaceName}
+                          {project.reference ? ` · ${project.reference}` : ""}
+                        </p>
+                      </div>
+                      <Badge tone="muted" size="sm">
+                        {project.projectRole.replaceAll("_", " ")}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
     </>

@@ -16,13 +16,13 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(
+    const { workspace, permissions } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "settings:read",
     );
 
     const roles = await listRolesForWorkspace(workspace.id);
-    const canManage = hasPermission(membership.permissions, "roles:manage");
+    const canManage = hasPermission(permissions, "roles:manage");
     const permissionGroups = getPermissionGroups();
 
     return successResponse({ roles, canManage, permissionGroups });

@@ -68,6 +68,8 @@ export type WorkspaceContext = {
       permissions: string[];
     };
   };
+  /** member = workspace membership; shared_project = ProjectGrant only (no membership). */
+  accessMode: "member" | "shared_project";
   navigation: WorkspaceNavigationItem[];
 };
 
@@ -172,21 +174,54 @@ export async function getWorkspaceContext(
     throw new AppError("WORKSPACE_NOT_FOUND", "Workspace not found.");
   }
 
-  const { requireMembership } = await import("@/server/permissions/require-membership");
-  const membership = await requireMembership(workspace.id, userId);
-  const role = await findRoleByIdInWorkspace(membership.roleId, workspace.id);
-
-  if (!role) {
-    throw new AppError("INTERNAL_ERROR", "Membership role not found.", {
-      expose: false,
-    });
-  }
+  const { resolveWorkspaceAccess } = await import(
+    "@/server/permissions/resolve-workspace-access"
+  );
+  const access = await resolveWorkspaceAccess(workspace.id, userId);
 
   await ensureDefaultDictionaries(workspace.id);
 
+  if (access.mode === "member" && access.membership) {
+    const role = await findRoleByIdInWorkspace(
+      access.membership.roleId,
+      workspace.id,
+    );
+
+    if (!role) {
+      throw new AppError("INTERNAL_ERROR", "Membership role not found.", {
+        expose: false,
+      });
+    }
+
+    const navigation = buildPermissionAwareNavigation(
+      workspace.slug,
+      access.permissions,
+    );
+
+    return {
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        timezone: workspace.timezone,
+        defaultCurrency: workspace.defaultCurrency,
+      },
+      membership: {
+        status: "active",
+        role: {
+          name: role.name,
+          key: role.key,
+          permissions: access.permissions,
+        },
+      },
+      accessMode: "member",
+      navigation,
+    };
+  }
+
   const navigation = buildPermissionAwareNavigation(
     workspace.slug,
-    membership.permissions,
+    access.permissions,
   );
 
   return {
@@ -200,11 +235,12 @@ export async function getWorkspaceContext(
     membership: {
       status: "active",
       role: {
-        name: role.name,
-        key: role.key,
-        permissions: membership.permissions,
+        name: "Shared project",
+        key: "shared_project",
+        permissions: access.permissions,
       },
     },
+    accessMode: "shared_project",
     navigation,
   };
 }

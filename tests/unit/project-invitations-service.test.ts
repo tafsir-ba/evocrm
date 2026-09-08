@@ -266,7 +266,7 @@ describe("acceptProjectInvitation", () => {
     } as never);
   });
 
-  it("creates membership and grant for registered invitees after accept", async () => {
+  it("creates ProjectGrant without workspace membership for invitees", async () => {
     vi.mocked(findMembership).mockResolvedValue(null);
     vi.mocked(createMembership).mockResolvedValue({
       id: "mem-new",
@@ -279,7 +279,7 @@ describe("acceptProjectInvitation", () => {
       userEmail: "invitee@example.com",
     });
 
-    expect(createMembership).toHaveBeenCalled();
+    expect(createMembership).not.toHaveBeenCalled();
     expect(createProjectGrant).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId,

@@ -6,16 +6,18 @@ import {
   hasPermission,
   isValidPermission,
 } from "@/server/permissions/permissions";
-
-import { requireMembership } from "./require-membership";
+import { resolveWorkspaceAccess } from "@/server/permissions/resolve-workspace-access";
 import type { WorkspaceMembership } from "./types";
 
 export type AuthorizedContext = {
-  membership: WorkspaceMembership;
+  membership: WorkspaceMembership | null;
+  permissions: PermissionKey[];
+  accessMode: "member" | "shared_project";
 };
 
 /**
  * Require a specific permission key within the resolved workspace context.
+ * Supports project-grant-only collaborators (no WorkspaceMembership).
  */
 export async function requirePermission(
   workspaceId: string,
@@ -28,11 +30,15 @@ export async function requirePermission(
     });
   }
 
-  const membership = await requireMembership(workspaceId, userId);
+  const access = await resolveWorkspaceAccess(workspaceId, userId);
 
-  if (!hasPermission(membership.permissions, permissionKey as PermissionKey)) {
+  if (!hasPermission(access.permissions, permissionKey as PermissionKey)) {
     throw new AppError("PERMISSION_DENIED", "Permission denied.");
   }
 
-  return { membership };
+  return {
+    membership: access.membership,
+    permissions: access.permissions,
+    accessMode: access.mode,
+  };
 }

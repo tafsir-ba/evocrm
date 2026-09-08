@@ -19,12 +19,12 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(
+    const { workspace, permissions } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "settings:read",
     );
 
-    const canManage = hasPermission(membership.permissions, "users:manage");
+    const canManage = hasPermission(permissions, "users:manage");
 
     const url = new URL(request.url);
     const queryResult = validateSearchParams(

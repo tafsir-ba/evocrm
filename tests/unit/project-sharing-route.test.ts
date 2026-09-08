@@ -1,15 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/server/auth/require-auth", () => ({
-  requireAuth: vi.fn(),
-}));
-
-vi.mock("@/server/workspaces/resolve-workspace", () => ({
-  resolveWorkspace: vi.fn(),
-}));
-
-vi.mock("@/server/permissions/require-membership", () => ({
-  requireMembership: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/permissions/require-project-access", () => ({
@@ -31,35 +23,39 @@ vi.mock("@/server/services/project-invitations", () => ({
   sendProjectInvitation: vi.fn(),
 }));
 
-import { POST as postSharing, PATCH as patchSharing } from "@/app/api/workspaces/[workspaceSlug]/projects/[projectId]/sharing/route";
-import { requireAuth } from "@/server/auth/require-auth";
+import {
+  PATCH as patchSharing,
+  POST as postSharing,
+} from "@/app/api/workspaces/[workspaceSlug]/projects/[projectId]/sharing/route";
 import { AppError } from "@/server/errors";
-import { requireMembership } from "@/server/permissions/require-membership";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
-import { sendProjectInvitation } from "@/server/services/project-invitations";
 import { changeProjectGrantRole } from "@/server/services/project-grants";
-import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
+import { sendProjectInvitation } from "@/server/services/project-invitations";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 describe("project sharing invite route permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireAuth).mockResolvedValue({
-      user: { id: "user-1", email: "a@b.com" },
-    } as never);
-    vi.mocked(resolveWorkspace).mockResolvedValue({
-      id: "ws-1",
-      slug: "demo",
-      name: "Demo",
-      timezone: "UTC",
-      defaultCurrency: "USD",
-    } as never);
-    vi.mocked(requireMembership).mockResolvedValue({
-      id: "m1",
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["project:read"],
+      },
       permissions: ["project:read"],
+      accessMode: "member",
+      isWorkspaceAdmin: false,
     } as never);
   });
 

@@ -16,12 +16,12 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, leadId } = await context.params;
-    const { workspace, membership } = await requireWorkspaceApiAccess(workspaceSlug, [
+    const { workspace, permissions } = await requireWorkspaceApiAccess(workspaceSlug, [
       "lead:enrich",
       "lead:read",
     ]);
     const payload = await getLeadEnrichmentForLead(workspace.id, leadId);
-    if (!hasPermission(membership.permissions, "lead:enrich")) {
+    if (!hasPermission(permissions, "lead:enrich")) {
       return successResponse({
         capability: payload.capability,
         overlay: payload.overlay,

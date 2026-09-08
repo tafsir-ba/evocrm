@@ -240,8 +240,8 @@ export function ProjectSharingPanel({
               Share project
             </h3>
             <p className="text-[12.5px] text-[var(--color-ink-muted)] mt-0.5">
-              Invite a registered EvoCRM user by email. Access is granted only after they
-              accept.
+              Invite a registered EvoCRM user by email. They get project access only after
+              accepting — without joining this workspace.
             </p>
           </div>
           {showShare ? (
@@ -401,7 +401,8 @@ export function ProjectSharingPanel({
         <div className="space-y-4">
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             Enter the email of someone who already has an EvoCRM account. They receive an
-            email and must click Accept before access is granted.
+            email and must click Accept before project access is granted. They keep their own
+            workspace and are not added to this one.
           </p>
           <div>
             <Label htmlFor="share-email">Email address</Label>
