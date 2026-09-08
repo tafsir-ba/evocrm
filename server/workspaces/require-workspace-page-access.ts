@@ -65,6 +65,15 @@ export async function requireWorkspacePageAccess(
     ? getRequiredPermissionForSegment(segment)
     : undefined;
 
+  // Workspace Settings (and equivalent admin UI) require membership — never grant-only.
+  if (segment === "settings" && context.accessMode === "shared_project") {
+    return {
+      user: session.user,
+      context,
+      permissionDenied: true,
+    };
+  }
+
   if (requiredPermission) {
     try {
       await requirePermission(

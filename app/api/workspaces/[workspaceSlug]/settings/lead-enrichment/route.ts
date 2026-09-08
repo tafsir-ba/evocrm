@@ -5,7 +5,7 @@ import {
 } from "@/server/services/lead-enrichment";
 import { parseRequestOrThrow } from "@/server/validation/request";
 import { updateLeadEnrichmentSettingsSchema } from "@/server/validation/lead-enrichment";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string }>;
@@ -14,7 +14,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(workspaceSlug, "settings:read");
+    const { workspace } = await requireWorkspaceMemberApiAccess(workspaceSlug, "settings:read");
     const settings = await getLeadEnrichmentWorkspaceSettings(workspace.id);
     return successResponse({ settings });
   } catch (error) {
@@ -25,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );

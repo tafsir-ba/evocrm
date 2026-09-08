@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/roles", () => ({
@@ -20,7 +20,7 @@ vi.mock("@/server/services/roles", () => ({
 
 import { GET as getRoles } from "@/app/api/workspaces/[workspaceSlug]/roles/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { getPermissionGroups, listRolesForWorkspace } from "@/server/services/roles";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -39,7 +39,15 @@ describe("roles API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -48,6 +56,9 @@ describe("roles API", () => {
         status: "active",
         permissions: ["settings:read", "roles:manage"],
       },
+      permissions: ["settings:read", "roles:manage"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listRolesForWorkspace).mockResolvedValue([
       {
@@ -89,7 +100,7 @@ describe("roles API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

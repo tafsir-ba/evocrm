@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/workspace-export", () => ({
@@ -18,7 +18,7 @@ vi.mock("@/server/services/workspace-export", () => ({
 
 import { GET as getExport } from "@/app/api/workspaces/[workspaceSlug]/export/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { exportWorkspaceData } from "@/server/services/workspace-export";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -61,7 +61,15 @@ describe("workspace export API", () => {
   });
 
   it("allows export with settings:update", async () => {
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -70,6 +78,9 @@ describe("workspace export API", () => {
         status: "active",
         permissions: ["settings:update"],
       },
+      permissions: ["settings:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(exportWorkspaceData).mockResolvedValue(emptyExportBundle);
 
@@ -79,7 +90,7 @@ describe("workspace export API", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:update");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
     expect(exportWorkspaceData).toHaveBeenCalledWith({
       workspaceId: "ws-1",
       actorId: "user-1",
@@ -87,7 +98,7 @@ describe("workspace export API", () => {
   });
 
   it("denies export with settings:read only", async () => {
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -103,7 +114,7 @@ describe("workspace export API", () => {
   });
 
   it("denies export without settings permissions", async () => {
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

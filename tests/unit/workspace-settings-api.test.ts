@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/workspace-settings", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/server/services/workspace-settings", () => ({
 
 import { GET as getSettings, PATCH as patchSettings } from "@/app/api/workspaces/[workspaceSlug]/settings/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   getWorkspaceSettings,
   updateWorkspaceSettings,
@@ -41,7 +41,15 @@ describe("workspace settings API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -50,6 +58,9 @@ describe("workspace settings API", () => {
         status: "active",
         permissions: ["settings:read"],
       },
+      permissions: ["settings:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(getWorkspaceSettings).mockResolvedValue({
       id: "ws-1",
@@ -68,7 +79,7 @@ describe("workspace settings API", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:read");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:read");
   });
 
   it("updates settings for settings:update", async () => {
@@ -80,7 +91,15 @@ describe("workspace settings API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -89,6 +108,9 @@ describe("workspace settings API", () => {
         status: "active",
         permissions: ["settings:update"],
       },
+      permissions: ["settings:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(updateWorkspaceSettings).mockResolvedValue({
       id: "ws-1",
@@ -111,7 +133,7 @@ describe("workspace settings API", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:update");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
   });
 
   it("denies update without settings:update", async () => {
@@ -123,7 +145,7 @@ describe("workspace settings API", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

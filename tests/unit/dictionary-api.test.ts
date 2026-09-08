@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/dictionaries", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/server/services/dictionaries", () => ({
 import { GET as getDictionaries } from "@/app/api/workspaces/[workspaceSlug]/dictionaries/route";
 import { POST as postDictionaryItem } from "@/app/api/workspaces/[workspaceSlug]/dictionary-items/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { listDictionariesForWorkspace } from "@/server/services/dictionaries";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -53,7 +53,15 @@ describe("dictionary API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -62,6 +70,9 @@ describe("dictionary API routes", () => {
         status: "active",
         permissions: ["settings:read"],
       },
+      permissions: ["settings:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listDictionariesForWorkspace).mockResolvedValue([
       {
@@ -84,7 +95,7 @@ describe("dictionary API routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.dictionaries).toHaveLength(1);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:read");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:read");
   });
 
   it("returns PERMISSION_DENIED without settings:read", async () => {
@@ -98,7 +109,7 @@ describe("dictionary API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -121,7 +132,7 @@ describe("dictionary API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -141,6 +152,6 @@ describe("dictionary API routes", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:update");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
   });
 });

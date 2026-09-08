@@ -8,7 +8,7 @@ import {
   createSendingDomainForWorkspace,
   listSendingDomainsForWorkspace,
 } from "@/server/services/sending-domains";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string }>;
@@ -17,7 +17,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:read",
     );
@@ -33,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { userId, workspace } = await requireWorkspaceApiAccess(
+    const { userId, workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:update",
     );

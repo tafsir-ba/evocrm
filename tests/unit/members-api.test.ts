@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/members", () => ({
@@ -18,7 +18,7 @@ vi.mock("@/server/services/members", () => ({
 
 import { GET as getMembers } from "@/app/api/workspaces/[workspaceSlug]/members/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { listWorkspaceMembersForWorkspace } from "@/server/services/members";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
@@ -39,7 +39,15 @@ describe("members API route", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -48,6 +56,9 @@ describe("members API route", () => {
         status: "active",
         permissions: ["settings:read"],
       },
+      permissions: ["settings:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listWorkspaceMembersForWorkspace).mockResolvedValue([
       {
@@ -63,7 +74,7 @@ describe("members API route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "settings:read");
+    expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:read");
     const body = await response.json();
     expect(body.data.members).toHaveLength(1);
     expect(body.data.members[0].userId).toBe("user-1");
@@ -80,7 +91,7 @@ describe("members API route", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceMemberApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

@@ -21,6 +21,28 @@ import {
 
 const WORKSPACE_ADMIN_ROLE_KEYS = new Set(["owner", "admin"]);
 
+/** Permissions that require active workspace membership — never granted via ProjectGrant alone. */
+export const WORKSPACE_WIDE_PERMISSIONS = [
+  "settings:read",
+  "settings:update",
+  "users:manage",
+  "roles:manage",
+  "billing:manage",
+  "project:create",
+] as const satisfies readonly PermissionKey[];
+
+const WORKSPACE_WIDE_PERMISSION_SET = new Set<string>(WORKSPACE_WIDE_PERMISSIONS);
+
+export function isWorkspaceWidePermission(permission: string): boolean {
+  return WORKSPACE_WIDE_PERMISSION_SET.has(permission);
+}
+
+export function filterProjectScopedPermissions(
+  permissions: readonly PermissionKey[],
+): PermissionKey[] {
+  return permissions.filter((permission) => !isWorkspaceWidePermission(permission));
+}
+
 export type WorkspaceAccessMode = "member" | "shared_project";
 
 export type ResolvedWorkspaceAccess = {
@@ -115,8 +137,10 @@ export async function resolveWorkspaceAccess(
     throw new AppError("MEMBERSHIP_REQUIRED", "Workspace membership required.");
   }
 
-  const permissions = uniquePermissions(
-    grants.flatMap((grant) => getProjectRolePermissions(grant.projectRole)),
+  const permissions = filterProjectScopedPermissions(
+    uniquePermissions(
+      grants.flatMap((grant) => getProjectRolePermissions(grant.projectRole)),
+    ),
   );
 
   return {
@@ -165,13 +189,21 @@ export async function requireProjectAccess(
     throw new AppError("PERMISSION_DENIED", "You do not have access to this project.");
   }
 
-  const effectivePermissions =
+  const effectivePermissions = filterProjectScopedPermissions(
     access.mode === "shared_project" || !access.membership
       ? getProjectRolePermissions(grant.projectRole)
       : resolveEffectiveProjectPermissions(
           access.membership.permissions,
           grant.projectRole,
-        );
+        ),
+  );
+
+  if (permission && isWorkspaceWidePermission(permission) && access.mode === "shared_project") {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "Project sharing does not grant workspace administration access.",
+    );
+  }
 
   if (permission && !effectivePermissions.includes(permission)) {
     throw new AppError("PERMISSION_DENIED", "Permission denied.");

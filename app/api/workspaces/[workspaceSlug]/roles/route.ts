@@ -7,7 +7,7 @@ import {
   getPermissionGroups,
   listRolesForWorkspace,
 } from "@/server/services/roles";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 type RouteContext = {
   params: Promise<{ workspaceSlug: string }>;
@@ -16,7 +16,7 @@ type RouteContext = {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, permissions } = await requireWorkspaceApiAccess(
+    const { workspace, permissions } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "settings:read",
     );
@@ -34,7 +34,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace, userId } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "roles:manage",
     );

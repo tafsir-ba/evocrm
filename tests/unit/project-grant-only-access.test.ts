@@ -52,7 +52,34 @@ describe("project-grant-only workspace access", () => {
     expect(access.permissions).toContain("project:read");
     expect(access.permissions).toContain("lead:update");
     expect(access.permissions).not.toContain("users:manage");
+    expect(access.permissions).not.toContain("settings:read");
   });
+
+  it("grant-only Project Admin does not receive settings:read or workspace admin permissions", async () => {
+    vi.mocked(findMembership).mockResolvedValue(null);
+    vi.mocked(findActiveProjectGrantsForUser).mockResolvedValue([
+      {
+        id: "g1",
+        workspaceId: "ws-1",
+        projectId: "proj-1",
+        userId: "user-1",
+        projectRole: "project_admin",
+        status: "active",
+      },
+    ] as never);
+
+    const access = await resolveWorkspaceAccess("ws-1", "user-1");
+
+    expect(access.mode).toBe("shared_project");
+    expect(access.permissions).not.toContain("settings:read");
+    expect(access.permissions).not.toContain("settings:update");
+    expect(access.permissions).not.toContain("users:manage");
+    expect(access.permissions).not.toContain("roles:manage");
+    expect(access.permissions).not.toContain("billing:manage");
+    expect(access.permissions).not.toContain("project:create");
+    expect(access.permissions).toContain("project:update");
+  });
+
 
   it("authorize requireProjectAccess from grant alone", async () => {
     vi.mocked(findMembership).mockResolvedValue(null);

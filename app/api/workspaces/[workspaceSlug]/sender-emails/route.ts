@@ -3,7 +3,7 @@ import {
   listSenderEmailsForDomain,
   listSendingDomainsForWorkspace,
 } from "@/server/services/sending-domains";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import { validateSearchParams } from "@/server/validation/request";
 import { senderEmailQuerySchema } from "@/server/validation/sending-domains";
 import { AppError } from "@/server/errors";
@@ -15,7 +15,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace } = await requireWorkspaceMemberApiAccess(
       workspaceSlug,
       "campaign:read",
     );

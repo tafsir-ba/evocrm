@@ -5,7 +5,7 @@ vi.mock("@/server/auth/require-auth", () => ({
 }));
 
 vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
-  requireWorkspaceApiAccess: vi.fn(),
+  requireWorkspaceMemberApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/workspace-deletion", () => ({
@@ -15,7 +15,7 @@ vi.mock("@/server/services/workspace-deletion", () => ({
 import { AppError } from "@/server/errors";
 import { DELETE } from "@/app/api/workspaces/[workspaceSlug]/route";
 import { deleteWorkspaceForOwner } from "@/server/services/workspace-deletion";
-import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
 describe("DELETE /api/workspaces/[workspaceSlug]", () => {
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe("DELETE /api/workspaces/[workspaceSlug]", () => {
   });
 
   it("deletes workspace when owner confirms name", async () => {
-    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
       userId: "user-1",
       workspace: {
         id: "ws-1",
@@ -40,6 +40,9 @@ describe("DELETE /api/workspaces/[workspaceSlug]", () => {
         status: "active",
         permissions: [],
       },
+      permissions: [],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: true,
     });
 
     vi.mocked(deleteWorkspaceForOwner).mockResolvedValue({ slug: "evo-crm" });
@@ -64,7 +67,7 @@ describe("DELETE /api/workspaces/[workspaceSlug]", () => {
   });
 
   it("returns forbidden when service rejects non-owner", async () => {
-    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+    vi.mocked(requireWorkspaceMemberApiAccess).mockResolvedValue({
       userId: "user-2",
       workspace: {
         id: "ws-1",
@@ -81,6 +84,9 @@ describe("DELETE /api/workspaces/[workspaceSlug]", () => {
         status: "active",
         permissions: [],
       },
+      permissions: [],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
 
     vi.mocked(deleteWorkspaceForOwner).mockRejectedValue(
