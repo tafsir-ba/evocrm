@@ -24,6 +24,10 @@ vi.mock("@/server/services/website-lead-capture", () => ({
   captureWebsiteLeadFromRequest: vi.fn(),
 }));
 
+vi.mock("@/server/services/website-lead-stats", () => ({
+  getWebsiteLeadStatsFromRequest: vi.fn(),
+}));
+
 import {
   DELETE as deleteIntegration,
 } from "@/app/api/workspaces/[workspaceSlug]/integrations/[integrationId]/route";
@@ -34,6 +38,7 @@ import {
   POST as createIntegration,
 } from "@/app/api/workspaces/[workspaceSlug]/integrations/route";
 import { POST as captureWebsiteLead } from "@/app/api/integrations/website/leads/route";
+import { GET as getWebsiteLeadStats } from "@/app/api/integrations/website/stats/leads/route";
 import { requireAuth } from "@/server/auth/require-auth";
 import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
@@ -44,6 +49,7 @@ import {
   rotateIntegrationApiKeyForWorkspace,
 } from "@/server/services/integrations";
 import { captureWebsiteLeadFromRequest } from "@/server/services/website-lead-capture";
+import { getWebsiteLeadStatsFromRequest } from "@/server/services/website-lead-stats";
 import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
 import { AppError } from "@/server/errors";
 import {
@@ -432,5 +438,40 @@ describe("integrations API", () => {
 
     expect(response.status).toBe(403);
     expect(requireWorkspaceMemberApiAccess).toHaveBeenCalledWith("demo", "settings:update");
+  });
+
+  it("returns live lead totals from authenticated stats endpoint", async () => {
+    vi.mocked(getWebsiteLeadStatsFromRequest).mockResolvedValue({
+      totalLeads: 38380,
+      workspaceId: "ws-1",
+    });
+
+    const response = await getWebsiteLeadStats(
+      new Request("http://localhost/api/integrations/website/stats/leads", {
+        headers: {
+          Authorization: "Bearer evocrm_whk_secret",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.totalLeads).toBe(38380);
+  });
+
+  it("returns 401 when stats API key is missing", async () => {
+    vi.mocked(getWebsiteLeadStatsFromRequest).mockRejectedValue(
+      new AppError("UNAUTHENTICATED", "Invalid or missing API key."),
+    );
+
+    const response = await getWebsiteLeadStats(
+      new Request("http://localhost/api/integrations/website/stats/leads", {
+        headers: {
+          "x-forwarded-for": "203.0.113.60",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(401);
   });
 });

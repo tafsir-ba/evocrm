@@ -34,6 +34,14 @@ This document matches current backend behavior (`allowProjectOverride` defaults 
 6. **Verify**  
    Submit a test lead → CRM Leads (filtered by project) → Settings → Integrations → Configure → Recent logs.
 
+7. **(Optional) Live homepage lead counter**  
+   The same API key can read the workspace active-lead total (non-archived) for marketing-site metrics:
+   ```txt
+   GET /api/integrations/website/stats/leads
+   Authorization: Bearer <apiKey>
+   ```
+   Response: `{ "data": { "totalLeads": 38380 } }`. Store the key only on the website **server**; never expose it in the browser.
+
 ---
 
 ## Payload contract

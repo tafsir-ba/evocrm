@@ -510,6 +510,17 @@ export async function countActiveLeadsForProject(
   );
 }
 
+export async function countActiveLeadsForWorkspace(
+  workspaceId: string,
+): Promise<number> {
+  await connectDb();
+  return LeadModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      archivedAt: null,
+    }),
+  );
+}
+
 export async function findActiveLeadsByEmailNormalized(
   workspaceId: string,
   emailNormalizedValues: string[],
