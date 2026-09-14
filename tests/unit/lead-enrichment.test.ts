@@ -28,7 +28,9 @@ import {
   isPlausibleJobTitle,
   mergeInferredOccupationalSuggestions,
   originLabel,
+  personNameFromEnrichmentQuery,
   sanitizeEnrichmentText,
+  searchHitsWorthKeeping,
 } from "@/lib/lead-enrichment";
 import { getLeadEnrichmentDemoFixture, DEMO_AMBIGUOUS_EMAIL, DEMO_UNIQUE_EMAIL } from "@/tests/fixtures/lead-enrichment-demo";
 import {
@@ -634,5 +636,34 @@ describe("lead enrichment contract", () => {
         "Alisa Scarlett-Buchanan",
       ).map((hit) => hit.url),
     ).toEqual(["https://nla.gov.jm/reports/alisa-scarlett-buchanan"]);
+  });
+
+  it("treats person-irrelevant provider hits as not worth keeping so OpenAI can run", () => {
+    expect(personNameFromEnrichmentQuery('"Kelly Schmaltzried" Switzerland')).toBe(
+      "Kelly Schmaltzried",
+    );
+    expect(
+      personNameFromEnrichmentQuery('"Kelly Schmaltzried" "schmaltzriedkelly@gmail.com"'),
+    ).toBe("Kelly Schmaltzried");
+
+    const junk = [
+      {
+        url: "https://example.com/unrelated-geneva-news",
+        title: "Geneva housing market update",
+        snippet: "Prices rose in Confignon this quarter.",
+      },
+    ];
+    expect(searchHitsWorthKeeping(junk, '"Kelly Schmaltzried" Geneva')).toBe(false);
+
+    const linkedin = [
+      {
+        url: "https://www.linkedin.com/in/kelly-schmaltzried",
+        title: "Kelly Schmaltzried - Product Manager",
+        snippet: "Geneva, Switzerland",
+      },
+    ];
+    expect(searchHitsWorthKeeping(linkedin, '"Kelly Schmaltzried" LinkedIn Geneva')).toBe(
+      true,
+    );
   });
 });
