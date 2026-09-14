@@ -752,6 +752,37 @@ export function hitMentionsPerson(
   return matches.length >= Math.min(2, tokens.length);
 }
 
+/** First quoted person name in an Enrich search query (`"Ada Lovelace" Geneva`). */
+export function personNameFromEnrichmentQuery(query: string): string {
+  for (const match of query.matchAll(/"([^"]+)"/g)) {
+    const part = match[1]?.trim() ?? "";
+    if (!part || part.includes("@")) {
+      continue;
+    }
+    if (personNameTokens(part).length > 0) {
+      return part;
+    }
+  }
+  return query.replace(/"/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Whether provider hits are strong enough to skip the next search backend.
+ * Irrelevant Tavily/Brave noise must not block OpenAI web search.
+ */
+export function searchHitsWorthKeeping(
+  hits: Array<{ url: string; title: string; snippet?: string }>,
+  query: string,
+): boolean {
+  if (hits.length === 0) {
+    return false;
+  }
+  const name = personNameFromEnrichmentQuery(query);
+  return hits.some(
+    (hit) => !isLowQualityEnrichmentUrl(hit.url) && hitMentionsPerson(hit, name),
+  );
+}
+
 export function isPlausibleJobTitle(value: string): boolean {
   const trimmed = value.trim();
   if (trimmed.length < 2 || trimmed.length > 80) {

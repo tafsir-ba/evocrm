@@ -4,7 +4,11 @@ import type { LeadEnrichmentAllowedSource } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentFieldKey } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentIdentityMatch } from "@/lib/lead-enrichment";
 import type { LeadEnrichmentSearchHit } from "@/lib/lead-enrichment";
-import { isHttpsUrl, PEOPLE_DATA_VENDOR_HOSTS } from "@/lib/lead-enrichment";
+import {
+  isHttpsUrl,
+  PEOPLE_DATA_VENDOR_HOSTS,
+  searchHitsWorthKeeping,
+} from "@/lib/lead-enrichment";
 import { extractOpenAiWebSearchHits } from "@/lib/openai-web-search-hits";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
@@ -231,28 +235,56 @@ export async function defaultSearch(
   _allowedSources: LeadEnrichmentAllowedSource[],
   options: EnrichmentSearchOptions = {},
 ): Promise<{ hits: LeadEnrichmentSearchHit[]; provider: string }> {
+  let weakFallback: { hits: LeadEnrichmentSearchHit[]; provider: string } | null = null;
+
+  const consider = (
+    hits: LeadEnrichmentSearchHit[],
+    provider: string,
+  ): { hits: LeadEnrichmentSearchHit[]; provider: string } | null => {
+    if (hits.length === 0) {
+      return null;
+    }
+    if (searchHitsWorthKeeping(hits, query)) {
+      return { hits, provider };
+    }
+    // Person-irrelevant noise — keep as last resort, try the next backend.
+    weakFallback ??= { hits, provider };
+    return null;
+  };
+
   if (getEnv().TAVILY_API_KEY) {
     try {
-      const hits = await searchTavily(query, options);
-      if (hits.length > 0) {
-        return { hits, provider: "tavily" };
+      const accepted = consider(await searchTavily(query, options), "tavily");
+      if (accepted) {
+        return accepted;
       }
     } catch {
-      // Empty or failed Tavily — try the next provider rather than fail the run.
+      // Empty, failed, or irrelevant Tavily — try the next provider rather than fail the run.
     }
   }
   if (getEnv().BRAVE_SEARCH_API_KEY) {
     try {
-      const hits = await searchBrave(query);
-      if (hits.length > 0) {
-        return { hits, provider: "brave" };
+      const accepted = consider(await searchBrave(query), "brave");
+      if (accepted) {
+        return accepted;
       }
     } catch {
       // Fall through to OpenAI web search.
     }
   }
-  const openai = await searchOpenAiWeb(query);
-  return { hits: openai.hits, provider: "openai_web_search" };
+  try {
+    const openai = await searchOpenAiWeb(query);
+    if (openai.hits.length > 0) {
+      if (searchHitsWorthKeeping(openai.hits, query) || !weakFallback) {
+        return { hits: openai.hits, provider: "openai_web_search" };
+      }
+    }
+  } catch (error) {
+    if (!weakFallback) {
+      throw error;
+    }
+  }
+  return weakFallback ?? { hits: [], provider: "openai_web_search" };
 }
 
 function parseJsonObject(text: string): Record<string, unknown> {
