@@ -79,6 +79,21 @@ This document matches current backend behavior (`allowProjectOverride` defaults 
 Sending a `projectId` that does not match the locked default returns **`403 FORBIDDEN`**.  
 Sending a non-ObjectId `projectId` returns **`400 VALIDATION_ERROR`**.
 
+### Compatibility (any marketing site)
+
+The webhook maps common aliases before validating, then **ignores unknown extra fields**. `workspaceId` / `createdBy` in the body are never trusted. Examples that succeed:
+
+| Site field | Stored as |
+|------------|-----------|
+| `first_name` / `last_name` | `firstName` / `lastName` |
+| `utm_source`, `utm_medium`, `utm_campaign` | nested `utm` |
+| `project` / `project_name` | `projectReference` (or `projectId` if it is a 24-char ObjectId) |
+| `source_unit` / `unit` | `propertyReference` |
+| `consent: true` | `emailConsentStatus: subscribed` |
+| `lead_type`, `source_page`, `source_url` | appended onto `message` |
+
+Project labels match an **active** workspace project by reference or name, ignoring case and accents (`eveil` / `Éveil` / `EVEIL`). If several projects fold to the same label, the payload is rejected rather than guessed.
+
 ### Minimal locked example
 
 ```json

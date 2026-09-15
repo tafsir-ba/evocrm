@@ -277,6 +277,44 @@ describe("integrations API", () => {
     expect(captureWebsiteLeadFromRequest).toHaveBeenCalled();
   });
 
+  it("accepts marketing-site extra fields on the website lead webhook", async () => {
+    vi.mocked(captureWebsiteLeadFromRequest).mockResolvedValue({
+      leadId: "lead-2",
+      duplicate: false,
+      idempotent: false,
+    });
+
+    const response = await captureWebsiteLead(
+      new Request("http://localhost/api/integrations/website/leads", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer evocrm_whk_secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          first_name: "Anne",
+          last_name: "Martin",
+          email: "anne@example.com",
+          project: "Eveil",
+          lead_type: "general_contact",
+          utm_source: "newsletter",
+          consent: true,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(captureWebsiteLeadFromRequest).toHaveBeenCalled();
+    const parsed = vi.mocked(captureWebsiteLeadFromRequest).mock.calls.at(-1)?.[1];
+    expect(parsed).toMatchObject({
+      firstName: "Anne",
+      lastName: "Martin",
+      projectReference: "Eveil",
+      emailConsentStatus: "subscribed",
+      utm: { source: "newsletter" },
+    });
+  });
+
   it("returns 401 when webhook API key is missing", async () => {
     const response = await captureWebsiteLead(
       new Request("http://localhost/api/integrations/website/leads", {

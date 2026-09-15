@@ -483,8 +483,23 @@ export async function findProjectByReference(
   reference: string,
 ): Promise<ProjectRecord | null> {
   await connectDb();
+  const trimmed = reference.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const exact = await ProjectModel.findOne(
+    withWorkspaceScope(workspaceId, { reference: trimmed }),
+  ).lean<ProjectDocument>();
+  if (exact) {
+    return toProjectRecord(exact);
+  }
+
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const document = await ProjectModel.findOne(
-    withWorkspaceScope(workspaceId, { reference: reference.trim() }),
+    withWorkspaceScope(workspaceId, {
+      reference: { $regex: `^${escaped}$`, $options: "i" },
+    }),
   ).lean<ProjectDocument>();
   return document ? toProjectRecord(document) : null;
 }

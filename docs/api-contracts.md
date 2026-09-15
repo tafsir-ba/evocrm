@@ -843,6 +843,8 @@ Duplicate email (same project) or repeated idempotency key returns HTTP 200 with
 
 Required payload fields: `firstName`, `lastName`, and at least one of `email` or `phone`. Optional: `externalId`, `idempotencyKey`, `message`, `source`, `preferredAreas`, `budgetMin`, `budgetMax`, `propertyReference`, `projectId`, `projectReference`, `emailConsentStatus`, `utm`.
 
+Inbound website payloads are **normalized before strict validation**. Common marketing-site aliases are accepted (`first_name` / `last_name`, flat `utm_source`, `project` as `projectReference`, `source_unit` as `propertyReference`, `consent`). Unknown extra fields (including `workspaceId`) are ignored — workspace is always derived from the API key. Project labels match an active project by reference or name, case- and accent-insensitively.
+
 Inbound leads set `sourceId` from dictionary item `lead_source` key `website` when available. UTM/external metadata is stored in `Lead.attributes.integration`.
 
 **Project routing:** Website integrations are locked to `defaultProjectId` by default (`allowProjectOverride: false`).
@@ -935,7 +937,7 @@ UI: floating widget on authenticated workspace shell; platform admin menu at `/a
 ## Request Validation
 
 - All mutation bodies validated with Zod on the server.
-- Reject unknown fields if using strict schemas.
+- Reject unknown fields if using strict schemas. Website lead capture is the exception: aliases are mapped, then extra keys (including `workspaceId`) are stripped so marketing sites are not rejected for undocumented fields. Workspace is still derived only from the integration API key.
 - Return `VALIDATION_ERROR` with `details` keyed by field path.
 
 ---

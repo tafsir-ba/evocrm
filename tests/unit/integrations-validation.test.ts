@@ -93,7 +93,7 @@ describe("website lead capture validation", () => {
     expect(missingContact.success).toBe(false);
   });
 
-  it("rejects trusted workspaceId in payload", () => {
+  it("ignores trusted workspaceId in payload", () => {
     const result = websiteSchema.safeParse({
       firstName: "John",
       lastName: "Smith",
@@ -101,7 +101,7 @@ describe("website lead capture validation", () => {
       workspaceId: "000000000000000000000000",
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("validates budget range", () => {

@@ -31,6 +31,7 @@ import {
   findProjectByReference,
   findProjects,
 } from "@/server/repositories/projects";
+import { foldProjectLabel } from "@/lib/project-label";
 import type { WebsiteLeadCaptureInput } from "@/server/validation/website-lead-capture";
 
 export type WebsiteLeadCaptureResult = {
@@ -38,6 +39,35 @@ export type WebsiteLeadCaptureResult = {
   duplicate: boolean;
   idempotent: boolean;
 };
+
+async function findProjectForWebsiteLabel(
+  workspaceId: string,
+  label: string,
+): Promise<Awaited<ReturnType<typeof findProjectByReference>>> {
+  const trimmed = label.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const byReference = await findProjectByReference(workspaceId, trimmed);
+  if (byReference && !byReference.archivedAt) {
+    return byReference;
+  }
+
+  const folded = foldProjectLabel(trimmed);
+  if (!folded) {
+    return null;
+  }
+
+  const projects = await findProjects(workspaceId, { includeArchived: false });
+  const matches = projects.filter((project) => {
+    return (
+      foldProjectLabel(project.reference) === folded || foldProjectLabel(project.name) === folded
+    );
+  });
+
+  return matches.length === 1 ? matches[0] : null;
+}
 
 export async function resolveWebsiteLeadProjectId(input: {
   workspaceId: string;
@@ -67,7 +97,7 @@ export async function resolveWebsiteLeadProjectId(input: {
     }
 
     if (payload.projectReference?.trim()) {
-      const project = await findProjectByReference(
+      const project = await findProjectForWebsiteLabel(
         workspaceId,
         payload.projectReference.trim(),
       );
@@ -97,7 +127,7 @@ export async function resolveWebsiteLeadProjectId(input: {
   }
 
   if (payload.projectReference?.trim()) {
-    const project = await findProjectByReference(
+    const project = await findProjectForWebsiteLabel(
       workspaceId,
       payload.projectReference.trim(),
     );

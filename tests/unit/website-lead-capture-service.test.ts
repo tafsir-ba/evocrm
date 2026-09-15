@@ -639,6 +639,42 @@ describe("website lead capture service", () => {
     expect(findProjectByReference).toHaveBeenCalledWith("ws-1", "default");
   });
 
+  it("matches website project labels to name or reference ignoring case and accents", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+    vi.mocked(findProjects).mockResolvedValue([
+      {
+        ...activeProject,
+        id: "eveil-project",
+        name: "Éveil",
+        reference: "EVEIL",
+      },
+    ]);
+
+    const projectId = await resolveWebsiteLeadProjectId({
+      workspaceId: "ws-1",
+      integration: { ...integration, allowProjectOverride: true },
+      payload: { projectReference: "Eveil" },
+    });
+
+    expect(projectId).toBe("eveil-project");
+  });
+
+  it("does not guess when several projects fold to the same website label", async () => {
+    vi.mocked(findProjectByReference).mockResolvedValue(null);
+    vi.mocked(findProjects).mockResolvedValue([
+      { ...activeProject, id: "project-a", name: "Vista", reference: "vista" },
+      { ...activeProject, id: "project-b", name: "Vista", reference: "vista-2" },
+    ]);
+
+    await expect(
+      resolveWebsiteLeadProjectId({
+        workspaceId: "ws-1",
+        integration: { ...integration, allowProjectOverride: true },
+        payload: { projectReference: "Vista" },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
   it("uses integration defaultProjectId when configured", async () => {
     vi.mocked(findProjects).mockResolvedValue([
       activeProject,

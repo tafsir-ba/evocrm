@@ -245,7 +245,7 @@ See `/docs/data-access-patterns.md`.
 
 - **Zod** for all API request validation on the server.
 - Frontend validation is UX only — not security.
-- Reject unknown fields on strict schemas where appropriate.
+- Reject unknown fields on strict schemas where appropriate. The public website-lead webhook maps aliases then strips extra keys so site-specific fields cannot break capture; `workspaceId` in the body is ignored.
 - Sanitize and validate file metadata on upload.
 
 ---
