@@ -137,16 +137,20 @@ export async function createWorkspaceForUser(
 export async function listActiveWorkspacesForUser(
   userId: string,
 ): Promise<WorkspaceListItem[]> {
+  const { PROJECT_SHARING_ENABLED } = await import("@/lib/project-sharing-feature");
+  const { findWorkspaceById } = await import("@/server/repositories/workspaces");
+  const { findRoleByIdInWorkspace } = await import("@/server/repositories/roles");
+
   const memberships = await findActiveMembershipsForUser(userId);
   const workspaces: WorkspaceListItem[] = [];
+  const memberWorkspaceIds = new Set<string>();
 
   for (const membership of memberships) {
-    const { findWorkspaceById } = await import("@/server/repositories/workspaces");
-    const { findRoleByIdInWorkspace } = await import("@/server/repositories/roles");
     const workspace = await findWorkspaceById(membership.workspaceId);
     const role = await findRoleByIdInWorkspace(membership.roleId, membership.workspaceId);
 
     if (workspace && role) {
+      memberWorkspaceIds.add(workspace.id);
       workspaces.push({
         id: workspace.id,
         name: workspace.name,
@@ -157,6 +161,43 @@ export async function listActiveWorkspacesForUser(
         roleKey: role.key,
         isOwner: role.key === "owner",
         canEdit: hasPermission(role.permissions, "settings:update"),
+      });
+    }
+  }
+
+  // Project sharing: grant-only collaborators must see grant-backed workspaces
+  // on login / workspace switcher (no WorkspaceMembership is created on accept).
+  if (PROJECT_SHARING_ENABLED) {
+    const { findActiveProjectGrantsAcrossWorkspaces } = await import(
+      "@/server/repositories/project-grants"
+    );
+    const grants = await findActiveProjectGrantsAcrossWorkspaces(userId);
+    const seenGrantWorkspaceIds = new Set<string>();
+
+    for (const grant of grants) {
+      if (
+        memberWorkspaceIds.has(grant.workspaceId) ||
+        seenGrantWorkspaceIds.has(grant.workspaceId)
+      ) {
+        continue;
+      }
+
+      const workspace = await findWorkspaceById(grant.workspaceId);
+      if (!workspace) {
+        continue;
+      }
+
+      seenGrantWorkspaceIds.add(workspace.id);
+      workspaces.push({
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        type: workspace.type,
+        timezone: workspace.timezone,
+        defaultCurrency: workspace.defaultCurrency,
+        roleKey: "shared_project",
+        isOwner: false,
+        canEdit: false,
       });
     }
   }

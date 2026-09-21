@@ -156,7 +156,9 @@ export function WorkspaceListItem({ workspace, initials }: WorkspaceListItemProp
             </span>
             <span className="block text-[12.5px] text-[var(--color-ink-muted)]">
               {workspace.type} · {workspace.timezone} · {workspace.defaultCurrency} ·{" "}
-              {workspace.roleKey}
+              {workspace.roleKey === "shared_project"
+                ? "shared project"
+                : workspace.roleKey}
             </span>
           </span>
         </a>

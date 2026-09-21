@@ -17,6 +17,7 @@
     "reconcile:lead-duplicates": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/reconcile-lead-duplicates.ts",
     "migrate:lead-project-memberships": "npx tsx scripts/backfill-lead-project-memberships.ts",
     "migrate:project-grants": "npx tsx scripts/backfill-project-grants.ts",
+    "ensure:project-grant": "npx tsx scripts/ensure-project-grant.ts",
     "migrate:hubspot-multi-project": "npx tsx scripts/apply-hubspot-multi-project-memberships.ts",
     "migrate:hubspot-gv-pilot": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-gv-pilot.ts",
     "migrate:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-migrate.ts",
