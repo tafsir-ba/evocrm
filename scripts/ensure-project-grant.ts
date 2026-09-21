@@ -7,7 +7,11 @@
  *     --email=maelle@evo-home.ch --project-id=<id> --role=contributor
  *   npx tsx scripts/ensure-project-grant.ts \
  *     --email=maelle@evo-home.ch --project-id=<id> --role=contributor \
- *     --actor-id=<userObjectId> --set-assigned-to
+ *     --actor-id=<userObjectId>
+ *
+ * --set-assigned-to is optional and only allowed when the target user already
+ * has an active WorkspaceMembership (same rule as validateAssignableMember).
+ * Grant-only collaborators must omit it — ProjectGrant alone grants access.
  *
  * Accepts MONGODB_URI or MONGO_URL. Defaults to database `evocrm` when the URI has no db path.
  */
@@ -197,6 +201,15 @@ async function main(): Promise<void> {
   }
 
   if (setAssignedTo && project.assignedTo !== user.id) {
+    const { findMembership } = await import("../server/repositories/memberships");
+    const membership = await findMembership(user.id, workspaceId);
+    if (!membership || membership.status !== "active") {
+      throw new Error(
+        `--set-assigned-to requires an active workspace membership. ` +
+          `${user.email} is grant-only; ProjectGrant is enough for project access. ` +
+          `Omit --set-assigned-to (architecture: validateAssignableMember).`,
+      );
+    }
     await updateProject(workspaceId, projectId, { assignedTo: user.id });
   }
 
