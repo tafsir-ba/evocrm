@@ -188,7 +188,7 @@ export async function createDocumentUploadUrlForWorkspace(
   );
 
   validateDocumentMimeType(input.mimeType);
-  validateDocumentFileSize(input.fileSize);
+  validateDocumentFileSize(input.fileSize, input.linkedEntityType);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
   const sanitizedFileName = sanitizeFileName(input.fileName);
@@ -271,7 +271,7 @@ export async function confirmDocumentUploadForWorkspace(
   );
 
   validateDocumentMimeType(input.mimeType);
-  validateDocumentFileSize(input.fileSize);
+  validateDocumentFileSize(input.fileSize, input.linkedEntityType);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
   const uploaded = await verifyUploadedObject(input.storageKey, input.fileSize);
