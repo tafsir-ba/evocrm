@@ -8,7 +8,7 @@ import { hasPermission } from "@/server/permissions/permissions";
 import { resolveWorkspaceAccess } from "@/server/permissions/resolve-workspace-access";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
-import { archiveDocument, findDocumentById } from "@/server/repositories/documents";
+import { archiveDocument, findDocumentById, updateDocumentLinkedEntity } from "@/server/repositories/documents";
 import { findLeadById, updateLead } from "@/server/repositories/leads";
 import { findProjectById } from "@/server/repositories/projects";
 import {
@@ -441,7 +441,7 @@ export async function publishVisitSessionForWorkspace(
   if (!draft) {
     throw new AppError(
       "VALIDATION_ERROR",
-      "Summarize this visit before publishing.",
+      "Summarize this conversation before saving to lead notes.",
     );
   }
 
@@ -454,7 +454,7 @@ export async function publishVisitSessionForWorkspace(
     if (!hasPermission(access.permissions, "lead:update")) {
       throw new AppError(
         "PERMISSION_DENIED",
-        "lead:update is required to mirror the visit summary onto Lead.notes.",
+        "lead:update is required to mirror the summary onto Lead.notes.",
       );
     }
   }
@@ -519,7 +519,22 @@ export async function publishVisitSessionForWorkspace(
     }
     const stamp = new Date().toISOString().slice(0, 10);
     const noteTitle =
-      title.length > 80 ? `${title.slice(0, 77)}…` : title || `Visit note ${stamp}`;
+      title.length > 80 ? `${title.slice(0, 77)}…` : title || `Note ${stamp}`;
+
+    const mediaDocs = (
+      await Promise.all(
+        session.documentIds.map((documentId) => findDocumentById(workspaceId, documentId)),
+      )
+    ).filter((doc): doc is NonNullable<typeof doc> => Boolean(doc && !doc.archivedAt));
+
+    const attachmentLines = mediaDocs.map(
+      (doc) => `- ${doc.fileName} (${doc.mimeType})`,
+    );
+    const noteDescription =
+      attachmentLines.length > 0
+        ? `${body}\n\n— Attachments (also in lead Files) —\n${attachmentLines.join("\n")}`
+        : body;
+
     await createActivityForWorkspace(workspaceId, actorId, {
       typeId: noteType.id,
       statusId: completedStatus.id,
@@ -527,8 +542,19 @@ export async function publishVisitSessionForWorkspace(
       projectId: session.projectId,
       propertyId: session.propertyId ?? undefined,
       title: noteTitle,
-      description: body,
+      description: noteDescription.slice(0, 5000),
     });
+
+    // Surface original session media on the lead Files profile (keep VisitSession documentIds).
+    for (const doc of mediaDocs) {
+      if (doc.linkedEntityType === "lead" && doc.linkedEntityId === session.leadId) {
+        continue;
+      }
+      await updateDocumentLinkedEntity(workspaceId, doc.id, {
+        linkedEntityType: "lead",
+        linkedEntityId: session.leadId,
+      });
+    }
   }
 
   if (input.createTasksFromNextSteps) {
@@ -553,7 +579,7 @@ export async function publishVisitSessionForWorkspace(
           projectId: session.projectId,
           title: step.text.slice(0, 120),
           description: step.ownerName
-            ? `Owner noted in visit: ${step.ownerName}`
+            ? `Owner noted in conversation: ${step.ownerName}`
             : undefined,
           dueDate: step.dueDate ?? undefined,
         });
@@ -565,7 +591,7 @@ export async function publishVisitSessionForWorkspace(
     const lead = await findLeadById(workspaceId, session.leadId);
     if (lead) {
       const stamp = new Date().toISOString().slice(0, 10);
-      const mirror = `[Visit ${stamp}]\n${body}`;
+      const mirror = `[Note ${stamp}]\n${body}`;
       const notes = lead.notes?.trim()
         ? `${lead.notes.trim()}\n\n${mirror}`
         : mirror;

@@ -131,8 +131,8 @@ export function deriveVisitSessionTitle(text: string): string {
 export function formatVisitSessionFallbackTitle(createdAt: Date | string): string {
   const date =
     createdAt instanceof Date ? createdAt : new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return "New visit";
-  return `Visit · ${date.toLocaleDateString(undefined, {
+  if (Number.isNaN(date.getTime())) return "New note";
+  return `Note · ${date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
   })}`;

@@ -218,3 +218,36 @@ export async function archiveDocument(
 
   return toDocumentRecord(document as DocumentDocument);
 }
+
+/** Re-point an active document at another authorized entity (e.g. visit_session → lead on publish). */
+export async function updateDocumentLinkedEntity(
+  workspaceId: string,
+  documentId: string,
+  input: {
+    linkedEntityType: DocumentRecord["linkedEntityType"];
+    linkedEntityId: string;
+  },
+): Promise<DocumentRecord | null> {
+  await connectDb();
+
+  const document = await DocumentModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, {
+      _id: documentId,
+      status: "active",
+      archivedAt: null,
+    }),
+    {
+      $set: {
+        linkedEntityType: input.linkedEntityType,
+        linkedEntityId: input.linkedEntityId,
+      },
+    },
+    { new: true },
+  ).lean();
+
+  if (!document) {
+    return null;
+  }
+
+  return toDocumentRecord(document as DocumentDocument);
+}

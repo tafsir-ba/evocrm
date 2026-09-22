@@ -21,7 +21,7 @@ describe("visit session titles", () => {
   it("formats a fallback title from createdAt", () => {
     expect(
       formatVisitSessionFallbackTitle("2026-09-22T10:00:00.000Z"),
-    ).toMatch(/^Visit ·/);
+    ).toMatch(/^Note ·/);
   });
 });
 

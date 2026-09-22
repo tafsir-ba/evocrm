@@ -47,6 +47,7 @@ vi.mock("@/server/repositories/visit-sessions", () => ({
 vi.mock("@/server/repositories/documents", () => ({
   archiveDocument: (...args: unknown[]) => archiveDocument(...args),
   findDocumentById: vi.fn(),
+  updateDocumentLinkedEntity: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/leads", () => ({
@@ -231,7 +232,7 @@ describe("visit-sessions P1 permission and archive integrity", () => {
     expect(updateLead).toHaveBeenCalledWith(
       baseSession.workspaceId,
       baseSession.leadId,
-      expect.objectContaining({ notes: expect.stringContaining("[Visit ") }),
+      expect.objectContaining({ notes: expect.stringContaining("[Note ") }),
     );
     expect(updateActivityForWorkspace).not.toHaveBeenCalled();
   });

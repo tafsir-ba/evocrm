@@ -90,7 +90,7 @@ export function VisitHistoryDrawer({
                 </p>
                 <p className="mt-0.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
                   {[item.leadName, item.propertyLabel].filter(Boolean).join(" · ") ||
-                    "Visit"}
+                    "Lead"}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[var(--color-ink-faint)]">
                   {when}

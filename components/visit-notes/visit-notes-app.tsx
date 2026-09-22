@@ -20,6 +20,7 @@ import {
   VisitHistoryDrawer,
   type VisitHistoryItem,
 } from "@/components/visit-notes/visit-history-drawer";
+import { LiveMicWaveform } from "@/components/visit-notes/live-mic-waveform";
 import { VisitMediaMessage } from "@/components/visit-notes/visit-media-message";
 import {
   IconArrowLeft,
@@ -34,9 +35,15 @@ import {
   IconPlus,
   IconSearch,
   IconSend,
+  IconShare,
   IconSparkles,
   IconVideo,
 } from "@/lib/icons";
+import {
+  buildConversationExport,
+  downloadNotesExport,
+  shareNotesText,
+} from "@/lib/notes-share";
 import { cn } from "@/lib/utils";
 import {
   clearOfflineDraft,
@@ -210,7 +217,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [micLevels, setMicLevels] = useState<number[]>([0, 0, 0, 0, 0]);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
@@ -225,20 +232,19 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [unitQuery, setUnitQuery] = useState("");
   const [unitHits, setUnitHits] = useState<PropertyHit[]>([]);
   const [unitSearching, setUnitSearching] = useState(false);
+  const [showJumpLatest, setShowJumpLatest] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const cancelRecordingRef = useRef(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const analyserFrameRef = useRef<number | null>(null);
   const recordingStartedAtRef = useRef<number | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
   const photoCaptureInputRef = useRef<HTMLInputElement | null>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const streamEndRef = useRef<HTMLDivElement | null>(null);
+  const threadScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
@@ -745,7 +751,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         const body = await response.json();
         if (!response.ok) {
           throw new VisitMediaUploadError(
-            apiErrorMessage(body, "Could not attach media to this visit."),
+            apiErrorMessage(body, "Could not attach media to this note."),
             {
               stage: "attach",
               status: response.status,
@@ -874,15 +880,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (file) enqueueMedia(file);
   }
 
-  function stopAnalyserLoop() {
-    if (analyserFrameRef.current !== null) {
-      window.cancelAnimationFrame(analyserFrameRef.current);
-      analyserFrameRef.current = null;
-    }
-    analyserRef.current = null;
-    setMicLevels([0, 0, 0, 0, 0]);
-  }
-
   function stopRecordingTimer() {
     if (recordingTimerRef.current !== null) {
       window.clearInterval(recordingTimerRef.current);
@@ -892,56 +889,11 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }
 
   function cleanupRecordingResources() {
-    stopAnalyserLoop();
     stopRecordingTimer();
-    if (audioContextRef.current) {
-      void audioContextRef.current.close().catch(() => undefined);
-      audioContextRef.current = null;
-    }
+    setRecordingStream(null);
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
-    }
-  }
-
-  function startMicLevelMeter(stream: MediaStream) {
-    const AudioCtx =
-      typeof window !== "undefined"
-        ? window.AudioContext ||
-          (window as unknown as { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext
-        : undefined;
-    if (!AudioCtx) return;
-
-    try {
-      const context = new AudioCtx();
-      const source = context.createMediaStreamSource(stream);
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.75;
-      source.connect(analyser);
-      audioContextRef.current = context;
-      analyserRef.current = analyser;
-      const data = new Uint8Array(analyser.frequencyBinCount);
-
-      const tick = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(data);
-        const bands = 5;
-        const slice = Math.floor(data.length / bands);
-        const nextLevels: number[] = [];
-        for (let i = 0; i < bands; i += 1) {
-          let sum = 0;
-          const start = i * slice;
-          for (let j = start; j < start + slice; j += 1) sum += data[j] ?? 0;
-          nextLevels.push(Math.min(1, sum / (slice * 180)));
-        }
-        setMicLevels(nextLevels);
-        analyserFrameRef.current = window.requestAnimationFrame(tick);
-      };
-      analyserFrameRef.current = window.requestAnimationFrame(tick);
-    } catch {
-      // Timer still works without AudioContext / analyser support.
     }
   }
 
@@ -970,6 +922,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
+      setRecordingStream(stream);
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       cancelRecordingRef.current = false;
@@ -997,14 +950,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           : mimeType.includes("mp4") || mimeType.includes("aac")
             ? "m4a"
             : "audio";
-        const file = new File([blob], `visit-audio-${Date.now()}.${extension}`, {
+        const file = new File([blob], `note-audio-${Date.now()}.${extension}`, {
           type: mimeType,
         });
         enqueueMedia(file);
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
-      startMicLevelMeter(stream);
       startRecordingClock();
       setRecording(true);
       setError(null);
@@ -1036,7 +988,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (!session) return;
     setBusy("summarize");
     setError(null);
-    setStatusBanner("Summarizing visit…");
+    setStatusBanner("Summarizing conversation…");
     try {
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/summarize`,
@@ -1087,16 +1039,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       );
       const body = await response.json();
       if (!response.ok) {
-        throw new Error(apiErrorMessage(body, "Publish failed."));
+        throw new Error(apiErrorMessage(body, "Could not save to lead notes."));
       }
       const next = normalizeSession(body.data.session as VisitSession);
       setSession(next);
       setDraftBody(next.draftBody ?? "");
       upsertSessionInList(next);
       if (selectedLead) await loadSessionsForLead(selectedLead.id);
-      setStatusBanner(null);
+      setStatusBanner("Saved to lead notes. Media is on the lead Files tab.");
     } catch (err) {
-      failBanner(err instanceof Error ? err.message : "Publish failed.");
+      failBanner(err instanceof Error ? err.message : "Could not save to lead notes.");
     } finally {
       setBusy(null);
     }
@@ -1147,6 +1099,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   const currentWorkspace = workspaces.find((item) => item.slug === workspaceSlug);
   const composerBusy = Boolean(busy) || pendingUploads.some((item) => item.status !== "failed");
+  const mediaBusy = pendingUploads.some(
+    (item) => item.status === "uploading" || item.status === "transcribing",
+  );
   const visibleMessages = useMemo(
     () => (session?.messages ?? []).filter((message) => message.kind !== "transcript"),
     [session?.messages],
@@ -1167,6 +1122,86 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     [sessions, selectedLead],
   );
   const linkedUnitLabel = propertyLabel(session?.property ?? null);
+  const hasSummary = Boolean(draftBody.trim() || session?.draftBody?.trim());
+
+  async function shareSummaryOrExport(options?: { allowExportWithoutSummary?: boolean }) {
+    if (!session) return;
+    const summary = draftBody.trim() || session.draftBody?.trim() || "";
+    if (!summary && !options?.allowExportWithoutSummary) {
+      setStatusBanner("Generate a summary first, or use Share → Download export.");
+      return;
+    }
+
+    const title = sessionDisplayTitle(session);
+    const text =
+      summary ||
+      buildConversationExport({
+        title,
+        leadName: session.lead?.fullName ?? selectedLead?.fullName ?? null,
+        unitLabel: linkedUnitLabel,
+        messages: visibleMessages.map((message) => ({
+          kind: message.kind,
+          text: message.text,
+          createdAt: message.createdAt,
+        })),
+        summary: summary || null,
+      });
+
+    setBusy("share");
+    try {
+      const result = await shareNotesText({ title, text });
+      if (result === "shared") {
+        setStatusBanner("Shared.");
+      } else if (result === "copied") {
+        setStatusBanner("Copied to clipboard.");
+      } else if (result === "cancelled") {
+        setStatusBanner(null);
+      } else {
+        downloadNotesExport({
+          fileName: `${title.replace(/[^\w.-]+/g, "_") || "note"}.txt`,
+          text,
+        });
+        setStatusBanner("Download started.");
+      }
+    } finally {
+      setBusy(null);
+      setAttachMenuOpen(false);
+    }
+  }
+
+  function downloadConversationExport() {
+    if (!session) return;
+    const title = sessionDisplayTitle(session);
+    const text = buildConversationExport({
+      title,
+      leadName: session.lead?.fullName ?? selectedLead?.fullName ?? null,
+      unitLabel: linkedUnitLabel,
+      messages: visibleMessages.map((message) => ({
+        kind: message.kind,
+        text: message.text,
+        createdAt: message.createdAt,
+      })),
+      summary: draftBody.trim() || session.draftBody || null,
+    });
+    downloadNotesExport({
+      fileName: `${title.replace(/[^\w.-]+/g, "_") || "note"}.txt`,
+      text,
+    });
+    setAttachMenuOpen(false);
+    setStatusBanner("Export downloaded.");
+  }
+
+  function jumpToLatest() {
+    streamEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    setShowJumpLatest(false);
+  }
+
+  function onThreadScroll() {
+    const el = threadScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowJumpLatest(distanceFromBottom > 120);
+  }
 
   if (workspaces.length === 0) {
     return (
@@ -1174,7 +1209,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         <div className="max-w-md text-center">
           <h1 className="text-xl font-semibold text-[var(--color-ink)]">Notes</h1>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Join or create a workspace before capturing visit notes for a lead.
+            Join or create a workspace before capturing notes for a lead.
           </p>
           <Link href="/workspaces" className="inline-block mt-4">
             <Button>Open workspaces</Button>
@@ -1186,7 +1221,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   return (
     <div className="min-h-dvh bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_40%,#f8fafc_100%)] text-[var(--color-ink)] flex flex-col">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-white/90 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+      <header
+        className={cn(
+          "z-30 border-b border-[var(--color-line)] bg-white/95 backdrop-blur-md pt-[env(safe-area-inset-top)]",
+          session
+            ? "fixed inset-x-0 top-0"
+            : "sticky top-0",
+        )}
+        data-testid="notes-sticky-header"
+      >
         {session ? (
           <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5">
             <button
@@ -1235,7 +1278,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               )}
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
                 <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
-                  {session.lead?.fullName ?? selectedLead?.fullName ?? "Visit"}
+                  {session.lead?.fullName ?? selectedLead?.fullName ?? "Lead"}
                 </p>
                 {sessionRefreshing && (
                   <span className="shrink-0 text-[11px] text-[var(--color-ink-faint)]">
@@ -1364,7 +1407,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-ink-faint)]" />
                 <Input
                   className="pl-9"
-                  placeholder="Who is this visit with?"
+                  placeholder="Who is this note about?"
                   value={leadQuery}
                   onChange={(event) => setLeadQuery(event.target.value)}
                 />
@@ -1392,7 +1435,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         )}
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4">
+      <main
+        className={cn(
+          "mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))]",
+          session ? "pt-[calc(4.75rem+env(safe-area-inset-top))]" : "pt-4",
+        )}
+      >
         {(error || statusBanner) && (
           <div className="mb-3 space-y-2">
             {error && (
@@ -1416,7 +1464,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[var(--shadow-sm)] border border-[var(--color-line)]">
               <IconSearch className="h-6 w-6 text-[var(--color-brand-600)]" />
             </div>
-            <h2 className="text-[17px] font-semibold">Who are you visiting?</h2>
+            <h2 className="text-[17px] font-semibold">Who is this note about?</h2>
             <p className="mt-1.5 max-w-sm text-[13.5px] text-[var(--color-ink-muted)]">
               Pick someone once, then type, talk, or attach.
             </p>
@@ -1433,8 +1481,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         )}
 
         {session && (
-          <div className="flex flex-1 flex-col gap-3">
-            <div className="flex-1 space-y-2.5">
+          <div className="relative flex flex-1 flex-col gap-3">
+            <div
+              ref={threadScrollRef}
+              onScroll={onThreadScroll}
+              className="flex-1 space-y-2.5 overflow-y-auto"
+              data-testid="notes-thread"
+            >
               {visibleMessages.length === 0 && pendingUploads.length === 0 && (
                 <p className="px-1 py-8 text-center text-[13.5px] text-[var(--color-ink-muted)]">
                   Type a note, tap the mic, or attach a photo.
@@ -1613,7 +1666,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
                   >
                     <IconSparkles className="h-3.5 w-3.5" />
-                    {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
+                    {busy === "summarize" ? "Summarizing…" : "Summarize conversation"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void shareSummaryOrExport()}
+                    disabled={Boolean(busy) || !hasSummary}
+                    title={
+                      hasSummary
+                        ? "Share the generated summary"
+                        : "Summarize first to share"
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                  >
+                    <IconShare className="h-3.5 w-3.5" />
+                    Share
                   </button>
                   <select
                     className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
@@ -1637,7 +1704,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                           Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
                         </h3>
                         <p className="text-[11.5px] text-[var(--color-ink-muted)]">
-                          {session.project?.name ?? "Project"} · saves to the lead Notes profile
+                          Saves the summary and media to this lead’s CRM notes profile
                         </p>
                       </div>
                       <Button
@@ -1653,11 +1720,22 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       value={draftBody}
                       onChange={(event) => setDraftBody(event.target.value)}
                       className="min-h-[160px] bg-white"
-                      placeholder="Edit the visit summary before publishing…"
+                      placeholder="Edit the summary before saving to the lead…"
                     />
                   </div>
                 )}
               </section>
+            )}
+
+            {showJumpLatest && (
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-[var(--color-line)] bg-white px-3 py-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] shadow-[var(--shadow-sm)]"
+                data-testid="jump-to-latest"
+              >
+                Jump to latest
+              </button>
             )}
           </div>
         )}
@@ -1671,15 +1749,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 <p className="shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)]">
                   {formatRecordingTimer(recordingSeconds)}
                 </p>
-                <div className="flex h-6 items-end gap-0.5" aria-hidden>
-                  {micLevels.map((level, index) => (
-                    <span
-                      key={index}
-                      className="w-1 rounded-full bg-[var(--color-danger-fg)] transition-[height] duration-75"
-                      style={{ height: `${Math.max(15, level * 100)}%` }}
-                    />
-                  ))}
-                </div>
+                <LiveMicWaveform stream={recordingStream} active={recording} />
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" type="button" onClick={cancelRecording}>
@@ -1730,7 +1800,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 aria-label="Add attachment"
                 aria-expanded={attachMenuOpen}
                 aria-controls={attachMenuId}
-                disabled={composerBusy && !recording}
+                disabled={mediaBusy && !recording}
+                data-testid="notes-attach-button"
               >
                 {attachMenuOpen ? (
                   <IconClose className="h-5 w-5" />
@@ -1774,6 +1845,27 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       ≤{Math.round(VISIT_VIDEO_MAX_DURATION_SECONDS / 60)} min
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                    disabled={Boolean(busy)}
+                    onClick={() => {
+                      if (hasSummary) {
+                        void shareSummaryOrExport();
+                      } else {
+                        downloadConversationExport();
+                      }
+                    }}
+                  >
+                    <IconShare className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    {hasSummary ? "Share summary" : "Download export"}
+                  </button>
+                  {!hasSummary && (
+                    <p className="border-t border-[var(--color-line)] px-3.5 py-2 text-[11.5px] text-[var(--color-ink-faint)]">
+                      Summarize first to share a summary. Export shares text only — never private media links.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1786,7 +1878,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               rows={1}
               className="min-h-[44px] max-h-40 flex-1 resize-none rounded-2xl border-[var(--color-line)] px-3.5 py-2.5 text-[16px] leading-snug focus:ring-2"
               disabled={recording}
-              aria-label="Visit note"
+              aria-label="Note message"
             />
 
             {hasComposerText ? (
