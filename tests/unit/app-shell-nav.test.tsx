@@ -75,9 +75,11 @@ describe("app shell navigation", () => {
     renderSidebar();
 
     for (const item of V1_NAV_ITEMS) {
+      const expectedHref =
+        item.segment === "notes" ? "/notes" : `/w/demo-workspace/${item.segment}`;
       expect(
         screen.getByRole("link", { name: item.label }),
-      ).toHaveAttribute("href", `/w/demo-workspace/${item.segment}`);
+      ).toHaveAttribute("href", expectedHref);
     }
   });
 

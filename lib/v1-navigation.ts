@@ -1,5 +1,6 @@
 /**
  * Locked V1 primary navigation — permission-aware from Phase 2.
+ * Visit Notes lives at top-level `/notes` (not under `/w/[slug]/…`).
  */
 
 import { workspaceNavPath } from "@/lib/workspace-paths";
@@ -11,6 +12,7 @@ export const V1_NAV_ITEMS = [
   { segment: "leads", label: "Leads" },
   { segment: "properties", label: "Properties" },
   { segment: "activities", label: "Activities" },
+  { segment: "notes", label: "Notes" },
   { segment: "dripping", label: "Dripping" },
   { segment: "settings", label: "Settings" },
 ] as const;
@@ -42,8 +44,14 @@ export const V1_NAV_PERMISSIONS: Record<V1NavSegment, string> = {
   leads: "lead:read",
   properties: "property:read",
   activities: "activity:read",
+  notes: "activity:read",
   dripping: "campaign:read",
   settings: "settings:read",
+};
+
+/** Absolute (non-workspace) hrefs for specific primary nav segments. */
+export const V1_NAV_ABSOLUTE_HREFS: Partial<Record<V1NavSegment, string>> = {
+  notes: "/notes",
 };
 
 /** Non-nav workspace routes that still require a permission check on direct URL access. */
@@ -58,6 +66,13 @@ export type WorkspaceNavigationItem = {
   segment: V1NavSegment;
 };
 
+export function navHrefForSegment(
+  workspaceSlug: string,
+  segment: V1NavSegment,
+): string {
+  return V1_NAV_ABSOLUTE_HREFS[segment] ?? workspaceNavPath(workspaceSlug, segment);
+}
+
 export function buildPermissionAwareNavigation(
   workspaceSlug: string,
   permissions: readonly string[],
@@ -66,7 +81,7 @@ export function buildPermissionAwareNavigation(
     permissions.includes(V1_NAV_PERMISSIONS[item.segment]),
   ).map((item) => ({
     label: item.label,
-    href: workspaceNavPath(workspaceSlug, item.segment),
+    href: navHrefForSegment(workspaceSlug, item.segment),
     permission: V1_NAV_PERMISSIONS[item.segment],
     segment: item.segment,
   }));

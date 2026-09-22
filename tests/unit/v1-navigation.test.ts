@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FORBIDDEN_PRIMARY_NAV_LABELS,
   V1_NAV_ITEMS,
+  navHrefForSegment,
 } from "@/lib/v1-navigation";
 
 describe("V1 navigation scope", () => {
@@ -14,9 +15,17 @@ describe("V1 navigation scope", () => {
       "Leads",
       "Properties",
       "Activities",
+      "Notes",
       "Dripping",
       "Settings",
     ]);
+  });
+
+  it("routes Notes to the top-level /notes app", () => {
+    expect(navHrefForSegment("demo-workspace", "notes")).toBe("/notes");
+    expect(navHrefForSegment("demo-workspace", "dashboard")).toBe(
+      "/w/demo-workspace/dashboard",
+    );
   });
 
   it("does not include forbidden primary nav labels", () => {
