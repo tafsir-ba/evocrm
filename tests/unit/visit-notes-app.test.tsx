@@ -105,6 +105,80 @@ describe("VisitNotesApp", () => {
     expect(screen.queryByLabelText(/^workspace$/i)).not.toBeInTheDocument();
   });
 
+  it("resumes the latest substantive session instead of an empty open one", async () => {
+    const user = userEvent.setup();
+    const emptyOld = {
+      ...sessionFixture,
+      id: "507f1f77bcf86cd7994390aa",
+      status: "open",
+      title: null,
+      messages: [],
+      createdAt: "2026-09-22T14:52:00.000Z",
+      updatedAt: "2026-09-22T21:40:00.000Z",
+    };
+    const substantive = {
+      ...sessionFixture,
+      id: "507f1f77bcf86cd7994390bb",
+      status: "published",
+      title: "QA media check",
+      messages: [
+        {
+          id: "msg-qa",
+          kind: "text",
+          text: "QA ONLY — no follow-up",
+          documentId: null,
+          status: "ready",
+          error: null,
+          createdAt: "2026-09-22T19:22:00.000Z",
+        },
+      ],
+      createdAt: "2026-09-22T19:22:00.000Z",
+      updatedAt: "2026-09-22T19:30:00.000Z",
+    };
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/leads?") && url.includes("search=")) {
+        return jsonResponse({
+          data: [
+            {
+              id: "507f1f77bcf86cd799439011",
+              fullName: "Ada Buyer",
+              email: "ada@example.com",
+              projectId: "507f1f77bcf86cd799439012",
+            },
+          ],
+        });
+      }
+      if (url.includes("/visit-sessions?") && url.includes("leadId=")) {
+        return jsonResponse({ data: [emptyOld, substantive] });
+      }
+      if (url.includes(`/visit-sessions/${substantive.id}`)) {
+        return jsonResponse({ data: { session: substantive } });
+      }
+      return jsonResponse({ error: { message: "unexpected" } }, 500);
+    }) as typeof fetch;
+
+    render(
+      <VisitNotesApp
+        initialWorkspaces={[
+          {
+            id: "ws1",
+            name: "Evo Home",
+            slug: "evo-home",
+            timezone: "Europe/Zurich",
+          },
+        ]}
+        initialWorkspaceSlug="evo-home"
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/who is this note about/i), "Ada");
+    await user.click(await screen.findByText("Ada Buyer"));
+    expect(await screen.findByText("QA media check")).toBeInTheDocument();
+    expect(screen.getByText("QA ONLY — no follow-up")).toBeInTheDocument();
+  });
+
   it("keeps a ChatGPT-style composer with CRM actions after capture", async () => {
     const user = await openSessionUi();
 
@@ -126,6 +200,8 @@ describe("VisitNotesApp", () => {
       within(menu).getByRole("menuitem", { name: /choose photo \/ file/i }),
     ).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /choose video/i })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /choose audio/i })).toBeInTheDocument();
+    expect(screen.getByTestId("notes-audio-file-input")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/note message/i), "Site visit note");
     expect(screen.getByRole("button", { name: /send note/i })).toBeInTheDocument();

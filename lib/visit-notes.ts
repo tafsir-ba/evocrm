@@ -211,13 +211,90 @@ export function formatVisitDraftBody(draft: VisitDraftBodySource): string {
 
   const confirmation = draft.needsConfirmation.map((item) => `- ${item}`).join("\n");
 
-  return [
-    `Summary\n${draft.summary || "—"}`,
-    `Customer requirements\n${draft.customerRequirements || "—"}`,
-    `Property / project discussed\n${draft.propertyDiscussed || "—"}`,
-    `Questions / objections\n${draft.questionsObjections || "—"}`,
-    `Actions\n${draft.actions || "—"}`,
-    `Next steps\n${nextSteps || "—"}`,
-    `Needs confirmation\n${confirmation || "—"}`,
-  ].join("\n\n");
+  // Omit empty sections — blank "Next steps —" implies invented follow-up.
+  const sections: string[] = [];
+  if (draft.summary.trim()) sections.push(`Summary\n${draft.summary.trim()}`);
+  if (draft.customerRequirements.trim()) {
+    sections.push(`Customer requirements\n${draft.customerRequirements.trim()}`);
+  }
+  if (draft.propertyDiscussed.trim()) {
+    sections.push(`Property / project discussed\n${draft.propertyDiscussed.trim()}`);
+  }
+  if (draft.questionsObjections.trim()) {
+    sections.push(`Questions / objections\n${draft.questionsObjections.trim()}`);
+  }
+  if (draft.actions.trim()) sections.push(`Actions\n${draft.actions.trim()}`);
+  if (nextSteps) sections.push(`Next steps\n${nextSteps}`);
+  if (confirmation) sections.push(`Needs confirmation\n${confirmation}`);
+
+  return sections.join("\n\n");
+}
+
+/** Ready user content (not system/legacy transcript-only rows). */
+export function visitSessionHasSubstantiveContent(session: {
+  messages: Array<{ kind: string; text?: string | null; status?: string }>;
+  title?: string | null;
+  draftBody?: string | null;
+  aiDraft?: unknown | null;
+  status: string;
+}): boolean {
+  if (session.aiDraft) return true;
+  if (session.draftBody?.trim()) return true;
+  if (session.title?.trim()) return true;
+  if (session.status === "published" || session.status === "amended") return true;
+  return session.messages.some((message) => {
+    if (message.kind === "system" || message.kind === "transcript") return false;
+    if (message.status && message.status !== "ready" && message.status !== "failed") {
+      // In-flight media still counts as substantive capture.
+      return message.kind === "photo" || message.kind === "video" || message.kind === "audio";
+    }
+    return (
+      message.kind === "text" ||
+      message.kind === "photo" ||
+      message.kind === "video" ||
+      message.kind === "audio"
+    );
+  });
+}
+
+/**
+ * Prefer last-opened, then latest substantive session.
+ * Do not let empty open sessions win via updatedAt touch/backfill.
+ */
+export function pickResumeVisitSession<
+  T extends {
+    id: string;
+    status: string;
+    createdAt: string;
+    updatedAt?: string;
+    messages: Array<{ kind: string; text?: string | null; status?: string }>;
+    title?: string | null;
+    draftBody?: string | null;
+    aiDraft?: unknown | null;
+  },
+>(sessions: T[], options?: { lastOpenedId?: string | null }): T | null {
+  if (sessions.length === 0) return null;
+
+  const lastOpenedId = options?.lastOpenedId?.trim() || null;
+  if (lastOpenedId) {
+    const remembered = sessions.find(
+      (item) => item.id === lastOpenedId && item.status !== "archived",
+    );
+    if (remembered) return remembered;
+  }
+
+  const byCreatedDesc = [...sessions].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+
+  const substantive = byCreatedDesc.find((item) =>
+    visitSessionHasSubstantiveContent(item),
+  );
+  if (substantive) return substantive;
+
+  return (
+    byCreatedDesc.find(
+      (item) => item.status === "open" || item.status === "draft",
+    ) ?? null
+  );
 }

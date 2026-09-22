@@ -191,4 +191,19 @@ describe("formatVisitDraftBody", () => {
     expect(structured).toContain("Call back");
     expect(structured).toContain("Budget");
   });
+
+  it("omits empty structured sections instead of placeholder dashes", () => {
+    const sparse = formatVisitDraftBody({
+      summary: "Media upload check only",
+      customerRequirements: "",
+      propertyDiscussed: "",
+      questionsObjections: "",
+      actions: "",
+      nextSteps: [],
+      needsConfirmation: [],
+    });
+    expect(sparse).toBe("Summary\nMedia upload check only");
+    expect(sparse).not.toContain("Next steps");
+    expect(sparse).not.toContain("—");
+  });
 });

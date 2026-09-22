@@ -50,16 +50,21 @@ import { cn } from "@/lib/utils";
 import { navHrefForSegment } from "@/lib/v1-navigation";
 import {
   clearOfflineDraft,
+  loadLastOpenedVisitSessionId,
   loadOfflineDraft,
+  saveLastOpenedVisitSessionId,
   saveOfflineDraft,
 } from "@/lib/visit-notes-offline";
 import {
   deriveVisitSessionTitle,
   formatVisitMediaFileSize,
   formatVisitSessionFallbackTitle,
+  pickResumeVisitSession,
   pickSupportedAudioRecorderMimeType,
   resolveVisitMediaMimeType,
+  validateVisitMediaFileClient,
   VISIT_AUDIO_MAX_DURATION_SECONDS,
+  VISIT_AUDIO_MIME_TYPES,
   VISIT_VIDEO_MAX_DURATION_SECONDS,
   visitMediaKindFromMime,
 } from "@/lib/visit-notes";
@@ -246,6 +251,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const photoCaptureInputRef = useRef<HTMLInputElement | null>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
   const streamEndRef = useRef<HTMLDivElement | null>(null);
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -486,9 +492,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setError(null);
     setStatusBanner(null);
     upsertSessionInList(normalized);
+    if (normalized.leadId && workspaceSlug) {
+      saveLastOpenedVisitSessionId(workspaceSlug, normalized.leadId, normalized.id);
+    }
   }
 
-  /** Select lead once → resume open conversation or start a fresh one. */
+  /** Select lead once → resume last-opened / latest substantive conversation. */
   async function selectLead(lead: LeadHit) {
     setSelectedLead(lead);
     setLeadQuery(lead.fullName);
@@ -501,9 +510,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setStatusBanner(null);
     try {
       const list = await loadSessionsForLead(lead.id);
-      const resumable = list.find(
-        (item) => item.status === "open" || item.status === "draft",
-      );
+      const lastOpenedId = loadLastOpenedVisitSessionId(workspaceSlug, lead.id);
+      const resumable = pickResumeVisitSession(list, { lastOpenedId });
       if (resumable) {
         // Instant enter from list payload — no blank “Opening conversation…” when known.
         enterSession(resumable);
@@ -757,7 +765,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             body: JSON.stringify({
               kind,
               documentId,
-              text: file.name,
+              // Audio transcript arrives via /transcribe — avoid filename-as-transcript.
+              text: kind === "audio" ? null : file.name,
             }),
           },
         );
@@ -858,6 +867,11 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   function enqueueMedia(file: File) {
     if (!session) return;
+    const validationError = validateVisitMediaFileClient(file);
+    if (validationError) {
+      failBanner(validationError);
+      return;
+    }
     const coercedType = resolveVisitMediaMimeType(file);
     const kind = visitMediaKindFromMime(coercedType);
     if (!kind) {
@@ -1124,10 +1138,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const mediaBusy = pendingUploads.some(
     (item) => item.status === "uploading" || item.status === "transcribing",
   );
-  const visibleMessages = useMemo(
-    () => (session?.messages ?? []).filter((message) => message.kind !== "transcript"),
-    [session?.messages],
-  );
+  const visibleMessages = useMemo(() => {
+    const pendingDocumentIds = new Set(
+      pendingUploads
+        .map((item) => item.documentId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    return (session?.messages ?? []).filter((message) => {
+      if (message.kind === "transcript") return false;
+      // One in-flight pending card — avoid duplicate player + Attachment.
+      if (message.documentId && pendingDocumentIds.has(message.documentId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [session?.messages, pendingUploads]);
   const historyItems: VisitHistoryItem[] = useMemo(
     () =>
       sessions.map((item) => ({
@@ -1868,6 +1893,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               className="hidden"
               onChange={onFilePicked}
             />
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept={[...VISIT_AUDIO_MIME_TYPES, "audio/*"].join(",")}
+              className="hidden"
+              onChange={onFilePicked}
+              data-testid="notes-audio-file-input"
+            />
 
             <div className="relative shrink-0" ref={attachMenuRef}>
               <button
@@ -1923,6 +1956,19 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     Choose video
                     <span className="ml-auto text-[11px] text-[var(--color-ink-faint)]">
                       ≤{Math.round(VISIT_VIDEO_MAX_DURATION_SECONDS / 60)} min
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    data-testid="notes-choose-audio"
+                    onClick={() => audioInputRef.current?.click()}
+                  >
+                    <IconMic className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    Choose audio
+                    <span className="ml-auto text-[11px] text-[var(--color-ink-faint)]">
+                      ≤{Math.round(VISIT_AUDIO_MAX_DURATION_SECONDS / 60)} min
                     </span>
                   </button>
                   <button

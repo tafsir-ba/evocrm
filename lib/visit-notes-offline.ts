@@ -1,5 +1,6 @@
 const DRAFT_PREFIX = "evocrm.visit-notes.draft.";
 const QUEUE_PREFIX = "evocrm.visit-notes.queue.";
+const LAST_OPENED_PREFIX = "evocrm.visit-notes.last-opened.";
 
 export type OfflineVisitDraft = {
   sessionId: string | null;
@@ -81,6 +82,36 @@ export function saveUploadQueue(
     window.localStorage.setItem(
       storageKey(QUEUE_PREFIX, workspaceSlug, "uploads"),
       JSON.stringify(slim),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+export function loadLastOpenedVisitSessionId(
+  workspaceSlug: string,
+  leadId: string,
+): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(
+      storageKey(LAST_OPENED_PREFIX, workspaceSlug, leadId),
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastOpenedVisitSessionId(
+  workspaceSlug: string,
+  leadId: string,
+  sessionId: string,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      storageKey(LAST_OPENED_PREFIX, workspaceSlug, leadId),
+      sessionId,
     );
   } catch {
     // ignore
