@@ -84,6 +84,8 @@ const visitSessionSchema = new Schema(
     leadId: { type: Schema.Types.ObjectId, ref: "Lead", required: true },
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     activityId: { type: Schema.Types.ObjectId, ref: "Activity", default: null },
+    /** Canonical Note activity shown on the lead Notes tab (idempotent publish target). */
+    noteActivityId: { type: Schema.Types.ObjectId, ref: "Activity", default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, trim: true, default: null, maxlength: 120 },
     propertyId: { type: Schema.Types.ObjectId, ref: "Property", default: null },
@@ -110,6 +112,7 @@ visitSessionSchema.index({ workspaceId: 1, leadId: 1, createdAt: -1 });
 visitSessionSchema.index({ workspaceId: 1, projectId: 1, archivedAt: 1 });
 visitSessionSchema.index({ workspaceId: 1, createdBy: 1, createdAt: -1 });
 visitSessionSchema.index({ workspaceId: 1, activityId: 1 });
+visitSessionSchema.index({ workspaceId: 1, noteActivityId: 1 });
 visitSessionSchema.index({ workspaceId: 1, status: 1, archivedAt: 1 });
 
 export type VisitSessionDocument = InferSchemaType<typeof visitSessionSchema> & {
