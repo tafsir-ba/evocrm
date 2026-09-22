@@ -243,6 +243,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [suppressingId, setSuppressingId] = useState<string | null>(null);
   const [sessionRefreshing, setSessionRefreshing] = useState(false);
   const [audioRecorderSupported, setAudioRecorderSupported] = useState(true);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -562,6 +563,49 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       failBanner(err instanceof Error ? err.message : "Could not start conversation.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function suppressSession(sessionId: string) {
+    if (!workspaceSlug || suppressingId) return;
+    setSuppressingId(sessionId);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/workspaces/${workspaceSlug}/visit-sessions/${sessionId}/archive`,
+        { method: "POST" },
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(body, "Could not delete conversation."));
+      }
+
+      const remaining = sessionsRef.current.filter((item) => item.id !== sessionId);
+      setSessions(remaining);
+
+      if (session?.id === sessionId) {
+        if (remaining[0]) {
+          await openSessionFromDrawer(remaining[0].id);
+        } else {
+          setSession(null);
+          setPendingUploads([]);
+          setAttachMenuOpen(false);
+          setHeaderMenuOpen(false);
+          setEditingTitle(false);
+          setLightboxUrl(null);
+          setDraftBody("");
+          setStatusBanner(null);
+          setSelectedLead(null);
+          setHistoryOpen(false);
+        }
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not delete conversation.";
+      failBanner(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setSuppressingId(null);
     }
   }
 
@@ -2112,7 +2156,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         currentSessionId={session?.id ?? null}
         onSelect={(sessionId) => void openSessionFromDrawer(sessionId)}
         onNew={() => void startSession()}
+        onSuppress={(sessionId) => suppressSession(sessionId)}
         creating={busy === "create"}
+        suppressingId={suppressingId}
       />
 
       <Modal

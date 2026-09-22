@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -500,5 +500,129 @@ describe("VisitNotesApp", () => {
       "/w/evo-home/leads/507f1f77bcf86cd799439011",
     );
     expect(within(menu).getByRole("menuitem", { name: /open lead/i })).toBeInTheDocument();
+  });
+
+  it("suppresses a conversation via swipe delete and archives it", async () => {
+    const user = userEvent.setup();
+    const keep = {
+      ...sessionFixture,
+      id: "507f1f77bcf86cd7994390cc",
+      title: "Keep me",
+      messages: [
+        {
+          id: "msg-keep",
+          kind: "text",
+          text: "Still here",
+          documentId: null,
+          status: "ready",
+          error: null,
+          createdAt: "2026-09-22T19:40:00.000Z",
+        },
+      ],
+      createdAt: "2026-09-22T19:40:00.000Z",
+      updatedAt: "2026-09-22T19:40:00.000Z",
+    };
+    const remove = {
+      ...sessionFixture,
+      id: "507f1f77bcf86cd7994390dd",
+      title: "Remove me",
+      status: "draft",
+      messages: [
+        {
+          id: "msg-remove",
+          kind: "text",
+          text: "Gone soon",
+          documentId: null,
+          status: "ready",
+          error: null,
+          createdAt: "2026-09-22T19:50:00.000Z",
+        },
+      ],
+      createdAt: "2026-09-22T19:50:00.000Z",
+      updatedAt: "2026-09-22T19:50:00.000Z",
+    };
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/leads?") && url.includes("search=")) {
+        return jsonResponse({
+          data: [
+            {
+              id: "507f1f77bcf86cd799439011",
+              fullName: "Ada Buyer",
+              email: "ada@example.com",
+              projectId: "507f1f77bcf86cd799439012",
+              project: {
+                id: "507f1f77bcf86cd799439012",
+                name: "Cressy",
+                reference: "CRS",
+              },
+            },
+          ],
+        });
+      }
+      if (url.includes("/visit-sessions?") && url.includes("leadId=")) {
+        return jsonResponse({ data: [remove, keep] });
+      }
+      if (url.includes(`/visit-sessions/${remove.id}/archive`) && init?.method === "POST") {
+        return jsonResponse({
+          data: { session: { ...remove, status: "archived", archivedAt: "2026-09-22T20:00:00.000Z" } },
+        });
+      }
+      if (url.includes(`/visit-sessions/${remove.id}`)) {
+        return jsonResponse({ data: { session: remove } });
+      }
+      if (url.includes(`/visit-sessions/${keep.id}`)) {
+        return jsonResponse({ data: { session: keep } });
+      }
+      return jsonResponse({ error: { message: "unexpected" } }, 500);
+    }) as typeof fetch;
+
+    render(
+      <VisitNotesApp
+        initialWorkspaces={[
+          {
+            id: "ws1",
+            name: "Evo Home",
+            slug: "evo-home",
+            timezone: "Europe/Zurich",
+          },
+        ]}
+        initialWorkspaceSlug="evo-home"
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/who is this note about/i), "Ada");
+    await user.click(await screen.findByText("Ada Buyer"));
+    expect(await screen.findByText("Remove me")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /conversation history/i }));
+    const history = await screen.findByTestId("visit-history-list");
+    expect(within(history).getByText("Remove me")).toBeInTheDocument();
+    expect(within(history).getByText("Keep me")).toBeInTheDocument();
+
+    const rows = within(history).getAllByTestId("swipe-suppress-content");
+    const removeRow = rows.find((row) => within(row).queryByText("Remove me"));
+    expect(removeRow).toBeTruthy();
+    fireEvent.pointerDown(removeRow!, { clientX: 220, clientY: 40, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(removeRow!, { clientX: 120, clientY: 40, pointerId: 1 });
+    fireEvent.pointerUp(removeRow!, { clientX: 120, clientY: 40, pointerId: 1 });
+
+    const actions = within(history).getAllByTestId("swipe-suppress-action");
+    await user.click(actions[0]!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Keep me")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Gone soon")).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/visit-sessions/${remove.id}/archive`),
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /conversation history/i }));
+    const refreshed = await screen.findByTestId("visit-history-list");
+    expect(within(refreshed).getByText("Keep me")).toBeInTheDocument();
+    expect(within(refreshed).queryByText("Remove me")).not.toBeInTheDocument();
   });
 });
