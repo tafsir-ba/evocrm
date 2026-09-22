@@ -25,6 +25,16 @@ describe("permission-aware navigation", () => {
     );
   });
 
+  it("links Notes to /notes when activity:read is granted", () => {
+    const navigation = buildPermissionAwareNavigation("demo", ["activity:read"]);
+    const notes = navigation.find((item) => item.segment === "notes");
+    expect(notes).toEqual({
+      label: "Notes",
+      href: "/notes",
+      permission: "activity:read",
+      segment: "notes",
+    });
+  });
   it("hides modules without permission", () => {
     const navigation = buildPermissionAwareNavigation("demo", ["dashboard:read"]);
 

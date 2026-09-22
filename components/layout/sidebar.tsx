@@ -11,6 +11,7 @@ import {
   IconDripping,
   IconLeads,
   IconLogo,
+  IconNote,
   IconPipeline,
   IconProjects,
   IconProperties,
@@ -28,6 +29,7 @@ const NAV_ICONS = {
   leads: IconLeads,
   properties: IconProperties,
   activities: IconActivities,
+  notes: IconNote,
   dripping: IconDripping,
   settings: IconSettings,
 } as const;
@@ -102,7 +104,7 @@ export function Sidebar({
         {navigation.map(({ segment, label, href }) => {
           const Icon = NAV_ICONS[segment as V1NavSegment];
           const isActive =
-            pathname === href || pathname?.startsWith(`${href}/`);
+            pathname === href || Boolean(pathname?.startsWith(`${href}/`));
           return (
             <Link
               key={segment}

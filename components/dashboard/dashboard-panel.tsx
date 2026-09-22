@@ -8,6 +8,7 @@ import { BarChart } from "@/components/domain/charts";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/dashboard-view";
 import { formatInboundDemandLine } from "@/lib/inbound-received-at";
 import { formatPrice } from "@/lib/format-price";
+import { IconNote } from "@/lib/icons";
 import { formatRelativeAge } from "@/lib/list-view";
 import { appendProjectIdToSearchParams, withProjectIdQuery } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
@@ -278,16 +280,27 @@ export function DashboardPanel({
           ) : undefined
         }
         actions={
-          <Select
-            value={datePreset}
-            onChange={(event) => setDatePreset(event.target.value as DatePreset)}
-            className="h-8 text-[13px]"
-            aria-label="Date range"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Link href="/notes">
+              <Button
+                size="sm"
+                variant="secondary"
+                leadingIcon={<IconNote className="h-4 w-4" />}
+              >
+                Visit notes
+              </Button>
+            </Link>
+            <Select
+              value={datePreset}
+              onChange={(event) => setDatePreset(event.target.value as DatePreset)}
+              className="h-8 text-[13px]"
+              aria-label="Date range"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </Select>
+          </div>
         }
       />
 

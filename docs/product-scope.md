@@ -30,15 +30,17 @@ Only these primary navigation items are allowed in V1:
 
 ```txt
 Dashboard
+Projects
 Pipeline
 Leads
 Properties
 Activities
+Notes
 Dripping
 Settings
 ```
 
-No additional primary modules may be added without explicit product approval.
+`Notes` opens the Visit Notes app at `/notes` (activity:read). No additional primary modules may be added without explicit product approval.
 
 ---
 
