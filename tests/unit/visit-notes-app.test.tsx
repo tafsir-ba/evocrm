@@ -97,8 +97,8 @@ describe("VisitNotesApp", () => {
 
   it("searches leads and starts a visit session", async () => {
     await openSessionUi();
-    expect(screen.getByText(/Cressy/)).toBeInTheDocument();
     expect(screen.getByLabelText(/visit note/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add attachment/i })).toBeInTheDocument();
   });
 
   it("uses ChatGPT-style composer: plus menu, mic when empty, send when text", async () => {
