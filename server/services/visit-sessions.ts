@@ -22,7 +22,9 @@ import {
   type VisitSessionRecord,
 } from "@/server/repositories/visit-sessions";
 import {
+  deriveVisitSessionTitle,
   formatVisitDraftBody,
+  formatVisitSessionFallbackTitle,
   isVisitAudioMimeType,
   isVisitVideoMimeType,
 } from "@/lib/visit-notes";
@@ -38,6 +40,7 @@ import {
   summarizeVisitSessionWithOpenAi,
   transcribeAudioWithOpenAi,
 } from "@/server/services/visit-notes-ai";
+import { findPropertyById } from "@/server/repositories/properties";
 import { getObjectBuffer } from "@/server/storage/spaces";
 import type {
   AppendVisitMessageInput,
@@ -52,6 +55,11 @@ import type {
 export type VisitSessionDetail = VisitSessionRecord & {
   lead: { id: string; fullName: string; email: string | null } | null;
   project: { id: string; name: string } | null;
+  property: {
+    id: string;
+    title: string;
+    reference: string | null;
+  } | null;
   draftBody: string | null;
 };
 
@@ -73,9 +81,12 @@ async function requireActiveSession(
 }
 
 async function enrichSession(session: VisitSessionRecord): Promise<VisitSessionDetail> {
-  const [lead, project] = await Promise.all([
+  const [lead, project, property] = await Promise.all([
     findLeadById(session.workspaceId, session.leadId),
     findProjectById(session.workspaceId, session.projectId),
+    session.propertyId
+      ? findPropertyById(session.workspaceId, session.propertyId)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -84,6 +95,14 @@ async function enrichSession(session: VisitSessionRecord): Promise<VisitSessionD
       ? { id: lead.id, fullName: lead.fullName, email: lead.email }
       : null,
     project: project ? { id: project.id, name: project.name } : null,
+    property:
+      property && !property.archivedAt
+        ? {
+            id: property.id,
+            title: property.title,
+            reference: property.reference ?? null,
+          }
+        : null,
     draftBody: session.aiDraft ? formatVisitDraftBody(session.aiDraft) : null,
   };
 }
@@ -191,8 +210,35 @@ export async function updateVisitSessionForWorkspace(
     };
   }
 
+  let propertyId: string | null | undefined = undefined;
+  if (input.propertyId !== undefined) {
+    if (input.propertyId === null) {
+      propertyId = null;
+    } else {
+      const property = await findPropertyById(workspaceId, input.propertyId);
+      if (!property || property.archivedAt) {
+        throw new AppError("NOT_FOUND", "Property not found.");
+      }
+      if (property.projectId !== session.projectId) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Property must belong to the same project as this visit.",
+        );
+      }
+      await assertRecordProjectAccess(
+        workspaceId,
+        actorId,
+        property.projectId,
+        "property:read",
+      );
+      propertyId = property.id;
+    }
+  }
+
   const updated = await updateVisitSession(workspaceId, sessionId, {
     language: input.language === undefined ? undefined : input.language,
+    title: input.title === undefined ? undefined : input.title,
+    propertyId,
     aiDraft,
     status:
       aiDraft && session.status === "open"
@@ -257,9 +303,23 @@ export async function appendVisitMessageForWorkspace(
       ? [...session.documentIds, documentId]
       : session.documentIds;
 
+  let title: string | undefined;
+  if (!session.title?.trim()) {
+    if (input.kind === "text" && input.text?.trim()) {
+      title = deriveVisitSessionTitle(input.text);
+    } else if (input.kind === "audio") {
+      title = "Voice note";
+    } else if (input.kind === "photo") {
+      title = "Photo visit";
+    } else if (input.kind === "video") {
+      title = "Video visit";
+    }
+  }
+
   const updated = await updateVisitSession(workspaceId, sessionId, {
     messages: [...session.messages, message],
     documentIds,
+    title,
     status:
       session.status === "published"
         ? "amended"
@@ -288,18 +348,28 @@ export async function summarizeVisitSessionForWorkspace(
     "activity:update",
   );
 
-  const [lead, project] = await Promise.all([
+  const [lead, project, property] = await Promise.all([
     findLeadById(workspaceId, session.leadId),
     findProjectById(workspaceId, session.projectId),
+    session.propertyId
+      ? findPropertyById(workspaceId, session.propertyId)
+      : Promise.resolve(null),
   ]);
 
   const language = input.language ?? session.language ?? null;
+  const propertyLabel =
+    property && !property.archivedAt
+      ? [property.reference, property.title].filter(Boolean).join(" · ") ||
+        property.title
+      : null;
+
   const summary = await summarizeVisitSessionWithOpenAi({
     messages: session.messages,
     language,
     crmLanguage: null,
     leadName: lead?.fullName ?? null,
     projectName: project?.name ?? null,
+    propertyLabel,
   });
 
   const sourceMessageIds = session.messages
@@ -408,7 +478,9 @@ export async function publishVisitSessionForWorkspace(
     );
   }
 
-  const title = `Visit — ${new Date().toISOString().slice(0, 10)}`;
+  const title =
+    session.title?.trim() ||
+    formatVisitSessionFallbackTitle(session.createdAt);
   let activityId = session.activityId;
 
   if (activityId) {
@@ -416,6 +488,7 @@ export async function publishVisitSessionForWorkspace(
       title,
       description: body,
       outcome: draft.nextSteps.map((step) => step.text).join("\n") || null,
+      propertyId: session.propertyId ?? null,
     });
   } else {
     const activity = await createActivityForWorkspace(workspaceId, actorId, {
@@ -423,6 +496,7 @@ export async function publishVisitSessionForWorkspace(
       statusId: completedStatus.id,
       leadId: session.leadId,
       projectId: session.projectId,
+      propertyId: session.propertyId ?? undefined,
       title,
       description: body,
       outcome: draft.nextSteps.map((step) => step.text).join("\n") || undefined,
@@ -586,30 +660,35 @@ export async function transcribeVisitMessageForWorkspace(
       language: input.language ?? session.language,
     });
 
-    const transcriptMessage: VisitMessageRecord = {
-      id: randomUUID(),
-      kind: "transcript",
-      text: result.text,
-      documentId: document.id,
-      language: result.language,
-      status: "ready",
-      error: null,
-      createdBy: actorId,
-      createdAt: new Date(),
-    };
+    const transcriptText = result.text;
 
     messages[messageIndex] = {
       ...message,
       status: "ready",
-      text: result.text,
+      text: transcriptText,
       language: result.language,
       error: null,
     };
 
+    // Single chat event: keep transcript on the audio message only.
+    // Do not append a separate kind:"transcript" message.
+    const withoutLegacyTranscriptDupes = messages.filter(
+      (item, index) =>
+        index === messageIndex ||
+        !(
+          item.kind === "transcript" &&
+          item.documentId === message.documentId
+        ),
+    );
+
     const updated = await updateVisitSession(workspaceId, sessionId, {
-      messages: [...messages, transcriptMessage],
+      messages: withoutLegacyTranscriptDupes,
       language: result.language ?? session.language,
       status: session.status === "published" ? "amended" : session.status,
+      title:
+        session.title?.trim()
+          ? undefined
+          : deriveVisitSessionTitle(transcriptText) || "Voice note",
     });
 
     if (!updated) {

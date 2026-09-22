@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -13,13 +14,22 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  VisitHistoryDrawer,
+  type VisitHistoryItem,
+} from "@/components/visit-notes/visit-history-drawer";
+import { VisitMediaMessage } from "@/components/visit-notes/visit-media-message";
+import {
   IconArrowLeft,
+  IconBuilding,
   IconCamera,
   IconClose,
   IconFile,
   IconMic,
+  IconMenu,
+  IconMore,
   IconNote,
   IconPlus,
   IconSearch,
@@ -34,7 +44,9 @@ import {
   saveOfflineDraft,
 } from "@/lib/visit-notes-offline";
 import {
+  deriveVisitSessionTitle,
   formatVisitMediaFileSize,
+  formatVisitSessionFallbackTitle,
   pickSupportedAudioRecorderMimeType,
   resolveVisitMediaMimeType,
   VISIT_AUDIO_MAX_DURATION_SECONDS,
@@ -42,7 +54,6 @@ import {
   visitMediaKindFromMime,
 } from "@/lib/visit-notes";
 import {
-  fetchDocumentSignedUrl,
   uploadVisitMedia,
   VisitMediaUploadError,
 } from "@/lib/visit-notes-upload";
@@ -78,6 +89,8 @@ type VisitSession = {
   activityId: string | null;
   status: string;
   language: string | null;
+  title: string | null;
+  propertyId: string | null;
   messages: VisitMessage[];
   draftBody: string | null;
   aiDraft: { version: number } | null;
@@ -85,6 +98,11 @@ type VisitSession = {
   updatedAt: string;
   lead: { id: string; fullName: string; email: string | null } | null;
   project: { id: string; name: string } | null;
+  property: {
+    id: string;
+    title: string;
+    reference: string | null;
+  } | null;
 };
 
 type PendingUploadStatus = "uploading" | "transcribing" | "failed";
@@ -102,6 +120,12 @@ type PendingUpload = {
   documentId: string | null;
   /** Set after message attach succeeds — Retry may only need transcription. */
   messageId: string | null;
+};
+
+type PropertyHit = {
+  id: string;
+  title: string;
+  reference: string | null;
 };
 
 type Props = {
@@ -139,6 +163,36 @@ function buildPreviewUrl(file: File, kind: "photo" | "audio" | "video"): string 
   return URL.createObjectURL(file);
 }
 
+function normalizeSession(raw: VisitSession): VisitSession {
+  return {
+    ...raw,
+    title: raw.title ?? null,
+    propertyId: raw.propertyId ?? null,
+    property: raw.property ?? null,
+    updatedAt: raw.updatedAt ?? raw.createdAt,
+  };
+}
+
+function propertyLabel(
+  property: { title: string; reference: string | null } | null | undefined,
+): string | null {
+  if (!property) return null;
+  return [property.reference, property.title].filter(Boolean).join(" · ") || property.title;
+}
+
+function formatRecordingTimer(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function sessionDisplayTitle(session: VisitSession): string {
+  const trimmed = session.title?.trim();
+  if (trimmed) return trimmed;
+  return formatVisitSessionFallbackTitle(session.createdAt);
+}
+
 export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props) {
   const [workspaces] = useState(initialWorkspaces);
   const [workspaceSlug, setWorkspaceSlug] = useState(
@@ -155,21 +209,41 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [micLevels, setMicLevels] = useState<number[]>([0, 0, 0, 0, 0]);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessionRefreshing, setSessionRefreshing] = useState(false);
   const [audioRecorderSupported, setAudioRecorderSupported] = useState(true);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [unitModalOpen, setUnitModalOpen] = useState(false);
+  const [unitQuery, setUnitQuery] = useState("");
+  const [unitHits, setUnitHits] = useState<PropertyHit[]>([]);
+  const [unitSearching, setUnitSearching] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const cancelRecordingRef = useRef(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const analyserFrameRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
   const photoCaptureInputRef = useRef<HTMLInputElement | null>(null);
   const photoLibraryInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const streamEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
+  const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingUploadsRef = useRef<PendingUpload[]>([]);
+  const sessionsRef = useRef<VisitSession[]>([]);
   const attachMenuId = useId();
   const draftKey = selectedLead?.id ?? "new";
   const hasComposerText = composer.trim().length > 0;
@@ -177,6 +251,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   useEffect(() => {
     pendingUploadsRef.current = pendingUploads;
   }, [pendingUploads]);
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   useEffect(() => {
     setAudioRecorderSupported(pickSupportedAudioRecorderMimeType() !== null);
@@ -211,15 +289,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }, [composer]);
 
   useEffect(() => {
-    if (!attachMenuOpen) return;
+    if (!attachMenuOpen && !headerMenuOpen) return;
     function onPointerDown(event: MouseEvent | TouchEvent) {
       const target = event.target as Node | null;
       if (attachMenuRef.current && target && !attachMenuRef.current.contains(target)) {
         setAttachMenuOpen(false);
       }
+      if (headerMenuRef.current && target && !headerMenuRef.current.contains(target)) {
+        setHeaderMenuOpen(false);
+      }
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setAttachMenuOpen(false);
+      if (event.key === "Escape") {
+        setAttachMenuOpen(false);
+        setHeaderMenuOpen(false);
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
@@ -229,7 +313,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       document.removeEventListener("touchstart", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [attachMenuOpen]);
+  }, [attachMenuOpen, headerMenuOpen]);
+
+  useEffect(() => {
+    if (!editingTitle) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, [editingTitle]);
 
   useEffect(() => {
     return () => {
@@ -242,6 +332,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           URL.revokeObjectURL(item.previewUrl);
         }
       });
+      cleanupRecordingResources();
     };
     // Only revoke on unmount for current refs; individual removes revoke themselves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -277,6 +368,49 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     return () => window.clearTimeout(handle);
   }, [leadQuery, searchLeads]);
 
+  const searchUnits = useCallback(
+    async (query: string, projectId: string) => {
+      if (!workspaceSlug || !projectId) {
+        setUnitHits([]);
+        return;
+      }
+      setUnitSearching(true);
+      try {
+        const params = new URLSearchParams({
+          projectId,
+          pageSize: "12",
+        });
+        if (query.trim()) params.set("search", query.trim());
+        const response = await fetch(
+          `/api/workspaces/${workspaceSlug}/properties?${params.toString()}`,
+        );
+        if (!response.ok) {
+          setUnitHits([]);
+          return;
+        }
+        const body = (await response.json()) as { data: PropertyHit[] };
+        setUnitHits(
+          body.data.map((item) => ({
+            id: item.id,
+            title: item.title,
+            reference: item.reference ?? null,
+          })),
+        );
+      } finally {
+        setUnitSearching(false);
+      }
+    },
+    [workspaceSlug],
+  );
+
+  useEffect(() => {
+    if (!unitModalOpen || !session?.projectId) return;
+    const handle = window.setTimeout(() => {
+      void searchUnits(unitQuery, session.projectId);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [unitModalOpen, unitQuery, session?.projectId, searchUnits]);
+
   const loadSessionsForLead = useCallback(
     async (leadId: string): Promise<VisitSession[]> => {
       const params = new URLSearchParams({ leadId, pageSize: "20" });
@@ -288,8 +422,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         return [];
       }
       const body = (await response.json()) as { data: VisitSession[] };
-      setSessions(body.data);
-      return body.data;
+      const next = body.data.map(normalizeSession);
+      setSessions(next);
+      return next;
     },
     [workspaceSlug],
   );
@@ -297,6 +432,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   function failBanner(message: string) {
     setStatusBanner(null);
     setError(message);
+  }
+
+  function upsertSessionInList(next: VisitSession) {
+    setSessions((prev) => {
+      const index = prev.findIndex((item) => item.id === next.id);
+      if (index === -1) return [next, ...prev];
+      const copy = [...prev];
+      copy[index] = next;
+      return copy;
+    });
   }
 
   async function createSessionForLead(lead: LeadHit): Promise<VisitSession> {
@@ -312,7 +457,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (!response.ok) {
       throw new Error(apiErrorMessage(body, "Could not start the conversation."));
     }
-    return body.data.session as VisitSession;
+    return normalizeSession(body.data.session as VisitSession);
   }
 
   async function fetchSession(sessionId: string): Promise<VisitSession> {
@@ -323,16 +468,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (!response.ok) {
       throw new Error(apiErrorMessage(body, "Could not open the conversation."));
     }
-    return body.data.session as VisitSession;
+    return normalizeSession(body.data.session as VisitSession);
   }
 
   function enterSession(next: VisitSession) {
-    setSession(next);
-    setDraftBody(next.draftBody ?? "");
+    const normalized = normalizeSession(next);
+    setSession(normalized);
+    setDraftBody(normalized.draftBody ?? "");
     setPendingUploads([]);
     setAttachMenuOpen(false);
+    setHeaderMenuOpen(false);
+    setEditingTitle(false);
+    setTitleDraft(sessionDisplayTitle(normalized));
     setError(null);
     setStatusBanner(null);
+    upsertSessionInList(normalized);
   }
 
   /** Select lead once → resume open conversation or start a fresh one. */
@@ -374,6 +524,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       const created = await createSessionForLead(selectedLead);
       enterSession(created);
       await loadSessionsForLead(selectedLead.id);
+      setHistoryOpen(false);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Could not start conversation.");
     } finally {
@@ -381,13 +532,99 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     }
   }
 
-  async function openSession(sessionId: string) {
-    setBusy("open");
+  async function openSessionFromDrawer(sessionId: string) {
+    if (session?.id === sessionId) {
+      setHistoryOpen(false);
+      return;
+    }
+
+    const cached = sessionsRef.current.find((item) => item.id === sessionId);
+    setHistoryOpen(false);
     setError(null);
+
+    if (cached) {
+      // Keep chat UI visible — never blank full-page "Opening conversation…"
+      enterSession(cached);
+      setSessionRefreshing(true);
+      try {
+        const fresh = await fetchSession(sessionId);
+        enterSession(fresh);
+      } catch (err) {
+        failBanner(err instanceof Error ? err.message : "Could not open conversation.");
+      } finally {
+        setSessionRefreshing(false);
+      }
+      return;
+    }
+
+    setSessionRefreshing(true);
     try {
       enterSession(await fetchSession(sessionId));
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Could not open conversation.");
+    } finally {
+      setSessionRefreshing(false);
+    }
+  }
+
+  async function patchSession(patch: {
+    title?: string | null;
+    propertyId?: string | null;
+    editedDraftBody?: string | null;
+  }): Promise<VisitSession> {
+    if (!session) throw new Error("No session.");
+    const response = await fetch(
+      `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      },
+    );
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(body, "Could not update conversation."));
+    }
+    return normalizeSession(body.data.session as VisitSession);
+  }
+
+  async function saveTitle(nextTitle: string) {
+    if (!session) return;
+    const trimmed = nextTitle.trim();
+    const current = session.title?.trim() || "";
+    setEditingTitle(false);
+    if (!trimmed || trimmed === current) {
+      setTitleDraft(sessionDisplayTitle(session));
+      return;
+    }
+    setBusy("title");
+    setError(null);
+    try {
+      const next = await patchSession({ title: trimmed });
+      setSession(next);
+      setTitleDraft(sessionDisplayTitle(next));
+      upsertSessionInList(next);
+    } catch (err) {
+      setTitleDraft(sessionDisplayTitle(session));
+      failBanner(err instanceof Error ? err.message : "Could not rename.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function linkUnit(propertyId: string | null) {
+    if (!session) return;
+    setBusy("unit");
+    setError(null);
+    try {
+      const next = await patchSession({ propertyId });
+      setSession(next);
+      upsertSessionInList(next);
+      setUnitModalOpen(false);
+      setUnitQuery("");
+      setHeaderMenuOpen(false);
+    } catch (err) {
+      failBanner(err instanceof Error ? err.message : "Could not link unit.");
     } finally {
       setBusy(null);
     }
@@ -398,20 +635,32 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (!session || !composer.trim()) return;
     setBusy("send");
     setError(null);
+    const text = composer.trim();
     try {
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "text", text: composer.trim() }),
+          body: JSON.stringify({ kind: "text", text }),
         },
       );
       const body = await response.json();
       if (!response.ok) {
         throw new Error(apiErrorMessage(body, "Could not send note."));
       }
-      setSession(body.data.session as VisitSession);
+      let next = normalizeSession(body.data.session as VisitSession);
+      if (!next.title?.trim()) {
+        const derived = deriveVisitSessionTitle(text);
+        if (derived) {
+          next = { ...next, title: derived };
+          setTitleDraft(derived);
+        }
+      } else {
+        setTitleDraft(sessionDisplayTitle(next));
+      }
+      setSession(next);
+      upsertSessionInList(next);
       setComposer("");
       clearOfflineDraft(workspaceSlug, draftKey);
     } catch (err) {
@@ -511,8 +760,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           );
         }
 
-        next = body.data.session as VisitSession;
+        next = normalizeSession(body.data.session as VisitSession);
         setSession(next);
+        upsertSessionInList(next);
         const attached = [...next.messages]
           .reverse()
           .find((message) => message.documentId === documentId);
@@ -553,8 +803,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             },
           );
         }
-        next = transcribeBody.data.session as VisitSession;
+        next = normalizeSession(transcribeBody.data.session as VisitSession);
         setSession(next);
+        upsertSessionInList(next);
       }
 
       removePending(pendingId);
@@ -629,6 +880,88 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     if (file) enqueueMedia(file);
   }
 
+  function stopAnalyserLoop() {
+    if (analyserFrameRef.current !== null) {
+      window.cancelAnimationFrame(analyserFrameRef.current);
+      analyserFrameRef.current = null;
+    }
+    analyserRef.current = null;
+    setMicLevels([0, 0, 0, 0, 0]);
+  }
+
+  function stopRecordingTimer() {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    recordingStartedAtRef.current = null;
+  }
+
+  function cleanupRecordingResources() {
+    stopAnalyserLoop();
+    stopRecordingTimer();
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  }
+
+  function startMicLevelMeter(stream: MediaStream) {
+    const AudioCtx =
+      typeof window !== "undefined"
+        ? window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext
+        : undefined;
+    if (!AudioCtx) return;
+
+    try {
+      const context = new AudioCtx();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      audioContextRef.current = context;
+      analyserRef.current = analyser;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(data);
+        const bands = 5;
+        const slice = Math.floor(data.length / bands);
+        const nextLevels: number[] = [];
+        for (let i = 0; i < bands; i += 1) {
+          let sum = 0;
+          const start = i * slice;
+          for (let j = start; j < start + slice; j += 1) sum += data[j] ?? 0;
+          nextLevels.push(Math.min(1, sum / (slice * 180)));
+        }
+        setMicLevels(nextLevels);
+        analyserFrameRef.current = window.requestAnimationFrame(tick);
+      };
+      analyserFrameRef.current = window.requestAnimationFrame(tick);
+    } catch {
+      // Timer still works without AudioContext / analyser support.
+    }
+  }
+
+  function startRecordingClock() {
+    recordingStartedAtRef.current = Date.now();
+    setRecordingSeconds(0);
+    recordingTimerRef.current = window.setInterval(() => {
+      if (!recordingStartedAtRef.current) return;
+      setRecordingSeconds(
+        Math.floor((Date.now() - recordingStartedAtRef.current) / 1000),
+      );
+    }, 250);
+  }
+
   async function startRecording() {
     if (!session || recording) return;
     const mimeType = pickSupportedAudioRecorderMimeType();
@@ -642,6 +975,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       cancelRecordingRef.current = false;
@@ -649,9 +983,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
+        cleanupRecordingResources();
         mediaRecorderRef.current = null;
         setRecording(false);
+        setRecordingSeconds(0);
         if (cancelRecordingRef.current) {
           chunksRef.current = [];
           setStatusBanner(null);
@@ -675,12 +1010,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
+      startMicLevelMeter(stream);
+      startRecordingClock();
       setRecording(true);
       setError(null);
       setStatusBanner(
         `Recording… tap Stop when finished (guide ≤ ${Math.round(VISIT_AUDIO_MAX_DURATION_SECONDS / 60)} min).`,
       );
     } catch {
+      cleanupRecordingResources();
       failBanner(
         "Microphone access was denied or is unavailable. Enable mic permission, then Retry.",
       );
@@ -720,9 +1058,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       if (!response.ok) {
         throw new Error(apiErrorMessage(body, "Summarize failed. Session is unchanged."));
       }
-      const next = body.data.session as VisitSession;
+      const next = normalizeSession(body.data.session as VisitSession);
       setSession(next);
       setDraftBody(next.draftBody ?? "");
+      upsertSessionInList(next);
       setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Summarize failed.");
@@ -737,11 +1076,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setError(null);
     try {
       if (draftBody && draftBody !== (session.draftBody ?? "")) {
-        await fetch(`/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ editedDraftBody: draftBody }),
-        });
+        await patchSession({ editedDraftBody: draftBody });
       }
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/publish`,
@@ -759,24 +1094,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       if (!response.ok) {
         throw new Error(apiErrorMessage(body, "Publish failed."));
       }
-      const next = body.data.session as VisitSession;
+      const next = normalizeSession(body.data.session as VisitSession);
       setSession(next);
       setDraftBody(next.draftBody ?? "");
+      upsertSessionInList(next);
       if (selectedLead) await loadSessionsForLead(selectedLead.id);
       setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Publish failed.");
     } finally {
       setBusy(null);
-    }
-  }
-
-  async function openMedia(documentId: string) {
-    try {
-      const url = await fetchDocumentSignedUrl(workspaceSlug, documentId);
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      failBanner(err instanceof Error ? err.message : "Could not open media.");
     }
   }
 
@@ -800,7 +1127,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       if (!response.ok) {
         throw new Error(apiErrorMessage(body, "Retry transcription failed."));
       }
-      setSession(body.data.session as VisitSession);
+      const next = normalizeSession(body.data.session as VisitSession);
+      setSession(next);
+      upsertSessionInList(next);
       setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Retry failed.");
@@ -809,8 +1138,40 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     }
   }
 
+  function leaveSession() {
+    setSession(null);
+    setPendingUploads([]);
+    setAttachMenuOpen(false);
+    setHeaderMenuOpen(false);
+    setHistoryOpen(false);
+    setEditingTitle(false);
+    setStatusBanner(null);
+    setError(null);
+    setLightboxUrl(null);
+  }
+
   const currentWorkspace = workspaces.find((item) => item.slug === workspaceSlug);
   const composerBusy = Boolean(busy) || pendingUploads.some((item) => item.status !== "failed");
+  const visibleMessages = useMemo(
+    () => (session?.messages ?? []).filter((message) => message.kind !== "transcript"),
+    [session?.messages],
+  );
+  const historyItems: VisitHistoryItem[] = useMemo(
+    () =>
+      sessions.map((item) => ({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        updatedAt: item.updatedAt,
+        createdAt: item.createdAt,
+        leadName:
+          item.lead?.fullName ??
+          (item.leadId === selectedLead?.id ? selectedLead.fullName : null),
+        propertyLabel: propertyLabel(item.property),
+      })),
+    [sessions, selectedLead],
+  );
+  const linkedUnitLabel = propertyLabel(session?.property ?? null);
 
   if (workspaces.length === 0) {
     return (
@@ -832,25 +1193,141 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     <div className="min-h-dvh bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_40%,#f8fafc_100%)] text-[var(--color-ink)] flex flex-col">
       <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-white/90 backdrop-blur-md pt-[env(safe-area-inset-top)]">
         {session ? (
-          <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5">
             <button
               type="button"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-              aria-label="Back to lead search"
-              onClick={() => {
-                setSession(null);
-                setPendingUploads([]);
-                setAttachMenuOpen(false);
-                setStatusBanner(null);
-                setError(null);
-              }}
+              aria-label="Conversation history"
+              onClick={() => setHistoryOpen(true)}
             >
-              <IconArrowLeft className="h-5 w-5" />
+              <IconMenu className="h-5 w-5" />
             </button>
+
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-semibold leading-tight">
-                {session.lead?.fullName ?? selectedLead?.fullName ?? "Visit"}
-              </p>
+              {editingTitle ? (
+                <Input
+                  ref={titleInputRef}
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={() => void saveTitle(titleDraft)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void saveTitle(titleDraft);
+                    }
+                    if (event.key === "Escape") {
+                      setEditingTitle(false);
+                      setTitleDraft(sessionDisplayTitle(session));
+                    }
+                  }}
+                  className="h-8 text-[15px] font-semibold"
+                  aria-label="Conversation title"
+                  maxLength={120}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="block w-full truncate text-left text-[15px] font-semibold leading-tight hover:text-[var(--color-brand-700)]"
+                  onClick={() => {
+                    setTitleDraft(sessionDisplayTitle(session));
+                    setEditingTitle(true);
+                  }}
+                  title="Rename conversation"
+                >
+                  {sessionDisplayTitle(session)}
+                </button>
+              )}
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
+                  {session.lead?.fullName ?? selectedLead?.fullName ?? "Visit"}
+                </p>
+                {sessionRefreshing && (
+                  <span className="shrink-0 text-[11px] text-[var(--color-ink-faint)]">
+                    Updating…
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {linkedUnitLabel ? (
+              <button
+                type="button"
+                className="inline-flex max-w-[40%] items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-muted)] px-2 py-1 text-[11.5px] text-[var(--color-ink-soft)]"
+                onClick={() => {
+                  setUnitQuery("");
+                  setUnitModalOpen(true);
+                }}
+                title={linkedUnitLabel}
+              >
+                <IconBuilding className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{linkedUnitLabel}</span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Clear linked unit"
+                  className="ml-0.5 inline-flex rounded-full p-0.5 hover:bg-white"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void linkUnit(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void linkUnit(null);
+                    }
+                  }}
+                >
+                  <IconClose className="h-3 w-3" />
+                </span>
+              </button>
+            ) : null}
+
+            <div className="relative shrink-0" ref={headerMenuRef}>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                  headerMenuOpen && "bg-[var(--color-muted)]",
+                )}
+                aria-label="Conversation actions"
+                aria-expanded={headerMenuOpen}
+                onClick={() => setHeaderMenuOpen((open) => !open)}
+              >
+                <IconMore className="h-5 w-5" />
+              </button>
+              {headerMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[11.5rem] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      setUnitQuery("");
+                      setUnitModalOpen(true);
+                    }}
+                  >
+                    <IconBuilding className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                    {linkedUnitLabel ? "Change unit" : "Link unit"}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      leaveSession();
+                    }}
+                  >
+                    <IconArrowLeft className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                    Find another lead
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -914,36 +1391,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   </ul>
                 )}
               </div>
-
-              {selectedLead && !session && (
-                <div className="flex items-center gap-2 overflow-x-auto">
-                  <Button
-                    size="sm"
-                    onClick={() => void startSession()}
-                    loading={busy === "create" || busy === "open"}
-                    disabled={Boolean(busy)}
-                  >
-                    New conversation
-                  </Button>
-                  {sessions.length > 0 && (
-                    <div className="flex gap-1.5">
-                      {sessions.slice(0, 5).map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => void openSession(item.id)}
-                          className="shrink-0 rounded-full border border-[var(--color-line)] bg-white px-2.5 py-1.5 text-[11.5px] text-[var(--color-ink-soft)]"
-                        >
-                          {item.status === "open" || item.status === "draft"
-                            ? "Continue"
-                            : "Earlier"}{" "}
-                          · {new Date(item.createdAt).toLocaleDateString()}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </>
         )}
@@ -984,9 +1431,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           <div className="flex flex-1 flex-col items-center justify-center text-center px-6">
             <h2 className="text-[17px] font-semibold">{selectedLead.fullName}</h2>
             <p className="mt-1.5 text-[13.5px] text-[var(--color-ink-muted)]">
-              {busy === "open" || busy === "create"
-                ? "Opening conversation…"
-                : "Opening conversation…"}
+              Opening conversation…
             </p>
           </div>
         )}
@@ -994,22 +1439,64 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         {session && (
           <div className="flex flex-1 flex-col gap-3">
             <div className="flex-1 space-y-2.5">
-              {session.messages.length === 0 && pendingUploads.length === 0 && (
+              {visibleMessages.length === 0 && pendingUploads.length === 0 && (
                 <p className="px-1 py-8 text-center text-[13.5px] text-[var(--color-ink-muted)]">
                   Type a note, tap the mic, or attach a photo.
                 </p>
               )}
 
-              {session.messages.map((message) => {
+              {visibleMessages.map((message) => {
                 const isText = message.kind === "text";
-                const mediaLabel =
-                  message.kind === "photo"
-                    ? "Photo"
-                    : message.kind === "video"
-                      ? "Video"
-                      : message.kind === "audio"
-                        ? "Audio"
-                        : "Attachment";
+                const isMedia =
+                  message.kind === "photo" ||
+                  message.kind === "video" ||
+                  message.kind === "audio";
+
+                if (isMedia) {
+                  const localPreview =
+                    pendingUploads.find(
+                      (item) => item.documentId === message.documentId,
+                    )?.previewUrl ?? null;
+                  return (
+                    <article
+                      key={message.id}
+                      className="rounded-2xl motion-safe:animate-[visitNoteIn_0.25s_ease]"
+                    >
+                      {message.status === "transcribing" && (
+                        <p className="mb-1 px-1 text-[12px] text-[var(--color-ink-muted)]">
+                          Transcribing…
+                        </p>
+                      )}
+                      <VisitMediaMessage
+                        workspaceSlug={workspaceSlug}
+                        kind={message.kind as "photo" | "video" | "audio"}
+                        documentId={message.documentId}
+                        transcript={
+                          message.kind === "audio" ? message.text : null
+                        }
+                        localPreviewUrl={localPreview}
+                        onOpenLightbox={(url) => setLightboxUrl(url)}
+                      />
+                      {message.status === "failed" && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                          <p className="text-[12px] text-[var(--color-danger-fg)]">
+                            {message.error ?? "Something went wrong."}
+                          </p>
+                          {message.kind === "audio" && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => void retryTranscribe(message.id)}
+                            >
+                              Retry
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </article>
+                  );
+                }
+
                 return (
                   <article
                     key={message.id}
@@ -1020,41 +1507,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                         : "rounded-2xl border border-[var(--color-line)] bg-white",
                     )}
                   >
-                    {!isText && (
-                      <p className="mb-1 text-[12px] font-medium text-[var(--color-ink-muted)]">
-                        {mediaLabel}
-                        {message.status === "transcribing" ? " · Transcribing…" : ""}
-                      </p>
-                    )}
                     {message.text && (
                       <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
                         {message.text}
                       </p>
                     )}
-                    {message.documentId && (
-                      <button
-                        type="button"
-                        className="mt-1.5 text-[12.5px] font-medium text-[var(--color-brand-700)]"
-                        onClick={() => void openMedia(message.documentId!)}
-                      >
-                        Open {mediaLabel.toLowerCase()}
-                      </button>
-                    )}
                     {message.status === "failed" && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <p className="text-[12px] text-[var(--color-danger-fg)]">
-                          {message.error ?? "Something went wrong."}
-                        </p>
-                        {message.kind === "audio" && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => void retryTranscribe(message.id)}
-                          >
-                            Retry
-                          </Button>
-                        )}
-                      </div>
+                      <p className="mt-2 text-[12px] text-[var(--color-danger-fg)]">
+                        {message.error ?? "Something went wrong."}
+                      </p>
                     )}
                   </article>
                 );
@@ -1086,7 +1547,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13.5px] font-medium">{item.file.name}</p>
+                      <p className="text-[13.5px] font-medium">
+                        {item.kind === "photo"
+                          ? "Photo"
+                          : item.kind === "video"
+                            ? "Video"
+                            : "Audio"}
+                      </p>
                       <p className="text-[12px] text-[var(--color-ink-muted)]">
                         {formatVisitMediaFileSize(item.file.size)}
                         {item.status === "uploading"
@@ -1137,65 +1604,64 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <div ref={streamEndRef} />
             </div>
 
-            {/* After capture — CRM / structure actions stay out of the composer */}
-            {(session.messages.length > 0 || session.aiDraft || Boolean(draftBody.trim())) && (
-            <section
-              className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-4"
-              data-testid="after-capture-actions"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void summarize()}
-                  disabled={Boolean(busy) || session.messages.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
-                >
-                  <IconSparkles className="h-3.5 w-3.5" />
-                  {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
-                </button>
-                <select
-                  className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
-                  value={language}
-                  onChange={(event) => setLanguage(event.target.value)}
-                  aria-label="Language"
-                >
-                  <option value="auto">Language: auto</option>
-                  <option value="en">English</option>
-                  <option value="fr">Français</option>
-                  <option value="de">Deutsch</option>
-                  <option value="it">Italiano</option>
-                </select>
-              </div>
-
-              {(session.aiDraft || draftBody) && (
-                <div className="rounded-2xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3.5">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-[13px] font-semibold text-[var(--color-brand-800)]">
-                        Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
-                      </h3>
-                      <p className="text-[11.5px] text-[var(--color-ink-muted)]">
-                        {session.project?.name ?? "Project"} · publish when ready
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => void publish()}
-                      loading={busy === "publish"}
-                      disabled={Boolean(busy) || !draftBody.trim()}
-                    >
-                      Publish to CRM
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={draftBody}
-                    onChange={(event) => setDraftBody(event.target.value)}
-                    className="min-h-[160px] bg-white"
-                    placeholder="Edit the visit summary before publishing…"
-                  />
+            {visibleMessages.length > 0 && (
+              <section
+                className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-4"
+                data-testid="after-capture-actions"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void summarize()}
+                    disabled={Boolean(busy) || visibleMessages.length === 0}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                  >
+                    <IconSparkles className="h-3.5 w-3.5" />
+                    {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
+                  </button>
+                  <select
+                    className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
+                    value={language}
+                    onChange={(event) => setLanguage(event.target.value)}
+                    aria-label="Language"
+                  >
+                    <option value="auto">Language: auto</option>
+                    <option value="en">English</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="it">Italiano</option>
+                  </select>
                 </div>
-              )}
-            </section>
+
+                {(session.aiDraft || draftBody) && (
+                  <div className="rounded-2xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3.5">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-[13px] font-semibold text-[var(--color-brand-800)]">
+                          Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
+                        </h3>
+                        <p className="text-[11.5px] text-[var(--color-ink-muted)]">
+                          {session.project?.name ?? "Project"} · publish when ready
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => void publish()}
+                        loading={busy === "publish"}
+                        disabled={Boolean(busy) || !draftBody.trim()}
+                      >
+                        Publish to CRM
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={draftBody}
+                      onChange={(event) => setDraftBody(event.target.value)}
+                      className="min-h-[160px] bg-white"
+                      placeholder="Edit the visit summary before publishing…"
+                    />
+                  </div>
+                )}
+              </section>
             )}
           </div>
         )}
@@ -1204,10 +1670,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       {session && (
         <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {recording && (
-            <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-2.5">
-              <p className="text-[12.5px] font-medium text-[var(--color-danger-fg)]">
-                Recording…
-              </p>
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 pt-2.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <p className="shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)]">
+                  {formatRecordingTimer(recordingSeconds)}
+                </p>
+                <div className="flex h-6 items-end gap-0.5" aria-hidden>
+                  {micLevels.map((level, index) => (
+                    <span
+                      key={index}
+                      className="w-1 rounded-full bg-[var(--color-danger-fg)] transition-[height] duration-75"
+                      style={{ height: `${Math.max(15, level * 100)}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" type="button" onClick={cancelRecording}>
                   Cancel
@@ -1354,6 +1831,107 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             )}
           </form>
         </footer>
+      )}
+
+      <VisitHistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        items={historyItems}
+        currentSessionId={session?.id ?? null}
+        onSelect={(sessionId) => void openSessionFromDrawer(sessionId)}
+        onNew={() => void startSession()}
+        creating={busy === "create"}
+      />
+
+      <Modal
+        open={unitModalOpen}
+        onClose={() => setUnitModalOpen(false)}
+        title="Link unit"
+      >
+        <div className="space-y-3">
+          <Input
+            placeholder="Search units…"
+            value={unitQuery}
+            onChange={(event) => setUnitQuery(event.target.value)}
+            autoFocus
+          />
+          {unitSearching && (
+            <p className="text-[12.5px] text-[var(--color-ink-muted)]">Searching…</p>
+          )}
+          <ul className="max-h-72 space-y-1 overflow-y-auto">
+            {unitHits.length === 0 && !unitSearching && (
+              <li className="py-6 text-center text-[13px] text-[var(--color-ink-muted)]">
+                No units found.
+              </li>
+            )}
+            {unitHits.map((property) => {
+              const label =
+                [property.reference, property.title].filter(Boolean).join(" · ") ||
+                property.title;
+              const active = session?.propertyId === property.id;
+              return (
+                <li key={property.id}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-[var(--color-muted)]",
+                      active && "bg-[var(--color-brand-50)]",
+                    )}
+                    onClick={() => void linkUnit(property.id)}
+                    disabled={busy === "unit"}
+                  >
+                    <IconBuilding className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-ink-soft)]" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13.5px] font-medium">
+                        {label}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {session?.propertyId && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => void linkUnit(null)}
+              disabled={busy === "unit"}
+            >
+              Clear linked unit
+            </Button>
+          )}
+        </div>
+      </Modal>
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo preview"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-zoom-out"
+            aria-label="Close photo"
+            onClick={() => setLightboxUrl(null)}
+          />
+          <button
+            type="button"
+            className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+            aria-label="Close"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <IconClose className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="relative z-[1] max-h-[min(90dvh,900px)] max-w-full object-contain"
+          />
+        </div>
       )}
     </div>
   );

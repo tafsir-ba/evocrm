@@ -29,6 +29,8 @@ export const updateVisitSessionInputSchema = z
   .object({
     language: z.string().trim().min(2).max(16).optional().nullable(),
     editedDraftBody: z.string().trim().max(20000).optional().nullable(),
+    title: z.string().trim().min(1).max(120).optional().nullable(),
+    propertyId: objectIdSchema.optional().nullable(),
   })
   .strict();
 

@@ -51,7 +51,9 @@ export type VisitSessionRecord = {
   leadId: string;
   projectId: string;
   activityId: string | null;
+  propertyId: string | null;
   createdBy: string;
+  title: string | null;
   status: VisitSessionStatus;
   language: string | null;
   messages: VisitMessageRecord[];
@@ -144,7 +146,9 @@ function toVisitSessionRecord(document: VisitSessionDocument): VisitSessionRecor
     leadId: document.leadId.toString(),
     projectId: document.projectId.toString(),
     activityId: toObjectIdString(document.activityId),
+    propertyId: toObjectIdString(document.propertyId),
     createdBy: document.createdBy.toString(),
+    title: document.title ?? null,
     status: document.status as VisitSessionStatus,
     language: document.language ?? null,
     messages: (document.messages ?? []).map((message) =>
@@ -179,6 +183,8 @@ export async function createVisitSession(input: {
   projectId: string;
   createdBy: string;
   language?: string | null;
+  title?: string | null;
+  propertyId?: string | null;
 }): Promise<VisitSessionRecord> {
   await connectDb();
 
@@ -188,6 +194,8 @@ export async function createVisitSession(input: {
       projectId: input.projectId,
       createdBy: input.createdBy,
       language: input.language ?? null,
+      title: input.title ?? null,
+      propertyId: input.propertyId ?? null,
       status: "open",
       messages: [],
       documentIds: [],
@@ -262,6 +270,8 @@ export async function updateVisitSession(
   update: {
     status?: VisitSessionStatus;
     language?: string | null;
+    title?: string | null;
+    propertyId?: string | null;
     activityId?: string | null;
     messages?: VisitMessageRecord[];
     documentIds?: string[];
@@ -277,6 +287,8 @@ export async function updateVisitSession(
 
   if (update.status !== undefined) $set.status = update.status;
   if (update.language !== undefined) $set.language = update.language;
+  if (update.title !== undefined) $set.title = update.title;
+  if (update.propertyId !== undefined) $set.propertyId = update.propertyId;
   if (update.activityId !== undefined) $set.activityId = update.activityId;
   if (update.messages !== undefined) $set.messages = update.messages;
   if (update.documentIds !== undefined) $set.documentIds = update.documentIds;

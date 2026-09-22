@@ -120,6 +120,24 @@ export function formatVisitMediaFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Human title from first substantive user text (ChatGPT-style). */
+export function deriveVisitSessionTitle(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  if (cleaned.length <= 60) return cleaned;
+  return `${cleaned.slice(0, 57).trimEnd()}…`;
+}
+
+export function formatVisitSessionFallbackTitle(createdAt: Date | string): string {
+  const date =
+    createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "New visit";
+  return `Visit · ${date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })}`;
+}
+
 export function validateVisitMediaFileClient(file: File): string | null {
   if (file.size <= 0) return "File cannot be empty.";
   if (file.size > MAX_VISIT_MEDIA_FILE_SIZE_BYTES) {

@@ -105,6 +105,8 @@ export async function summarizeVisitSessionWithOpenAi(input: {
   crmLanguage?: string | null;
   leadName?: string | null;
   projectName?: string | null;
+  /** Explicitly linked unit only — never infer from the lead. */
+  propertyLabel?: string | null;
 }): Promise<VisitSummaryPayload> {
   if (!isOpenAiConfigured()) {
     throw new AppError(
@@ -120,9 +122,19 @@ export async function summarizeVisitSessionWithOpenAi(input: {
 
   const transcript = input.messages
     .filter((message) => message.status === "ready")
+    // Skip legacy duplicate transcript rows; audio messages already carry text.
+    .filter((message) => message.kind !== "transcript")
     .map((message) => {
       const label = message.kind.toUpperCase();
-      const body = message.text?.trim() || `[${message.kind} attachment ${message.documentId ?? ""}]`;
+      const body =
+        message.text?.trim() ||
+        (message.kind === "photo"
+          ? "[photo attached]"
+          : message.kind === "video"
+            ? "[video attached]"
+            : message.kind === "audio"
+              ? "[audio attached]"
+              : `[${message.kind}]`);
       return `[${message.id}] (${label}) ${body}`;
     })
     .join("\n");
@@ -134,12 +146,18 @@ export async function summarizeVisitSessionWithOpenAi(input: {
     );
   }
 
+  const unitLine = input.propertyLabel?.trim()
+    ? `Linked unit (explicit): ${input.propertyLabel.trim()}`
+    : "Linked unit: none (do not invent a unit)";
+
   const prompt = `You are an assistant for a real-estate CRM visit note.
 Lead: ${input.leadName ?? "Unknown"}
 Project: ${input.projectName ?? "Unknown"}
+${unitLine}
 Write the structured summary in language: ${outputLanguage}.
-Only use facts present in the session messages. Do not invent owners or due dates.
+Only use facts present in the session messages. Do not invent owners, due dates, or property units.
 If an owner or due date is not explicitly stated, leave those fields null / omit them.
+Only mention a specific unit in propertyDiscussed when it appears in messages or the linked unit line above.
 Mark uncertain items in needsConfirmation.
 
 Session messages (preserve message ids for traceability):

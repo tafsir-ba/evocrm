@@ -85,6 +85,8 @@ const visitSessionSchema = new Schema(
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     activityId: { type: Schema.Types.ObjectId, ref: "Activity", default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    title: { type: String, trim: true, default: null, maxlength: 120 },
+    propertyId: { type: Schema.Types.ObjectId, ref: "Property", default: null },
     status: {
       type: String,
       enum: VISIT_SESSION_STATUSES,
