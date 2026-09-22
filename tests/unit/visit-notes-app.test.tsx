@@ -55,6 +55,11 @@ async function openSessionUi() {
             fullName: "Ada Buyer",
             email: "ada@example.com",
             projectId: "507f1f77bcf86cd799439012",
+            project: {
+              id: "507f1f77bcf86cd799439012",
+              name: "Cressy",
+              reference: "CRS",
+            },
           },
         ],
       });
@@ -82,9 +87,11 @@ async function openSessionUi() {
     />,
   );
 
-    await user.type(screen.getByPlaceholderText(/who is this note about/i), "Ada");
-  expect(await screen.findByText("Ada Buyer")).toBeInTheDocument();
-  await user.click(screen.getByText("Ada Buyer"));
+  await user.type(screen.getByPlaceholderText(/who is this note about/i), "Ada");
+  const hit = await screen.findByTestId("notes-lead-hit");
+  expect(within(hit).getByText("Ada Buyer")).toBeInTheDocument();
+  expect(within(hit).getByText(/ada@example\.com · Cressy \(CRS\)/i)).toBeInTheDocument();
+  await user.click(hit);
   await waitFor(() => {
     expect(screen.getByLabelText(/note message/i)).toBeInTheDocument();
   });
@@ -331,6 +338,11 @@ describe("VisitNotesApp", () => {
               fullName: "Ada Buyer",
               email: "ada@example.com",
               projectId: "507f1f77bcf86cd799439012",
+              project: {
+                id: "507f1f77bcf86cd799439012",
+                name: "Cressy",
+                reference: "CRS",
+              },
             },
           ],
         });
@@ -398,5 +410,10 @@ describe("VisitNotesApp", () => {
       "/w/evo-home/dashboard",
     );
     expect(within(menu).getByRole("menuitem", { name: /link unit|change unit/i })).toBeInTheDocument();
+    expect(within(menu).getByTestId("notes-open-lead")).toHaveAttribute(
+      "href",
+      "/w/evo-home/leads/507f1f77bcf86cd799439011",
+    );
+    expect(within(menu).getByRole("menuitem", { name: /open lead/i })).toBeInTheDocument();
   });
 });

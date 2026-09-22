@@ -39,6 +39,7 @@ import {
   IconSend,
   IconShare,
   IconSparkles,
+  IconUser,
   IconVideo,
 } from "@/lib/icons";
 import {
@@ -48,6 +49,7 @@ import {
 } from "@/lib/notes-share";
 import { cn } from "@/lib/utils";
 import { navHrefForSegment } from "@/lib/v1-navigation";
+import { workspacePath } from "@/lib/workspace-paths";
 import {
   clearOfflineDraft,
   loadLastOpenedVisitSessionId,
@@ -85,7 +87,17 @@ type LeadHit = {
   fullName: string;
   email: string | null;
   projectId: string | null;
+  project?: { id: string; name: string; reference: string | null } | null;
 };
+
+function leadProjectLabel(lead: LeadHit): string | null {
+  if (lead.project?.name?.trim()) {
+    return lead.project.reference
+      ? `${lead.project.name} (${lead.project.reference})`
+      : lead.project.name;
+  }
+  return null;
+}
 
 type VisitMessage = {
   id: string;
@@ -1398,6 +1410,22 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <IconBuilding className="h-4 w-4 text-[var(--color-ink-soft)]" />
                     {linkedUnitLabel ? "Change unit" : "Link unit"}
                   </button>
+                  {(session?.leadId || selectedLead?.id) && (
+                    <Link
+                      href={workspacePath(
+                        workspaceSlug,
+                        "leads",
+                        session?.leadId ?? selectedLead!.id,
+                      )}
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                      onClick={() => setHeaderMenuOpen(false)}
+                      data-testid="notes-open-lead"
+                    >
+                      <IconUser className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                      Open Lead
+                    </Link>
+                  )}
                   <button
                     type="button"
                     role="menuitem"
@@ -1522,10 +1550,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                           type="button"
                           className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-[var(--color-muted)]"
                           onClick={() => void selectLead(lead)}
+                          data-testid="notes-lead-hit"
                         >
                           <span className="text-[13.5px] font-medium">{lead.fullName}</span>
                           <span className="text-[12px] text-[var(--color-ink-muted)]">
-                            {lead.email ?? "No email"}
+                            {[lead.email || "No email", leadProjectLabel(lead)]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         </button>
                       </li>
