@@ -310,5 +310,17 @@ describe("VisitNotesApp", () => {
     const history = await screen.findByTestId("visit-history-list");
     expect(within(history).getByText("Parking discussion")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /new conversation/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /conversation actions/i }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: /dashboard/i })).toHaveAttribute(
+      "href",
+      "/w/evo-home/dashboard",
+    );
+    expect(within(menu).getByRole("menuitem", { name: /exit notes/i })).toHaveAttribute(
+      "href",
+      "/w/evo-home/dashboard",
+    );
+    expect(within(menu).getByRole("menuitem", { name: /link unit|change unit/i })).toBeInTheDocument();
   });
 });

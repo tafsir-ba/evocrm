@@ -27,7 +27,9 @@ import {
   IconBuilding,
   IconCamera,
   IconClose,
+  IconDashboard,
   IconFile,
+  IconLogout,
   IconMic,
   IconMenu,
   IconMore,
@@ -45,6 +47,7 @@ import {
   shareNotesText,
 } from "@/lib/notes-share";
 import { cn } from "@/lib/utils";
+import { navHrefForSegment } from "@/lib/v1-navigation";
 import {
   clearOfflineDraft,
   loadOfflineDraft,
@@ -1338,7 +1341,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               {headerMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[11.5rem] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                  className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[12rem] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
                 >
                   <button
                     type="button"
@@ -1365,6 +1368,25 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <IconArrowLeft className="h-4 w-4 text-[var(--color-ink-soft)]" />
                     Find another lead
                   </button>
+                  <div className="my-1 border-t border-[var(--color-line)]" />
+                  <Link
+                    href={navHrefForSegment(workspaceSlug, "dashboard")}
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                    onClick={() => setHeaderMenuOpen(false)}
+                  >
+                    <IconDashboard className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    href={navHrefForSegment(workspaceSlug, "dashboard")}
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                    onClick={() => setHeaderMenuOpen(false)}
+                  >
+                    <IconLogout className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                    Exit Notes
+                  </Link>
                 </div>
               )}
             </div>
@@ -1382,7 +1404,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 </p>
               </div>
               <select
-                className="h-9 max-w-[42%] rounded-md border border-[var(--color-line)] bg-white px-2 text-[12.5px]"
+                className="h-9 max-w-[38%] rounded-md border border-[var(--color-line)] bg-white px-2 text-[12.5px]"
                 value={workspaceSlug}
                 onChange={(event) => {
                   setWorkspaceSlug(event.target.value);
@@ -1400,6 +1422,45 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   </option>
                 ))}
               </select>
+              <div className="relative shrink-0" ref={headerMenuRef}>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                    headerMenuOpen && "bg-[var(--color-muted)]",
+                  )}
+                  aria-label="Notes navigation"
+                  aria-expanded={headerMenuOpen}
+                  onClick={() => setHeaderMenuOpen((open) => !open)}
+                >
+                  <IconMore className="h-5 w-5" />
+                </button>
+                {headerMenuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[12rem] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                  >
+                    <Link
+                      href={navHrefForSegment(workspaceSlug, "dashboard")}
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                      onClick={() => setHeaderMenuOpen(false)}
+                    >
+                      <IconDashboard className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                      Dashboard
+                    </Link>
+                    <Link
+                      href={navHrefForSegment(workspaceSlug, "dashboard")}
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                      onClick={() => setHeaderMenuOpen(false)}
+                    >
+                      <IconLogout className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                      Exit Notes
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mx-auto max-w-3xl px-4 pb-3 space-y-2">
