@@ -1080,7 +1080,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           body: JSON.stringify({
             editedDraftBody: draftBody || null,
             createTasksFromNextSteps: true,
-            mirrorToLeadNotes: false,
+            mirrorToLeadNotes: true,
+            registerLeadNoteActivity: true,
           }),
         },
       );
@@ -1171,9 +1172,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     return (
       <div className="min-h-dvh bg-[var(--color-canvas)] flex items-center justify-center p-6">
         <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold text-[var(--color-ink)]">Visit Notes</h1>
+          <h1 className="text-xl font-semibold text-[var(--color-ink)]">Notes</h1>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Join or create a workspace before capturing visits.
+            Join or create a workspace before capturing visit notes for a lead.
           </p>
           <Link href="/workspaces" className="inline-block mt-4">
             <Button>Open workspaces</Button>
@@ -1636,7 +1637,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                           Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
                         </h3>
                         <p className="text-[11.5px] text-[var(--color-ink-muted)]">
-                          {session.project?.name ?? "Project"} · publish when ready
+                          {session.project?.name ?? "Project"} · saves to the lead Notes profile
                         </p>
                       </div>
                       <Button
@@ -1645,7 +1646,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                         loading={busy === "publish"}
                         disabled={Boolean(busy) || !draftBody.trim()}
                       >
-                        Publish to CRM
+                        Save to lead notes
                       </Button>
                     </div>
                     <Textarea

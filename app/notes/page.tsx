@@ -10,7 +10,7 @@ import {
 import { findUserById } from "@/server/repositories/users";
 import { listActiveWorkspacesForUser } from "@/server/services/workspaces";
 
-export const metadata = { title: "Visit Notes — EvoHome CRM" };
+export const metadata = { title: "Notes — EvoHome CRM" };
 
 export default async function NotesPage() {
   const session = await auth();

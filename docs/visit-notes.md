@@ -20,7 +20,7 @@ Authenticated mobile-first app at `/notes`. Working session record is `VisitSess
 1. **Route:** top-level `/notes` (matches `crm.evo-home.ch/notes`). Workspace selector inside the page. Linked from primary CRM nav (Dashboard homepage CTA + sidebar **Notes**).
 2. **No Need entity.** Lead remains primary; VisitSession is the only new domain model.
 3. **Media:** Documents linked as `visit_session`. Photos include JPEG/PNG/WebP/**HEIC/HEIF**. Audio/video (`audio/webm|mp4|mpeg|wav|ogg|aac`, `video/webm|mp4|quicktime`) are **visit_session-only**. Max **50 MB**; client guides ~15 min audio / ~3 min video. Audio may be transcribed; video is attached-only. Uploads go through same-origin `/documents/direct` (not browser PUT to Spaces).
-4. **Lead.notes mirror:** optional dated append on publish only; Activity remains source of truth.
+4. **Lead notes on publish:** Publishing always creates a completed `note` Activity on the lead (same Internal notes UI as the lead Notes tab) and, by default, appends a dated mirror onto `Lead.notes`. Visit Activity remains VisitSession source of truth on the timeline. `lead:update` is required only for the `Lead.notes` mirror.
 5. **Permissions:** `lead:read` (search/open), `activity:create|update|read` (session/publish), `document:create|read` (media). No parallel ACL.
 6. **Retention:** soft-archive session (`archivedAt`); media follows Document archive. No hard delete in V1.
 7. **Offline:** composer text in `localStorage`. Media requires connectivity; failed in-session uploads keep Retry/Remove and automatically retry on `online` while the tab remains open (files are not persisted to disk/localStorage).

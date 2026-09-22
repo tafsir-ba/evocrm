@@ -52,7 +52,19 @@ export function IconFile(p: IconProps) { return (<svg {...base(p)}><path d="M14 
 export function IconUpload(p: IconProps) { return (<svg {...base(p)}><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 20h16"/></svg>); }
 export function IconDownload(p: IconProps) { return (<svg {...base(p)}><path d="M12 4v12M8 12l4 4 4-4"/><path d="M4 20h16"/></svg>); }
 export function IconTrash(p: IconProps) { return (<svg {...base(p)}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M10 11v6M14 11v6M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>); }
-export function IconNote(p: IconProps) { return (<svg {...base(p)}><path d="M5 4h10l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M8 10h6M8 14h8M8 18h5"/></svg>); }
+/** Lined notepad (spiral binding) — used for Notes CTA / nav. */
+export function IconNote(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M7 3.5h11.5A1.5 1.5 0 0 1 20 5v14.5A1.5 1.5 0 0 1 18.5 21H7A1.5 1.5 0 0 1 5.5 19.5V5A1.5 1.5 0 0 1 7 3.5Z" />
+      <path d="M9 9h8M9 13h8M9 17h5" />
+      <circle cx="4.75" cy="7" r="1.1" />
+      <circle cx="4.75" cy="11" r="1.1" />
+      <circle cx="4.75" cy="15" r="1.1" />
+      <path d="M5.8 7H7.2M5.8 11H7.2M5.8 15H7.2" />
+    </svg>
+  );
+}
 export function IconImage(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 19 6-7 5 6 3-3 2 2"/></svg>); }
 export function IconAlert(p: IconProps) { return (<svg {...base(p)}><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v5M12 18.5h0"/></svg>); }
 export function IconShield(p: IconProps) { return (<svg {...base(p)}><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/></svg>); }

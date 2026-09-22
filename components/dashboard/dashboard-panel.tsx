@@ -287,7 +287,7 @@ export function DashboardPanel({
                 variant="secondary"
                 leadingIcon={<IconNote className="h-4 w-4" />}
               >
-                Visit notes
+                Notes
               </Button>
             </Link>
             <Select

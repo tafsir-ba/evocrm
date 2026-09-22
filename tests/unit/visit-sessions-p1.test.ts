@@ -81,11 +81,20 @@ vi.mock("@/server/repositories/dictionary-items", () => ({
 }));
 
 import { AppError } from "@/server/errors";
+import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
+import { updateVisitSession } from "@/server/repositories/visit-sessions";
+import {
+  createActivityForWorkspace,
+  updateActivityForWorkspace,
+} from "@/server/services/activities";
 import {
   archiveVisitSessionForWorkspace,
   publishVisitSessionForWorkspace,
 } from "@/server/services/visit-sessions";
 
+const mockedFindDictionary = vi.mocked(findDictionaryItemByTypeAndKey);
+const mockedCreateActivity = vi.mocked(createActivityForWorkspace);
+const mockedUpdateVisitSession = vi.mocked(updateVisitSession);
 const baseSession = {
   id: "507f1f77bcf86cd799439013",
   workspaceId: "507f1f77bcf86cd799439001",
@@ -160,6 +169,71 @@ describe("visit-sessions P1 permission and archive integrity", () => {
     } satisfies Partial<AppError>);
 
     expect(updateLead).not.toHaveBeenCalled();
+  });
+
+  it("registers a note Activity on the lead Notes profile when publishing", async () => {
+    findVisitSessionById.mockResolvedValue(baseSession);
+    resolveWorkspaceAccess.mockResolvedValue({
+      mode: "member",
+      membership: null,
+      permissions: ["activity:update", "activity:create", "lead:update"],
+      isWorkspaceAdmin: false,
+      grantedProjectIds: null,
+    });
+    hasPermission.mockImplementation(
+      (permissions: string[], required: string) => permissions.includes(required),
+    );
+    mockedFindDictionary.mockImplementation(async (_ws, type, key) => {
+      if (type === "activity_type" && key === "visit") {
+        return { id: "type-visit", key: "visit", label: "Visit" };
+      }
+      if (type === "activity_type" && key === "note") {
+        return { id: "type-note", key: "note", label: "Note" };
+      }
+      if (type === "activity_status" && key === "completed") {
+        return { id: "status-done", key: "completed", label: "Completed" };
+      }
+      return null;
+    });
+    mockedCreateActivity
+      .mockResolvedValueOnce({ id: "visit-act" } as never)
+      .mockResolvedValueOnce({ id: "note-act" } as never);
+    mockedUpdateVisitSession.mockResolvedValue({
+      ...baseSession,
+      activityId: "visit-act",
+      status: "published",
+      publishedAt: new Date(),
+    });
+
+    await publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
+      mirrorToLeadNotes: true,
+      registerLeadNoteActivity: true,
+      createTasksFromNextSteps: false,
+    });
+
+    expect(mockedCreateActivity).toHaveBeenCalledTimes(2);
+    expect(mockedCreateActivity).toHaveBeenNthCalledWith(
+      1,
+      baseSession.workspaceId,
+      "actor",
+      expect.objectContaining({ typeId: "type-visit", leadId: baseSession.leadId }),
+    );
+    expect(mockedCreateActivity).toHaveBeenNthCalledWith(
+      2,
+      baseSession.workspaceId,
+      "actor",
+      expect.objectContaining({
+        typeId: "type-note",
+        leadId: baseSession.leadId,
+        statusId: "status-done",
+      }),
+    );
+    expect(updateLead).toHaveBeenCalledWith(
+      baseSession.workspaceId,
+      baseSession.leadId,
+      expect.objectContaining({ notes: expect.stringContaining("[Visit ") }),
+    );
+    expect(updateActivityForWorkspace).not.toHaveBeenCalled();
   });
 
   it("archives linked documents before soft-archiving the session", async () => {

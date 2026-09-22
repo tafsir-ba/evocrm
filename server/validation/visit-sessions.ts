@@ -73,7 +73,10 @@ export const publishVisitSessionInputSchema = z
   .object({
     editedDraftBody: z.string().trim().min(1).max(20000).optional().nullable(),
     createTasksFromNextSteps: z.boolean().optional().default(false),
-    mirrorToLeadNotes: z.boolean().optional().default(false),
+    /** Append summary onto Lead.notes (overview). Defaults on — Notes app fills the lead notes profile. */
+    mirrorToLeadNotes: z.boolean().optional().default(true),
+    /** Create/update a note Activity so the lead Notes tab shows the published content. Defaults on. */
+    registerLeadNoteActivity: z.boolean().optional().default(true),
   })
   .strict();
 

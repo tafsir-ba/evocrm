@@ -465,6 +465,11 @@ export async function publishVisitSessionForWorkspace(
     "activity_type",
     "visit",
   );
+  const noteType = await findDictionaryItemByTypeAndKey(
+    workspaceId,
+    "activity_type",
+    "note",
+  );
   const completedStatus = await findDictionaryItemByTypeAndKey(
     workspaceId,
     "activity_status",
@@ -502,6 +507,28 @@ export async function publishVisitSessionForWorkspace(
       outcome: draft.nextSteps.map((step) => step.text).join("\n") || undefined,
     });
     activityId = activity.id;
+  }
+
+  // Register on the lead Notes tab (Internal notes) — same Activity type the CRM notes UI lists.
+  if (input.registerLeadNoteActivity !== false) {
+    if (!noteType) {
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "Note activity dictionary is not configured for this workspace.",
+      );
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const noteTitle =
+      title.length > 80 ? `${title.slice(0, 77)}…` : title || `Visit note ${stamp}`;
+    await createActivityForWorkspace(workspaceId, actorId, {
+      typeId: noteType.id,
+      statusId: completedStatus.id,
+      leadId: session.leadId,
+      projectId: session.projectId,
+      propertyId: session.propertyId ?? undefined,
+      title: noteTitle,
+      description: body,
+    });
   }
 
   if (input.createTasksFromNextSteps) {

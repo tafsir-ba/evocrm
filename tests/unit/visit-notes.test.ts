@@ -61,12 +61,23 @@ describe("visit session validation", () => {
     );
   });
 
-  it("accepts publish options", () => {
+  it("accepts publish options and defaults note registration on", () => {
     const parsed = publishVisitSessionInputSchema.safeParse({
       createTasksFromNextSteps: true,
       mirrorToLeadNotes: false,
     });
     expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.registerLeadNoteActivity).toBe(true);
+      expect(parsed.data.mirrorToLeadNotes).toBe(false);
+    }
+
+    const defaults = publishVisitSessionInputSchema.safeParse({});
+    expect(defaults.success).toBe(true);
+    if (defaults.success) {
+      expect(defaults.data.mirrorToLeadNotes).toBe(true);
+      expect(defaults.data.registerLeadNoteActivity).toBe(true);
+    }
   });
 });
 
