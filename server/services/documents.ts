@@ -187,7 +187,7 @@ export async function createDocumentUploadUrlForWorkspace(
     "document:create",
   );
 
-  validateDocumentMimeType(input.mimeType);
+  validateDocumentMimeType(input.mimeType, input.linkedEntityType);
   validateDocumentFileSize(input.fileSize, input.linkedEntityType);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 
@@ -270,7 +270,7 @@ export async function confirmDocumentUploadForWorkspace(
     "document:create",
   );
 
-  validateDocumentMimeType(input.mimeType);
+  validateDocumentMimeType(input.mimeType, input.linkedEntityType);
   validateDocumentFileSize(input.fileSize, input.linkedEntityType);
   await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
 

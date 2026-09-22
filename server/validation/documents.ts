@@ -28,6 +28,7 @@ export type DocumentLinkedEntityType = (typeof DOCUMENT_LINKED_ENTITY_TYPES)[num
 
 export const DOCUMENT_VISIBILITY_VALUES = ["private", "workspace"] as const;
 
+/** Base document MIME allowlist — excludes visit-only audio/video. */
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -38,6 +39,11 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
+] as const;
+
+/** Visit-session media only — images reuse base types; audio/video are visit-scoped. */
+export const ALLOWED_VISIT_SESSION_MIME_TYPES = [
+  ...ALLOWED_DOCUMENT_MIME_TYPES,
   ...VISIT_AUDIO_MIME_TYPES,
   ...VISIT_VIDEO_MIME_TYPES,
 ] as const;
@@ -80,22 +86,48 @@ function maxBytesForLinkedEntity(
     : MAX_DOCUMENT_FILE_SIZE_BYTES;
 }
 
+function allowedMimeTypesForLinkedEntity(
+  linkedEntityType: DocumentLinkedEntityType,
+): readonly string[] {
+  return linkedEntityType === "visit_session"
+    ? ALLOWED_VISIT_SESSION_MIME_TYPES
+    : ALLOWED_DOCUMENT_MIME_TYPES;
+}
+
+function refineDocumentUploadPayload(
+  value: {
+    linkedEntityType: DocumentLinkedEntityType;
+    mimeType: string;
+    fileSize: number;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const max = maxBytesForLinkedEntity(value.linkedEntityType);
+  if (value.fileSize > max) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `File exceeds maximum allowed size of ${max} bytes.`,
+      path: ["fileSize"],
+    });
+  }
+
+  const allowed = allowedMimeTypesForLinkedEntity(value.linkedEntityType);
+  if (!allowed.includes(value.mimeType)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Unsupported file type.",
+      path: ["mimeType"],
+    });
+  }
+}
+
 export const documentUploadUrlInputSchema = z
   .object({
     ...baseUploadFields,
     fileSize: z.coerce.number().int().min(1),
   })
   .strict()
-  .superRefine((value, ctx) => {
-    const max = maxBytesForLinkedEntity(value.linkedEntityType);
-    if (value.fileSize > max) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `File exceeds maximum allowed size of ${max} bytes.`,
-        path: ["fileSize"],
-      });
-    }
-  });
+  .superRefine(refineDocumentUploadPayload);
 
 export const documentConfirmInputSchema = z
   .object({
@@ -105,16 +137,7 @@ export const documentConfirmInputSchema = z
     fileSize: z.coerce.number().int().min(1),
   })
   .strict()
-  .superRefine((value, ctx) => {
-    const max = maxBytesForLinkedEntity(value.linkedEntityType);
-    if (value.fileSize > max) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `File exceeds maximum allowed size of ${max} bytes.`,
-        path: ["fileSize"],
-      });
-    }
-  });
+  .superRefine(refineDocumentUploadPayload);
 
 export type DocumentListQuery = z.infer<typeof documentListQuerySchema>;
 export type DocumentUploadUrlInput = z.infer<typeof documentUploadUrlInputSchema>;

@@ -2,10 +2,9 @@
 
 import {
   MAX_VISIT_MEDIA_FILE_SIZE_BYTES,
-  VISIT_AUDIO_MIME_TYPES,
-  VISIT_VIDEO_MIME_TYPES,
 } from "@/lib/visit-notes";
 
+/** Base document MIME allowlist — excludes visit-only audio/video. */
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -16,8 +15,6 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
-  ...VISIT_AUDIO_MIME_TYPES,
-  ...VISIT_VIDEO_MIME_TYPES,
 ] as const;
 
 export const MAX_DOCUMENT_FILE_SIZE_BYTES = 25 * 1024 * 1024;

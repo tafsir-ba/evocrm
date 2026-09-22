@@ -102,6 +102,38 @@ describe("visit_session document uploads", () => {
     });
     expect(leadStillCapped.success).toBe(false);
   });
+
+  it("rejects visit audio/video MIME on non-visit entities", () => {
+    const leadAudio = documentUploadUrlInputSchema.safeParse({
+      linkedEntityType: "lead",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      fileName: "note.webm",
+      mimeType: "audio/webm",
+      fileSize: 1024,
+      visibility: "private",
+    });
+    expect(leadAudio.success).toBe(false);
+
+    const propertyVideo = documentUploadUrlInputSchema.safeParse({
+      linkedEntityType: "property",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      fileName: "tour.mp4",
+      mimeType: "video/mp4",
+      fileSize: 1024,
+      visibility: "private",
+    });
+    expect(propertyVideo.success).toBe(false);
+
+    const visitAudio = documentUploadUrlInputSchema.safeParse({
+      linkedEntityType: "visit_session",
+      linkedEntityId: "507f1f77bcf86cd799439011",
+      fileName: "note.webm",
+      mimeType: "audio/webm",
+      fileSize: 1024,
+      visibility: "private",
+    });
+    expect(visitAudio.success).toBe(true);
+  });
 });
 
 describe("formatVisitDraftBody", () => {

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { AppError } from "@/server/errors";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
+  ALLOWED_VISIT_SESSION_MIME_TYPES,
   MAX_DOCUMENT_FILE_SIZE_BYTES,
   MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES,
   type DocumentLinkedEntityType,
@@ -24,10 +25,23 @@ export function sanitizeFileName(fileName: string): string {
   return sanitized;
 }
 
-export function validateDocumentMimeType(mimeType: string): void {
-  if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(mimeType as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number])) {
+export function allowedMimeTypesForLinkedEntity(
+  linkedEntityType?: DocumentLinkedEntityType,
+): readonly string[] {
+  return linkedEntityType === "visit_session"
+    ? ALLOWED_VISIT_SESSION_MIME_TYPES
+    : ALLOWED_DOCUMENT_MIME_TYPES;
+}
+
+export function validateDocumentMimeType(
+  mimeType: string,
+  linkedEntityType?: DocumentLinkedEntityType,
+): void {
+  const allowed = allowedMimeTypesForLinkedEntity(linkedEntityType);
+
+  if (!allowed.includes(mimeType)) {
     throw new AppError("VALIDATION_ERROR", "Unsupported file type.", {
-      details: { mimeType, allowed: ALLOWED_DOCUMENT_MIME_TYPES },
+      details: { mimeType, linkedEntityType: linkedEntityType ?? null, allowed },
     });
   }
 }

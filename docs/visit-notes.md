@@ -19,7 +19,7 @@ Authenticated mobile-first app at `/notes`. Working session record is `VisitSess
 
 1. **Route:** top-level `/notes` (matches `crm.evo-home.ch/notes`). Workspace selector inside the page. No new primary nav item.
 2. **No Need entity.** Lead remains primary; VisitSession is the only new domain model.
-3. **Media:** Documents linked as `visit_session`. Photos = existing image MIME. Audio = `audio/webm|mp4|mpeg|wav|ogg` (transcribed). Video = `video/webm|mp4` (**attached-only**, not transcribed). Max **50 MB** for visit media; client guides ~15 min audio / ~3 min video.
+3. **Media:** Documents linked as `visit_session`. Photos = existing image MIME (also allowed on other entities). Audio/video MIME (`audio/webm|mp4|mpeg|wav|ogg`, `video/webm|mp4`) are **visit_session-only**. Max **50 MB** for visit media; client guides ~15 min audio / ~3 min video. Audio may be transcribed; video is attached-only.
 4. **Lead.notes mirror:** optional dated append on publish only; Activity remains source of truth.
 5. **Permissions:** `lead:read` (search/open), `activity:create|update|read` (session/publish), `document:create|read` (media). No parallel ACL.
 6. **Retention:** soft-archive session (`archivedAt`); media follows Document archive. No hard delete in V1.

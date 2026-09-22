@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { hasPermission } from "@/server/permissions/permissions";
+import { resolveWorkspaceAccess } from "@/server/permissions/resolve-workspace-access";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
-import { findDocumentById } from "@/server/repositories/documents";
+import { archiveDocument, findDocumentById } from "@/server/repositories/documents";
 import { findLeadById, updateLead } from "@/server/repositories/leads";
 import { findProjectById } from "@/server/repositories/projects";
 import {
@@ -377,6 +379,16 @@ export async function publishVisitSessionForWorkspace(
     draft = { ...draft, editedBody: input.editedDraftBody };
   }
 
+  if (input.mirrorToLeadNotes) {
+    const access = await resolveWorkspaceAccess(workspaceId, actorId);
+    if (!hasPermission(access.permissions, "lead:update")) {
+      throw new AppError(
+        "PERMISSION_DENIED",
+        "lead:update is required to mirror the visit summary onto Lead.notes.",
+      );
+    }
+  }
+
   const body = formatVisitDraftBody(draft);
   const visitType = await findDictionaryItemByTypeAndKey(
     workspaceId,
@@ -488,7 +500,19 @@ export async function archiveVisitSessionForWorkspace(
   sessionId: string,
   actorId: string,
 ): Promise<VisitSessionDetail> {
-  await requireActiveSession(workspaceId, sessionId, actorId, "activity:archive");
+  const session = await requireActiveSession(
+    workspaceId,
+    sessionId,
+    actorId,
+    "activity:archive",
+  );
+
+  // Cascade while session is still active so linked-entity validation remains valid
+  // for any follow-on document pipelines; Visit Notes retention: media follows Document archive.
+  for (const documentId of session.documentIds) {
+    await archiveDocument(workspaceId, documentId);
+  }
+
   const updated = await archiveVisitSession(workspaceId, sessionId);
   if (!updated) {
     throw new AppError("NOT_FOUND", "Visit session not found.");
@@ -500,6 +524,7 @@ export async function archiveVisitSessionForWorkspace(
     action: "visit_session.archived",
     entityType: "visit_session",
     entityId: sessionId,
+    after: { archivedDocumentIds: session.documentIds },
   });
 
   return enrichSession(updated);
