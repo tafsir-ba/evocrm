@@ -79,10 +79,9 @@ async function openSessionUi() {
     />,
   );
 
-  await user.type(screen.getByPlaceholderText(/search lead/i), "Ada");
+  await user.type(screen.getByPlaceholderText(/who is this visit with/i), "Ada");
   expect(await screen.findByText("Ada Buyer")).toBeInTheDocument();
   await user.click(screen.getByText("Ada Buyer"));
-  await user.click(screen.getByRole("button", { name: /new visit/i }));
   await waitFor(() => {
     expect(screen.getByLabelText(/visit note/i)).toBeInTheDocument();
   });
@@ -95,20 +94,30 @@ describe("VisitNotesApp", () => {
     window.localStorage.clear();
   });
 
-  it("searches leads and starts a visit session", async () => {
+  it("selects a lead once and opens the conversation without a New visit gate", async () => {
     await openSessionUi();
     expect(screen.getByLabelText(/visit note/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add attachment/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new visit/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^workspace$/i)).not.toBeInTheDocument();
   });
 
-  it("uses ChatGPT-style composer: plus menu, mic when empty, send when text", async () => {
+  it("keeps a ChatGPT-style composer with CRM actions after capture", async () => {
     const user = await openSessionUi();
+
+    const footer = screen.getByLabelText(/visit note/i).closest("form");
+    expect(footer).toBeTruthy();
+    expect(within(footer as HTMLElement).queryByText(/summarize/i)).not.toBeInTheDocument();
+    expect(within(footer as HTMLElement).queryByText(/publish/i)).not.toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: /record audio/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send note/i })).not.toBeInTheDocument();
+
+    const afterCapture = screen.getByTestId("after-capture-actions");
     expect(
-      screen.getByRole("button", { name: /summarize this visit/i }),
+      within(afterCapture).getByRole("button", { name: /summarize this visit/i }),
     ).toBeInTheDocument();
+    expect(within(afterCapture).queryByText(/publish to crm/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /add attachment/i }));
     const menu = screen.getByRole("menu");
@@ -117,7 +126,6 @@ describe("VisitNotesApp", () => {
       within(menu).getByRole("menuitem", { name: /choose photo \/ file/i }),
     ).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /choose video/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^add photo$/i })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/visit note/i), "Site visit note");
     expect(screen.getByRole("button", { name: /send note/i })).toBeInTheDocument();

@@ -269,14 +269,18 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }, [leadQuery, searchLeads]);
 
   const loadSessionsForLead = useCallback(
-    async (leadId: string) => {
+    async (leadId: string): Promise<VisitSession[]> => {
       const params = new URLSearchParams({ leadId, pageSize: "20" });
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions?${params.toString()}`,
       );
-      if (!response.ok) return;
+      if (!response.ok) {
+        setSessions([]);
+        return [];
+      }
       const body = (await response.json()) as { data: VisitSession[] };
       setSessions(body.data);
+      return body.data;
     },
     [workspaceSlug],
   );
@@ -286,15 +290,71 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setError(message);
   }
 
+  async function createSessionForLead(lead: LeadHit): Promise<VisitSession> {
+    const response = await fetch(`/api/workspaces/${workspaceSlug}/visit-sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: lead.id,
+        language: language === "auto" ? null : language,
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(body, "Could not start the conversation."));
+    }
+    return body.data.session as VisitSession;
+  }
+
+  async function fetchSession(sessionId: string): Promise<VisitSession> {
+    const response = await fetch(
+      `/api/workspaces/${workspaceSlug}/visit-sessions/${sessionId}`,
+    );
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(body, "Could not open the conversation."));
+    }
+    return body.data.session as VisitSession;
+  }
+
+  function enterSession(next: VisitSession) {
+    setSession(next);
+    setDraftBody(next.draftBody ?? "");
+    setPendingUploads([]);
+    setAttachMenuOpen(false);
+    setError(null);
+    setStatusBanner(null);
+  }
+
+  /** Select lead once → resume open conversation or start a fresh one. */
   async function selectLead(lead: LeadHit) {
     setSelectedLead(lead);
     setLeadQuery(lead.fullName);
     setLeadHits([]);
-    setSession(null);
     setDraftBody("");
     setPendingUploads([]);
     setAttachMenuOpen(false);
-    await loadSessionsForLead(lead.id);
+    setBusy("open");
+    setError(null);
+    setStatusBanner(null);
+    try {
+      const list = await loadSessionsForLead(lead.id);
+      const resumable = list.find(
+        (item) => item.status === "open" || item.status === "draft",
+      );
+      if (resumable) {
+        enterSession(await fetchSession(resumable.id));
+        return;
+      }
+      const created = await createSessionForLead(lead);
+      enterSession(created);
+      await loadSessionsForLead(lead.id);
+    } catch (err) {
+      setSession(null);
+      failBanner(err instanceof Error ? err.message : "Could not open conversation.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function startSession() {
@@ -302,25 +362,11 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setBusy("create");
     setError(null);
     try {
-      const response = await fetch(`/api/workspaces/${workspaceSlug}/visit-sessions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId: selectedLead.id,
-          language: language === "auto" ? null : language,
-        }),
-      });
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(apiErrorMessage(body, "Could not start visit session."));
-      }
-      const created = body.data.session as VisitSession;
-      setSession(created);
-      setDraftBody(created.draftBody ?? "");
+      const created = await createSessionForLead(selectedLead);
+      enterSession(created);
       await loadSessionsForLead(selectedLead.id);
-      setStatusBanner("New visit session started.");
     } catch (err) {
-      failBanner(err instanceof Error ? err.message : "Could not start session.");
+      failBanner(err instanceof Error ? err.message : "Could not start conversation.");
     } finally {
       setBusy(null);
     }
@@ -330,33 +376,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setBusy("open");
     setError(null);
     try {
-      const response = await fetch(
-        `/api/workspaces/${workspaceSlug}/visit-sessions/${sessionId}`,
-      );
-      const body = await response.json();
-      if (!response.ok) {
-        throw new Error(apiErrorMessage(body, "Could not open session."));
-      }
-      const opened = body.data.session as VisitSession;
-      setSession(opened);
-      setDraftBody(opened.draftBody ?? "");
-      setPendingUploads([]);
+      enterSession(await fetchSession(sessionId));
     } catch (err) {
-      failBanner(err instanceof Error ? err.message : "Could not open session.");
+      failBanner(err instanceof Error ? err.message : "Could not open conversation.");
     } finally {
       setBusy(null);
     }
-  }
-
-  async function refreshSession(sessionId: string) {
-    const response = await fetch(
-      `/api/workspaces/${workspaceSlug}/visit-sessions/${sessionId}`,
-    );
-    if (!response.ok) return;
-    const body = await response.json();
-    const refreshed = body.data.session as VisitSession;
-    setSession(refreshed);
-    setDraftBody(refreshed.draftBody ?? "");
   }
 
   async function sendText(event?: FormEvent) {
@@ -497,17 +522,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         }
         next = transcribeBody.data.session as VisitSession;
         setSession(next);
-        setStatusBanner("Audio transcribed.");
       } else if (uploaded.kind === "video") {
-        setStatusBanner(
-          `Video attached (not transcribed). Max guide: ${Math.round(VISIT_VIDEO_MAX_DURATION_SECONDS / 60)} min · ${formatVisitMediaFileSize(uploaded.fileSize)}.`,
-        );
-      } else {
-        setStatusBanner("Photo attached.");
+        // Attached only — no transcription claim.
       }
 
       removePending(pendingId);
       setError(null);
+      setStatusBanner(null);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Upload failed. Retry or Remove.";
@@ -652,7 +673,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       const next = body.data.session as VisitSession;
       setSession(next);
       setDraftBody(next.draftBody ?? "");
-      setStatusBanner(`Draft v${next.aiDraft?.version ?? "?"} ready — review before publish.`);
+      setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Summarize failed.");
     } finally {
@@ -692,7 +713,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       setSession(next);
       setDraftBody(next.draftBody ?? "");
       if (selectedLead) await loadSessionsForLead(selectedLead.id);
-      setStatusBanner("Published to CRM Visit Activity.");
+      setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Publish failed.");
     } finally {
@@ -730,7 +751,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         throw new Error(apiErrorMessage(body, "Retry transcription failed."));
       }
       setSession(body.data.session as VisitSession);
-      setStatusBanner("Transcription updated.");
+      setStatusBanner(null);
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Retry failed.");
     } finally {
@@ -780,9 +801,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <p className="truncate text-[15px] font-semibold leading-tight">
                 {session.lead?.fullName ?? selectedLead?.fullName ?? "Visit"}
               </p>
-              <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
-                Visit notes
-              </p>
             </div>
           </div>
         ) : (
@@ -792,7 +810,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 <IconNote className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-[15px] font-semibold leading-tight">Visit Notes</h1>
+                <h1 className="text-[15px] font-semibold leading-tight">Notes</h1>
                 <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
                   {currentWorkspace?.name ?? "Select workspace"}
                 </p>
@@ -823,7 +841,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-ink-faint)]" />
                 <Input
                   className="pl-9"
-                  placeholder="Search lead by name, email, phone…"
+                  placeholder="Who is this visit with?"
                   value={leadQuery}
                   onChange={(event) => setLeadQuery(event.target.value)}
                 />
@@ -847,15 +865,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 )}
               </div>
 
-              {selectedLead && (
+              {selectedLead && !session && (
                 <div className="flex items-center gap-2 overflow-x-auto">
                   <Button
                     size="sm"
                     onClick={() => void startSession()}
-                    loading={busy === "create"}
+                    loading={busy === "create" || busy === "open"}
                     disabled={Boolean(busy)}
                   >
-                    New visit
+                    New conversation
                   </Button>
                   {sessions.length > 0 && (
                     <div className="flex gap-1.5">
@@ -864,12 +882,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                           key={item.id}
                           type="button"
                           onClick={() => void openSession(item.id)}
-                          className={cn(
-                            "shrink-0 rounded-md border px-2.5 py-1.5 text-[11.5px]",
-                            "border-[var(--color-line)] bg-white text-[var(--color-ink-soft)]",
-                          )}
+                          className="shrink-0 rounded-full border border-[var(--color-line)] bg-white px-2.5 py-1.5 text-[11.5px] text-[var(--color-ink-soft)]"
                         >
-                          {new Date(item.createdAt).toLocaleDateString()} · {item.status}
+                          {item.status === "open" || item.status === "draft"
+                            ? "Continue"
+                            : "Earlier"}{" "}
+                          · {new Date(item.createdAt).toLocaleDateString()}
                         </button>
                       ))}
                     </div>
@@ -905,10 +923,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[var(--shadow-sm)] border border-[var(--color-line)]">
               <IconSearch className="h-6 w-6 text-[var(--color-brand-600)]" />
             </div>
-            <h2 className="text-[17px] font-semibold">Find a lead to begin</h2>
+            <h2 className="text-[17px] font-semibold">Who are you visiting?</h2>
             <p className="mt-1.5 max-w-sm text-[13.5px] text-[var(--color-ink-muted)]">
-              Search only leads you can access, open a visit session, then capture notes,
-              voice, photos, and video.
+              Pick someone once, then type, talk, or attach.
             </p>
           </div>
         )}
@@ -917,100 +934,86 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           <div className="flex flex-1 flex-col items-center justify-center text-center px-6">
             <h2 className="text-[17px] font-semibold">{selectedLead.fullName}</h2>
             <p className="mt-1.5 text-[13.5px] text-[var(--color-ink-muted)]">
-              Start a new visit or continue a prior session above.
+              {busy === "open" || busy === "create"
+                ? "Opening conversation…"
+                : "Opening conversation…"}
             </p>
           </div>
         )}
 
         {session && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void summarize()}
-                disabled={Boolean(busy)}
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
-              >
-                <IconSparkles className="h-3.5 w-3.5" />
-                {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
-              </button>
-              <select
-                className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
-                value={language}
-                onChange={(event) => setLanguage(event.target.value)}
-                aria-label="Language"
-              >
-                <option value="auto">Language: auto</option>
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="it">Italiano</option>
-              </select>
-              <button
-                type="button"
-                className="ml-auto text-[12px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                onClick={() => void refreshSession(session.id)}
-                disabled={Boolean(busy)}
-              >
-                Refresh
-              </button>
-            </div>
+          <div className="flex flex-1 flex-col gap-3">
+            <div className="flex-1 space-y-2.5">
+              {session.messages.length === 0 && pendingUploads.length === 0 && (
+                <p className="px-1 py-8 text-center text-[13.5px] text-[var(--color-ink-muted)]">
+                  Type a note, hold the mic, or attach a photo.
+                </p>
+              )}
 
-            <div className="space-y-2.5">
-              {session.messages.map((message) => (
-                <article
-                  key={message.id}
-                  className="rounded-xl border border-[var(--color-line)] bg-white px-3.5 py-3 shadow-[var(--shadow-xs)] motion-safe:animate-[visitNoteIn_0.25s_ease]"
-                >
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
-                      {message.kind}
-                      {message.status !== "ready" ? ` · ${message.status}` : ""}
-                    </span>
-                    <span className="text-[11px] text-[var(--color-ink-faint)]">
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  {message.text && (
-                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
-                      {message.text}
-                    </p>
-                  )}
-                  {message.documentId && (
-                    <button
-                      type="button"
-                      className="mt-2 text-[12.5px] font-medium text-[var(--color-brand-700)]"
-                      onClick={() => void openMedia(message.documentId!)}
-                    >
-                      Open media securely
-                    </button>
-                  )}
-                  {message.status === "failed" && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-[12px] text-[var(--color-danger-fg)]">
-                        {message.error ?? "Failed"}
+              {session.messages.map((message) => {
+                const isText = message.kind === "text";
+                const mediaLabel =
+                  message.kind === "photo"
+                    ? "Photo"
+                    : message.kind === "video"
+                      ? "Video"
+                      : message.kind === "audio"
+                        ? "Audio"
+                        : "Attachment";
+                return (
+                  <article
+                    key={message.id}
+                    className={cn(
+                      "px-3.5 py-2.5 motion-safe:animate-[visitNoteIn_0.25s_ease]",
+                      isText
+                        ? "ml-auto max-w-[92%] rounded-2xl rounded-br-md bg-white shadow-[var(--shadow-xs)]"
+                        : "rounded-2xl border border-[var(--color-line)] bg-white",
+                    )}
+                  >
+                    {!isText && (
+                      <p className="mb-1 text-[12px] font-medium text-[var(--color-ink-muted)]">
+                        {mediaLabel}
+                        {message.status === "transcribing" ? " · Transcribing…" : ""}
                       </p>
-                      {message.kind === "audio" && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => void retryTranscribe(message.id)}
-                        >
-                          Retry transcription
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </article>
-              ))}
+                    )}
+                    {message.text && (
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                        {message.text}
+                      </p>
+                    )}
+                    {message.documentId && (
+                      <button
+                        type="button"
+                        className="mt-1.5 text-[12.5px] font-medium text-[var(--color-brand-700)]"
+                        onClick={() => void openMedia(message.documentId!)}
+                      >
+                        Open {mediaLabel.toLowerCase()}
+                      </button>
+                    )}
+                    {message.status === "failed" && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <p className="text-[12px] text-[var(--color-danger-fg)]">
+                          {message.error ?? "Something went wrong."}
+                        </p>
+                        {message.kind === "audio" && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void retryTranscribe(message.id)}
+                          >
+                            Retry
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
 
               {pendingUploads.map((item) => (
                 <article
                   key={item.id}
-                  className="rounded-xl border border-[var(--color-line)] bg-white px-3.5 py-3"
+                  className="rounded-2xl border border-[var(--color-line)] bg-white px-3.5 py-3"
                   data-testid="pending-upload"
                 >
                   <div className="flex gap-3">
@@ -1035,7 +1038,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13.5px] font-medium">{item.file.name}</p>
                       <p className="text-[12px] text-[var(--color-ink-muted)]">
-                        {item.kind} · {formatVisitMediaFileSize(item.file.size)}
+                        {formatVisitMediaFileSize(item.file.size)}
                         {item.status === "uploading"
                           ? ` · Uploading ${item.progress}%`
                           : item.status === "transcribing"
@@ -1084,34 +1087,64 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <div ref={streamEndRef} />
             </div>
 
-            {(session.aiDraft || draftBody) && (
-              <section className="rounded-xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3.5">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-[13px] font-semibold text-[var(--color-brand-800)]">
-                      AI draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
-                    </h3>
-                    <p className="text-[11.5px] text-[var(--color-ink-muted)]">
-                      {session.project?.name ?? "Project"} · review before publish
-                    </p>
+            {/* After capture — CRM / structure actions stay out of the composer */}
+            <section
+              className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-4"
+              data-testid="after-capture-actions"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void summarize()}
+                  disabled={Boolean(busy) || session.messages.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                >
+                  <IconSparkles className="h-3.5 w-3.5" />
+                  {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
+                </button>
+                <select
+                  className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                  aria-label="Language"
+                >
+                  <option value="auto">Language: auto</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="it">Italiano</option>
+                </select>
+              </div>
+
+              {(session.aiDraft || draftBody) && (
+                <div className="rounded-2xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3.5">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-[13px] font-semibold text-[var(--color-brand-800)]">
+                        Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
+                      </h3>
+                      <p className="text-[11.5px] text-[var(--color-ink-muted)]">
+                        {session.project?.name ?? "Project"} · publish when ready
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => void publish()}
+                      loading={busy === "publish"}
+                      disabled={Boolean(busy) || !draftBody.trim()}
+                    >
+                      Publish to CRM
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => void publish()}
-                    loading={busy === "publish"}
-                    disabled={Boolean(busy) || !draftBody.trim()}
-                  >
-                    Publish to CRM
-                  </Button>
+                  <Textarea
+                    value={draftBody}
+                    onChange={(event) => setDraftBody(event.target.value)}
+                    className="min-h-[160px] bg-white"
+                    placeholder="Edit the visit summary before publishing…"
+                  />
                 </div>
-                <Textarea
-                  value={draftBody}
-                  onChange={(event) => setDraftBody(event.target.value)}
-                  className="min-h-[180px] bg-white"
-                  placeholder="Summarize this visit to generate a draft…"
-                />
-              </section>
-            )}
+              )}
+            </section>
           </div>
         )}
       </main>
