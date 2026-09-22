@@ -6,6 +6,7 @@ import { AppError } from "@/server/errors";
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   MAX_DOCUMENT_FILE_SIZE_BYTES,
+  MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES,
   type DocumentLinkedEntityType,
 } from "@/server/validation/documents";
 
@@ -31,14 +32,22 @@ export function validateDocumentMimeType(mimeType: string): void {
   }
 }
 
-export function validateDocumentFileSize(fileSize: number): void {
+export function validateDocumentFileSize(
+  fileSize: number,
+  linkedEntityType?: DocumentLinkedEntityType,
+): void {
   if (fileSize <= 0) {
     throw new AppError("VALIDATION_ERROR", "File cannot be empty.");
   }
 
-  if (fileSize > MAX_DOCUMENT_FILE_SIZE_BYTES) {
+  const maxBytes =
+    linkedEntityType === "visit_session"
+      ? MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES
+      : MAX_DOCUMENT_FILE_SIZE_BYTES;
+
+  if (fileSize > maxBytes) {
     throw new AppError("VALIDATION_ERROR", "File exceeds maximum allowed size.", {
-      details: { maxBytes: MAX_DOCUMENT_FILE_SIZE_BYTES },
+      details: { maxBytes },
     });
   }
 }

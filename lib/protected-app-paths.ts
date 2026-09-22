@@ -10,6 +10,8 @@ export function isProtectedAppPath(pathname: string): boolean {
     pathname === "/" ||
     pathname.startsWith("/w/") ||
     pathname.startsWith("/workspaces") ||
+    pathname === "/notes" ||
+    pathname.startsWith("/notes/") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/invitations/accept") ||
     pathname.startsWith("/api/me") ||

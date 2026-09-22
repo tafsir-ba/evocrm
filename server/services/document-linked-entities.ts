@@ -4,6 +4,7 @@ import { findLeadById } from "@/server/repositories/leads";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findOpportunityById } from "@/server/repositories/opportunities";
 import { findPropertyById } from "@/server/repositories/properties";
+import { findVisitSessionById } from "@/server/repositories/visit-sessions";
 import { AppError } from "@/server/errors";
 import type { PermissionKey } from "@/server/permissions/permissions";
 import {
@@ -98,6 +99,23 @@ export async function validateDocumentLinkedEntity(
     };
   }
 
+  if (linkedEntityType === "visit_session") {
+    const session = await findVisitSessionById(workspaceId, linkedEntityId);
+
+    if (!session || session.archivedAt) {
+      throw new AppError("NOT_FOUND", "Linked visit session not found.");
+    }
+
+    return {
+      linkedEntityType,
+      linkedEntityId,
+      projectId: session.projectId,
+      projectIds: session.projectId ? [session.projectId] : [],
+      readPermission: "activity:read",
+      updatePermission: "activity:update",
+    };
+  }
+
   throw new AppError("VALIDATION_ERROR", "Unsupported linked entity type.");
 }
 
@@ -137,6 +155,8 @@ export function getEntityReadPermission(
       return "opportunity:read";
     case "campaign":
       return "campaign:read";
+    case "visit_session":
+      return "activity:read";
     default:
       throw new AppError("VALIDATION_ERROR", "Unsupported linked entity type.");
   }

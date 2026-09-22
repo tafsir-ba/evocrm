@@ -33,7 +33,8 @@ export type AuditEntityType =
   | "project_invitation"
   | "lead_project_membership"
   | "lead_enrichment_run"
-  | "lead_financial_situation";
+  | "lead_financial_situation"
+  | "visit_session";
 
 export type CreateAuditLogInput = {
   workspaceId: string;

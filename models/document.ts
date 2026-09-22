@@ -5,7 +5,7 @@ const documentSchema = new Schema(
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     linkedEntityType: {
       type: String,
-      enum: ["lead", "property", "opportunity", "campaign"],
+      enum: ["lead", "property", "opportunity", "campaign", "visit_session"],
       required: true,
     },
     linkedEntityId: { type: Schema.Types.ObjectId, required: true },

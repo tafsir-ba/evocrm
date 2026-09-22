@@ -1,5 +1,11 @@
 /** Client-safe document upload constants — keep in sync with server/validation/documents.ts */
 
+import {
+  MAX_VISIT_MEDIA_FILE_SIZE_BYTES,
+  VISIT_AUDIO_MIME_TYPES,
+  VISIT_VIDEO_MIME_TYPES,
+} from "@/lib/visit-notes";
+
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -10,9 +16,14 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
+  ...VISIT_AUDIO_MIME_TYPES,
+  ...VISIT_VIDEO_MIME_TYPES,
 ] as const;
 
 export const MAX_DOCUMENT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+
+/** Prefer this when uploading visit-session media (photos/audio/video). */
+export const MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES = MAX_VISIT_MEDIA_FILE_SIZE_BYTES;
 
 export function formatDocumentFileSize(bytes: number): string {
   if (bytes < 1024) {
@@ -46,7 +57,12 @@ export function validateDocumentFileClient(file: File): string | null {
   return null;
 }
 
-export type DocumentLinkedEntityType = "lead" | "property" | "opportunity" | "campaign";
+export type DocumentLinkedEntityType =
+  | "lead"
+  | "property"
+  | "opportunity"
+  | "campaign"
+  | "visit_session";
 
 export type DocumentListItem = {
   id: string;

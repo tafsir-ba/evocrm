@@ -93,3 +93,6 @@ export function IconCreditCard(p: IconProps) { return (<svg {...base(p)}><rect x
 export function IconShieldUser(p: IconProps) { return (<svg {...base(p)}><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><circle cx="12" cy="11" r="2.5"/><path d="M8 17c.5-2 2-3 4-3s3.5 1 4 3"/></svg>); }
 export function IconBriefcase(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>); }
 export function IconSparkles(p: IconProps) { return (<svg {...base(p)}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.5 5.5l2.5 2.5M16 16l2.5 2.5M5.5 18.5 8 16M16 8l2.5-2.5"/></svg>); }
+export function IconMic(p: IconProps) { return (<svg {...base(p)}><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>); }
+export function IconSend(p: IconProps) { return (<svg {...base(p)}><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="m22 2-11 11"/></svg>); }
+export function IconVideo(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>); }

@@ -23,6 +23,16 @@ export {
 export { PropertyModel, type PropertyDocument } from "./property";
 export { OpportunityModel, type OpportunityDocument } from "./opportunity";
 export { ActivityModel, type ActivityDocument } from "./activity";
+export {
+  VisitSessionModel,
+  type VisitSessionDocument,
+  VISIT_SESSION_STATUSES,
+  VISIT_MESSAGE_KINDS,
+  VISIT_MESSAGE_STATUSES,
+  type VisitSessionStatus,
+  type VisitMessageKind,
+  type VisitMessageStatus,
+} from "./visit-session";
 export { DocumentModel, type DocumentDocument } from "./document";
 export { CampaignModel, type CampaignDocument } from "./campaign";
 export { CampaignStepModel, type CampaignStepDocument } from "./campaign-step";

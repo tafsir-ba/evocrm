@@ -2,12 +2,27 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  MAX_DOCUMENT_FILE_SIZE_BYTES,
+  MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES,
+} from "@/lib/documents";
+import {
+  VISIT_AUDIO_MIME_TYPES,
+  VISIT_VIDEO_MIME_TYPES,
+} from "@/lib/visit-notes";
+
 const objectIdSchema = z
   .string()
   .trim()
   .regex(/^[a-fA-F0-9]{24}$/, "Invalid ID.");
 
-export const DOCUMENT_LINKED_ENTITY_TYPES = ["lead", "property", "opportunity", "campaign"] as const;
+export const DOCUMENT_LINKED_ENTITY_TYPES = [
+  "lead",
+  "property",
+  "opportunity",
+  "campaign",
+  "visit_session",
+] as const;
 
 export type DocumentLinkedEntityType = (typeof DOCUMENT_LINKED_ENTITY_TYPES)[number];
 
@@ -23,10 +38,11 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
+  ...VISIT_AUDIO_MIME_TYPES,
+  ...VISIT_VIDEO_MIME_TYPES,
 ] as const;
 
-/** V1 max upload size — 25 MB */
-export const MAX_DOCUMENT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+export { MAX_DOCUMENT_FILE_SIZE_BYTES, MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES };
 
 const documentMimeTypePrefixSchema = z.literal("image/");
 
@@ -47,31 +63,58 @@ export const documentListQuerySchema = z.object({
   sortOrder: z.enum(DOCUMENT_LIST_SORT_ORDERS).optional(),
 });
 
+const baseUploadFields = {
+  linkedEntityType: z.enum(DOCUMENT_LINKED_ENTITY_TYPES),
+  linkedEntityId: objectIdSchema,
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  visibility: z.enum(DOCUMENT_VISIBILITY_VALUES).default("private"),
+  ownerId: objectIdSchema.optional(),
+};
+
+function maxBytesForLinkedEntity(
+  linkedEntityType: DocumentLinkedEntityType,
+): number {
+  return linkedEntityType === "visit_session"
+    ? MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES
+    : MAX_DOCUMENT_FILE_SIZE_BYTES;
+}
+
 export const documentUploadUrlInputSchema = z
   .object({
-    linkedEntityType: z.enum(DOCUMENT_LINKED_ENTITY_TYPES),
-    linkedEntityId: objectIdSchema,
-    fileName: z.string().trim().min(1).max(255),
-    mimeType: z.string().trim().min(1).max(120),
-    fileSize: z.coerce.number().int().min(1).max(MAX_DOCUMENT_FILE_SIZE_BYTES),
-    visibility: z.enum(DOCUMENT_VISIBILITY_VALUES).default("private"),
-    ownerId: objectIdSchema.optional(),
+    ...baseUploadFields,
+    fileSize: z.coerce.number().int().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    const max = maxBytesForLinkedEntity(value.linkedEntityType);
+    if (value.fileSize > max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `File exceeds maximum allowed size of ${max} bytes.`,
+        path: ["fileSize"],
+      });
+    }
+  });
 
 export const documentConfirmInputSchema = z
   .object({
     uploadId: z.string().trim().min(1).max(2048),
     storageKey: z.string().trim().min(1).max(1024),
-    linkedEntityType: z.enum(DOCUMENT_LINKED_ENTITY_TYPES),
-    linkedEntityId: objectIdSchema,
-    fileName: z.string().trim().min(1).max(255),
-    mimeType: z.string().trim().min(1).max(120),
-    fileSize: z.coerce.number().int().min(1).max(MAX_DOCUMENT_FILE_SIZE_BYTES),
-    visibility: z.enum(DOCUMENT_VISIBILITY_VALUES).default("private"),
-    ownerId: objectIdSchema.optional(),
+    ...baseUploadFields,
+    fileSize: z.coerce.number().int().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    const max = maxBytesForLinkedEntity(value.linkedEntityType);
+    if (value.fileSize > max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `File exceeds maximum allowed size of ${max} bytes.`,
+        path: ["fileSize"],
+      });
+    }
+  });
 
 export type DocumentListQuery = z.infer<typeof documentListQuerySchema>;
 export type DocumentUploadUrlInput = z.infer<typeof documentUploadUrlInputSchema>;

@@ -7,7 +7,7 @@ import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 export type DocumentRecord = {
   id: string;
   workspaceId: string;
-  linkedEntityType: "lead" | "property" | "opportunity" | "campaign";
+  linkedEntityType: "lead" | "property" | "opportunity" | "campaign" | "visit_session";
   linkedEntityId: string;
   ownerId: string | null;
   uploadedBy: string;
@@ -46,7 +46,7 @@ function toDocumentRecord(document: DocumentDocument): DocumentRecord {
 
 export type DocumentListFilter = {
   includeArchived?: boolean;
-  linkedEntityType?: "lead" | "property" | "opportunity" | "campaign";
+  linkedEntityType?: "lead" | "property" | "opportunity" | "campaign" | "visit_session";
   linkedEntityId?: string;
   mimeTypePrefix?: "image/";
   sortOrder?: "asc" | "desc";
@@ -154,7 +154,7 @@ export async function findDocumentsByIds(
 }
 
 export type CreateDocumentInput = {
-  linkedEntityType: "lead" | "property" | "opportunity" | "campaign";
+  linkedEntityType: "lead" | "property" | "opportunity" | "campaign" | "visit_session";
   linkedEntityId: string;
   ownerId?: string | null;
   uploadedBy: string;
