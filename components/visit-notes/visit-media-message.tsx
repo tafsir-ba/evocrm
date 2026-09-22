@@ -80,11 +80,11 @@ export function VisitMediaMessage({
   const displayUrl = url ?? localPreviewUrl ?? null;
 
   return (
-    <div className="space-y-2" data-testid={`visit-media-${kind}`}>
+    <div className="w-full max-w-full space-y-2 overflow-hidden" data-testid={`visit-media-${kind}`}>
       {kind === "photo" && (
         <button
           type="button"
-          className="block overflow-hidden rounded-2xl bg-[var(--color-muted)]"
+          className="block w-full max-w-full overflow-hidden rounded-2xl bg-[var(--color-muted)] touch-manipulation"
           onClick={() => {
             if (displayUrl) onOpenLightbox?.(displayUrl, "photo");
           }}
@@ -98,7 +98,7 @@ export function VisitMediaMessage({
               className="max-h-64 w-full object-cover"
             />
           ) : (
-            <div className="flex h-40 w-56 items-center justify-center text-[12px] text-[var(--color-ink-muted)]">
+            <div className="flex h-40 w-full items-center justify-center text-[12px] text-[var(--color-ink-muted)]">
               {loading ? "Loading…" : "Photo"}
             </div>
           )}
@@ -106,7 +106,7 @@ export function VisitMediaMessage({
       )}
 
       {kind === "video" && (
-        <div className="overflow-hidden rounded-2xl bg-black">
+        <div className="w-full max-w-full overflow-hidden rounded-2xl bg-black">
           {displayUrl ? (
             <video
               src={displayUrl}
@@ -116,7 +116,7 @@ export function VisitMediaMessage({
               className="max-h-72 w-full"
             />
           ) : (
-            <div className="flex h-40 w-56 items-center justify-center text-[12px] text-white/80">
+            <div className="flex h-40 w-full items-center justify-center text-[12px] text-white/80">
               {loading ? "Loading…" : "Video"}
             </div>
           )}
@@ -124,16 +124,16 @@ export function VisitMediaMessage({
       )}
 
       {kind === "audio" && (
-        <div className="rounded-2xl border border-[var(--color-line)] bg-white px-3 py-2.5">
+        <div className="w-full max-w-full rounded-2xl border border-[var(--color-line)] bg-white px-3 py-2.5">
           {displayUrl ? (
-            <audio src={displayUrl} controls preload="metadata" className="w-full" />
+            <audio src={displayUrl} controls preload="metadata" className="w-full max-w-full" />
           ) : (
             <p className="text-[12px] text-[var(--color-ink-muted)]">
               {loading ? "Loading audio…" : "Audio"}
             </p>
           )}
           {transcript?.trim() ? (
-            <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--color-ink)]">
+            <p className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-[var(--color-ink)]">
               {transcript}
             </p>
           ) : null}

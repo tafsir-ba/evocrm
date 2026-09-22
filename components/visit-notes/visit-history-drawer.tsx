@@ -40,10 +40,10 @@ export function VisitHistoryDrawer({
       onClose={onClose}
       title="Conversations"
       side="left"
-      className="w-[min(100%,22rem)] md:w-[22rem]"
+      className="w-[min(100%,20rem)] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:w-[22rem] md:w-[22rem]"
       footer={
         <Button
-          className="w-full"
+          className="w-full min-h-11 touch-manipulation"
           onClick={onNew}
           loading={creating}
           disabled={creating}
@@ -81,14 +81,14 @@ export function VisitHistoryDrawer({
                   onClose();
                 }}
                 className={cn(
-                  "w-full rounded-xl px-3 py-2.5 text-left hover:bg-[var(--color-muted)]",
+                  "w-full min-w-0 rounded-xl px-3 py-3 text-left touch-manipulation hover:bg-[var(--color-muted)] active:bg-[var(--color-muted)]",
                   active && "bg-[var(--color-brand-50)]",
                 )}
               >
-                <p className="truncate text-[13.5px] font-medium text-[var(--color-ink)]">
+                <p className="truncate text-[15px] font-medium leading-snug text-[var(--color-ink)]">
                   {title}
                 </p>
-                <p className="mt-0.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                <p className="mt-0.5 truncate text-[12px] text-[var(--color-ink-muted)]">
                   {[item.leadName, item.propertyLabel].filter(Boolean).join(" · ") ||
                     "Lead"}
                 </p>

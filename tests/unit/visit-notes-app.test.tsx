@@ -162,6 +162,41 @@ describe("VisitNotesApp", () => {
     expect(within(hit).getByText("Ada Buyer").className).toMatch(/truncate/);
   });
 
+  it("keeps conversation language select at 16px to avoid iOS zoom", async () => {
+    const user = await openSessionUi();
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/messages") && init?.method === "POST") {
+          return jsonResponse({
+            data: {
+              session: {
+                ...sessionFixture,
+                messages: [
+                  {
+                    id: "msg-1",
+                    kind: "text",
+                    text: "Site visit note",
+                    documentId: null,
+                    status: "ready",
+                    error: null,
+                    createdAt: "2026-09-22T10:01:00.000Z",
+                  },
+                ],
+              },
+            },
+          });
+        }
+        return jsonResponse({ error: { message: "unexpected" } }, 500);
+      },
+    );
+
+    await user.type(screen.getByLabelText(/note message/i), "Site visit note");
+    await user.click(screen.getByRole("button", { name: /send note/i }));
+    await screen.findByTestId("after-capture-actions");
+    expect(screen.getByTestId("notes-language-select").className).toMatch(/text-\[16px\]/);
+  });
+
   it("resumes the latest substantive session instead of an empty open one", async () => {
     const user = userEvent.setup();
     const emptyOld = {

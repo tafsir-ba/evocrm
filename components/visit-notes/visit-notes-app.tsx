@@ -1288,10 +1288,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         data-testid="notes-sticky-header"
       >
         {session ? (
-          <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2.5">
+          <div className="mx-auto flex max-w-3xl items-center gap-1.5 px-2.5 py-2 sm:gap-2 sm:px-3 sm:py-2.5">
             <button
               type="button"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] touch-manipulation"
               aria-label="Conversation history"
               onClick={() => setHistoryOpen(true)}
             >
@@ -1316,14 +1316,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       setTitleDraft(sessionDisplayTitle(session));
                     }
                   }}
-                  className="h-9 w-full rounded-md border border-[var(--color-line)] bg-white px-2 text-[16px] font-semibold focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
+                  className="h-10 w-full rounded-md border border-[var(--color-line)] bg-white px-2 text-[16px] font-semibold focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
                   aria-label="Conversation title"
                   maxLength={120}
                 />
               ) : (
                 <button
                   type="button"
-                  className="block w-full truncate text-left text-[15px] font-semibold leading-tight hover:text-[var(--color-brand-700)]"
+                  className="block w-full truncate text-left text-[15px] font-semibold leading-tight hover:text-[var(--color-brand-700)] touch-manipulation"
                   onClick={() => {
                     setTitleDraft(sessionDisplayTitle(session));
                     setEditingTitle(true);
@@ -1348,7 +1348,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             {linkedUnitLabel ? (
               <button
                 type="button"
-                className="inline-flex max-w-[40%] items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-muted)] px-2 py-1 text-[11.5px] text-[var(--color-ink-soft)]"
+                className="hidden max-w-[9rem] items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-muted)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)] touch-manipulation sm:inline-flex"
                 onClick={() => {
                   setUnitQuery("");
                   setUnitModalOpen(true);
@@ -1383,7 +1383,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <button
                 type="button"
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                  "flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] touch-manipulation",
                   headerMenuOpen && "bg-[var(--color-muted)]",
                 )}
                 aria-label="Conversation actions"
@@ -1582,8 +1582,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
       <main
         className={cn(
-          "mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))]",
-          session ? "pt-[calc(4.75rem+env(safe-area-inset-top))]" : "pt-4",
+          "mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 sm:px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(8.5rem+env(safe-area-inset-bottom))]",
+          session
+            ? "pt-[calc(4.25rem+env(safe-area-inset-top))] sm:pt-[calc(4.75rem+env(safe-area-inset-top))]"
+            : "pt-3 sm:pt-4",
         )}
       >
         {(error || statusBanner) && (
@@ -1708,7 +1710,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     )}
                   >
                     {message.text && (
-                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                      <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
                         {message.text}
                       </p>
                     )}
@@ -1806,7 +1808,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
             {visibleMessages.length > 0 && (
               <section
-                className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-4"
+                className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-3 sm:pt-4"
                 data-testid="after-capture-actions"
               >
                 <div className="flex flex-wrap items-center gap-2">
@@ -1814,7 +1816,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     type="button"
                     onClick={() => void summarize()}
                     disabled={Boolean(busy) || visibleMessages.length === 0}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3.5 py-2 text-[13px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50 touch-manipulation sm:text-[12.5px] sm:min-h-0 sm:py-1.5"
                   >
                     <IconSparkles className="h-3.5 w-3.5" />
                     {busy === "summarize" ? "Summarizing…" : "Summarize conversation"}
@@ -1828,17 +1830,18 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                         ? "Share via the system share sheet (or copy)"
                         : "Add a message or summarize first"
                     }
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3.5 py-2 text-[13px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50 touch-manipulation sm:text-[12.5px] sm:min-h-0 sm:py-1.5"
                     data-testid="notes-share-chip"
                   >
                     <IconShare className="h-3.5 w-3.5" />
                     Share
                   </button>
                   <select
-                    className="h-8 rounded-full border-0 bg-transparent px-2 text-[12px] text-[var(--color-ink-muted)]"
+                    className="h-10 min-w-0 max-w-full rounded-full border-0 bg-[var(--color-muted)] px-3 text-[16px] text-[var(--color-ink-muted)] touch-manipulation sm:h-8 sm:bg-transparent sm:px-2"
                     value={language}
                     onChange={(event) => setLanguage(event.target.value)}
                     aria-label="Language"
+                    data-testid="notes-language-select"
                   >
                     <option value="auto">Language: auto</option>
                     <option value="en">English</option>
@@ -1849,9 +1852,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 </div>
 
                 {(session.aiDraft || draftBody) && (
-                  <div className="rounded-2xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3.5">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div>
+                  <div className="rounded-2xl border border-[var(--color-brand-200)] bg-[var(--color-brand-50)]/40 p-3 sm:p-3.5">
+                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
                         <h3 className="text-[13px] font-semibold text-[var(--color-brand-800)]">
                           Draft{session.aiDraft ? ` v${session.aiDraft.version}` : ""}
                         </h3>
@@ -1861,6 +1864,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       </div>
                       <Button
                         size="sm"
+                        className="w-full shrink-0 touch-manipulation sm:w-auto"
                         onClick={() => void publish()}
                         loading={busy === "publish"}
                         disabled={Boolean(busy) || !draftBody.trim()}
@@ -1871,7 +1875,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <Textarea
                       value={draftBody}
                       onChange={(event) => setDraftBody(event.target.value)}
-                      className="min-h-[160px] bg-white text-[16px]"
+                      className="min-h-[140px] bg-white text-[16px] sm:min-h-[160px]"
                       placeholder="Edit the summary before saving to the lead…"
                     />
                   </div>
@@ -1894,13 +1898,13 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       </main>
 
       {session && (
-        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[max(0.35rem,env(safe-area-inset-bottom))]">
           {recording && (
             <div
-              className="mx-auto flex max-w-3xl items-center gap-3 px-4 pt-3"
+              className="mx-auto flex max-w-3xl items-center gap-2 px-3 pt-2.5 sm:gap-3 sm:px-4 sm:pt-3"
               data-testid="notes-recording-bar"
             >
-              <p className="w-12 shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)]">
+              <p className="w-11 shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)] sm:w-12">
                 {formatRecordingTimer(recordingSeconds)}
               </p>
               <LiveMicWaveform stream={recordingStream} active={recording} />
@@ -1917,7 +1921,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
           <form
             onSubmit={(event) => void sendText(event)}
-            className="mx-auto flex max-w-3xl items-end gap-2 px-3 py-2.5"
+            className="mx-auto flex max-w-3xl items-end gap-1.5 px-2.5 py-2 sm:gap-2 sm:px-3 sm:py-2.5"
           >
             <input
               ref={photoCaptureInputRef}
@@ -1954,8 +1958,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <button
                 type="button"
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                  "flex h-11 w-11 items-center justify-center rounded-full touch-manipulation",
                   attachMenuOpen && "bg-[var(--color-muted)] text-[var(--color-ink)]",
+                  !attachMenuOpen && "text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
                 )}
                 onClick={() => setAttachMenuOpen((open) => !open)}
                 aria-label="Add attachment"
@@ -1974,12 +1979,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 <div
                   id={attachMenuId}
                   role="menu"
-                  className="absolute bottom-[calc(100%+8px)] left-0 z-30 w-[min(16.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)] motion-safe:animate-[visitNoteIn_0.18s_ease]"
+                  className="absolute bottom-[calc(100%+8px)] left-0 z-30 max-h-[min(70dvh,24rem)] w-[min(17rem,calc(100vw-1.25rem))] overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)] motion-safe:animate-[visitNoteIn_0.18s_ease]"
                 >
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] touch-manipulation sm:py-3 sm:text-[14px]"
                     onClick={() => photoCaptureInputRef.current?.click()}
                   >
                     <IconCamera className="h-5 w-5 text-[var(--color-ink-soft)]" />
@@ -1988,7 +1993,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] touch-manipulation sm:py-3 sm:text-[14px]"
                     onClick={() => photoLibraryInputRef.current?.click()}
                   >
                     <IconFile className="h-5 w-5 text-[var(--color-ink-soft)]" />
@@ -1997,7 +2002,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] touch-manipulation sm:py-3 sm:text-[14px]"
                     onClick={() => videoInputRef.current?.click()}
                   >
                     <IconVideo className="h-5 w-5 text-[var(--color-ink-soft)]" />
@@ -2009,7 +2014,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] touch-manipulation sm:py-3 sm:text-[14px]"
                     data-testid="notes-choose-audio"
                     onClick={() => audioInputRef.current?.click()}
                   >
@@ -2022,7 +2027,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] disabled:opacity-50 touch-manipulation sm:py-3 sm:text-[14px]"
                     disabled={Boolean(busy) || !canShare}
                     data-testid="notes-share-menu-item"
                     onClick={() => void shareConversation()}
@@ -2033,7 +2038,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                    className="flex w-full items-center gap-3 px-3.5 py-3.5 text-left text-[15px] hover:bg-[var(--color-muted)] disabled:opacity-50 touch-manipulation sm:py-3 sm:text-[14px]"
                     disabled={Boolean(busy) || !session}
                     data-testid="notes-download-export-menu-item"
                     onClick={() => downloadConversationExport()}
@@ -2054,15 +2059,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               onChange={(event) => setComposer(event.target.value)}
               placeholder="Message"
               rows={1}
-              className="min-h-[44px] max-h-40 flex-1 resize-none rounded-2xl border-[var(--color-line)] px-3.5 py-2.5 text-[16px] leading-snug focus:ring-2"
+              className="min-h-[44px] max-h-36 flex-1 resize-none rounded-2xl border-[var(--color-line)] px-3 py-2.5 text-[16px] leading-snug focus:ring-2 sm:max-h-40 sm:px-3.5"
               disabled={recording}
               aria-label="Note message"
+              enterKeyHint="send"
             />
 
             {hasComposerText ? (
               <button
                 type="submit"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white hover:bg-[var(--color-brand-700)] disabled:opacity-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white hover:bg-[var(--color-brand-700)] disabled:opacity-50 touch-manipulation"
                 aria-label="Send note"
                 disabled={Boolean(busy) || recording}
               >
@@ -2072,7 +2078,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               <button
                 type="button"
                 className={cn(
-                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full touch-manipulation",
                   recording
                     ? "bg-[var(--color-danger-bg)] text-[var(--color-danger-fg)]"
                     : "text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
@@ -2113,6 +2119,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         open={unitModalOpen}
         onClose={() => setUnitModalOpen(false)}
         title="Link unit"
+        className="max-w-[calc(100vw-1.5rem)] sm:max-w-lg"
       >
         <div className="space-y-3">
           <Input
