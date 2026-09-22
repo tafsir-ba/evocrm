@@ -23,7 +23,7 @@ Authenticated mobile-first app at `/notes`. Working session record is `VisitSess
 4. **Lead.notes mirror:** optional dated append on publish only; Activity remains source of truth.
 5. **Permissions:** `lead:read` (search/open), `activity:create|update|read` (session/publish), `document:create|read` (media). No parallel ACL.
 6. **Retention:** soft-archive session (`archivedAt`); media follows Document archive. No hard delete in V1.
-7. **Offline:** composer text in `localStorage`; upload queue with retry on reconnect.
+7. **Offline:** composer text in `localStorage`. Media requires connectivity; failed in-session uploads keep Retry/Remove and automatically retry on `online` while the tab remains open (files are not persisted to disk/localStorage).
 
 ## Blockers / env
 

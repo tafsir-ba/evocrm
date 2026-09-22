@@ -79,7 +79,8 @@ Production startup **fails fast** if required production keys are missing (`serv
 [ ] Indexes created (Mongoose ensures on first connect)
 [ ] Google OAuth redirect URIs include NEXTAUTH_URL callback
 [ ] Resend domain verified for EMAIL_FROM
-[ ] Spaces bucket private; CORS if direct browser upload
+[ ] Spaces bucket private; CORS if direct browser upload (Visit Notes media uses same-origin `/documents/direct` and does not require browser→Spaces CORS)
+[ ] Reverse proxy / App Platform request body limit ≥ 51 MB so Visit Notes 50 MB media can reach `/documents/direct`
 [ ] CRON job scheduled: POST /api/cron/campaigns/send-due with Authorization: Bearer $CRON_SECRET
     (or rely on built-in internal cron — enabled by default in production when CRON_SECRET is set;
      disable with CAMPAIGN_CRON_INTERNAL=false if using an external scheduler)

@@ -110,14 +110,11 @@ describe("VisitNotesApp", () => {
     expect(within(footer as HTMLElement).queryByText(/summarize/i)).not.toBeInTheDocument();
     expect(within(footer as HTMLElement).queryByText(/publish/i)).not.toBeInTheDocument();
 
+    // Empty capture: after-capture CRM actions stay hidden
+    expect(screen.queryByTestId("after-capture-actions")).not.toBeInTheDocument();
+
     expect(screen.getByRole("button", { name: /record audio/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send note/i })).not.toBeInTheDocument();
-
-    const afterCapture = screen.getByTestId("after-capture-actions");
-    expect(
-      within(afterCapture).getByRole("button", { name: /summarize this visit/i }),
-    ).toBeInTheDocument();
-    expect(within(afterCapture).queryByText(/publish to crm/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /add attachment/i }));
     const menu = screen.getByRole("menu");
@@ -130,6 +127,46 @@ describe("VisitNotesApp", () => {
     await user.type(screen.getByLabelText(/visit note/i), "Site visit note");
     expect(screen.getByRole("button", { name: /send note/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /record audio/i })).not.toBeInTheDocument();
+  });
+
+  it("shows after-capture Summarize only once messages exist", async () => {
+    const user = await openSessionUi();
+    expect(screen.queryByTestId("after-capture-actions")).not.toBeInTheDocument();
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/messages") && init?.method === "POST") {
+          return jsonResponse({
+            data: {
+              session: {
+                ...sessionFixture,
+                messages: [
+                  {
+                    id: "msg-1",
+                    kind: "text",
+                    text: "Site visit note",
+                    documentId: null,
+                    status: "ready",
+                    error: null,
+                    createdAt: "2026-09-22T10:01:00.000Z",
+                  },
+                ],
+              },
+            },
+          });
+        }
+        return jsonResponse({ error: { message: "unexpected" } }, 500);
+      },
+    );
+
+    await user.type(screen.getByLabelText(/visit note/i), "Site visit note");
+    await user.click(screen.getByRole("button", { name: /send note/i }));
+
+    const afterCapture = await screen.findByTestId("after-capture-actions");
+    expect(
+      within(afterCapture).getByRole("button", { name: /summarize this visit/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows Retry and Remove when media upload fails (never stuck Uploading)", async () => {

@@ -98,6 +98,10 @@ type PendingUpload = {
   status: PendingUploadStatus;
   error: string | null;
   retryable: boolean;
+  /** Set after Spaces/document create succeeds — Retry must not re-upload. */
+  documentId: string | null;
+  /** Set after message attach succeeds — Retry may only need transcription. */
+  messageId: string | null;
 };
 
 type Props = {
@@ -165,9 +169,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const streamEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
+  const pendingUploadsRef = useRef<PendingUpload[]>([]);
   const attachMenuId = useId();
   const draftKey = selectedLead?.id ?? "new";
   const hasComposerText = composer.trim().length > 0;
+
+  useEffect(() => {
+    pendingUploadsRef.current = pendingUploads;
+  }, [pendingUploads]);
 
   useEffect(() => {
     setAudioRecorderSupported(pickSupportedAudioRecorderMimeType() !== null);
@@ -442,66 +451,90 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   async function processPendingUpload(pendingId: string, file: File) {
     if (!session) return;
 
+    const existing = pendingUploadsRef.current.find((item) => item.id === pendingId);
+    let documentId = existing?.documentId ?? null;
+    let messageId = existing?.messageId ?? null;
+    let kind = existing?.kind ?? visitMediaKindFromMime(resolveVisitMediaMimeType(file));
+    if (!kind) {
+      failBanner("Unsupported media type.");
+      return;
+    }
+
     updatePending(pendingId, {
-      status: "uploading",
-      progress: 0,
+      status: documentId && messageId && kind === "audio" ? "transcribing" : "uploading",
+      progress: documentId ? 100 : 0,
       error: null,
       retryable: true,
     });
 
     try {
-      const uploaded = await uploadVisitMedia({
-        workspaceSlug,
-        sessionId: session.id,
-        file,
-        onProgress: (percent) => updatePending(pendingId, { progress: percent }),
-      });
-
-      const response = await fetch(
-        `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kind: uploaded.kind,
-            documentId: uploaded.documentId,
-            text: uploaded.fileName,
-          }),
-        },
-      );
-      const body = await response.json();
-      if (!response.ok) {
-        throw new VisitMediaUploadError(
-          apiErrorMessage(body, "Could not attach media to this visit."),
-          {
-            stage: "attach",
-            status: response.status,
-            retryable: response.status >= 500,
-          },
-        );
+      if (!documentId) {
+        const uploaded = await uploadVisitMedia({
+          workspaceSlug,
+          sessionId: session.id,
+          file,
+          onProgress: (percent) => updatePending(pendingId, { progress: percent }),
+        });
+        documentId = uploaded.documentId;
+        kind = uploaded.kind;
+        updatePending(pendingId, {
+          documentId,
+          kind,
+          progress: 100,
+        });
       }
 
-      let next = body.data.session as VisitSession;
-      setSession(next);
+      let next = session;
 
-      if (uploaded.kind === "audio") {
-        updatePending(pendingId, { status: "transcribing", progress: 100 });
-        const audioMessage = [...next.messages]
-          .reverse()
-          .find((message) => message.documentId === uploaded.documentId);
-        if (!audioMessage) {
+      if (!messageId) {
+        const response = await fetch(
+          `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              kind,
+              documentId,
+              text: file.name,
+            }),
+          },
+        );
+        const body = await response.json();
+        if (!response.ok) {
           throw new VisitMediaUploadError(
-            "Audio attached but message id missing. Refresh and retry transcription.",
-            { stage: "transcribe", retryable: true },
+            apiErrorMessage(body, "Could not attach media to this visit."),
+            {
+              stage: "attach",
+              status: response.status,
+              retryable: response.status >= 500 || response.status === 429,
+            },
           );
         }
+
+        next = body.data.session as VisitSession;
+        setSession(next);
+        const attached = [...next.messages]
+          .reverse()
+          .find((message) => message.documentId === documentId);
+        messageId = attached?.id ?? null;
+        updatePending(pendingId, { messageId });
+        if (!messageId) {
+          throw new VisitMediaUploadError(
+            "Media uploaded but message id missing. Retry to attach again.",
+            { stage: "attach", retryable: true },
+          );
+        }
+      }
+
+      if (kind === "audio" && messageId) {
+        updatePending(pendingId, { status: "transcribing", progress: 100 });
         const transcribeResponse = await fetch(
           `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/transcribe`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              messageId: audioMessage.id,
+              messageId,
               language: language === "auto" ? null : language,
             }),
           },
@@ -522,8 +555,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         }
         next = transcribeBody.data.session as VisitSession;
         setSession(next);
-      } else if (uploaded.kind === "video") {
-        // Attached only — no transcription claim.
       }
 
       removePending(pendingId);
@@ -538,11 +569,28 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         status: "failed",
         error: message,
         retryable,
-        progress: 0,
+        progress: documentId ? 100 : 0,
+        documentId,
+        messageId,
       });
       failBanner(message);
     }
   }
+
+  useEffect(() => {
+    function onOnline() {
+      const failed = pendingUploadsRef.current.filter(
+        (item) => item.status === "failed" && item.retryable,
+      );
+      for (const item of failed) {
+        void processPendingUpload(item.id, item.file);
+      }
+    }
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+    // processPendingUpload closes over session/language; reconnect only while mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, workspaceSlug, language]);
 
   function enqueueMedia(file: File) {
     if (!session) return;
@@ -565,6 +613,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       status: "uploading",
       error: null,
       retryable: true,
+      documentId: null,
+      messageId: null,
     };
     setPendingUploads((prev) => [...prev, pending]);
     setError(null);
@@ -946,7 +996,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             <div className="flex-1 space-y-2.5">
               {session.messages.length === 0 && pendingUploads.length === 0 && (
                 <p className="px-1 py-8 text-center text-[13.5px] text-[var(--color-ink-muted)]">
-                  Type a note, hold the mic, or attach a photo.
+                  Type a note, tap the mic, or attach a photo.
                 </p>
               )}
 
@@ -1088,6 +1138,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             </div>
 
             {/* After capture — CRM / structure actions stay out of the composer */}
+            {(session.messages.length > 0 || session.aiDraft || Boolean(draftBody.trim())) && (
             <section
               className="mt-2 space-y-3 border-t border-[var(--color-line)] pt-4"
               data-testid="after-capture-actions"
@@ -1145,6 +1196,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 </div>
               )}
             </section>
+            )}
           </div>
         )}
       </main>
