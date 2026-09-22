@@ -90,7 +90,7 @@ async function main() {
 
   if (!apply) {
     console.log("Dry-run only. Re-run with --apply to write Note activities and re-link files.");
-    return;
+    process.exit(0);
   }
 
   for (const session of sessions) {
@@ -119,6 +119,7 @@ async function main() {
       );
     }
   }
+  process.exit(0);
 }
 
 function readArg(args: string[], flag: string): string | null {
