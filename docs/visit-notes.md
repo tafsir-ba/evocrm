@@ -43,3 +43,12 @@ POST       /api/workspaces/:slug/visit-sessions/:id/transcribe
 ```
 
 Visit media uses same-origin `POST /documents/direct` (multipart → server `uploadObject` → Document) with `linkedEntityType=visit_session`. This avoids browser → Spaces CORS failures that iPhone Safari surfaces as “Load failed”. Presigned `/upload-url` + `/confirm` remains for other document UIs.
+
+## Capture UX (ChatGPT-first)
+
+1. **History drawer:** Conversation list (title, updated time, lead, optional unit) via collapsible side panel / mobile slide-over. No blank “Opening conversation…” when the session payload is already known. New conversation from the drawer.
+2. **Session title:** Persisted on `VisitSession.title`. Default from first substantive user text (or AI when available); rename via PATCH. Rename must not mutate CRM Activities.
+3. **Optional unit:** One optional primary `VisitSession.propertyId` (canonical Property). Explicit link/unlink only — never inferred from the lead’s primary project. Included in publish/summarize context only when set. Compact chip after link.
+4. **Audio:** One chat event (`kind=audio`) with player + transcript text on the same message. Legacy `kind=transcript` rows are hidden in the thread (data retained). Live recording shows timer, stop/cancel, and Web Audio analyser mic level (Safari-safe stream release).
+5. **Media:** Inline image thumbnails (in-app lightbox); video poster + in-app player. Signed private URLs; local object-URL preview until ready. Download/open is secondary overflow. Retry/Remove on failure.
+6. **Summary:** After the thread; sees media metadata + transcripts; includes linked unit label only when `propertyId` is set.

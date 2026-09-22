@@ -19,6 +19,9 @@ const sessionFixture = {
   activityId: null,
   status: "open",
   language: null,
+  title: null as string | null,
+  propertyId: null as string | null,
+  property: null as { id: string; title: string; reference: string | null } | null,
   messages: [] as Array<{
     id: string;
     kind: string;
@@ -210,5 +213,97 @@ describe("VisitNotesApp", () => {
     expect(within(pending).getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
     expect(within(pending).getByRole("button", { name: /^remove$/i })).toBeInTheDocument();
     expect(within(pending).queryByText(/uploading/i)).not.toBeInTheDocument();
+  });
+
+  it("opens conversation history drawer and hides legacy transcript rows", async () => {
+    const user = userEvent.setup();
+    const withMessages = {
+      ...sessionFixture,
+      title: "Parking discussion",
+      messages: [
+        {
+          id: "msg-audio",
+          kind: "audio",
+          text: "They asked about parking",
+          documentId: "507f1f77bcf86cd799439099",
+          status: "ready",
+          error: null,
+          createdAt: "2026-09-22T10:01:00.000Z",
+        },
+        {
+          id: "msg-dup",
+          kind: "transcript",
+          text: "They asked about parking",
+          documentId: "507f1f77bcf86cd799439099",
+          status: "ready",
+          error: null,
+          createdAt: "2026-09-22T10:01:01.000Z",
+        },
+      ],
+    };
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/leads?") && url.includes("search=")) {
+        return jsonResponse({
+          data: [
+            {
+              id: "507f1f77bcf86cd799439011",
+              fullName: "Ada Buyer",
+              email: "ada@example.com",
+              projectId: "507f1f77bcf86cd799439012",
+            },
+          ],
+        });
+      }
+      if (url.includes("/visit-sessions?") && url.includes("leadId=")) {
+        return jsonResponse({ data: [withMessages] });
+      }
+      if (
+        url.includes("/visit-sessions/") &&
+        !url.includes("/messages") &&
+        !url.includes("/transcribe") &&
+        init?.method !== "POST" &&
+        init?.method !== "PATCH"
+      ) {
+        return jsonResponse({ data: { session: withMessages } });
+      }
+      if (url.endsWith("/visit-sessions") && init?.method === "POST") {
+        return jsonResponse({ data: { session: withMessages } }, 201);
+      }
+      if (url.includes("/signed-url")) {
+        return jsonResponse({ data: { url: "https://example.test/audio.m4a" } });
+      }
+      return jsonResponse({ error: { message: "unexpected" } }, 500);
+    }) as typeof fetch;
+
+    render(
+      <VisitNotesApp
+        initialWorkspaces={[
+          {
+            id: "ws1",
+            name: "Evo Home",
+            slug: "evo-home",
+            timezone: "Europe/Zurich",
+          },
+        ]}
+        initialWorkspaceSlug="evo-home"
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText(/who is this visit with/i), "Ada");
+    await user.click(await screen.findByText("Ada Buyer"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/visit note/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("They asked about parking")).toBeInTheDocument();
+    expect(screen.queryAllByText("They asked about parking")).toHaveLength(1);
+    expect(screen.getByTestId("visit-media-audio")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /conversation history/i }));
+    const history = await screen.findByTestId("visit-history-list");
+    expect(within(history).getByText("Parking discussion")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /new conversation/i })).toBeInTheDocument();
   });
 });
