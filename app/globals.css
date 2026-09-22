@@ -204,3 +204,15 @@ body {
   border-radius: 8px;
   animation: enrich-reveal 1.15s ease-out 1;
 }
+
+@keyframes visitNoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
