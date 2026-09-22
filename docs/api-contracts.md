@@ -336,7 +336,9 @@ DELETE /api/workspaces/[workspaceSlug]/documents/[documentId]  # archive (soft)
 
 #### Canonical V1 upload flow (presigned direct-to-Spaces)
 
-V1 uses **presigned direct upload**, not backend multipart proxy. Do not implement an alternative multipart-through-backend path unless explicitly approved in a future revision.
+V1 uses **presigned direct upload**, not backend multipart proxy for general Documents UI.
+
+**Exception (Visit Notes P0):** `visit_session` media from `/notes` uses same-origin `POST /documents/direct` (server `uploadObject`) so iPhone Safari is not blocked by Spaces browser CORS (“Load failed”). Presigned `/upload-url` + `/confirm` remains the default for other document surfaces.
 
 ```txt
 1. Client: POST /documents/upload-url

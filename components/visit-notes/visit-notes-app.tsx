@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -15,9 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   IconCamera,
+  IconClose,
+  IconFile,
   IconMic,
   IconNote,
-  IconPaperclip,
+  IconPlus,
   IconSearch,
   IconSend,
   IconSparkles,
@@ -30,8 +33,17 @@ import {
   saveOfflineDraft,
 } from "@/lib/visit-notes-offline";
 import {
+  formatVisitMediaFileSize,
+  pickSupportedAudioRecorderMimeType,
+  resolveVisitMediaMimeType,
+  VISIT_AUDIO_MAX_DURATION_SECONDS,
+  VISIT_VIDEO_MAX_DURATION_SECONDS,
+  visitMediaKindFromMime,
+} from "@/lib/visit-notes";
+import {
   fetchDocumentSignedUrl,
   uploadVisitMedia,
+  VisitMediaUploadError,
 } from "@/lib/visit-notes-upload";
 
 type WorkspaceOption = {
@@ -74,6 +86,19 @@ type VisitSession = {
   project: { id: string; name: string } | null;
 };
 
+type PendingUploadStatus = "uploading" | "transcribing" | "failed";
+
+type PendingUpload = {
+  id: string;
+  file: File;
+  kind: "photo" | "audio" | "video";
+  previewUrl: string | null;
+  progress: number;
+  status: PendingUploadStatus;
+  error: string | null;
+  retryable: boolean;
+};
+
 type Props = {
   initialWorkspaces: WorkspaceOption[];
   initialWorkspaceSlug: string | null;
@@ -94,6 +119,21 @@ function apiErrorMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
+function createPendingId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildPreviewUrl(file: File, kind: "photo" | "audio" | "video"): string | null {
+  if (kind !== "photo" && kind !== "video") return null;
+  if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+    return null;
+  }
+  return URL.createObjectURL(file);
+}
+
 export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props) {
   const [workspaces] = useState(initialWorkspaces);
   const [workspaceSlug, setWorkspaceSlug] = useState(
@@ -111,12 +151,26 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [audioRecorderSupported, setAudioRecorderSupported] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cancelRecordingRef = useRef(false);
+  const photoCaptureInputRef = useRef<HTMLInputElement | null>(null);
+  const photoLibraryInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const streamEndRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const attachMenuRef = useRef<HTMLDivElement | null>(null);
+  const attachMenuId = useId();
   const draftKey = selectedLead?.id ?? "new";
+  const hasComposerText = composer.trim().length > 0;
+
+  useEffect(() => {
+    setAudioRecorderSupported(pickSupportedAudioRecorderMimeType() !== null);
+  }, []);
 
   useEffect(() => {
     const offline = loadOfflineDraft(workspaceSlug, draftKey);
@@ -136,7 +190,52 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   useEffect(() => {
     streamEndRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
-  }, [session?.messages.length, session?.draftBody]);
+  }, [session?.messages.length, session?.draftBody, pendingUploads.length]);
+
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    const next = Math.min(Math.max(el.scrollHeight, 44), 160);
+    el.style.height = `${next}px`;
+  }, [composer]);
+
+  useEffect(() => {
+    if (!attachMenuOpen) return;
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node | null;
+      if (attachMenuRef.current && target && !attachMenuRef.current.contains(target)) {
+        setAttachMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setAttachMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [attachMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      pendingUploads.forEach((item) => {
+        if (
+          item.previewUrl &&
+          typeof URL !== "undefined" &&
+          typeof URL.revokeObjectURL === "function"
+        ) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+    };
+    // Only revoke on unmount for current refs; individual removes revoke themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const searchLeads = useCallback(
     async (query: string) => {
@@ -181,12 +280,19 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     [workspaceSlug],
   );
 
+  function failBanner(message: string) {
+    setStatusBanner(null);
+    setError(message);
+  }
+
   async function selectLead(lead: LeadHit) {
     setSelectedLead(lead);
     setLeadQuery(lead.fullName);
     setLeadHits([]);
     setSession(null);
     setDraftBody("");
+    setPendingUploads([]);
+    setAttachMenuOpen(false);
     await loadSessionsForLead(lead.id);
   }
 
@@ -213,7 +319,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       await loadSessionsForLead(selectedLead.id);
       setStatusBanner("New visit session started.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start session.");
+      failBanner(err instanceof Error ? err.message : "Could not start session.");
     } finally {
       setBusy(null);
     }
@@ -233,8 +339,9 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       const opened = body.data.session as VisitSession;
       setSession(opened);
       setDraftBody(opened.draftBody ?? "");
+      setPendingUploads([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open session.");
+      failBanner(err instanceof Error ? err.message : "Could not open session.");
     } finally {
       setBusy(null);
     }
@@ -273,23 +380,57 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       setComposer("");
       clearOfflineDraft(workspaceSlug, draftKey);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send note.");
+      failBanner(err instanceof Error ? err.message : "Could not send note.");
     } finally {
       setBusy(null);
     }
   }
 
-  async function attachMedia(file: File) {
+  function updatePending(
+    id: string,
+    patch: Partial<PendingUpload> | ((current: PendingUpload) => Partial<PendingUpload>),
+  ) {
+    setPendingUploads((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const next = typeof patch === "function" ? patch(item) : patch;
+        return { ...item, ...next };
+      }),
+    );
+  }
+
+  function removePending(id: string) {
+    setPendingUploads((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (
+        target?.previewUrl &&
+        typeof URL !== "undefined" &&
+        typeof URL.revokeObjectURL === "function"
+      ) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((item) => item.id !== id);
+    });
+  }
+
+  async function processPendingUpload(pendingId: string, file: File) {
     if (!session) return;
-    setBusy("upload");
-    setError(null);
-    setStatusBanner(`Uploading ${file.name}…`);
+
+    updatePending(pendingId, {
+      status: "uploading",
+      progress: 0,
+      error: null,
+      retryable: true,
+    });
+
     try {
       const uploaded = await uploadVisitMedia({
         workspaceSlug,
         sessionId: session.id,
         file,
+        onProgress: (percent) => updatePending(pendingId, { progress: percent }),
       });
+
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/messages`,
         {
@@ -304,91 +445,187 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       );
       const body = await response.json();
       if (!response.ok) {
-        throw new Error(apiErrorMessage(body, "Could not attach media."));
+        throw new VisitMediaUploadError(
+          apiErrorMessage(body, "Could not attach media to this visit."),
+          {
+            stage: "attach",
+            status: response.status,
+            retryable: response.status >= 500,
+          },
+        );
       }
+
       let next = body.data.session as VisitSession;
       setSession(next);
 
       if (uploaded.kind === "audio") {
-        setStatusBanner("Transcribing audio…");
+        updatePending(pendingId, { status: "transcribing", progress: 100 });
         const audioMessage = [...next.messages]
           .reverse()
           .find((message) => message.documentId === uploaded.documentId);
-        if (audioMessage) {
-          const transcribeResponse = await fetch(
-            `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/transcribe`,
+        if (!audioMessage) {
+          throw new VisitMediaUploadError(
+            "Audio attached but message id missing. Refresh and retry transcription.",
+            { stage: "transcribe", retryable: true },
+          );
+        }
+        const transcribeResponse = await fetch(
+          `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/transcribe`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messageId: audioMessage.id,
+              language: language === "auto" ? null : language,
+            }),
+          },
+        );
+        const transcribeBody = await transcribeResponse.json();
+        if (!transcribeResponse.ok) {
+          throw new VisitMediaUploadError(
+            apiErrorMessage(
+              transcribeBody,
+              "Transcription failed. Audio is saved — Retry to transcribe again.",
+            ),
             {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                messageId: audioMessage.id,
-                language: language === "auto" ? null : language,
-              }),
+              stage: "transcribe",
+              status: transcribeResponse.status,
+              retryable: true,
             },
           );
-          const transcribeBody = await transcribeResponse.json();
-          if (!transcribeResponse.ok) {
-            throw new Error(
-              apiErrorMessage(
-                transcribeBody,
-                "Transcription failed. Audio is saved — retry from the message.",
-              ),
-            );
-          }
-          next = transcribeBody.data.session as VisitSession;
-          setSession(next);
         }
+        next = transcribeBody.data.session as VisitSession;
+        setSession(next);
+        setStatusBanner("Audio transcribed.");
       } else if (uploaded.kind === "video") {
-        setStatusBanner("Video attached (preview only — not transcribed).");
+        setStatusBanner(
+          `Video attached (not transcribed). Max guide: ${Math.round(VISIT_VIDEO_MAX_DURATION_SECONDS / 60)} min · ${formatVisitMediaFileSize(uploaded.fileSize)}.`,
+        );
       } else {
         setStatusBanner("Photo attached.");
       }
+
+      removePending(pendingId);
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setBusy(null);
+      const message =
+        err instanceof Error ? err.message : "Upload failed. Retry or Remove.";
+      const retryable =
+        err instanceof VisitMediaUploadError ? err.retryable : true;
+      updatePending(pendingId, {
+        status: "failed",
+        error: message,
+        retryable,
+        progress: 0,
+      });
+      failBanner(message);
     }
+  }
+
+  function enqueueMedia(file: File) {
+    if (!session) return;
+    const coercedType = resolveVisitMediaMimeType(file);
+    const kind = visitMediaKindFromMime(coercedType);
+    if (!kind) {
+      failBanner(
+        `Unsupported media type (${coercedType || "unknown"}). Use JPEG/PNG/WebP/HEIC photo, MP4/MOV video, or WebM/MP4/M4A audio.`,
+      );
+      return;
+    }
+
+    const id = createPendingId();
+    const pending: PendingUpload = {
+      id,
+      file,
+      kind,
+      previewUrl: buildPreviewUrl(file, kind),
+      progress: 0,
+      status: "uploading",
+      error: null,
+      retryable: true,
+    };
+    setPendingUploads((prev) => [...prev, pending]);
+    setError(null);
+    setStatusBanner(null);
+    void processPendingUpload(id, file);
   }
 
   function onFilePicked(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (file) void attachMedia(file);
+    setAttachMenuOpen(false);
+    if (file) enqueueMedia(file);
   }
 
-  async function toggleRecording() {
-    if (recording) {
-      mediaRecorderRef.current?.stop();
-      setRecording(false);
+  async function startRecording() {
+    if (!session || recording) return;
+    const mimeType = pickSupportedAudioRecorderMimeType();
+    if (!mimeType) {
+      failBanner(
+        "This browser cannot record audio (no MediaRecorder MIME). Use Chrome/Safari current, or attach an audio file instead.",
+      );
+      setAudioRecorderSupported(false);
       return;
     }
-    if (!session) return;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/mp4";
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
+      cancelRecordingRef.current = false;
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setRecording(false);
+        if (cancelRecordingRef.current) {
+          chunksRef.current = [];
+          setStatusBanner(null);
+          return;
+        }
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        const extension = mimeType.includes("webm") ? "webm" : "m4a";
+        chunksRef.current = [];
+        if (blob.size <= 0) {
+          failBanner("Recording was empty. Try again or check the microphone.");
+          return;
+        }
+        const extension = mimeType.includes("webm")
+          ? "webm"
+          : mimeType.includes("mp4") || mimeType.includes("aac")
+            ? "m4a"
+            : "audio";
         const file = new File([blob], `visit-audio-${Date.now()}.${extension}`, {
           type: mimeType,
         });
-        void attachMedia(file);
+        enqueueMedia(file);
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
       setRecording(true);
-      setStatusBanner("Recording… tap mic again to stop.");
+      setError(null);
+      setStatusBanner(
+        `Recording… tap Stop when finished (guide ≤ ${Math.round(VISIT_AUDIO_MAX_DURATION_SECONDS / 60)} min).`,
+      );
     } catch {
-      setError("Microphone access was denied or is unavailable.");
+      failBanner(
+        "Microphone access was denied or is unavailable. Enable mic permission, then Retry.",
+      );
     }
+  }
+
+  function stopRecording() {
+    if (!recording) return;
+    cancelRecordingRef.current = false;
+    mediaRecorderRef.current?.stop();
+  }
+
+  function cancelRecording() {
+    if (!recording) return;
+    cancelRecordingRef.current = true;
+    mediaRecorderRef.current?.stop();
+    setStatusBanner("Recording cancelled.");
   }
 
   async function summarize() {
@@ -416,7 +653,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       setDraftBody(next.draftBody ?? "");
       setStatusBanner(`Draft v${next.aiDraft?.version ?? "?"} ready — review before publish.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Summarize failed.");
+      failBanner(err instanceof Error ? err.message : "Summarize failed.");
     } finally {
       setBusy(null);
     }
@@ -456,7 +693,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       if (selectedLead) await loadSessionsForLead(selectedLead.id);
       setStatusBanner("Published to CRM Visit Activity.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Publish failed.");
+      failBanner(err instanceof Error ? err.message : "Publish failed.");
     } finally {
       setBusy(null);
     }
@@ -467,13 +704,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       const url = await fetchDocumentSignedUrl(workspaceSlug, documentId);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open media.");
+      failBanner(err instanceof Error ? err.message : "Could not open media.");
     }
   }
 
   async function retryTranscribe(messageId: string) {
     if (!session) return;
     setBusy("transcribe");
+    setError(null);
     try {
       const response = await fetch(
         `/api/workspaces/${workspaceSlug}/visit-sessions/${session.id}/transcribe`,
@@ -491,14 +729,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         throw new Error(apiErrorMessage(body, "Retry transcription failed."));
       }
       setSession(body.data.session as VisitSession);
+      setStatusBanner("Transcription updated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Retry failed.");
+      failBanner(err instanceof Error ? err.message : "Retry failed.");
     } finally {
       setBusy(null);
     }
   }
 
   const currentWorkspace = workspaces.find((item) => item.slug === workspaceSlug);
+  const composerBusy = Boolean(busy) || pendingUploads.some((item) => item.status !== "failed");
 
   if (workspaces.length === 0) {
     return (
@@ -518,7 +758,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   return (
     <div className="min-h-dvh bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_40%,#f8fafc_100%)] text-[var(--color-ink)] flex flex-col">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-white/90 backdrop-blur-md pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-brand-50)] text-[var(--color-brand-700)]">
             <IconNote className="h-5 w-5" />
@@ -538,6 +778,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               setSession(null);
               setSessions([]);
               setLeadQuery("");
+              setPendingUploads([]);
             }}
             aria-label="Workspace"
           >
@@ -624,11 +865,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-4">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-4">
         {(error || statusBanner) && (
           <div className="mb-3 space-y-2">
             {error && (
-              <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-3 py-2 text-[13px] text-[var(--color-danger-fg)]">
+              <div
+                role="alert"
+                className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-3 py-2 text-[13px] text-[var(--color-danger-fg)]"
+              >
                 {error}
               </div>
             )}
@@ -664,23 +908,35 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
         {session && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[14px] font-semibold">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold">
                   {session.lead?.fullName ?? selectedLead?.fullName}
                 </p>
                 <p className="text-[12px] text-[var(--color-ink-muted)]">
-                  {session.project?.name ?? "Project"} · {session.status}
+                  {session.project?.name ?? "Project"}
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
+              <button
+                type="button"
+                className="shrink-0 text-[12px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
                 onClick={() => void refreshSession(session.id)}
                 disabled={Boolean(busy)}
               >
                 Refresh
-              </Button>
+              </button>
+            </div>
+
+            <div className="flex justify-start">
+              <button
+                type="button"
+                onClick={() => void summarize()}
+                disabled={Boolean(busy)}
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
+              >
+                <IconSparkles className="h-3.5 w-3.5" />
+                {busy === "summarize" ? "Summarizing…" : "Summarize this visit"}
+              </button>
             </div>
 
             <div className="space-y-2.5">
@@ -702,7 +958,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     </span>
                   </div>
                   {message.text && (
-                    <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
+                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
                       {message.text}
                     </p>
                   )}
@@ -716,7 +972,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     </button>
                   )}
                   {message.status === "failed" && (
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <p className="text-[12px] text-[var(--color-danger-fg)]">
                         {message.error ?? "Failed"}
                       </p>
@@ -731,6 +987,81 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       )}
                     </div>
                   )}
+                </article>
+              ))}
+
+              {pendingUploads.map((item) => (
+                <article
+                  key={item.id}
+                  className="rounded-xl border border-[var(--color-line)] bg-white px-3.5 py-3"
+                  data-testid="pending-upload"
+                >
+                  <div className="flex gap-3">
+                    {item.previewUrl && item.kind === "photo" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.previewUrl}
+                        alt=""
+                        className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[var(--color-muted)] text-[var(--color-ink-soft)]">
+                        {item.kind === "video" ? (
+                          <IconVideo className="h-5 w-5" />
+                        ) : item.kind === "audio" ? (
+                          <IconMic className="h-5 w-5" />
+                        ) : (
+                          <IconFile className="h-5 w-5" />
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-medium">{item.file.name}</p>
+                      <p className="text-[12px] text-[var(--color-ink-muted)]">
+                        {item.kind} · {formatVisitMediaFileSize(item.file.size)}
+                        {item.status === "uploading"
+                          ? ` · Uploading ${item.progress}%`
+                          : item.status === "transcribing"
+                            ? " · Transcribing…"
+                            : null}
+                      </p>
+                      {item.status !== "failed" && (
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-muted)]">
+                          <div
+                            className="h-full rounded-full bg-[var(--color-brand-600)] transition-[width] duration-200"
+                            style={{
+                              width: `${item.status === "transcribing" ? 100 : item.progress}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                      {item.status === "failed" && (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[12.5px] text-[var(--color-danger-fg)]">
+                            {item.error ?? "Upload failed."}
+                          </p>
+                          <div className="flex gap-2">
+                            {item.retryable && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void processPendingUpload(item.id, item.file)}
+                              >
+                                Retry
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => removePending(item.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </article>
               ))}
               <div ref={streamEndRef} />
@@ -764,98 +1095,156 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       </main>
 
       {session && (
-        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+        <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {recording && (
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-2.5">
+              <p className="text-[12.5px] font-medium text-[var(--color-danger-fg)]">
+                Recording…
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" type="button" onClick={cancelRecording}>
+                  Cancel
+                </Button>
+                <Button size="sm" type="button" onClick={stopRecording}>
+                  Stop
+                </Button>
+              </div>
+            </div>
+          )}
+
           <form
             onSubmit={(event) => void sendText(event)}
             className="mx-auto flex max-w-3xl items-end gap-2 px-3 py-2.5"
           >
             <input
-              ref={fileInputRef}
+              ref={photoCaptureInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,audio/*,video/webm,video/mp4"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+              capture="environment"
               className="hidden"
               onChange={onFilePicked}
             />
-            <button
-              type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Attach media"
-              disabled={Boolean(busy)}
-            >
-              <IconPaperclip className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-              onClick={() => {
-                const input = fileInputRef.current;
-                if (!input) return;
-                input.accept = "image/*";
-                input.click();
-                input.accept =
-                  "image/jpeg,image/png,image/webp,audio/*,video/webm,video/mp4";
-              }}
-              aria-label="Add photo"
-              disabled={Boolean(busy)}
-            >
-              <IconCamera className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-              onClick={() => {
-                const input = fileInputRef.current;
-                if (!input) return;
-                input.accept = "video/webm,video/mp4";
-                input.click();
-                input.accept =
-                  "image/jpeg,image/png,image/webp,audio/*,video/webm,video/mp4";
-              }}
-              aria-label="Add video"
-              disabled={Boolean(busy)}
-            >
-              <IconVideo className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                recording
-                  ? "bg-[var(--color-danger-bg)] text-[var(--color-danger-fg)]"
-                  : "text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+            <input
+              ref={photoLibraryInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+              className="hidden"
+              onChange={onFilePicked}
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,video/*"
+              className="hidden"
+              onChange={onFilePicked}
+            />
+
+            <div className="relative shrink-0" ref={attachMenuRef}>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                  attachMenuOpen && "bg-[var(--color-muted)] text-[var(--color-ink)]",
+                )}
+                onClick={() => setAttachMenuOpen((open) => !open)}
+                aria-label="Add attachment"
+                aria-expanded={attachMenuOpen}
+                aria-controls={attachMenuId}
+                disabled={composerBusy && !recording}
+              >
+                {attachMenuOpen ? (
+                  <IconClose className="h-5 w-5" />
+                ) : (
+                  <IconPlus className="h-5 w-5" />
+                )}
+              </button>
+              {attachMenuOpen && (
+                <div
+                  id={attachMenuId}
+                  role="menu"
+                  className="absolute bottom-[calc(100%+8px)] left-0 z-30 w-[min(16.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)] motion-safe:animate-[visitNoteIn_0.18s_ease]"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    onClick={() => photoCaptureInputRef.current?.click()}
+                  >
+                    <IconCamera className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    Take photo
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    onClick={() => photoLibraryInputRef.current?.click()}
+                  >
+                    <IconFile className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    Choose photo / file
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    <IconVideo className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    Choose video
+                    <span className="ml-auto text-[11px] text-[var(--color-ink-faint)]">
+                      ≤{Math.round(VISIT_VIDEO_MAX_DURATION_SECONDS / 60)} min
+                    </span>
+                  </button>
+                </div>
               )}
-              onClick={() => void toggleRecording()}
-              aria-label={recording ? "Stop recording" : "Record audio"}
-              disabled={Boolean(busy) && !recording}
-            >
-              <IconMic className="h-5 w-5" />
-            </button>
+            </div>
+
             <Textarea
+              ref={composerRef}
               value={composer}
               onChange={(event) => setComposer(event.target.value)}
-              placeholder="Type a visit note…"
-              className="min-h-[40px] max-h-28 flex-1 resize-none py-2"
+              placeholder="Message"
               rows={1}
+              className="min-h-[44px] max-h-40 flex-1 resize-none rounded-2xl border-[var(--color-line)] px-3.5 py-2.5 text-[16px] leading-snug focus:ring-2"
+              disabled={recording}
+              aria-label="Visit note"
             />
-            <button
-              type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
-              onClick={() => void summarize()}
-              aria-label="Summarize this visit"
-              disabled={Boolean(busy)}
-              title="Summarize this visit"
-            >
-              <IconSparkles className="h-5 w-5" />
-            </button>
-            <button
-              type="submit"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white hover:bg-[var(--color-brand-700)] disabled:opacity-50"
-              aria-label="Send note"
-              disabled={Boolean(busy) || !composer.trim()}
-            >
-              <IconSend className="h-4 w-4" />
-            </button>
+
+            {hasComposerText ? (
+              <button
+                type="submit"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white hover:bg-[var(--color-brand-700)] disabled:opacity-50"
+                aria-label="Send note"
+                disabled={Boolean(busy) || recording}
+              >
+                <IconSend className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={cn(
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+                  recording
+                    ? "bg-[var(--color-danger-bg)] text-[var(--color-danger-fg)]"
+                    : "text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                  !audioRecorderSupported && "opacity-40",
+                )}
+                onClick={() => {
+                  if (recording) stopRecording();
+                  else void startRecording();
+                }}
+                aria-label={recording ? "Stop recording" : "Record audio"}
+                disabled={!audioRecorderSupported || (Boolean(busy) && !recording)}
+                title={
+                  audioRecorderSupported
+                    ? recording
+                      ? "Stop recording"
+                      : "Record audio"
+                    : "Audio recording is not supported in this browser"
+                }
+              >
+                <IconMic className="h-5 w-5" />
+              </button>
+            )}
           </form>
         </footer>
       )}

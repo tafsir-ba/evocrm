@@ -8,6 +8,7 @@ import {
 } from "@/lib/documents";
 import {
   VISIT_AUDIO_MIME_TYPES,
+  VISIT_IMAGE_MIME_TYPES,
   VISIT_VIDEO_MIME_TYPES,
 } from "@/lib/visit-notes";
 
@@ -41,12 +42,19 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "text/plain",
 ] as const;
 
-/** Visit-session media only — images reuse base types; audio/video are visit-scoped. */
-export const ALLOWED_VISIT_SESSION_MIME_TYPES = [
-  ...ALLOWED_DOCUMENT_MIME_TYPES,
-  ...VISIT_AUDIO_MIME_TYPES,
-  ...VISIT_VIDEO_MIME_TYPES,
-] as const;
+/**
+ * Visit-session media allowlist.
+ * Includes iPhone HEIC/HEIF + QuickTime beyond base document images.
+ * Keep in sync with `VISIT_*_MIME_TYPES` in lib/visit-notes.ts.
+ */
+export const ALLOWED_VISIT_SESSION_MIME_TYPES = Array.from(
+  new Set<string>([
+    ...ALLOWED_DOCUMENT_MIME_TYPES,
+    ...VISIT_IMAGE_MIME_TYPES,
+    ...VISIT_AUDIO_MIME_TYPES,
+    ...VISIT_VIDEO_MIME_TYPES,
+  ]),
+);
 
 export { MAX_DOCUMENT_FILE_SIZE_BYTES, MAX_VISIT_DOCUMENT_FILE_SIZE_BYTES };
 

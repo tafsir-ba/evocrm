@@ -18,14 +18,23 @@ export const VISIT_AUDIO_MIME_TYPES = [
   "audio/ogg",
   "audio/x-m4a",
   "audio/mp3",
+  "audio/aac",
 ] as const;
 
-export const VISIT_VIDEO_MIME_TYPES = ["video/webm", "video/mp4"] as const;
+/** Includes iPhone Camera Roll QuickTime (.mov). */
+export const VISIT_VIDEO_MIME_TYPES = [
+  "video/webm",
+  "video/mp4",
+  "video/quicktime",
+] as const;
 
+/** Includes iPhone HEIC/HEIF from Photos. */
 export const VISIT_IMAGE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
 ] as const;
 
 export const VISIT_MEDIA_MIME_TYPES = [
@@ -40,6 +49,45 @@ export const MAX_VISIT_MEDIA_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 /** Client guidance only — server enforces size, not duration. */
 export const VISIT_AUDIO_MAX_DURATION_SECONDS = 15 * 60;
 export const VISIT_VIDEO_MAX_DURATION_SECONDS = 3 * 60;
+
+const EXT_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  webm: "video/webm",
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  qt: "video/quicktime",
+  m4a: "audio/mp4",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  aac: "audio/aac",
+};
+
+export function extensionOfFileName(fileName: string): string {
+  const base = fileName.trim().split(/[/\\]/).pop() ?? fileName;
+  const dot = base.lastIndexOf(".");
+  if (dot < 0) return "";
+  return base.slice(dot + 1).toLowerCase();
+}
+
+/** Safari/iOS often yields empty File.type — infer from extension. */
+export function resolveVisitMediaMimeType(file: {
+  name: string;
+  type: string;
+}): string {
+  const declared = file.type.trim().toLowerCase();
+  if (declared && declared !== "application/octet-stream") {
+    return declared;
+  }
+  const ext = extensionOfFileName(file.name);
+  return EXT_MIME[ext] ?? declared;
+}
 
 export function isVisitAudioMimeType(mimeType: string): boolean {
   return (VISIT_AUDIO_MIME_TYPES as readonly string[]).includes(mimeType);
@@ -77,8 +125,25 @@ export function validateVisitMediaFileClient(file: File): string | null {
   if (file.size > MAX_VISIT_MEDIA_FILE_SIZE_BYTES) {
     return `File exceeds maximum size of ${formatVisitMediaFileSize(MAX_VISIT_MEDIA_FILE_SIZE_BYTES)}.`;
   }
-  if (!isVisitMediaMimeType(file.type)) {
-    return "Unsupported media type. Use photo (JPEG/PNG/WebP), audio (WebM/MP4/MPEG/WAV/OGG), or video (WebM/MP4).";
+  const mimeType = resolveVisitMediaMimeType(file);
+  if (!isVisitMediaMimeType(mimeType)) {
+    return `Unsupported media type (${mimeType || "unknown"}). Use JPEG/PNG/WebP/HEIC photo, WebM/MP4/MOV video, or WebM/MP4/M4A audio.`;
+  }
+  return null;
+}
+
+export function pickSupportedAudioRecorderMimeType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  const candidates = [
+    "audio/mp4",
+    "audio/aac",
+    "audio/webm;codecs=opus",
+    "audio/webm",
+  ];
+  for (const candidate of candidates) {
+    if (MediaRecorder.isTypeSupported(candidate)) {
+      return candidate.split(";")[0] ?? candidate;
+    }
   }
   return null;
 }

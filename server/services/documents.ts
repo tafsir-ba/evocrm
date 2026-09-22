@@ -33,10 +33,13 @@ import {
   generateDownloadSignedUrl,
   generateUploadSignedUrl,
   getBucketName,
+  isSpacesConfigured,
+  uploadObject,
   verifyUploadedObject,
 } from "@/server/storage/spaces";
 import type {
   DocumentConfirmInput,
+  DocumentLinkedEntityType,
   DocumentListQuery,
   DocumentUploadUrlInput,
 } from "@/server/validation/documents";
@@ -224,6 +227,122 @@ export async function createDocumentUploadUrlForWorkspace(
     storageKey,
     expiresAt: expiresAt.toISOString(),
   };
+}
+
+/**
+ * Same-origin upload that puts bytes to Spaces from the server.
+ * Used by Visit Notes so iPhone Safari is not blocked by Spaces bucket CORS
+ * on browser PUT (surfaces as WebKit "Load failed").
+ */
+export async function createDocumentFromDirectUploadForWorkspace(
+  workspaceId: string,
+  userId: string,
+  permissions: readonly string[],
+  input: {
+    linkedEntityType: DocumentLinkedEntityType;
+    linkedEntityId: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    visibility: "private" | "workspace";
+    ownerId?: string;
+    body: Buffer;
+  },
+): Promise<DocumentDetail> {
+  if (!isSpacesConfigured()) {
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "File storage is not configured. Contact your administrator.",
+      { expose: true },
+    );
+  }
+
+  if (input.body.byteLength !== input.fileSize) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Uploaded file size does not match the declared file size.",
+    );
+  }
+
+  const linkedEntity = await validateDocumentLinkedEntity(
+    workspaceId,
+    input.linkedEntityType,
+    input.linkedEntityId,
+  );
+  assertEntityReadAccess(permissions, input.linkedEntityType);
+  await assertDocumentLinkedEntityProjectAccess(
+    workspaceId,
+    userId,
+    linkedEntity,
+    "document:create",
+  );
+
+  validateDocumentMimeType(input.mimeType, input.linkedEntityType);
+  validateDocumentFileSize(input.fileSize, input.linkedEntityType);
+  await validateOptionalAssignableMember(workspaceId, input.ownerId, "Owner");
+
+  const sanitizedFileName = sanitizeFileName(input.fileName);
+  const storageKey = buildDocumentStorageKey({
+    workspaceId,
+    linkedEntityType: input.linkedEntityType,
+    linkedEntityId: input.linkedEntityId,
+    fileName: sanitizedFileName,
+  });
+
+  try {
+    await uploadObject({
+      storageKey,
+      body: input.body,
+      mimeType: input.mimeType,
+    });
+  } catch (error) {
+    await createAuditLog({
+      workspaceId,
+      actorId: userId,
+      action: "document.upload_failed",
+      entityType: "document",
+      entityId: storageKey,
+      after: {
+        reason: "spaces_put_failed",
+        storageKey,
+        message: error instanceof Error ? error.message : "upload_failed",
+      },
+    });
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "Storage upload failed. Retry in a moment or contact an admin if this persists.",
+      { expose: true, cause: error },
+    );
+  }
+
+  const document = await createDocument(workspaceId, {
+    linkedEntityType: input.linkedEntityType,
+    linkedEntityId: input.linkedEntityId,
+    ownerId: input.ownerId ?? null,
+    uploadedBy: userId,
+    fileName: sanitizedFileName,
+    mimeType: input.mimeType,
+    fileSize: input.fileSize,
+    bucket: getBucketName(),
+    storageKey,
+    visibility: input.visibility,
+  });
+
+  await createAuditLog({
+    workspaceId,
+    actorId: userId,
+    action: "document.uploaded",
+    entityType: "document",
+    entityId: document.id,
+    after: {
+      fileName: document.fileName,
+      linkedEntityType: document.linkedEntityType,
+      linkedEntityId: document.linkedEntityId,
+      via: "direct_upload",
+    },
+  });
+
+  return enrichDocument(document);
 }
 
 export async function confirmDocumentUploadForWorkspace(
