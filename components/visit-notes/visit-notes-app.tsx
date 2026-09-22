@@ -505,7 +505,17 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         (item) => item.status === "open" || item.status === "draft",
       );
       if (resumable) {
-        enterSession(await fetchSession(resumable.id));
+        // Instant enter from list payload — no blank “Opening conversation…” when known.
+        enterSession(resumable);
+        setBusy(null);
+        setSessionRefreshing(true);
+        try {
+          enterSession(await fetchSession(resumable.id));
+        } catch {
+          // Keep the list snapshot; soft-refresh failure is non-fatal.
+        } finally {
+          setSessionRefreshing(false);
+        }
         return;
       }
       const created = await createSessionForLead(lead);
@@ -1101,7 +1111,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }
 
   const currentWorkspace = workspaces.find((item) => item.slug === workspaceSlug);
-  const composerBusy = Boolean(busy) || pendingUploads.some((item) => item.status !== "failed");
   const mediaBusy = pendingUploads.some(
     (item) => item.status === "uploading" || item.status === "transcribing",
   );

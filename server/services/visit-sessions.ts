@@ -310,9 +310,9 @@ export async function appendVisitMessageForWorkspace(
     } else if (input.kind === "audio") {
       title = "Voice note";
     } else if (input.kind === "photo") {
-      title = "Photo visit";
+      title = "Photo";
     } else if (input.kind === "video") {
-      title = "Video visit";
+      title = "Video";
     }
   }
 
@@ -545,15 +545,20 @@ export async function publishVisitSessionForWorkspace(
       description: noteDescription.slice(0, 5000),
     });
 
-    // Surface original session media on the lead Files profile (keep VisitSession documentIds).
-    for (const doc of mediaDocs) {
-      if (doc.linkedEntityType === "lead" && doc.linkedEntityId === session.leadId) {
-        continue;
+    // Surface original session media on the lead Files profile (keep VisitSession.documentIds).
+    // Require document:create; skip re-link (do not fail publish) when missing.
+    const accessForDocs = await resolveWorkspaceAccess(workspaceId, actorId);
+    const canRelinkMedia = hasPermission(accessForDocs.permissions, "document:create");
+    if (canRelinkMedia) {
+      for (const doc of mediaDocs) {
+        if (doc.linkedEntityType === "lead" && doc.linkedEntityId === session.leadId) {
+          continue;
+        }
+        await updateDocumentLinkedEntity(workspaceId, doc.id, {
+          linkedEntityType: "lead",
+          linkedEntityId: session.leadId,
+        });
       }
-      await updateDocumentLinkedEntity(workspaceId, doc.id, {
-        linkedEntityType: "lead",
-        linkedEntityId: session.leadId,
-      });
     }
   }
 
@@ -634,10 +639,21 @@ export async function archiveVisitSessionForWorkspace(
     "activity:archive",
   );
 
-  // Cascade while session is still active so linked-entity validation remains valid
-  // for any follow-on document pipelines; Visit Notes retention: media follows Document archive.
+  // Cascade archives only for media still owned by this session.
+  // Docs re-linked to the lead on publish must remain on the lead Files profile.
+  const archivedDocumentIds: string[] = [];
   for (const documentId of session.documentIds) {
+    const document = await findDocumentById(workspaceId, documentId);
+    if (
+      !document ||
+      document.archivedAt ||
+      document.linkedEntityType !== "visit_session" ||
+      document.linkedEntityId !== sessionId
+    ) {
+      continue;
+    }
     await archiveDocument(workspaceId, documentId);
+    archivedDocumentIds.push(documentId);
   }
 
   const updated = await archiveVisitSession(workspaceId, sessionId);
@@ -651,7 +667,7 @@ export async function archiveVisitSessionForWorkspace(
     action: "visit_session.archived",
     entityType: "visit_session",
     entityId: sessionId,
-    after: { archivedDocumentIds: session.documentIds },
+    after: { archivedDocumentIds },
   });
 
   return enrichSession(updated);
