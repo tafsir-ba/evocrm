@@ -316,12 +316,6 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }, [attachMenuOpen, headerMenuOpen]);
 
   useEffect(() => {
-    if (!editingTitle) return;
-    titleInputRef.current?.focus();
-    titleInputRef.current?.select();
-  }, [editingTitle]);
-
-  useEffect(() => {
     return () => {
       pendingUploads.forEach((item) => {
         if (
@@ -1205,11 +1199,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
             <div className="min-w-0 flex-1">
               {editingTitle ? (
-                <Input
-                  ref={titleInputRef}
+                <input
+                  autoFocus
                   value={titleDraft}
                   onChange={(event) => setTitleDraft(event.target.value)}
                   onBlur={() => void saveTitle(titleDraft)}
+                  onFocus={(event) => event.currentTarget.select()}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -1220,7 +1215,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       setTitleDraft(sessionDisplayTitle(session));
                     }
                   }}
-                  className="h-8 text-[15px] font-semibold"
+                  className="h-8 w-full rounded-md border border-[var(--color-line)] bg-white px-2 text-[15px] font-semibold focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
                   aria-label="Conversation title"
                   maxLength={120}
                 />
