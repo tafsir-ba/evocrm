@@ -51,6 +51,7 @@ export type VisitSessionRecord = {
   leadId: string;
   projectId: string;
   activityId: string | null;
+  noteActivityId: string | null;
   propertyId: string | null;
   createdBy: string;
   title: string | null;
@@ -146,6 +147,9 @@ function toVisitSessionRecord(document: VisitSessionDocument): VisitSessionRecor
     leadId: document.leadId.toString(),
     projectId: document.projectId.toString(),
     activityId: toObjectIdString(document.activityId),
+    noteActivityId: toObjectIdString(
+      (document as VisitSessionDocument & { noteActivityId?: unknown }).noteActivityId,
+    ),
     propertyId: toObjectIdString(document.propertyId),
     createdBy: document.createdBy.toString(),
     title: document.title ?? null,
@@ -273,6 +277,7 @@ export async function updateVisitSession(
     title?: string | null;
     propertyId?: string | null;
     activityId?: string | null;
+    noteActivityId?: string | null;
     messages?: VisitMessageRecord[];
     documentIds?: string[];
     aiDraft?: VisitAiDraftRecord | null;
@@ -290,6 +295,7 @@ export async function updateVisitSession(
   if (update.title !== undefined) $set.title = update.title;
   if (update.propertyId !== undefined) $set.propertyId = update.propertyId;
   if (update.activityId !== undefined) $set.activityId = update.activityId;
+  if (update.noteActivityId !== undefined) $set.noteActivityId = update.noteActivityId;
   if (update.messages !== undefined) $set.messages = update.messages;
   if (update.documentIds !== undefined) $set.documentIds = update.documentIds;
   if (update.aiDraft !== undefined) $set.aiDraft = update.aiDraft;

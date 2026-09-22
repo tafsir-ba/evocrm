@@ -1145,29 +1145,27 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   );
   const linkedUnitLabel = propertyLabel(session?.property ?? null);
   const hasSummary = Boolean(draftBody.trim() || session?.draftBody?.trim());
+  const canShare =
+    Boolean(session) && (hasSummary || visibleMessages.length > 0);
 
-  async function shareSummaryOrExport(options?: { allowExportWithoutSummary?: boolean }) {
-    if (!session) return;
+  async function shareConversation() {
+    if (!session || !canShare) return;
+
     const summary = draftBody.trim() || session.draftBody?.trim() || "";
-    if (!summary && !options?.allowExportWithoutSummary) {
-      setStatusBanner("Generate a summary first, or use Share → Download export.");
-      return;
-    }
-
     const title = sessionDisplayTitle(session);
-    const text =
-      summary ||
-      buildConversationExport({
-        title,
-        leadName: session.lead?.fullName ?? selectedLead?.fullName ?? null,
-        unitLabel: linkedUnitLabel,
-        messages: visibleMessages.map((message) => ({
-          kind: message.kind,
-          text: message.text,
-          createdAt: message.createdAt,
-        })),
-        summary: summary || null,
-      });
+    const text = summary
+      ? summary
+      : buildConversationExport({
+          title,
+          leadName: session.lead?.fullName ?? selectedLead?.fullName ?? null,
+          unitLabel: linkedUnitLabel,
+          messages: visibleMessages.map((message) => ({
+            kind: message.kind,
+            text: message.text,
+            createdAt: message.createdAt,
+          })),
+          summary: null,
+        });
 
     setBusy("share");
     try {
@@ -1183,7 +1181,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           fileName: `${title.replace(/[^\w.-]+/g, "_") || "note"}.txt`,
           text,
         });
-        setStatusBanner("Download started.");
+        setStatusBanner("Download started (sharing unavailable here).");
       }
     } finally {
       setBusy(null);
@@ -1750,14 +1748,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                   </button>
                   <button
                     type="button"
-                    onClick={() => void shareSummaryOrExport()}
-                    disabled={Boolean(busy) || !hasSummary}
+                    onClick={() => void shareConversation()}
+                    disabled={Boolean(busy) || !canShare}
                     title={
-                      hasSummary
-                        ? "Share the generated summary"
-                        : "Summarize first to share"
+                      canShare
+                        ? "Share via the system share sheet (or copy)"
+                        : "Add a message or summarize first"
                     }
                     className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                    data-testid="notes-share-chip"
                   >
                     <IconShare className="h-3.5 w-3.5" />
                     Share
@@ -1930,23 +1929,27 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     type="button"
                     role="menuitem"
                     className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)] disabled:opacity-50"
-                    disabled={Boolean(busy)}
-                    onClick={() => {
-                      if (hasSummary) {
-                        void shareSummaryOrExport();
-                      } else {
-                        downloadConversationExport();
-                      }
-                    }}
+                    disabled={Boolean(busy) || !canShare}
+                    data-testid="notes-share-menu-item"
+                    onClick={() => void shareConversation()}
                   >
                     <IconShare className="h-5 w-5 text-[var(--color-ink-soft)]" />
-                    {hasSummary ? "Share summary" : "Download export"}
+                    Share
                   </button>
-                  {!hasSummary && (
-                    <p className="border-t border-[var(--color-line)] px-3.5 py-2 text-[11.5px] text-[var(--color-ink-faint)]">
-                      Summarize first to share a summary. Export shares text only — never private media links.
-                    </p>
-                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-[14px] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                    disabled={Boolean(busy) || !session}
+                    data-testid="notes-download-export-menu-item"
+                    onClick={() => downloadConversationExport()}
+                  >
+                    <IconFile className="h-5 w-5 text-[var(--color-ink-soft)]" />
+                    Download export
+                  </button>
+                  <p className="border-t border-[var(--color-line)] px-3.5 py-2 text-[11.5px] text-[var(--color-ink-faint)]">
+                    Share uses the device share sheet when available (copy/download otherwise). Exports are text only — never private media links.
+                  </p>
                 </div>
               )}
             </div>

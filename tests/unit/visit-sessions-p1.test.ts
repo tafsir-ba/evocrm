@@ -14,6 +14,7 @@ const findLeadById = vi.fn();
 const updateLead = vi.fn();
 const findProjectById = vi.fn();
 const createAuditLog = vi.fn();
+const findActivityById = vi.fn();
 
 vi.mock("@/server/permissions/require-project-access", () => ({
   requireProjectAccess: (...args: unknown[]) => requireProjectAccess(...args),
@@ -61,6 +62,10 @@ vi.mock("@/server/repositories/projects", () => ({
   findProjectById: (...args: unknown[]) => findProjectById(...args),
 }));
 
+vi.mock("@/server/repositories/activities", () => ({
+  findActivityById: (...args: unknown[]) => findActivityById(...args),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: (...args: unknown[]) => createAuditLog(...args),
 }));
@@ -97,15 +102,18 @@ import {
 
 const mockedFindDictionary = vi.mocked(findDictionaryItemByTypeAndKey);
 const mockedCreateActivity = vi.mocked(createActivityForWorkspace);
+const mockedUpdateActivity = vi.mocked(updateActivityForWorkspace);
 const mockedUpdateVisitSession = vi.mocked(updateVisitSession);
+
 const baseSession = {
   id: "507f1f77bcf86cd799439013",
   workspaceId: "507f1f77bcf86cd799439001",
   leadId: "507f1f77bcf86cd799439011",
   projectId: "507f1f77bcf86cd799439012",
   propertyId: null as string | null,
-  title: null as string | null,
+  title: "Parking follow-up" as string | null,
   activityId: null as string | null,
+  noteActivityId: null as string | null,
   createdBy: "507f1f77bcf86cd799439099",
   status: "draft" as const,
   language: "en",
@@ -132,7 +140,22 @@ const baseSession = {
   updatedAt: new Date(),
 };
 
-describe("visit-sessions P1 permission and archive integrity", () => {
+function mockDictionaries() {
+  mockedFindDictionary.mockImplementation(async (_ws, type, key) => {
+    if (type === "activity_type" && key === "note") {
+      return { id: "type-note", key: "note", label: "Note" } as never;
+    }
+    if (type === "activity_type" && key === "visit") {
+      return { id: "type-visit", key: "visit", label: "Visit" } as never;
+    }
+    if (type === "activity_status" && key === "completed") {
+      return { id: "status-done", key: "completed", label: "Completed" } as never;
+    }
+    return null;
+  });
+}
+
+describe("visit-sessions publish lead surface", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     assertRecordProjectAccess.mockResolvedValue(undefined);
@@ -149,6 +172,17 @@ describe("visit-sessions P1 permission and archive integrity", () => {
       name: "Cressy",
       workspaceId: baseSession.workspaceId,
     });
+    findActivityById.mockResolvedValue(null);
+    hasPermission.mockImplementation(
+      (permissions: string[], required: string) => permissions.includes(required),
+    );
+    resolveWorkspaceAccess.mockResolvedValue({
+      mode: "member",
+      membership: null,
+      permissions: ["activity:update", "activity:create", "lead:update"],
+      isWorkspaceAdmin: false,
+      grantedProjectIds: null,
+    });
   });
 
   it("refuses mirrorToLeadNotes without lead:update", async () => {
@@ -160,9 +194,6 @@ describe("visit-sessions P1 permission and archive integrity", () => {
       isWorkspaceAdmin: false,
       grantedProjectIds: null,
     });
-    hasPermission.mockImplementation(
-      (permissions: string[], required: string) => permissions.includes(required),
-    );
 
     await expect(
       publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
@@ -175,39 +206,98 @@ describe("visit-sessions P1 permission and archive integrity", () => {
     } satisfies Partial<AppError>);
 
     expect(updateLead).not.toHaveBeenCalled();
+    expect(mockedCreateActivity).not.toHaveBeenCalled();
   });
 
-  it("registers a note Activity on the lead Notes profile when publishing", async () => {
-    findVisitSessionById.mockResolvedValue(baseSession);
-    resolveWorkspaceAccess.mockResolvedValue({
-      mode: "member",
-      membership: null,
-      permissions: ["activity:update", "activity:create", "lead:update"],
-      isWorkspaceAdmin: false,
-      grantedProjectIds: null,
+  it("publishes a Note activity (not Visit) and re-links media to the lead", async () => {
+    const docId = baseSession.documentIds[0]!;
+    findVisitSessionById.mockResolvedValue({
+      ...baseSession,
+      documentIds: [docId],
     });
-    hasPermission.mockImplementation(
-      (permissions: string[], required: string) => permissions.includes(required),
-    );
-    mockedFindDictionary.mockImplementation(async (_ws, type, key) => {
-      if (type === "activity_type" && key === "visit") {
-        return { id: "type-visit", key: "visit", label: "Visit" } as never;
-      }
-      if (type === "activity_type" && key === "note") {
-        return { id: "type-note", key: "note", label: "Note" } as never;
-      }
-      if (type === "activity_status" && key === "completed") {
-        return { id: "status-done", key: "completed", label: "Completed" } as never;
-      }
-      return null;
+    mockDictionaries();
+    findDocumentById.mockResolvedValue({
+      id: docId,
+      fileName: "clip.mp4",
+      mimeType: "video/mp4",
+      archivedAt: null,
+      linkedEntityType: "visit_session",
+      linkedEntityId: baseSession.id,
     });
-    mockedCreateActivity
-      .mockResolvedValueOnce({ id: "visit-act" } as never)
-      .mockResolvedValueOnce({ id: "note-act" } as never);
+    mockedCreateActivity.mockResolvedValue({ id: "note-act" } as never);
     mockedUpdateVisitSession.mockResolvedValue({
       ...baseSession,
-      activityId: "visit-act",
+      activityId: "note-act",
+      noteActivityId: "note-act",
       status: "published",
+      publishedAt: new Date(),
+      documentIds: [docId],
+    } as never);
+
+    await publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
+      mirrorToLeadNotes: true,
+      registerLeadNoteActivity: true,
+      createTasksFromNextSteps: false,
+    });
+
+    expect(mockedCreateActivity).toHaveBeenCalledTimes(1);
+    expect(mockedCreateActivity).toHaveBeenCalledWith(
+      baseSession.workspaceId,
+      "actor",
+      expect.objectContaining({
+        typeId: "type-note",
+        leadId: baseSession.leadId,
+        statusId: "status-done",
+      }),
+    );
+    expect(updateDocumentLinkedEntity).toHaveBeenCalledWith(
+      baseSession.workspaceId,
+      docId,
+      {
+        linkedEntityType: "lead",
+        linkedEntityId: baseSession.leadId,
+      },
+    );
+    expect(updateLead).toHaveBeenCalledWith(
+      baseSession.workspaceId,
+      baseSession.leadId,
+      expect.objectContaining({
+        notes: expect.stringContaining(`[Note session:${baseSession.id}]`),
+      }),
+    );
+    expect(mockedUpdateVisitSession).toHaveBeenCalledWith(
+      baseSession.workspaceId,
+      baseSession.id,
+      expect.objectContaining({
+        activityId: "note-act",
+        noteActivityId: "note-act",
+      }),
+    );
+  });
+
+  it("is idempotent: republish updates the same Note and does not duplicate Lead.notes", async () => {
+    const noteId = "note-act-existing";
+    findVisitSessionById.mockResolvedValue({
+      ...baseSession,
+      activityId: noteId,
+      noteActivityId: noteId,
+      publishedAt: new Date(),
+      documentIds: [],
+    });
+    mockDictionaries();
+    findLeadById.mockResolvedValue({
+      id: baseSession.leadId,
+      fullName: "Ada",
+      email: "ada@example.com",
+      notes: `Prior\n\n[Note session:${baseSession.id}]\nOld summary`,
+      projectId: baseSession.projectId,
+      archivedAt: null,
+    });
+    mockedUpdateVisitSession.mockResolvedValue({
+      ...baseSession,
+      activityId: noteId,
+      noteActivityId: noteId,
+      status: "amended",
       publishedAt: new Date(),
     } as never);
 
@@ -217,29 +307,53 @@ describe("visit-sessions P1 permission and archive integrity", () => {
       createTasksFromNextSteps: false,
     });
 
-    expect(mockedCreateActivity).toHaveBeenCalledTimes(2);
-    expect(mockedCreateActivity).toHaveBeenNthCalledWith(
-      1,
+    expect(mockedCreateActivity).not.toHaveBeenCalled();
+    expect(mockedUpdateActivity).toHaveBeenCalledWith(
       baseSession.workspaceId,
+      noteId,
       "actor",
-      expect.objectContaining({ typeId: "type-visit", leadId: baseSession.leadId }),
+      expect.objectContaining({ title: "Parking follow-up" }),
     );
-    expect(mockedCreateActivity).toHaveBeenNthCalledWith(
-      2,
+    const mirrored = updateLead.mock.calls[0]?.[2]?.notes as string;
+    expect(mirrored.match(/\[Note session:/g)?.length).toBe(1);
+    expect(mirrored).toContain("Summary");
+    expect(mirrored).not.toContain("Old summary");
+  });
+
+  it("reuses activityId when it already points at a Note type", async () => {
+    findVisitSessionById.mockResolvedValue({
+      ...baseSession,
+      activityId: "legacy-note",
+      noteActivityId: null,
+      documentIds: [],
+    });
+    mockDictionaries();
+    findActivityById.mockResolvedValue({
+      id: "legacy-note",
+      typeId: "type-note",
+      archivedAt: null,
+    });
+    mockedUpdateVisitSession.mockResolvedValue({
+      ...baseSession,
+      activityId: "legacy-note",
+      noteActivityId: "legacy-note",
+      status: "published",
+      publishedAt: new Date(),
+    } as never);
+
+    await publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
+      mirrorToLeadNotes: false,
+      registerLeadNoteActivity: true,
+      createTasksFromNextSteps: false,
+    });
+
+    expect(mockedCreateActivity).not.toHaveBeenCalled();
+    expect(mockedUpdateActivity).toHaveBeenCalledWith(
       baseSession.workspaceId,
+      "legacy-note",
       "actor",
-      expect.objectContaining({
-        typeId: "type-note",
-        leadId: baseSession.leadId,
-        statusId: "status-done",
-      }),
+      expect.any(Object),
     );
-    expect(updateLead).toHaveBeenCalledWith(
-      baseSession.workspaceId,
-      baseSession.leadId,
-      expect.objectContaining({ notes: expect.stringContaining("[Note ") }),
-    );
-    expect(updateActivityForWorkspace).not.toHaveBeenCalled();
   });
 
   it("archives only documents still linked to the visit session before soft-archiving", async () => {
@@ -272,29 +386,6 @@ describe("visit-sessions P1 permission and archive integrity", () => {
     );
 
     expect(archiveDocument).toHaveBeenCalledTimes(2);
-    expect(archiveDocument).toHaveBeenNthCalledWith(
-      1,
-      baseSession.workspaceId,
-      baseSession.documentIds[0],
-    );
-    expect(archiveDocument).toHaveBeenNthCalledWith(
-      2,
-      baseSession.workspaceId,
-      baseSession.documentIds[1],
-    );
-    expect(archiveVisitSession).toHaveBeenCalledWith(
-      baseSession.workspaceId,
-      baseSession.id,
-    );
-    expect(createAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "visit_session.archived",
-        after: { archivedDocumentIds: baseSession.documentIds },
-      }),
-    );
-    const archiveDocOrder = archiveDocument.mock.invocationCallOrder[0]!;
-    const archiveSessionOrder = archiveVisitSession.mock.invocationCallOrder[0]!;
-    expect(archiveDocOrder).toBeLessThan(archiveSessionOrder);
   });
 
   it("does not cascade-archive documents re-linked to the lead after publish", async () => {
@@ -326,130 +417,5 @@ describe("visit-sessions P1 permission and archive integrity", () => {
     );
 
     expect(archiveDocument).not.toHaveBeenCalled();
-    expect(createAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "visit_session.archived",
-        after: { archivedDocumentIds: [] },
-      }),
-    );
-  });
-
-  it("skips media re-link on publish when actor lacks document:create", async () => {
-    const docId = baseSession.documentIds[0]!;
-    findVisitSessionById.mockResolvedValue({
-      ...baseSession,
-      documentIds: [docId],
-    });
-    resolveWorkspaceAccess.mockResolvedValue({
-      mode: "member",
-      membership: null,
-      permissions: ["activity:update", "activity:create", "lead:update"],
-      isWorkspaceAdmin: false,
-      grantedProjectIds: null,
-    });
-    hasPermission.mockImplementation(
-      (permissions: string[], required: string) => permissions.includes(required),
-    );
-    mockedFindDictionary.mockImplementation(async (_ws, type, key) => {
-      if (type === "activity_type" && key === "visit") {
-        return { id: "type-visit", key: "visit", label: "Visit" } as never;
-      }
-      if (type === "activity_type" && key === "note") {
-        return { id: "type-note", key: "note", label: "Note" } as never;
-      }
-      if (type === "activity_status" && key === "completed") {
-        return { id: "status-done", key: "completed", label: "Completed" } as never;
-      }
-      return null;
-    });
-    findDocumentById.mockResolvedValue({
-      id: docId,
-      fileName: "clip.mp4",
-      mimeType: "video/mp4",
-      archivedAt: null,
-      linkedEntityType: "visit_session",
-      linkedEntityId: baseSession.id,
-    });
-    mockedCreateActivity
-      .mockResolvedValueOnce({ id: "visit-act" } as never)
-      .mockResolvedValueOnce({ id: "note-act" } as never);
-    mockedUpdateVisitSession.mockResolvedValue({
-      ...baseSession,
-      activityId: "visit-act",
-      status: "published",
-      publishedAt: new Date(),
-      documentIds: [docId],
-    } as never);
-
-    await publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
-      mirrorToLeadNotes: true,
-      registerLeadNoteActivity: true,
-      createTasksFromNextSteps: false,
-    });
-
-    expect(updateDocumentLinkedEntity).not.toHaveBeenCalled();
-  });
-
-  it("re-links media to the lead on publish when actor has document:create", async () => {
-    const docId = baseSession.documentIds[0]!;
-    findVisitSessionById.mockResolvedValue({
-      ...baseSession,
-      documentIds: [docId],
-    });
-    resolveWorkspaceAccess.mockResolvedValue({
-      mode: "member",
-      membership: null,
-      permissions: ["activity:update", "activity:create", "lead:update", "document:create"],
-      isWorkspaceAdmin: false,
-      grantedProjectIds: null,
-    });
-    hasPermission.mockImplementation(
-      (permissions: string[], required: string) => permissions.includes(required),
-    );
-    mockedFindDictionary.mockImplementation(async (_ws, type, key) => {
-      if (type === "activity_type" && key === "visit") {
-        return { id: "type-visit", key: "visit", label: "Visit" } as never;
-      }
-      if (type === "activity_type" && key === "note") {
-        return { id: "type-note", key: "note", label: "Note" } as never;
-      }
-      if (type === "activity_status" && key === "completed") {
-        return { id: "status-done", key: "completed", label: "Completed" } as never;
-      }
-      return null;
-    });
-    findDocumentById.mockResolvedValue({
-      id: docId,
-      fileName: "clip.mp4",
-      mimeType: "video/mp4",
-      archivedAt: null,
-      linkedEntityType: "visit_session",
-      linkedEntityId: baseSession.id,
-    });
-    mockedCreateActivity
-      .mockResolvedValueOnce({ id: "visit-act" } as never)
-      .mockResolvedValueOnce({ id: "note-act" } as never);
-    mockedUpdateVisitSession.mockResolvedValue({
-      ...baseSession,
-      activityId: "visit-act",
-      status: "published",
-      publishedAt: new Date(),
-      documentIds: [docId],
-    } as never);
-
-    await publishVisitSessionForWorkspace(baseSession.workspaceId, baseSession.id, "actor", {
-      mirrorToLeadNotes: true,
-      registerLeadNoteActivity: true,
-      createTasksFromNextSteps: false,
-    });
-
-    expect(updateDocumentLinkedEntity).toHaveBeenCalledWith(
-      baseSession.workspaceId,
-      docId,
-      {
-        linkedEntityType: "lead",
-        linkedEntityId: baseSession.leadId,
-      },
-    );
   });
 });

@@ -28,6 +28,8 @@ import {
   isVisitAudioMimeType,
   isVisitVideoMimeType,
 } from "@/lib/visit-notes";
+import { upsertLeadNotesMirror } from "@/lib/notes-lead-mirror";
+import { findActivityById } from "@/server/repositories/activities";
 import {
   applyUserProjectScope,
   assertRecordProjectAccess,
@@ -460,11 +462,6 @@ export async function publishVisitSessionForWorkspace(
   }
 
   const body = formatVisitDraftBody(draft);
-  const visitType = await findDictionaryItemByTypeAndKey(
-    workspaceId,
-    "activity_type",
-    "visit",
-  );
   const noteType = await findDictionaryItemByTypeAndKey(
     workspaceId,
     "activity_type",
@@ -476,90 +473,78 @@ export async function publishVisitSessionForWorkspace(
     "completed",
   );
 
-  if (!visitType || !completedStatus) {
+  if (!noteType || !completedStatus) {
     throw new AppError(
       "INTERNAL_ERROR",
-      "Visit activity dictionaries are not configured for this workspace.",
+      "Note activity dictionaries are not configured for this workspace.",
     );
   }
 
   const title =
     session.title?.trim() ||
     formatVisitSessionFallbackTitle(session.createdAt);
-  let activityId = session.activityId;
 
-  if (activityId) {
-    await updateActivityForWorkspace(workspaceId, activityId, actorId, {
-      title,
-      description: body,
-      outcome: draft.nextSteps.map((step) => step.text).join("\n") || null,
-      propertyId: session.propertyId ?? null,
-    });
-  } else {
-    const activity = await createActivityForWorkspace(workspaceId, actorId, {
-      typeId: visitType.id,
-      statusId: completedStatus.id,
-      leadId: session.leadId,
-      projectId: session.projectId,
-      propertyId: session.propertyId ?? undefined,
-      title,
-      description: body,
-      outcome: draft.nextSteps.map((step) => step.text).join("\n") || undefined,
-    });
-    activityId = activity.id;
+  const mediaDocs = (
+    await Promise.all(
+      session.documentIds.map((documentId) => findDocumentById(workspaceId, documentId)),
+    )
+  ).filter((doc): doc is NonNullable<typeof doc> => Boolean(doc && !doc.archivedAt));
+
+  const attachmentLines = mediaDocs.map(
+    (doc) => `- ${doc.fileName} (${doc.mimeType})`,
+  );
+  const noteDescription =
+    attachmentLines.length > 0
+      ? `${body}\n\n— Attachments (also in lead Files) —\n${attachmentLines.join("\n")}`
+      : body;
+
+  // Canonical CRM projection is a Note activity (Notes tab), not Visit.
+  // VisitSession remains the system of record; activityId/noteActivityId are projections.
+  let noteActivityId = session.noteActivityId;
+  if (!noteActivityId && session.activityId) {
+    const existing = await findActivityById(workspaceId, session.activityId);
+    if (existing && !existing.archivedAt && existing.typeId === noteType.id) {
+      noteActivityId = existing.id;
+    }
   }
 
-  // Register on the lead Notes tab (Internal notes) — same Activity type the CRM notes UI lists.
-  if (input.registerLeadNoteActivity !== false) {
-    if (!noteType) {
-      throw new AppError(
-        "INTERNAL_ERROR",
-        "Note activity dictionary is not configured for this workspace.",
-      );
-    }
-    const stamp = new Date().toISOString().slice(0, 10);
+  const shouldRegisterNote = input.registerLeadNoteActivity !== false;
+  if (shouldRegisterNote) {
     const noteTitle =
-      title.length > 80 ? `${title.slice(0, 77)}…` : title || `Note ${stamp}`;
+      title.length > 80 ? `${title.slice(0, 77)}…` : title || "Note";
 
-    const mediaDocs = (
-      await Promise.all(
-        session.documentIds.map((documentId) => findDocumentById(workspaceId, documentId)),
-      )
-    ).filter((doc): doc is NonNullable<typeof doc> => Boolean(doc && !doc.archivedAt));
-
-    const attachmentLines = mediaDocs.map(
-      (doc) => `- ${doc.fileName} (${doc.mimeType})`,
-    );
-    const noteDescription =
-      attachmentLines.length > 0
-        ? `${body}\n\n— Attachments (also in lead Files) —\n${attachmentLines.join("\n")}`
-        : body;
-
-    await createActivityForWorkspace(workspaceId, actorId, {
-      typeId: noteType.id,
-      statusId: completedStatus.id,
-      leadId: session.leadId,
-      projectId: session.projectId,
-      propertyId: session.propertyId ?? undefined,
-      title: noteTitle,
-      description: noteDescription.slice(0, 5000),
-    });
-
-    // Surface original session media on the lead Files profile (keep VisitSession.documentIds).
-    // Require document:create; skip re-link (do not fail publish) when missing.
-    const accessForDocs = await resolveWorkspaceAccess(workspaceId, actorId);
-    const canRelinkMedia = hasPermission(accessForDocs.permissions, "document:create");
-    if (canRelinkMedia) {
-      for (const doc of mediaDocs) {
-        if (doc.linkedEntityType === "lead" && doc.linkedEntityId === session.leadId) {
-          continue;
-        }
-        await updateDocumentLinkedEntity(workspaceId, doc.id, {
-          linkedEntityType: "lead",
-          linkedEntityId: session.leadId,
-        });
-      }
+    if (noteActivityId) {
+      await updateActivityForWorkspace(workspaceId, noteActivityId, actorId, {
+        title: noteTitle,
+        description: noteDescription.slice(0, 5000),
+        outcome: draft.nextSteps.map((step) => step.text).join("\n") || null,
+        propertyId: session.propertyId ?? null,
+      });
+    } else {
+      const note = await createActivityForWorkspace(workspaceId, actorId, {
+        typeId: noteType.id,
+        statusId: completedStatus.id,
+        leadId: session.leadId,
+        projectId: session.projectId,
+        propertyId: session.propertyId ?? undefined,
+        title: noteTitle,
+        description: noteDescription.slice(0, 5000),
+        outcome: draft.nextSteps.map((step) => step.text).join("\n") || undefined,
+      });
+      noteActivityId = note.id;
     }
+  }
+
+  // Surface session media on the lead Files profile (idempotent re-link).
+  // Docs stay referenced by VisitSession.documentIds; archive cascade skips lead-linked docs.
+  for (const doc of mediaDocs) {
+    if (doc.linkedEntityType === "lead" && doc.linkedEntityId === session.leadId) {
+      continue;
+    }
+    await updateDocumentLinkedEntity(workspaceId, doc.id, {
+      linkedEntityType: "lead",
+      linkedEntityId: session.leadId,
+    });
   }
 
   if (input.createTasksFromNextSteps) {
@@ -595,24 +580,28 @@ export async function publishVisitSessionForWorkspace(
   if (input.mirrorToLeadNotes) {
     const lead = await findLeadById(workspaceId, session.leadId);
     if (lead) {
-      const stamp = new Date().toISOString().slice(0, 10);
-      const mirror = `[Note ${stamp}]\n${body}`;
-      const notes = lead.notes?.trim()
-        ? `${lead.notes.trim()}\n\n${mirror}`
-        : mirror;
-      await updateLead(workspaceId, lead.id, { notes: notes.slice(0, 5000) });
+      const notes = upsertLeadNotesMirror({
+        existingNotes: lead.notes,
+        sessionId,
+        body,
+      });
+      await updateLead(workspaceId, lead.id, { notes });
     }
   }
 
   const updated = await updateVisitSession(workspaceId, sessionId, {
-    activityId,
+    // Canonical projection id is the Note activity when registered.
+    activityId: noteActivityId ?? session.activityId,
+    noteActivityId: noteActivityId ?? session.noteActivityId,
     aiDraft: draft,
-    publishedAt: new Date(),
-    status: session.activityId ? "amended" : "published",
+    publishedAt: session.publishedAt ?? new Date(),
+    status: session.publishedAt || session.noteActivityId || session.activityId
+      ? "amended"
+      : "published",
   });
 
   if (!updated) {
-    throw new AppError("NOT_FOUND", "Visit session not found.");
+    throw new AppError("NOT_FOUND", "Conversation not found.");
   }
 
   await createAuditLog({
@@ -621,10 +610,41 @@ export async function publishVisitSessionForWorkspace(
     action: "visit_session.published",
     entityType: "visit_session",
     entityId: sessionId,
-    after: { activityId },
+    after: { activityId: updated.activityId, noteActivityId: updated.noteActivityId },
   });
 
   return enrichSession(updated);
+}
+
+/**
+ * Repair path for already-published sessions that only have a Visit activity
+ * (pre-Note-registration releases). Creates/updates the Note projection and
+ * re-links media without duplicating Lead.notes blocks.
+ */
+export async function backfillVisitSessionLeadSurfaceForWorkspace(
+  workspaceId: string,
+  sessionId: string,
+  actorId: string,
+): Promise<VisitSessionDetail> {
+  const session = await findVisitSessionById(workspaceId, sessionId);
+  if (!session || session.archivedAt) {
+    throw new AppError("NOT_FOUND", "Conversation not found.");
+  }
+  await assertRecordProjectAccess(workspaceId, actorId, session.projectId, "activity:update");
+
+  if (!session.aiDraft && !session.publishedAt) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Session has no summary draft to backfill onto lead notes.",
+    );
+  }
+
+  return publishVisitSessionForWorkspace(workspaceId, sessionId, actorId, {
+    mirrorToLeadNotes: true,
+    registerLeadNoteActivity: true,
+    createTasksFromNextSteps: false,
+    editedDraftBody: session.aiDraft?.editedBody ?? undefined,
+  });
 }
 
 export async function archiveVisitSessionForWorkspace(

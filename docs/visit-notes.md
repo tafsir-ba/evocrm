@@ -1,6 +1,6 @@
 # AI Visit Notes — Implementation Plan
 
-Authenticated mobile-first app at `/notes`. Working session record is `VisitSession`; published CRM truth remains Activity `type=visit` on the Lead/project timeline.
+Authenticated mobile-first app at `/notes`. Working session record is `VisitSession` (system of record). Published CRM projection is a completed Activity `type=note` on the lead Notes tab, with session media re-linked onto lead Files.
 
 ## Existing components mapped to changes
 
@@ -9,7 +9,7 @@ Authenticated mobile-first app at `/notes`. Working session record is `VisitSess
 | Auth / protected route | `middleware.ts`, `protected-app-paths.ts` | Add `/notes` + `/api/workspaces/.../visit-sessions` |
 | Workspace + grants | `requireWorkspaceApiAccess`, `applyUserProjectScope`, `requireProjectAccess` | Every session/search/media call |
 | Lead search | `listLeadsForWorkspace` | Notes UI search only |
-| Activity publish | `createActivityForWorkspace` / `updateActivityForWorkspace` + dictionary `visit` / `task` | Publish & optional next-step task |
+| Activity publish | `createActivityForWorkspace` / `updateActivityForWorkspace` + dictionary `note` / `task` | Canonical Note on lead Notes tab; optional next-step tasks |
 | Documents / Spaces | signed upload → confirm → signed download | Add `visit_session` linked type; audio/video MIME; 50 MB visit for visit media |
 | OpenAI | `OPENAI_API_KEY`, chat completions pattern | Whisper transcription + structured summary |
 | Soft archive | `archivedAt` | Same on VisitSession + Document |
@@ -20,8 +20,8 @@ Authenticated mobile-first app at `/notes`. Working session record is `VisitSess
 1. **Route:** top-level `/notes` (matches `crm.evo-home.ch/notes`). Workspace selector inside the page. Linked from primary CRM nav (Dashboard homepage CTA + sidebar **Notes**).
 2. **No Need entity.** Lead remains primary; VisitSession is the only new domain model.
 3. **Media:** Documents linked as `visit_session`. Photos include JPEG/PNG/WebP/**HEIC/HEIF**. Audio/video (`audio/webm|mp4|mpeg|wav|ogg|aac`, `video/webm|mp4|quicktime`) are **visit_session-only**. Max **50 MB**; client guides ~15 min audio / ~3 min video. Audio may be transcribed; video is attached-only. Uploads go through same-origin `/documents/direct` (not browser PUT to Spaces).
-4. **Lead notes on publish:** Publishing creates a completed `note` Activity on the lead (Internal notes / Notes tab), appends a dated mirror onto `Lead.notes` by default, and **re-links session media documents to the lead** so they appear under lead Files. VisitSession remains the working conversation history; unpublished sessions stay drafts in Notes.
-5. **Permissions:** `lead:read` (search/open), `activity:create|update|read` (session/publish), `document:create|read` (media). No parallel ACL.
+4. **Lead notes on publish:** Publishing upserts a completed `note` Activity on the lead (Notes tab) via `VisitSession.noteActivityId` (idempotent), upserts a session-scoped mirror onto `Lead.notes`, and **re-links session media documents to the lead** so they appear under lead Files. VisitSession remains the working conversation history; unpublished sessions stay drafts in Notes. Legacy Visit-only publishes can be repaired with `scripts/backfill-notes-lead-surface.ts`.
+5. **Permissions:** `lead:read` (search/open), `activity:create|update|read` (session/publish), `document:create|read` (media upload/read). Publish re-link of session-owned media does not require a separate `document:create` gate.
 6. **Retention:** soft-archive session (`archivedAt`); media follows Document archive. No hard delete in V1.
 7. **Offline:** composer text in `localStorage`. Media requires connectivity; failed in-session uploads keep Retry/Remove and automatically retry on `online` while the tab remains open (files are not persisted to disk/localStorage).
 
