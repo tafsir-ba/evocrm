@@ -933,9 +933,19 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
       mediaStreamRef.current = stream;
+      // Show recording chrome + waveform immediately (before MediaRecorder settles).
       setRecordingStream(stream);
+      setRecording(true);
+      startRecordingClock();
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       cancelRecordingRef.current = false;
@@ -970,14 +980,14 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
-      startRecordingClock();
-      setRecording(true);
       setError(null);
       setStatusBanner(
         `Recording… tap Stop when finished (guide ≤ ${Math.round(VISIT_AUDIO_MAX_DURATION_SECONDS / 60)} min).`,
       );
     } catch {
       cleanupRecordingResources();
+      setRecording(false);
+      setRecordingSeconds(0);
       failBanner(
         "Microphone access was denied or is unavailable. Enable mic permission, then Retry.",
       );
@@ -1814,14 +1824,15 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       {session && (
         <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--color-line)] bg-white/95 backdrop-blur-md pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {recording && (
-            <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 pt-2.5">
-              <div className="flex min-w-0 items-center gap-3">
-                <p className="shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)]">
-                  {formatRecordingTimer(recordingSeconds)}
-                </p>
-                <LiveMicWaveform stream={recordingStream} active={recording} />
-              </div>
-              <div className="flex gap-2">
+            <div
+              className="mx-auto flex max-w-3xl items-center gap-3 px-4 pt-3"
+              data-testid="notes-recording-bar"
+            >
+              <p className="w-12 shrink-0 tabular-nums text-[13px] font-semibold text-[var(--color-danger-fg)]">
+                {formatRecordingTimer(recordingSeconds)}
+              </p>
+              <LiveMicWaveform stream={recordingStream} active={recording} />
+              <div className="flex shrink-0 gap-2">
                 <Button size="sm" variant="outline" type="button" onClick={cancelRecording}>
                   Cancel
                 </Button>
