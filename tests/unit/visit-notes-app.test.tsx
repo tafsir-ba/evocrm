@@ -112,6 +112,56 @@ describe("VisitNotesApp", () => {
     expect(screen.queryByLabelText(/^workspace$/i)).not.toBeInTheDocument();
   });
 
+  it("keeps lead search at 16px and shows truncated readable hits while searching", async () => {
+    const user = userEvent.setup();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/leads?") && url.includes("search=")) {
+        return jsonResponse({
+          data: [
+            {
+              id: "507f1f77bcf86cd799439011",
+              fullName: "Ada Buyer",
+              email: "ada@example.com",
+              projectId: "507f1f77bcf86cd799439012",
+              project: {
+                id: "507f1f77bcf86cd799439012",
+                name: "Cressy",
+                reference: "CRS",
+              },
+            },
+          ],
+        });
+      }
+      return jsonResponse({ error: { message: "unexpected" } }, 500);
+    }) as typeof fetch;
+
+    render(
+      <VisitNotesApp
+        initialWorkspaces={[
+          {
+            id: "ws1",
+            name: "Evo Home",
+            slug: "evo-home",
+            timezone: "Europe/Zurich",
+          },
+        ]}
+        initialWorkspaceSlug="evo-home"
+      />,
+    );
+
+    const search = screen.getByTestId("notes-lead-search");
+    expect(search.className).toMatch(/text-\[16px\]/);
+    expect(screen.getByRole("heading", { name: /who is this note about/i })).toBeInTheDocument();
+
+    await user.type(search, "Ada");
+    expect(await screen.findByTestId("notes-lead-hits")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /who is this note about/i })).not.toBeInTheDocument();
+    const hit = screen.getByTestId("notes-lead-hit");
+    expect(hit.className).toMatch(/min-w-0/);
+    expect(within(hit).getByText("Ada Buyer").className).toMatch(/truncate/);
+  });
+
   it("resumes the latest substantive session instead of an empty open one", async () => {
     const user = userEvent.setup();
     const emptyOld = {

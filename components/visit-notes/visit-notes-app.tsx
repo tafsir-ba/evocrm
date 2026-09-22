@@ -1277,7 +1277,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }
 
   return (
-    <div className="min-h-dvh bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_40%,#f8fafc_100%)] text-[var(--color-ink)] flex flex-col">
+    <div className="min-h-dvh overflow-x-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_40%,#f8fafc_100%)] text-[var(--color-ink)] flex flex-col">
       <header
         className={cn(
           "z-30 border-b border-[var(--color-line)] bg-white/95 backdrop-blur-md pt-[env(safe-area-inset-top)]",
@@ -1316,7 +1316,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       setTitleDraft(sessionDisplayTitle(session));
                     }
                   }}
-                  className="h-8 w-full rounded-md border border-[var(--color-line)] bg-white px-2 text-[15px] font-semibold focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
+                  className="h-9 w-full rounded-md border border-[var(--color-line)] bg-white px-2 text-[16px] font-semibold focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
                   aria-label="Conversation title"
                   maxLength={120}
                 />
@@ -1463,18 +1463,18 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           </div>
         ) : (
           <>
-            <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-brand-50)] text-[var(--color-brand-700)]">
-                <IconNote className="h-5 w-5" />
+            <div className="mx-auto max-w-3xl px-3 py-2.5 flex items-center gap-2 sm:gap-3 sm:px-4 sm:py-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-brand-50)] text-[var(--color-brand-700)] sm:h-9 sm:w-9">
+                <IconNote className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <h1 className="text-[15px] font-semibold leading-tight">Notes</h1>
-                <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
+                <p className="truncate text-[11px] text-[var(--color-ink-muted)] sm:text-[12px]">
                   {currentWorkspace?.name ?? "Select workspace"}
                 </p>
               </div>
               <select
-                className="h-9 max-w-[38%] rounded-md border border-[var(--color-line)] bg-white px-2 text-[12.5px]"
+                className="h-9 max-w-[40%] rounded-md border border-[var(--color-line)] bg-white px-2 text-[16px] sm:max-w-[38%]"
                 value={workspaceSlug}
                 onChange={(event) => {
                   setWorkspaceSlug(event.target.value);
@@ -1533,27 +1533,38 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               </div>
             </div>
 
-            <div className="mx-auto max-w-3xl px-4 pb-3 space-y-2">
+            <div className="mx-auto max-w-3xl px-3 pb-2.5 sm:px-4 sm:pb-3">
               <div className="relative">
-                <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-ink-faint)]" />
                 <Input
-                  className="pl-9"
+                  leadingIcon={<IconSearch className="h-4 w-4" />}
+                  fieldSize="lg"
+                  inputClassName="text-[16px] leading-snug"
                   placeholder="Who is this note about?"
                   value={leadQuery}
                   onChange={(event) => setLeadQuery(event.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="words"
+                  enterKeyHint="search"
+                  data-testid="notes-lead-search"
                 />
                 {leadHits.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]">
+                  <ul
+                    className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-[min(50dvh,18rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                    data-testid="notes-lead-hits"
+                  >
                     {leadHits.map((lead) => (
-                      <li key={lead.id}>
+                      <li key={lead.id} className="border-b border-[var(--color-line)] last:border-b-0">
                         <button
                           type="button"
-                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-[var(--color-muted)]"
+                          className="flex w-full min-w-0 flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-[var(--color-muted)] active:bg-[var(--color-muted)]"
                           onClick={() => void selectLead(lead)}
                           data-testid="notes-lead-hit"
                         >
-                          <span className="text-[13.5px] font-medium">{lead.fullName}</span>
-                          <span className="text-[12px] text-[var(--color-ink-muted)]">
+                          <span className="w-full truncate text-[15px] font-medium leading-snug">
+                            {lead.fullName}
+                          </span>
+                          <span className="w-full truncate text-[12px] leading-snug text-[var(--color-ink-muted)]">
                             {[lead.email || "No email", leadProjectLabel(lead)]
                               .filter(Boolean)
                               .join(" · ")}
@@ -1593,16 +1604,22 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           </div>
         )}
 
-        {!selectedLead && (
-          <div className="flex flex-1 flex-col items-center justify-center text-center px-6">
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[var(--shadow-sm)] border border-[var(--color-line)]">
-              <IconSearch className="h-6 w-6 text-[var(--color-brand-600)]" />
+        {!selectedLead && leadQuery.trim().length < 2 && (
+          <div className="flex flex-1 flex-col items-center justify-center px-5 text-center sm:px-6">
+            <div className="mb-2.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-sm)] sm:mb-3 sm:h-14 sm:w-14">
+              <IconSearch className="h-5 w-5 text-[var(--color-brand-600)] sm:h-6 sm:w-6" />
             </div>
-            <h2 className="text-[17px] font-semibold">Who is this note about?</h2>
-            <p className="mt-1.5 max-w-sm text-[13.5px] text-[var(--color-ink-muted)]">
+            <h2 className="text-[16px] font-semibold sm:text-[17px]">Who is this note about?</h2>
+            <p className="mt-1 max-w-sm text-[13px] text-[var(--color-ink-muted)] sm:mt-1.5 sm:text-[13.5px]">
               Pick someone once, then type, talk, or attach.
             </p>
           </div>
+        )}
+
+        {!selectedLead && leadQuery.trim().length >= 2 && leadHits.length === 0 && (
+          <p className="px-4 pt-6 text-center text-[13.5px] text-[var(--color-ink-muted)]">
+            No matching leads. Try another name or email.
+          </p>
         )}
 
         {selectedLead && !session && (
@@ -1854,7 +1871,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <Textarea
                       value={draftBody}
                       onChange={(event) => setDraftBody(event.target.value)}
-                      className="min-h-[160px] bg-white"
+                      className="min-h-[160px] bg-white text-[16px]"
                       placeholder="Edit the summary before saving to the lead…"
                     />
                   </div>
@@ -2103,6 +2120,8 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
             value={unitQuery}
             onChange={(event) => setUnitQuery(event.target.value)}
             autoFocus
+            fieldSize="lg"
+            inputClassName="text-[16px]"
           />
           {unitSearching && (
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">Searching…</p>

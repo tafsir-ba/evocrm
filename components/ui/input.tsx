@@ -12,7 +12,9 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   leadingIcon?: ReactNode;
   trailingIcon?: ReactNode;
   invalid?: boolean;
-  fieldSize?: "sm" | "md";
+  fieldSize?: "sm" | "md" | "lg";
+  /** Classes applied to the native input (wrapper uses `className`). */
+  inputClassName?: string;
 };
 
 export function Input({
@@ -21,9 +23,10 @@ export function Input({
   invalid,
   fieldSize = "md",
   className,
+  inputClassName,
   ...rest
 }: InputProps) {
-  const h = fieldSize === "sm" ? "h-8" : "h-10";
+  const h = fieldSize === "sm" ? "h-8" : fieldSize === "lg" ? "h-11" : "h-10";
   return (
     <div className={cn("relative", className)}>
       {leadingIcon && (
@@ -40,6 +43,7 @@ export function Input({
           trailingIcon ? "pr-9" : "pr-3",
           invalid &&
             "border-[var(--color-danger-fg)] focus:border-[var(--color-danger-fg)] focus:ring-[var(--color-danger-border)]",
+          inputClassName,
         )}
       />
       {trailingIcon && (

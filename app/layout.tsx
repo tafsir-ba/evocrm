@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 
@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   title: "EvoHome CRM — Real estate workspace",
   description:
     "Operational CRM for real estate teams. Leads, properties, pipeline, activities and email drips in one calm workspace.",
+};
+
+/** Keep initialScale=1; do not lock maximumScale (a11y). Prevent iOS zoom via ≥16px inputs instead. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
