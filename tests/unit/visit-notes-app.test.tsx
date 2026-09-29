@@ -486,11 +486,19 @@ describe("VisitNotesApp", () => {
 
     await user.click(screen.getByRole("button", { name: /conversation actions/i }));
     const menu = screen.getByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: /dashboard/i })).toHaveAttribute(
+    expect(within(menu).getByTestId("notes-nav-dashboard")).toHaveAttribute(
       "href",
       "/w/evo-home/dashboard",
     );
-    expect(within(menu).getByRole("menuitem", { name: /exit notes/i })).toHaveAttribute(
+    expect(within(menu).getByTestId("notes-nav-activities")).toHaveAttribute(
+      "href",
+      "/w/evo-home/activities",
+    );
+    expect(within(menu).getByTestId("notes-nav-projects")).toHaveAttribute(
+      "href",
+      "/w/evo-home/projects",
+    );
+    expect(within(menu).getByTestId("notes-exit")).toHaveAttribute(
       "href",
       "/w/evo-home/dashboard",
     );
@@ -500,6 +508,81 @@ describe("VisitNotesApp", () => {
       "/w/evo-home/leads/507f1f77bcf86cd799439011",
     );
     expect(within(menu).getByRole("menuitem", { name: /open lead/i })).toBeInTheDocument();
+  });
+
+  it("starts a personal note without a buyer and exposes CRM nav on home", async () => {
+    const user = userEvent.setup();
+    const personalSession = {
+      ...sessionFixture,
+      id: "507f1f77bcf86cd7994390aa",
+      leadId: null,
+      projectId: null,
+      lead: null,
+      project: null,
+      title: null,
+    };
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/context")) {
+        return jsonResponse({
+          data: {
+            navigation: [
+              { segment: "dashboard", label: "Dashboard", href: "/w/evo-home/dashboard", permission: "dashboard:read" },
+              { segment: "projects", label: "Projects", href: "/w/evo-home/projects", permission: "project:read" },
+              { segment: "activities", label: "Activities", href: "/w/evo-home/activities", permission: "activity:read" },
+              { segment: "notes", label: "Notes", href: "/notes", permission: "activity:read" },
+            ],
+          },
+        });
+      }
+      if (url.includes("/visit-sessions?") && url.includes("mine=true")) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.endsWith("/visit-sessions") && init?.method === "POST") {
+        const payload = JSON.parse(String(init.body ?? "{}")) as { leadId?: string | null };
+        expect(payload.leadId ?? null).toBeNull();
+        return jsonResponse({ data: { session: personalSession } }, 201);
+      }
+      return jsonResponse({ error: { message: "unexpected" } }, 500);
+    }) as typeof fetch;
+
+    render(
+      <VisitNotesApp
+        initialWorkspaces={[
+          {
+            id: "ws1",
+            name: "Evo Home",
+            slug: "evo-home",
+            timezone: "Europe/Zurich",
+          },
+        ]}
+        initialWorkspaceSlug="evo-home"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /notes navigation/i }));
+    const homeMenu = await screen.findByTestId("notes-crm-nav-menu");
+    expect(within(homeMenu).getByTestId("notes-nav-activities")).toHaveAttribute(
+      "href",
+      "/w/evo-home/activities",
+    );
+    expect(within(homeMenu).getByTestId("notes-nav-projects")).toHaveAttribute(
+      "href",
+      "/w/evo-home/projects",
+    );
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("notes-start-personal"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/note message/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText("My note")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /conversation actions/i }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByTestId("notes-link-buyer")).toBeInTheDocument();
+    expect(within(menu).queryByTestId("notes-open-lead")).not.toBeInTheDocument();
   });
 
   it("suppresses a conversation via swipe delete and archives it", async () => {

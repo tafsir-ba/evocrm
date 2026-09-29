@@ -42,5 +42,15 @@ describe("visit session update validation", () => {
         propertyId: null,
       }).success,
     ).toBe(true);
+    expect(
+      updateVisitSessionInputSchema.safeParse({
+        leadId: "507f1f77bcf86cd799439011",
+      }).success,
+    ).toBe(true);
+    expect(
+      updateVisitSessionInputSchema.safeParse({
+        leadId: null,
+      }).success,
+    ).toBe(true);
   });
 });

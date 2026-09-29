@@ -7,9 +7,10 @@ import { AppError } from "@/server/errors";
 import { hasPermission } from "@/server/permissions/permissions";
 import { resolveWorkspaceAccess } from "@/server/permissions/resolve-workspace-access";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
-import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
+import { findDictionaryItemByTypeAndBehavior, findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import { archiveDocument, findDocumentById, updateDocumentLinkedEntity } from "@/server/repositories/documents";
 import { findLeadById, updateLead } from "@/server/repositories/leads";
+import { findAllOpportunities } from "@/server/repositories/opportunities";
 import { findProjectById } from "@/server/repositories/projects";
 import {
   archiveVisitSession,
@@ -38,6 +39,7 @@ import {
   createActivityForWorkspace,
   updateActivityForWorkspace,
 } from "@/server/services/activities";
+import { createOpportunityForWorkspace } from "@/server/services/opportunities";
 import {
   summarizeVisitSessionWithOpenAi,
   transcribeAudioWithOpenAi,
@@ -65,6 +67,17 @@ export type VisitSessionDetail = VisitSessionRecord & {
   draftBody: string | null;
 };
 
+async function requireWorkspaceActivityPermission(
+  workspaceId: string,
+  actorId: string,
+  permission: "activity:read" | "activity:create" | "activity:update" | "activity:archive",
+): Promise<void> {
+  const access = await resolveWorkspaceAccess(workspaceId, actorId);
+  if (!hasPermission(access.permissions, permission)) {
+    throw new AppError("PERMISSION_DENIED", "Permission denied.");
+  }
+}
+
 async function requireActiveSession(
   workspaceId: string,
   sessionId: string,
@@ -78,14 +91,28 @@ async function requireActiveSession(
   if (session.archivedAt && permission !== "activity:read") {
     throw new AppError("NOT_FOUND", "Visit session not found.");
   }
+
+  // Personal / unassigned notes are private to the creator.
+  if (!session.leadId) {
+    if (session.createdBy !== actorId) {
+      throw new AppError("NOT_FOUND", "Visit session not found.");
+    }
+    await requireWorkspaceActivityPermission(workspaceId, actorId, permission);
+    return session;
+  }
+
   await assertRecordProjectAccess(workspaceId, actorId, session.projectId, permission);
   return session;
 }
 
 async function enrichSession(session: VisitSessionRecord): Promise<VisitSessionDetail> {
   const [lead, project, property] = await Promise.all([
-    findLeadById(session.workspaceId, session.leadId),
-    findProjectById(session.workspaceId, session.projectId),
+    session.leadId
+      ? findLeadById(session.workspaceId, session.leadId)
+      : Promise.resolve(null),
+    session.projectId
+      ? findProjectById(session.workspaceId, session.projectId)
+      : Promise.resolve(null),
     session.propertyId
       ? findPropertyById(session.workspaceId, session.propertyId)
       : Promise.resolve(null),
@@ -109,11 +136,75 @@ async function enrichSession(session: VisitSessionRecord): Promise<VisitSessionD
   };
 }
 
+/**
+ * Linking a buyer + unit in Notes is a CRM link: ensure an Opportunity exists
+ * for that lead↔property pair (idempotent).
+ */
+async function ensureLeadUnitOpportunityLink(
+  workspaceId: string,
+  actorId: string,
+  leadId: string,
+  propertyId: string,
+): Promise<void> {
+  const existing = await findAllOpportunities(workspaceId, {
+    leadId,
+    propertyId,
+  });
+  if (existing.length > 0) {
+    return;
+  }
+
+  const access = await resolveWorkspaceAccess(workspaceId, actorId);
+  if (!hasPermission(access.permissions, "opportunity:create")) {
+    // Attribution still succeeds; opportunity creation is best-effort when permitted.
+    return;
+  }
+
+  const defaultStatus =
+    (await findDictionaryItemByTypeAndBehavior(
+      workspaceId,
+      "opportunity_status",
+      "open",
+    )) ??
+    (await findDictionaryItemByTypeAndKey(workspaceId, "opportunity_status", "new"));
+
+  if (!defaultStatus) {
+    return;
+  }
+
+  try {
+    await createOpportunityForWorkspace(workspaceId, actorId, {
+      leadId,
+      propertyId,
+      statusId: defaultStatus.id,
+    });
+  } catch (error) {
+    if (error instanceof AppError && error.code === "VALIDATION_ERROR") {
+      // Race or project mismatch — leave session attribution intact.
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function listVisitSessionsForWorkspace(
   workspaceId: string,
   query: VisitSessionListQuery,
   userId: string,
 ): Promise<{ sessions: VisitSessionDetail[]; total: number }> {
+  if (query.mine) {
+    await requireWorkspaceActivityPermission(workspaceId, userId, "activity:read");
+    const { sessions, total } = await findVisitSessions(workspaceId, {
+      createdBy: userId,
+      unassignedOnly: true,
+      includeArchived: query.includeArchived,
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+    const enriched = await Promise.all(sessions.map(enrichSession));
+    return { sessions: enriched, total };
+  }
+
   const scoped = await applyUserProjectScope<{
     projectId?: string;
     projectIds?: string[];
@@ -147,6 +238,29 @@ export async function createVisitSessionForWorkspace(
   actorId: string,
   input: CreateVisitSessionInput,
 ): Promise<VisitSessionDetail> {
+  if (!input.leadId) {
+    await requireWorkspaceActivityPermission(workspaceId, actorId, "activity:create");
+
+    const session = await createVisitSession({
+      workspaceId,
+      leadId: null,
+      projectId: null,
+      createdBy: actorId,
+      language: input.language ?? null,
+    });
+
+    await createAuditLog({
+      workspaceId,
+      actorId,
+      action: "visit_session.created",
+      entityType: "visit_session",
+      entityId: session.id,
+      after: { leadId: null, projectId: null, personal: true },
+    });
+
+    return enrichSession(session);
+  }
+
   const lead = await findLeadById(workspaceId, input.leadId);
   if (!lead || lead.archivedAt) {
     throw new AppError("NOT_FOUND", "Lead not found.");
@@ -212,19 +326,64 @@ export async function updateVisitSessionForWorkspace(
     };
   }
 
-  let propertyId: string | null | undefined = undefined;
+  let nextLeadId: string | null | undefined = undefined;
+  let nextProjectId: string | null | undefined = undefined;
+  let nextPropertyId: string | null | undefined = undefined;
+
+  if (input.leadId !== undefined) {
+    if (input.leadId === null) {
+      nextLeadId = null;
+      // Clearing the buyer keeps the project when a unit remains linked.
+      if (session.propertyId == null && input.propertyId === null) {
+        nextProjectId = null;
+      } else if (session.propertyId == null && input.propertyId === undefined) {
+        nextProjectId = null;
+      }
+    } else {
+      const lead = await findLeadById(workspaceId, input.leadId);
+      if (!lead || lead.archivedAt) {
+        throw new AppError("NOT_FOUND", "Lead not found.");
+      }
+      if (!lead.projectId) {
+        throw new AppError("VALIDATION_ERROR", "Lead must belong to a project.");
+      }
+      await requireProjectAccess(workspaceId, actorId, lead.projectId, "activity:update");
+      nextLeadId = lead.id;
+      nextProjectId = lead.projectId;
+
+      const effectivePropertyId =
+        input.propertyId !== undefined ? input.propertyId : session.propertyId;
+      if (effectivePropertyId) {
+        const property = await findPropertyById(workspaceId, effectivePropertyId);
+        if (!property || property.archivedAt) {
+          throw new AppError("NOT_FOUND", "Property not found.");
+        }
+        if (property.projectId !== lead.projectId) {
+          throw new AppError(
+            "VALIDATION_ERROR",
+            "Buyer and unit must belong to the same project.",
+          );
+        }
+      }
+    }
+  }
+
   if (input.propertyId !== undefined) {
     if (input.propertyId === null) {
-      propertyId = null;
+      nextPropertyId = null;
+      if ((nextLeadId ?? session.leadId) == null) {
+        nextProjectId = nextProjectId === undefined ? null : nextProjectId;
+      }
     } else {
       const property = await findPropertyById(workspaceId, input.propertyId);
       if (!property || property.archivedAt) {
         throw new AppError("NOT_FOUND", "Property not found.");
       }
-      if (property.projectId !== session.projectId) {
+      const effectiveProjectId = nextProjectId ?? session.projectId;
+      if (effectiveProjectId && property.projectId !== effectiveProjectId) {
         throw new AppError(
           "VALIDATION_ERROR",
-          "Property must belong to the same project as this visit.",
+          "Property must belong to the same project as this note.",
         );
       }
       await assertRecordProjectAccess(
@@ -233,14 +392,19 @@ export async function updateVisitSessionForWorkspace(
         property.projectId,
         "property:read",
       );
-      propertyId = property.id;
+      nextPropertyId = property.id;
+      if (!effectiveProjectId) {
+        nextProjectId = property.projectId;
+      }
     }
   }
 
   const updated = await updateVisitSession(workspaceId, sessionId, {
     language: input.language === undefined ? undefined : input.language,
     title: input.title === undefined ? undefined : input.title,
-    propertyId,
+    leadId: nextLeadId,
+    projectId: nextProjectId,
+    propertyId: nextPropertyId,
     aiDraft,
     status:
       aiDraft && session.status === "open"
@@ -252,6 +416,33 @@ export async function updateVisitSessionForWorkspace(
 
   if (!updated) {
     throw new AppError("NOT_FOUND", "Visit session not found.");
+  }
+
+  const linkedLeadId = updated.leadId;
+  const linkedPropertyId = updated.propertyId;
+  if (linkedLeadId && linkedPropertyId) {
+    await ensureLeadUnitOpportunityLink(
+      workspaceId,
+      actorId,
+      linkedLeadId,
+      linkedPropertyId,
+    );
+  }
+
+  // If a buyer was attributed after a personal publish, project onto lead Notes/Files.
+  if (
+    linkedLeadId &&
+    input.leadId &&
+    updated.publishedAt &&
+    updated.aiDraft &&
+    !session.leadId
+  ) {
+    return publishVisitSessionForWorkspace(workspaceId, sessionId, actorId, {
+      mirrorToLeadNotes: true,
+      registerLeadNoteActivity: true,
+      createTasksFromNextSteps: false,
+      editedDraftBody: updated.aiDraft.editedBody ?? undefined,
+    });
   }
 
   return enrichSession(updated);
@@ -351,8 +542,12 @@ export async function summarizeVisitSessionForWorkspace(
   );
 
   const [lead, project, property] = await Promise.all([
-    findLeadById(workspaceId, session.leadId),
-    findProjectById(workspaceId, session.projectId),
+    session.leadId
+      ? findLeadById(workspaceId, session.leadId)
+      : Promise.resolve(null),
+    session.projectId
+      ? findProjectById(workspaceId, session.projectId)
+      : Promise.resolve(null),
     session.propertyId
       ? findPropertyById(workspaceId, session.propertyId)
       : Promise.resolve(null),
@@ -451,6 +646,30 @@ export async function publishVisitSessionForWorkspace(
     draft = { ...draft, editedBody: input.editedDraftBody };
   }
 
+  const body = formatVisitDraftBody(draft);
+  const hasLead = Boolean(session.leadId);
+
+  // Personal notes can be saved without CRM lead projection until a buyer is linked.
+  if (!hasLead) {
+    const updatedPersonal = await updateVisitSession(workspaceId, sessionId, {
+      aiDraft: draft,
+      publishedAt: session.publishedAt ?? new Date(),
+      status: session.publishedAt ? "amended" : "published",
+    });
+    if (!updatedPersonal) {
+      throw new AppError("NOT_FOUND", "Conversation not found.");
+    }
+    await createAuditLog({
+      workspaceId,
+      actorId,
+      action: "visit_session.published",
+      entityType: "visit_session",
+      entityId: sessionId,
+      after: { personal: true, activityId: null, noteActivityId: null },
+    });
+    return enrichSession(updatedPersonal);
+  }
+
   if (input.mirrorToLeadNotes) {
     const access = await resolveWorkspaceAccess(workspaceId, actorId);
     if (!hasPermission(access.permissions, "lead:update")) {
@@ -461,7 +680,6 @@ export async function publishVisitSessionForWorkspace(
     }
   }
 
-  const body = formatVisitDraftBody(draft);
   const noteType = await findDictionaryItemByTypeAndKey(
     workspaceId,
     "activity_type",
@@ -524,8 +742,8 @@ export async function publishVisitSessionForWorkspace(
       const note = await createActivityForWorkspace(workspaceId, actorId, {
         typeId: noteType.id,
         statusId: completedStatus.id,
-        leadId: session.leadId,
-        projectId: session.projectId,
+        leadId: session.leadId!,
+        projectId: session.projectId ?? undefined,
         propertyId: session.propertyId ?? undefined,
         title: noteTitle,
         description: noteDescription.slice(0, 5000),
@@ -543,7 +761,7 @@ export async function publishVisitSessionForWorkspace(
     }
     await updateDocumentLinkedEntity(workspaceId, doc.id, {
       linkedEntityType: "lead",
-      linkedEntityId: session.leadId,
+      linkedEntityId: session.leadId!,
     });
   }
 
@@ -565,8 +783,8 @@ export async function publishVisitSessionForWorkspace(
         await createActivityForWorkspace(workspaceId, actorId, {
           typeId: taskType.id,
           statusId: pendingStatus.id,
-          leadId: session.leadId,
-          projectId: session.projectId,
+          leadId: session.leadId!,
+          projectId: session.projectId ?? undefined,
           title: step.text.slice(0, 120),
           description: step.ownerName
             ? `Owner noted in conversation: ${step.ownerName}`
@@ -578,7 +796,7 @@ export async function publishVisitSessionForWorkspace(
   }
 
   if (input.mirrorToLeadNotes) {
-    const lead = await findLeadById(workspaceId, session.leadId);
+    const lead = await findLeadById(workspaceId, session.leadId!);
     if (lead) {
       const notes = upsertLeadNotesMirror({
         existingNotes: lead.notes,

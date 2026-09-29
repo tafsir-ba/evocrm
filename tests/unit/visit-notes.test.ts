@@ -39,11 +39,16 @@ describe("visit notes media constants", () => {
 });
 
 describe("visit session validation", () => {
-  it("requires leadId on create", () => {
-    const parsed = createVisitSessionInputSchema.safeParse({
-      leadId: "507f1f77bcf86cd799439011",
-    });
-    expect(parsed.success).toBe(true);
+  it("allows create with or without leadId for personal notes", () => {
+    expect(
+      createVisitSessionInputSchema.safeParse({
+        leadId: "507f1f77bcf86cd799439011",
+      }).success,
+    ).toBe(true);
+    expect(createVisitSessionInputSchema.safeParse({ leadId: null }).success).toBe(
+      true,
+    );
+    expect(createVisitSessionInputSchema.safeParse({}).success).toBe(true);
   });
 
   it("requires text for text messages and documentId for media", () => {

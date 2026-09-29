@@ -86,6 +86,19 @@ vi.mock("@/server/storage/spaces", () => ({
 
 vi.mock("@/server/repositories/dictionary-items", () => ({
   findDictionaryItemByTypeAndKey: vi.fn(),
+  findDictionaryItemByTypeAndBehavior: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/opportunities", () => ({
+  findAllOpportunities: vi.fn(async () => []),
+}));
+
+vi.mock("@/server/services/opportunities", () => ({
+  createOpportunityForWorkspace: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/properties", () => ({
+  findPropertyById: vi.fn(),
 }));
 
 import { AppError } from "@/server/errors";

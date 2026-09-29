@@ -12,6 +12,11 @@ export const visitSessionListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   leadId: objectIdSchema.optional(),
   projectId: objectIdSchema.optional(),
+  /** Personal notes for the current user (no buyer linked). */
+  mine: z
+    .union([z.literal("true"), z.literal("false")])
+    .optional()
+    .transform((value) => value === "true"),
   includeArchived: z
     .union([z.literal("true"), z.literal("false")])
     .optional()
@@ -20,7 +25,8 @@ export const visitSessionListQuerySchema = z.object({
 
 export const createVisitSessionInputSchema = z
   .object({
-    leadId: objectIdSchema,
+    /** Omit or null to start a personal note without a buyer. */
+    leadId: objectIdSchema.optional().nullable(),
     language: z.string().trim().min(2).max(16).optional().nullable(),
   })
   .strict();
@@ -30,6 +36,8 @@ export const updateVisitSessionInputSchema = z
     language: z.string().trim().min(2).max(16).optional().nullable(),
     editedDraftBody: z.string().trim().max(20000).optional().nullable(),
     title: z.string().trim().min(1).max(120).optional().nullable(),
+    /** Attribute (or clear) the buyer after capture. */
+    leadId: objectIdSchema.optional().nullable(),
     propertyId: objectIdSchema.optional().nullable(),
   })
   .strict();

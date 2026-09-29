@@ -23,20 +23,27 @@ import {
 import { LiveMicWaveform } from "@/components/visit-notes/live-mic-waveform";
 import { VisitMediaMessage } from "@/components/visit-notes/visit-media-message";
 import {
+  IconActivities,
   IconArrowLeft,
   IconBuilding,
   IconCamera,
   IconClose,
   IconDashboard,
+  IconDripping,
   IconFile,
+  IconLeads,
   IconLogout,
   IconMic,
   IconMenu,
   IconMore,
   IconNote,
+  IconPipeline,
   IconPlus,
+  IconProjects,
+  IconProperties,
   IconSearch,
   IconSend,
+  IconSettings,
   IconShare,
   IconSparkles,
   IconUser,
@@ -48,8 +55,27 @@ import {
   shareNotesText,
 } from "@/lib/notes-share";
 import { cn } from "@/lib/utils";
-import { navHrefForSegment } from "@/lib/v1-navigation";
+import {
+  buildPermissionAwareNavigation,
+  navHrefForSegment,
+  type V1NavSegment,
+  type WorkspaceNavigationItem,
+} from "@/lib/v1-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
+
+const PERSONAL_NOTES_SCOPE = "__mine__";
+
+const NOTES_NAV_ICONS: Record<V1NavSegment, typeof IconDashboard> = {
+  dashboard: IconDashboard,
+  projects: IconProjects,
+  pipeline: IconPipeline,
+  leads: IconLeads,
+  properties: IconProperties,
+  activities: IconActivities,
+  notes: IconNote,
+  dripping: IconDripping,
+  settings: IconSettings,
+};
 import {
   clearOfflineDraft,
   loadLastOpenedVisitSessionId,
@@ -111,8 +137,8 @@ type VisitMessage = {
 
 type VisitSession = {
   id: string;
-  leadId: string;
-  projectId: string;
+  leadId: string | null;
+  projectId: string | null;
   activityId: string | null;
   status: string;
   language: string | null;
@@ -193,11 +219,22 @@ function buildPreviewUrl(file: File, kind: "photo" | "audio" | "video"): string 
 function normalizeSession(raw: VisitSession): VisitSession {
   return {
     ...raw,
+    leadId: raw.leadId ?? null,
+    projectId: raw.projectId ?? null,
     title: raw.title ?? null,
     propertyId: raw.propertyId ?? null,
     property: raw.property ?? null,
+    lead: raw.lead ?? null,
+    project: raw.project ?? null,
     updatedAt: raw.updatedAt ?? raw.createdAt,
   };
+}
+
+function sessionScopeLabel(session: VisitSession | null, selectedLead: LeadHit | null): string {
+  if (session?.lead?.fullName) return session.lead.fullName;
+  if (selectedLead?.fullName) return selectedLead.fullName;
+  if (session && !session.leadId) return "My note";
+  return "Note";
 }
 
 function propertyLabel(
@@ -253,7 +290,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const [unitQuery, setUnitQuery] = useState("");
   const [unitHits, setUnitHits] = useState<PropertyHit[]>([]);
   const [unitSearching, setUnitSearching] = useState(false);
+  const [buyerModalOpen, setBuyerModalOpen] = useState(false);
+  const [buyerQuery, setBuyerQuery] = useState("");
+  const [buyerHits, setBuyerHits] = useState<LeadHit[]>([]);
+  const [crmNav, setCrmNav] = useState<WorkspaceNavigationItem[]>([]);
   const [showJumpLatest, setShowJumpLatest] = useState(false);
+  const [personalMode, setPersonalMode] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -273,8 +315,12 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   const pendingUploadsRef = useRef<PendingUpload[]>([]);
   const sessionsRef = useRef<VisitSession[]>([]);
   const attachMenuId = useId();
-  const draftKey = selectedLead?.id ?? "new";
+  const draftKey = selectedLead?.id ?? (personalMode || (session && !session.leadId) ? PERSONAL_NOTES_SCOPE : "new");
   const hasComposerText = composer.trim().length > 0;
+  const crmNavItems = useMemo(
+    () => crmNav.filter((item) => item.segment !== "notes"),
+    [crmNav],
+  );
 
   useEffect(() => {
     pendingUploadsRef.current = pendingUploads;
@@ -287,6 +333,52 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   useEffect(() => {
     setAudioRecorderSupported(pickSupportedAudioRecorderMimeType() !== null);
   }, []);
+
+  useEffect(() => {
+    if (!workspaceSlug) {
+      setCrmNav([]);
+      return;
+    }
+    const fallbackPermissions = [
+      "dashboard:read",
+      "project:read",
+      "opportunity:read",
+      "lead:read",
+      "property:read",
+      "activity:read",
+      "campaign:read",
+      "settings:read",
+    ];
+    // Show full CRM menu immediately; refine once workspace permissions resolve.
+    setCrmNav(buildPermissionAwareNavigation(workspaceSlug, fallbackPermissions));
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/workspaces/${workspaceSlug}/context`);
+        if (!response.ok || cancelled) return;
+        const body = (await response.json()) as {
+          data: {
+            navigation?: WorkspaceNavigationItem[];
+            membership?: { role?: { permissions?: string[] } };
+          };
+        };
+        if (cancelled) return;
+        if (body.data.navigation?.length) {
+          setCrmNav(body.data.navigation);
+          return;
+        }
+        const permissions = body.data.membership?.role?.permissions ?? [];
+        if (permissions.length > 0) {
+          setCrmNav(buildPermissionAwareNavigation(workspaceSlug, permissions));
+        }
+      } catch {
+        // Keep optimistic fallback navigation.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceSlug]);
 
   useEffect(() => {
     const offline = loadOfflineDraft(workspaceSlug, draftKey);
@@ -391,17 +483,17 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   }, [leadQuery, searchLeads]);
 
   const searchUnits = useCallback(
-    async (query: string, projectId: string) => {
-      if (!workspaceSlug || !projectId) {
+    async (query: string, projectId: string | null) => {
+      if (!workspaceSlug) {
         setUnitHits([]);
         return;
       }
       setUnitSearching(true);
       try {
         const params = new URLSearchParams({
-          projectId,
           pageSize: "12",
         });
+        if (projectId) params.set("projectId", projectId);
         if (query.trim()) params.set("search", query.trim());
         const response = await fetch(
           `/api/workspaces/${workspaceSlug}/properties?${params.toString()}`,
@@ -426,12 +518,43 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
   );
 
   useEffect(() => {
-    if (!unitModalOpen || !session?.projectId) return;
+    if (!unitModalOpen) return;
     const handle = window.setTimeout(() => {
-      void searchUnits(unitQuery, session.projectId);
+      void searchUnits(unitQuery, session?.projectId ?? null);
     }, 250);
     return () => window.clearTimeout(handle);
   }, [unitModalOpen, unitQuery, session?.projectId, searchUnits]);
+
+  const searchBuyers = useCallback(
+    async (query: string) => {
+      if (!workspaceSlug || query.trim().length < 2) {
+        setBuyerHits([]);
+        return;
+      }
+      const params = new URLSearchParams({
+        search: query.trim(),
+        pageSize: "8",
+      });
+      const response = await fetch(
+        `/api/workspaces/${workspaceSlug}/leads?${params.toString()}`,
+      );
+      if (!response.ok) {
+        setBuyerHits([]);
+        return;
+      }
+      const body = (await response.json()) as { data: LeadHit[] };
+      setBuyerHits(body.data);
+    },
+    [workspaceSlug],
+  );
+
+  useEffect(() => {
+    if (!buyerModalOpen) return;
+    const handle = window.setTimeout(() => {
+      void searchBuyers(buyerQuery);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [buyerModalOpen, buyerQuery, searchBuyers]);
 
   const loadSessionsForLead = useCallback(
     async (leadId: string): Promise<VisitSession[]> => {
@@ -450,6 +573,21 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     },
     [workspaceSlug],
   );
+
+  const loadPersonalSessions = useCallback(async (): Promise<VisitSession[]> => {
+    const params = new URLSearchParams({ mine: "true", pageSize: "20" });
+    const response = await fetch(
+      `/api/workspaces/${workspaceSlug}/visit-sessions?${params.toString()}`,
+    );
+    if (!response.ok) {
+      setSessions([]);
+      return [];
+    }
+    const body = (await response.json()) as { data: VisitSession[] };
+    const next = body.data.map(normalizeSession);
+    setSessions(next);
+    return next;
+  }, [workspaceSlug]);
 
   function failBanner(message: string) {
     setStatusBanner(null);
@@ -482,6 +620,22 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     return normalizeSession(body.data.session as VisitSession);
   }
 
+  async function createPersonalSession(): Promise<VisitSession> {
+    const response = await fetch(`/api/workspaces/${workspaceSlug}/visit-sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: null,
+        language: language === "auto" ? null : language,
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(apiErrorMessage(body, "Could not start your note."));
+    }
+    return normalizeSession(body.data.session as VisitSession);
+  }
+
   async function fetchSession(sessionId: string): Promise<VisitSession> {
     const response = await fetch(
       `/api/workspaces/${workspaceSlug}/visit-sessions/${sessionId}`,
@@ -505,14 +659,16 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setError(null);
     setStatusBanner(null);
     upsertSessionInList(normalized);
-    if (normalized.leadId && workspaceSlug) {
-      saveLastOpenedVisitSessionId(workspaceSlug, normalized.leadId, normalized.id);
+    if (workspaceSlug) {
+      const scopeKey = normalized.leadId ?? PERSONAL_NOTES_SCOPE;
+      saveLastOpenedVisitSessionId(workspaceSlug, scopeKey, normalized.id);
     }
   }
 
   /** Select lead once → resume last-opened / latest substantive conversation. */
   async function selectLead(lead: LeadHit) {
     setSelectedLead(lead);
+    setPersonalMode(false);
     setLeadQuery(lead.fullName);
     setLeadHits([]);
     setDraftBody("");
@@ -550,7 +706,62 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     }
   }
 
+  async function startPersonalNote() {
+    setSelectedLead(null);
+    setPersonalMode(true);
+    setLeadQuery("");
+    setLeadHits([]);
+    setDraftBody("");
+    setPendingUploads([]);
+    setAttachMenuOpen(false);
+    setBusy("open");
+    setError(null);
+    setStatusBanner(null);
+    try {
+      const list = await loadPersonalSessions();
+      const lastOpenedId = loadLastOpenedVisitSessionId(workspaceSlug, PERSONAL_NOTES_SCOPE);
+      const resumable = pickResumeVisitSession(list, { lastOpenedId });
+      if (resumable) {
+        enterSession(resumable);
+        setBusy(null);
+        setSessionRefreshing(true);
+        try {
+          enterSession(await fetchSession(resumable.id));
+        } catch {
+          // keep snapshot
+        } finally {
+          setSessionRefreshing(false);
+        }
+        return;
+      }
+      const created = await createPersonalSession();
+      enterSession(created);
+      await loadPersonalSessions();
+    } catch (err) {
+      setSession(null);
+      setPersonalMode(false);
+      failBanner(err instanceof Error ? err.message : "Could not start your note.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function startSession() {
+    if (personalMode || (session && !session.leadId && !selectedLead)) {
+      setBusy("create");
+      setError(null);
+      try {
+        const created = await createPersonalSession();
+        enterSession(created);
+        await loadPersonalSessions();
+        setHistoryOpen(false);
+      } catch (err) {
+        failBanner(err instanceof Error ? err.message : "Could not start your note.");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
     if (!selectedLead) return;
     setBusy("create");
     setError(null);
@@ -646,6 +857,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   async function patchSession(patch: {
     title?: string | null;
+    leadId?: string | null;
     propertyId?: string | null;
     editedDraftBody?: string | null;
   }): Promise<VisitSession> {
@@ -700,8 +912,40 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       setUnitModalOpen(false);
       setUnitQuery("");
       setHeaderMenuOpen(false);
+      if (next.leadId && propertyId) {
+        setStatusBanner("Buyer and unit linked in CRM.");
+      }
     } catch (err) {
       failBanner(err instanceof Error ? err.message : "Could not link unit.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function linkBuyer(lead: LeadHit) {
+    if (!session) return;
+    setBusy("buyer");
+    setError(null);
+    try {
+      const next = await patchSession({ leadId: lead.id });
+      setSession(next);
+      setSelectedLead(lead);
+      setPersonalMode(false);
+      upsertSessionInList(next);
+      setBuyerModalOpen(false);
+      setBuyerQuery("");
+      setBuyerHits([]);
+      setHeaderMenuOpen(false);
+      if (next.propertyId) {
+        setStatusBanner("Buyer and unit linked in CRM.");
+      } else {
+        setStatusBanner(`Linked to ${lead.fullName}.`);
+      }
+      if (next.leadId) {
+        await loadSessionsForLead(next.leadId);
+      }
+    } catch (err) {
+      failBanner(err instanceof Error ? err.message : "Could not link buyer.");
     } finally {
       setBusy(null);
     }
@@ -1180,6 +1424,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
 
   function leaveSession() {
     setSession(null);
+    setSelectedLead(null);
+    setPersonalMode(false);
+    setLeadQuery("");
+    setSessions([]);
     setPendingUploads([]);
     setAttachMenuOpen(false);
     setHeaderMenuOpen(false);
@@ -1188,6 +1436,41 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
     setStatusBanner(null);
     setError(null);
     setLightboxUrl(null);
+    setBuyerModalOpen(false);
+    setUnitModalOpen(false);
+  }
+
+  function renderCrmNavMenuItems() {
+    return (
+      <>
+        {crmNavItems.map((item) => {
+          const Icon = NOTES_NAV_ICONS[item.segment] ?? IconDashboard;
+          return (
+            <Link
+              key={item.segment}
+              href={item.href}
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+              onClick={() => setHeaderMenuOpen(false)}
+              data-testid={`notes-nav-${item.segment}`}
+            >
+              <Icon className="h-4 w-4 text-[var(--color-ink-soft)]" />
+              {item.label}
+            </Link>
+          );
+        })}
+        <Link
+          href={navHrefForSegment(workspaceSlug, "dashboard")}
+          role="menuitem"
+          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+          onClick={() => setHeaderMenuOpen(false)}
+          data-testid="notes-exit"
+        >
+          <IconLogout className="h-4 w-4 text-[var(--color-ink-soft)]" />
+          Exit Notes
+        </Link>
+      </>
+    );
   }
 
   const currentWorkspace = workspaces.find((item) => item.slug === workspaceSlug);
@@ -1310,7 +1593,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         <div className="max-w-md text-center">
           <h1 className="text-xl font-semibold text-[var(--color-ink)]">Notes</h1>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Join or create a workspace before capturing notes for a lead.
+            Join or create a workspace before capturing notes.
           </p>
           <Link href="/workspaces" className="inline-block mt-4">
             <Button>Open workspaces</Button>
@@ -1379,7 +1662,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
               )}
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
                 <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
-                  {session.lead?.fullName ?? selectedLead?.fullName ?? "Lead"}
+                  {sessionScopeLabel(session, selectedLead)}
                 </p>
                 {sessionRefreshing && (
                   <span className="shrink-0 text-[11px] text-[var(--color-ink-faint)]">
@@ -1454,7 +1737,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     <IconBuilding className="h-4 w-4 text-[var(--color-ink-soft)]" />
                     {linkedUnitLabel ? "Change unit" : "Link unit"}
                   </button>
-                  {(session?.leadId || selectedLead?.id) && (
+                  {session?.leadId || selectedLead?.id ? (
                     <Link
                       href={workspacePath(
                         workspaceSlug,
@@ -1469,6 +1752,22 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                       <IconUser className="h-4 w-4 text-[var(--color-ink-soft)]" />
                       Open Lead
                     </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setBuyerQuery("");
+                        setBuyerHits([]);
+                        setBuyerModalOpen(true);
+                      }}
+                      data-testid="notes-link-buyer"
+                    >
+                      <IconUser className="h-4 w-4 text-[var(--color-ink-soft)]" />
+                      Link buyer
+                    </button>
                   )}
                   <button
                     type="button"
@@ -1480,27 +1779,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                     }}
                   >
                     <IconArrowLeft className="h-4 w-4 text-[var(--color-ink-soft)]" />
-                    Find another lead
+                    {session?.leadId ? "Find another lead" : "Notes home"}
                   </button>
                   <div className="my-1 border-t border-[var(--color-line)]" />
-                  <Link
-                    href={navHrefForSegment(workspaceSlug, "dashboard")}
-                    role="menuitem"
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
-                    onClick={() => setHeaderMenuOpen(false)}
-                  >
-                    <IconDashboard className="h-4 w-4 text-[var(--color-ink-soft)]" />
-                    Dashboard
-                  </Link>
-                  <Link
-                    href={navHrefForSegment(workspaceSlug, "dashboard")}
-                    role="menuitem"
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
-                    onClick={() => setHeaderMenuOpen(false)}
-                  >
-                    <IconLogout className="h-4 w-4 text-[var(--color-ink-soft)]" />
-                    Exit Notes
-                  </Link>
+                  {renderCrmNavMenuItems()}
                 </div>
               )}
             </div>
@@ -1523,6 +1805,7 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 onChange={(event) => {
                   setWorkspaceSlug(event.target.value);
                   setSelectedLead(null);
+                  setPersonalMode(false);
                   setSession(null);
                   setSessions([]);
                   setLeadQuery("");
@@ -1552,26 +1835,10 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
                 {headerMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[12rem] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                    className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[12rem] max-h-[min(70dvh,24rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-md)]"
+                    data-testid="notes-crm-nav-menu"
                   >
-                    <Link
-                      href={navHrefForSegment(workspaceSlug, "dashboard")}
-                      role="menuitem"
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
-                      onClick={() => setHeaderMenuOpen(false)}
-                    >
-                      <IconDashboard className="h-4 w-4 text-[var(--color-ink-soft)]" />
-                      Dashboard
-                    </Link>
-                    <Link
-                      href={navHrefForSegment(workspaceSlug, "dashboard")}
-                      role="menuitem"
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13.5px] hover:bg-[var(--color-muted)]"
-                      onClick={() => setHeaderMenuOpen(false)}
-                    >
-                      <IconLogout className="h-4 w-4 text-[var(--color-ink-soft)]" />
-                      Exit Notes
-                    </Link>
+                    {renderCrmNavMenuItems()}
                   </div>
                 )}
               </div>
@@ -1650,15 +1917,25 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           </div>
         )}
 
-        {!selectedLead && leadQuery.trim().length < 2 && (
+        {!selectedLead && !session && leadQuery.trim().length < 2 && (
           <div className="flex flex-1 flex-col items-center justify-center px-5 text-center sm:px-6">
             <div className="mb-2.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--color-line)] bg-white shadow-[var(--shadow-sm)] sm:mb-3 sm:h-14 sm:w-14">
               <IconSearch className="h-5 w-5 text-[var(--color-brand-600)] sm:h-6 sm:w-6" />
             </div>
             <h2 className="text-[16px] font-semibold sm:text-[17px]">Who is this note about?</h2>
             <p className="mt-1 max-w-sm text-[13px] text-[var(--color-ink-muted)] sm:mt-1.5 sm:text-[13.5px]">
-              Pick someone once, then type, talk, or attach.
+              Search a buyer, or keep it for yourself and link later.
             </p>
+            <Button
+              type="button"
+              className="mt-4"
+              onClick={() => void startPersonalNote()}
+              disabled={busy === "open" || busy === "create"}
+              data-testid="notes-start-personal"
+            >
+              <IconUser className="mr-1.5 h-4 w-4" />
+              Note for myself
+            </Button>
           </div>
         )}
 
@@ -2160,6 +2437,61 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
         creating={busy === "create"}
         suppressingId={suppressingId}
       />
+
+      <Modal
+        open={buyerModalOpen}
+        onClose={() => {
+          setBuyerModalOpen(false);
+          setBuyerQuery("");
+          setBuyerHits([]);
+        }}
+        title="Link buyer"
+      >
+        <div className="space-y-3">
+          <Input
+            leadingIcon={<IconSearch className="h-4 w-4" />}
+            placeholder="Search buyers…"
+            value={buyerQuery}
+            onChange={(event) => setBuyerQuery(event.target.value)}
+            autoFocus
+            fieldSize="lg"
+            inputClassName="text-[16px]"
+            data-testid="notes-buyer-search"
+          />
+          <ul className="max-h-72 space-y-1 overflow-y-auto" data-testid="notes-buyer-hits">
+            {buyerQuery.trim().length < 2 && (
+              <li className="py-6 text-center text-[13px] text-[var(--color-ink-muted)]">
+                Type at least 2 characters.
+              </li>
+            )}
+            {buyerQuery.trim().length >= 2 && buyerHits.length === 0 && (
+              <li className="py-6 text-center text-[13px] text-[var(--color-ink-muted)]">
+                No matching buyers.
+              </li>
+            )}
+            {buyerHits.map((lead) => (
+              <li key={lead.id}>
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 flex-col items-start gap-0.5 rounded-xl px-3 py-2.5 text-left hover:bg-[var(--color-muted)]"
+                  onClick={() => void linkBuyer(lead)}
+                  disabled={busy === "buyer"}
+                  data-testid="notes-buyer-hit"
+                >
+                  <span className="w-full truncate text-[13.5px] font-medium">
+                    {lead.fullName}
+                  </span>
+                  <span className="w-full truncate text-[12px] text-[var(--color-ink-muted)]">
+                    {[lead.email || "No email", leadProjectLabel(lead)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Modal>
 
       <Modal
         open={unitModalOpen}

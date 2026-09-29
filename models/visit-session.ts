@@ -81,8 +81,10 @@ const visitMessageSchema = new Schema(
 const visitSessionSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
-    leadId: { type: Schema.Types.ObjectId, ref: "Lead", required: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
+    /** Null for personal / unassigned notes that can be attributed later. */
+    leadId: { type: Schema.Types.ObjectId, ref: "Lead", default: null },
+    /** Null for personal notes; set from lead or linked unit when attributed. */
+    projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
     activityId: { type: Schema.Types.ObjectId, ref: "Activity", default: null },
     /** Canonical Note activity shown on the lead Notes tab (idempotent publish target). */
     noteActivityId: { type: Schema.Types.ObjectId, ref: "Activity", default: null },

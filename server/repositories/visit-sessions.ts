@@ -48,8 +48,8 @@ export type VisitMessageRecord = {
 export type VisitSessionRecord = {
   id: string;
   workspaceId: string;
-  leadId: string;
-  projectId: string;
+  leadId: string | null;
+  projectId: string | null;
   activityId: string | null;
   noteActivityId: string | null;
   propertyId: string | null;
@@ -144,8 +144,8 @@ function toVisitSessionRecord(document: VisitSessionDocument): VisitSessionRecor
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
-    leadId: document.leadId.toString(),
-    projectId: document.projectId.toString(),
+    leadId: toObjectIdString(document.leadId),
+    projectId: toObjectIdString(document.projectId),
     activityId: toObjectIdString(document.activityId),
     noteActivityId: toObjectIdString(
       (document as VisitSessionDocument & { noteActivityId?: unknown }).noteActivityId,
@@ -174,6 +174,9 @@ function toVisitSessionRecord(document: VisitSessionDocument): VisitSessionRecor
 
 export type VisitSessionListFilter = {
   leadId?: string;
+  /** Personal notes owned by this user with no buyer linked. */
+  createdBy?: string;
+  unassignedOnly?: boolean;
   projectId?: string;
   projectIds?: string[];
   includeArchived?: boolean;
@@ -183,8 +186,8 @@ export type VisitSessionListFilter = {
 
 export async function createVisitSession(input: {
   workspaceId: string;
-  leadId: string;
-  projectId: string;
+  leadId?: string | null;
+  projectId?: string | null;
   createdBy: string;
   language?: string | null;
   title?: string | null;
@@ -194,8 +197,8 @@ export async function createVisitSession(input: {
 
   const created = await VisitSessionModel.create(
     withWorkspaceScope(input.workspaceId, {
-      leadId: input.leadId,
-      projectId: input.projectId,
+      leadId: input.leadId ?? null,
+      projectId: input.projectId ?? null,
       createdBy: input.createdBy,
       language: input.language ?? null,
       title: input.title ?? null,
@@ -240,13 +243,31 @@ export async function findVisitSessions(
     query.leadId = filter.leadId;
   }
 
+  if (filter.unassignedOnly) {
+    query.$or = [{ leadId: null }, { leadId: { $exists: false } }];
+  }
+
+  if (filter.createdBy) {
+    query.createdBy = filter.createdBy;
+  }
+
   if (filter.projectId) {
     query.projectId = filter.projectId;
   } else if (filter.projectIds) {
     if (filter.projectIds.length === 0) {
       return { sessions: [], total: 0 };
     }
-    query.projectId = { $in: filter.projectIds };
+    // Personal notes have no project — include them when the caller is listing by grant scope.
+    query.$and = [
+      ...(Array.isArray(query.$and) ? query.$and : []),
+      {
+        $or: [
+          { projectId: { $in: filter.projectIds } },
+          { projectId: null },
+          { projectId: { $exists: false } },
+        ],
+      },
+    ];
   }
 
   const page = filter.page ?? 1;
@@ -275,6 +296,8 @@ export async function updateVisitSession(
     status?: VisitSessionStatus;
     language?: string | null;
     title?: string | null;
+    leadId?: string | null;
+    projectId?: string | null;
     propertyId?: string | null;
     activityId?: string | null;
     noteActivityId?: string | null;
@@ -293,6 +316,8 @@ export async function updateVisitSession(
   if (update.status !== undefined) $set.status = update.status;
   if (update.language !== undefined) $set.language = update.language;
   if (update.title !== undefined) $set.title = update.title;
+  if (update.leadId !== undefined) $set.leadId = update.leadId;
+  if (update.projectId !== undefined) $set.projectId = update.projectId;
   if (update.propertyId !== undefined) $set.propertyId = update.propertyId;
   if (update.activityId !== undefined) $set.activityId = update.activityId;
   if (update.noteActivityId !== undefined) $set.noteActivityId = update.noteActivityId;
