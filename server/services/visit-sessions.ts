@@ -156,8 +156,10 @@ async function ensureLeadUnitOpportunityLink(
 
   const access = await resolveWorkspaceAccess(workspaceId, actorId);
   if (!hasPermission(access.permissions, "opportunity:create")) {
-    // Attribution still succeeds; opportunity creation is best-effort when permitted.
-    return;
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "opportunity:create is required to link a buyer and unit in the CRM.",
+    );
   }
 
   const defaultStatus =
@@ -169,7 +171,10 @@ async function ensureLeadUnitOpportunityLink(
     (await findDictionaryItemByTypeAndKey(workspaceId, "opportunity_status", "new"));
 
   if (!defaultStatus) {
-    return;
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "Opportunity status dictionaries are not configured for this workspace.",
+    );
   }
 
   try {
@@ -179,9 +184,15 @@ async function ensureLeadUnitOpportunityLink(
       statusId: defaultStatus.id,
     });
   } catch (error) {
+    // Concurrent create for the same lead↔unit pair is idempotent enough: re-check.
     if (error instanceof AppError && error.code === "VALIDATION_ERROR") {
-      // Race or project mismatch — leave session attribution intact.
-      return;
+      const raced = await findAllOpportunities(workspaceId, {
+        leadId,
+        propertyId,
+      });
+      if (raced.length > 0) {
+        return;
+      }
     }
     throw error;
   }
@@ -222,6 +233,8 @@ export async function listVisitSessionsForWorkspace(
 
   const { sessions, total } = await findVisitSessions(workspaceId, {
     leadId: query.leadId,
+    // Personal notes are private — never include unassigned rows in shared lists.
+    excludeUnassigned: !query.leadId,
     projectId: scoped.projectId,
     projectIds: scoped.projectIds,
     includeArchived: query.includeArchived,
@@ -399,6 +412,25 @@ export async function updateVisitSessionForWorkspace(
     }
   }
 
+  const resultingLeadId =
+    nextLeadId !== undefined ? nextLeadId : session.leadId;
+  const resultingPropertyId =
+    nextPropertyId !== undefined ? nextPropertyId : session.propertyId;
+
+  // CRM link must succeed before session mutation so Notes never claims a
+  // buyer↔unit link that Pipeline/Opportunities does not have.
+  const leadOrUnitChanging =
+    (nextLeadId !== undefined && nextLeadId !== session.leadId) ||
+    (nextPropertyId !== undefined && nextPropertyId !== session.propertyId);
+  if (resultingLeadId && resultingPropertyId && leadOrUnitChanging) {
+    await ensureLeadUnitOpportunityLink(
+      workspaceId,
+      actorId,
+      resultingLeadId,
+      resultingPropertyId,
+    );
+  }
+
   const updated = await updateVisitSession(workspaceId, sessionId, {
     language: input.language === undefined ? undefined : input.language,
     title: input.title === undefined ? undefined : input.title,
@@ -419,15 +451,6 @@ export async function updateVisitSessionForWorkspace(
   }
 
   const linkedLeadId = updated.leadId;
-  const linkedPropertyId = updated.propertyId;
-  if (linkedLeadId && linkedPropertyId) {
-    await ensureLeadUnitOpportunityLink(
-      workspaceId,
-      actorId,
-      linkedLeadId,
-      linkedPropertyId,
-    );
-  }
 
   // If a buyer was attributed after a personal publish, project onto lead Notes/Files.
   if (

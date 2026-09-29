@@ -177,6 +177,8 @@ export type VisitSessionListFilter = {
   /** Personal notes owned by this user with no buyer linked. */
   createdBy?: string;
   unassignedOnly?: boolean;
+  /** Exclude personal/unassigned notes (leadId null). Used for non-mine lists. */
+  excludeUnassigned?: boolean;
   projectId?: string;
   projectIds?: string[];
   includeArchived?: boolean;
@@ -247,6 +249,10 @@ export async function findVisitSessions(
     query.$or = [{ leadId: null }, { leadId: { $exists: false } }];
   }
 
+  if (filter.excludeUnassigned) {
+    query.leadId = { $ne: null, $exists: true };
+  }
+
   if (filter.createdBy) {
     query.createdBy = filter.createdBy;
   }
@@ -257,17 +263,8 @@ export async function findVisitSessions(
     if (filter.projectIds.length === 0) {
       return { sessions: [], total: 0 };
     }
-    // Personal notes have no project — include them when the caller is listing by grant scope.
-    query.$and = [
-      ...(Array.isArray(query.$and) ? query.$and : []),
-      {
-        $or: [
-          { projectId: { $in: filter.projectIds } },
-          { projectId: null },
-          { projectId: { $exists: false } },
-        ],
-      },
-    ];
+    // Personal/unassigned notes are listed only via mine=true — never via grant scope.
+    query.projectId = { $in: filter.projectIds };
   }
 
   const page = filter.page ?? 1;

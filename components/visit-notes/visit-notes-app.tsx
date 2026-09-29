@@ -61,21 +61,6 @@ import {
   type V1NavSegment,
   type WorkspaceNavigationItem,
 } from "@/lib/v1-navigation";
-import { workspacePath } from "@/lib/workspace-paths";
-
-const PERSONAL_NOTES_SCOPE = "__mine__";
-
-const NOTES_NAV_ICONS: Record<V1NavSegment, typeof IconDashboard> = {
-  dashboard: IconDashboard,
-  projects: IconProjects,
-  pipeline: IconPipeline,
-  leads: IconLeads,
-  properties: IconProperties,
-  activities: IconActivities,
-  notes: IconNote,
-  dripping: IconDripping,
-  settings: IconSettings,
-};
 import {
   clearOfflineDraft,
   loadLastOpenedVisitSessionId,
@@ -100,6 +85,21 @@ import {
   uploadVisitMedia,
   VisitMediaUploadError,
 } from "@/lib/visit-notes-upload";
+import { workspacePath } from "@/lib/workspace-paths";
+
+const PERSONAL_NOTES_SCOPE = "__mine__";
+
+const NOTES_NAV_ICONS: Record<V1NavSegment, typeof IconDashboard> = {
+  dashboard: IconDashboard,
+  projects: IconProjects,
+  pipeline: IconPipeline,
+  leads: IconLeads,
+  properties: IconProperties,
+  activities: IconActivities,
+  notes: IconNote,
+  dripping: IconDripping,
+  settings: IconSettings,
+};
 
 type WorkspaceOption = {
   id: string;
@@ -339,23 +339,20 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
       setCrmNav([]);
       return;
     }
-    const fallbackPermissions = [
-      "dashboard:read",
-      "project:read",
-      "opportunity:read",
-      "lead:read",
-      "property:read",
-      "activity:read",
-      "campaign:read",
-      "settings:read",
-    ];
-    // Show full CRM menu immediately; refine once workspace permissions resolve.
-    setCrmNav(buildPermissionAwareNavigation(workspaceSlug, fallbackPermissions));
+    // Permission-aware only — never invent a full CRM menu before context resolves.
+    setCrmNav([]);
     let cancelled = false;
     void (async () => {
       try {
         const response = await fetch(`/api/workspaces/${workspaceSlug}/context`);
-        if (!response.ok || cancelled) return;
+        if (!response.ok || cancelled) {
+          if (!cancelled) {
+            setCrmNav(
+              buildPermissionAwareNavigation(workspaceSlug, ["dashboard:read"]),
+            );
+          }
+          return;
+        }
         const body = (await response.json()) as {
           data: {
             navigation?: WorkspaceNavigationItem[];
@@ -368,11 +365,18 @@ export function VisitNotesApp({ initialWorkspaces, initialWorkspaceSlug }: Props
           return;
         }
         const permissions = body.data.membership?.role?.permissions ?? [];
-        if (permissions.length > 0) {
-          setCrmNav(buildPermissionAwareNavigation(workspaceSlug, permissions));
-        }
+        setCrmNav(
+          buildPermissionAwareNavigation(
+            workspaceSlug,
+            permissions.length > 0 ? permissions : ["dashboard:read"],
+          ),
+        );
       } catch {
-        // Keep optimistic fallback navigation.
+        if (!cancelled) {
+          setCrmNav(
+            buildPermissionAwareNavigation(workspaceSlug, ["dashboard:read"]),
+          );
+        }
       }
     })();
     return () => {

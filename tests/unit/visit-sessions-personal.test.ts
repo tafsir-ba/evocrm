@@ -189,7 +189,7 @@ describe("visit-sessions personal notes", () => {
 
     const result = await listVisitSessionsForWorkspace(
       workspaceId,
-      { mine: true, page: 1, pageSize: 20 },
+      { mine: true, page: 1, pageSize: 20, includeArchived: false },
       actorId,
     );
 
@@ -202,6 +202,25 @@ describe("visit-sessions personal notes", () => {
     );
     expect(result.total).toBe(1);
     expect(applyUserProjectScope).not.toHaveBeenCalled();
+  });
+
+  it("excludes unassigned personal notes from shared non-mine lists", async () => {
+    applyUserProjectScope.mockResolvedValue({ projectIds: [projectId] });
+    findVisitSessions.mockResolvedValue({ sessions: [], total: 0 });
+
+    await listVisitSessionsForWorkspace(
+      workspaceId,
+      { page: 1, pageSize: 20, includeArchived: false, mine: false },
+      actorId,
+    );
+
+    expect(findVisitSessions).toHaveBeenCalledWith(
+      workspaceId,
+      expect.objectContaining({
+        excludeUnassigned: true,
+        projectIds: [projectId],
+      }),
+    );
   });
 
   it("attributes a buyer and unit and upserts a CRM opportunity", async () => {
@@ -261,6 +280,44 @@ describe("visit-sessions personal notes", () => {
     );
     expect(result.leadId).toBe(leadId);
     expect(result.propertyId).toBe(propertyId);
+  });
+
+  it("rejects buyer+unit link when opportunity:create is missing", async () => {
+    findVisitSessionById.mockResolvedValue(personalSession);
+    findLeadById.mockResolvedValue({
+      id: leadId,
+      fullName: "Ada Buyer",
+      email: "ada@example.com",
+      projectId,
+      archivedAt: null,
+    });
+    findPropertyById.mockResolvedValue({
+      id: propertyId,
+      title: "A1",
+      reference: "A1",
+      projectId,
+      archivedAt: null,
+    });
+    requireProjectAccess.mockResolvedValue({});
+    assertRecordProjectAccess.mockResolvedValue(undefined);
+    findAllOpportunities.mockResolvedValue([]);
+    resolveWorkspaceAccess.mockResolvedValue({
+      permissions: ["activity:read", "activity:create", "activity:update"],
+      isWorkspaceAdmin: true,
+      mode: "member",
+      membership: null,
+    });
+
+    await expect(
+      updateVisitSessionForWorkspace(workspaceId, personalSession.id, actorId, {
+        leadId,
+        propertyId,
+      }),
+    ).rejects.toMatchObject({
+      code: "PERMISSION_DENIED",
+      message: expect.stringMatching(/opportunity:create/i),
+    });
+    expect(updateVisitSession).not.toHaveBeenCalled();
   });
 
   it("does not create a duplicate opportunity when one already exists", async () => {

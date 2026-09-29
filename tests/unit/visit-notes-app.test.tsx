@@ -43,10 +43,25 @@ const sessionFixture = {
   project: { id: "507f1f77bcf86cd799439012", name: "Cressy" },
 };
 
+const fullCrmNavigation = [
+  { segment: "dashboard", label: "Dashboard", href: "/w/evo-home/dashboard", permission: "dashboard:read" },
+  { segment: "projects", label: "Projects", href: "/w/evo-home/projects", permission: "project:read" },
+  { segment: "pipeline", label: "Pipeline", href: "/w/evo-home/pipeline", permission: "opportunity:read" },
+  { segment: "leads", label: "Leads", href: "/w/evo-home/leads", permission: "lead:read" },
+  { segment: "properties", label: "Properties", href: "/w/evo-home/properties", permission: "property:read" },
+  { segment: "activities", label: "Activities", href: "/w/evo-home/activities", permission: "activity:read" },
+  { segment: "notes", label: "Notes", href: "/notes", permission: "activity:read" },
+  { segment: "dripping", label: "Dripping", href: "/w/evo-home/dripping", permission: "campaign:read" },
+  { segment: "settings", label: "Settings", href: "/w/evo-home/settings", permission: "settings:read" },
+];
+
 async function openSessionUi() {
   const user = userEvent.setup();
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes("/context")) {
+      return jsonResponse({ data: { navigation: fullCrmNavigation } });
+    }
     if (url.includes("/leads?") && url.includes("search=")) {
       return jsonResponse({
         data: [
@@ -415,6 +430,9 @@ describe("VisitNotesApp", () => {
 
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes("/context")) {
+        return jsonResponse({ data: { navigation: fullCrmNavigation } });
+      }
       if (url.includes("/leads?") && url.includes("search=")) {
         return jsonResponse({
           data: [
@@ -484,8 +502,16 @@ describe("VisitNotesApp", () => {
     expect(within(history).getByText("Parking discussion")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /new conversation/i })).toBeInTheDocument();
 
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/context"),
+      );
+    });
     await user.click(screen.getByRole("button", { name: /conversation actions/i }));
-    const menu = screen.getByRole("menu");
+    const menu = await screen.findByRole("menu");
+    await waitFor(() => {
+      expect(within(menu).getByTestId("notes-nav-activities")).toBeInTheDocument();
+    });
     expect(within(menu).getByTestId("notes-nav-dashboard")).toHaveAttribute(
       "href",
       "/w/evo-home/dashboard",
