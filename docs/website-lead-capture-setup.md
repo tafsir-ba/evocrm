@@ -112,6 +112,29 @@ curl -X POST 'https://<host>/api/integrations/website/leads' \
 
 ---
 
+## Satigny duplex (evahomes.ch)
+
+Eva Homes listing page `https://evahomes.ch/satigny-duplex` (contact, visit, brochure, plans forms) forwards into CRM project **Satigny duplex**.
+
+| CRM field | Value |
+|-----------|--------|
+| Project name | `Satigny duplex` |
+| Project reference | `satigny_duplex` |
+| Website integration | `evahomes.ch — Satigny duplex` (override locked) |
+| Website env | `CRM_SYNC_ENABLED=true`, `CRM_WEBHOOK_URL=https://crm.evo-home.ch/api/integrations/website/leads`, `CRM_API_KEY=evocrm_whk_…`, `CRM_PROJECT_REFERENCE=satigny_duplex` |
+
+Idempotent provisioning (with production Mongo + pepper):
+
+```bash
+npm run setup:satigny-duplex-website-capture -- --confirm-write
+# mint / rotate key:
+npm run setup:satigny-duplex-website-capture -- --confirm-write --rotate
+```
+
+Eva Homes only pushes Satigny form types (`Visite/Brochure/Plans/Contact Satigny — L’Échappée`); the main-site contact form is not routed to this project.
+
+---
+
 ## CRM management
 
 | Action | Effect |

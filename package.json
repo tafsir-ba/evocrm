@@ -22,6 +22,7 @@
     "migrate:hubspot-gv-pilot": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-gv-pilot.ts",
     "migrate:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-migrate.ts",
     "setup:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-setup.ts",
+    "setup:satigny-duplex-website-capture": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/ensure-satigny-duplex-website-capture.ts",
     "select:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-select.ts",
     "automate:hubspot-wd-project": "NODE_ENV=\"${NODE_ENV:-development}\" npx tsx scripts/hubspot-wd-project-automate.ts",
     "repair:transient-bounce-suppressions": "npx tsx scripts/repair-transient-bounce-suppressions.ts",
