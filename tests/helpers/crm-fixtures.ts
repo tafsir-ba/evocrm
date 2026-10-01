@@ -40,6 +40,7 @@ export const campaignRecordExtras: Pick<
   | "scheduledFor"
   | "audienceLockedAt"
   | "audienceSummary"
+  | "unknownConsentPolicy"
 > = {
   projectIds: [],
   autoEnrollmentEnabled: false,
@@ -52,6 +53,7 @@ export const campaignRecordExtras: Pick<
   scheduledFor: null,
   audienceLockedAt: null,
   audienceSummary: null,
+  unknownConsentPolicy: "include_and_flag",
 };
 
 export const enrollmentRecordExtras: Pick<

@@ -1,11 +1,16 @@
 import "server-only";
 
 import { AppError } from "@/server/errors";
-import { DEFAULT_NEWSLETTER_AUDIENCE_LIMIT } from "@/lib/newsletter";
+import {
+  DEFAULT_NEWSLETTER_AUDIENCE_LIMIT,
+  DEFAULT_NEWSLETTER_UNKNOWN_CONSENT_POLICY,
+  type NewsletterUnknownConsentPolicy,
+} from "@/lib/newsletter";
 import {
   isValidEmail,
   normalizeEmailValue,
 } from "@/server/imports/import-normalizers";
+import { findCampaignById } from "@/server/repositories/campaigns";
 import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import {
   findLeadsByIds,
@@ -39,7 +44,8 @@ export type NewsletterAudienceExclusion = {
     | "unsubscribed"
     | "suppressed"
     | "archived"
-    | "deduped";
+    | "deduped"
+    | "unknown_consent";
 };
 
 export type NewsletterAudienceResolveResult = {
@@ -47,6 +53,7 @@ export type NewsletterAudienceResolveResult = {
   exclusions: NewsletterAudienceExclusion[];
   flaggedUnknownConsent: NewsletterAudienceLead[];
   summary: CampaignAudienceSummary;
+  unknownConsentPolicy: NewsletterUnknownConsentPolicy;
   importSummaries: Array<{
     segmentId: string;
     importJobId: string;
@@ -210,9 +217,17 @@ function preferLeadForDedupe(
 export async function resolveNewsletterAudience(
   workspaceId: string,
   campaignId: string,
-  options: { audienceLimit?: number } = {},
+  options: {
+    audienceLimit?: number;
+    unknownConsentPolicy?: NewsletterUnknownConsentPolicy;
+  } = {},
 ): Promise<NewsletterAudienceResolveResult> {
   const audienceLimit = options.audienceLimit ?? DEFAULT_NEWSLETTER_AUDIENCE_LIMIT;
+  const campaign = await findCampaignById(workspaceId, campaignId);
+  const unknownConsentPolicy =
+    options.unknownConsentPolicy ??
+    campaign?.unknownConsentPolicy ??
+    DEFAULT_NEWSLETTER_UNKNOWN_CONSENT_POLICY;
   const segments = await findNewsletterAudienceSegments(workspaceId, campaignId);
 
   if (segments.length === 0) {
@@ -220,6 +235,7 @@ export async function resolveNewsletterAudience(
       included: [],
       exclusions: [],
       flaggedUnknownConsent: [],
+      unknownConsentPolicy,
       summary: {
         queued: 0,
         excludedMissingEmail: 0,
@@ -227,6 +243,7 @@ export async function resolveNewsletterAudience(
         excludedSuppressed: 0,
         excludedInvalid: 0,
         excludedArchived: 0,
+        excludedUnknownConsent: 0,
         unknownConsent: 0,
         deduped: 0,
       },
@@ -386,6 +403,7 @@ export async function resolveNewsletterAudience(
   const included: NewsletterAudienceLead[] = [];
   const flaggedUnknownConsent: NewsletterAudienceLead[] = [];
   let excludedSuppressed = 0;
+  let excludedUnknownConsent = 0;
 
   for (const [email, candidate] of candidatesByEmail) {
     if (suppressedEmails.has(email)) {
@@ -399,6 +417,19 @@ export async function resolveNewsletterAudience(
       continue;
     }
 
+    const isUnknownConsent = candidate.lead.emailConsentStatus === "unknown";
+
+    if (isUnknownConsent && unknownConsentPolicy === "require_subscribed") {
+      excludedUnknownConsent += 1;
+      exclusions.push({
+        leadId: candidate.lead.id,
+        email: candidate.lead.email,
+        fullName: candidate.lead.fullName,
+        reason: "unknown_consent",
+      });
+      continue;
+    }
+
     const entry: NewsletterAudienceLead = {
       leadId: candidate.lead.id,
       email,
@@ -406,7 +437,7 @@ export async function resolveNewsletterAudience(
       projectId: candidate.lead.projectId,
       emailConsentStatus: candidate.lead.emailConsentStatus,
       segmentIds: candidate.segmentIds,
-      unknownConsent: candidate.lead.emailConsentStatus === "unknown",
+      unknownConsent: isUnknownConsent,
     };
 
     included.push(entry);
@@ -422,10 +453,14 @@ export async function resolveNewsletterAudience(
     );
   }
 
+  const unknownConsentTotal =
+    flaggedUnknownConsent.length + excludedUnknownConsent;
+
   return {
     included,
     exclusions,
     flaggedUnknownConsent,
+    unknownConsentPolicy,
     summary: {
       queued: included.length,
       excludedMissingEmail,
@@ -433,7 +468,8 @@ export async function resolveNewsletterAudience(
       excludedSuppressed,
       excludedInvalid,
       excludedArchived,
-      unknownConsent: flaggedUnknownConsent.length,
+      excludedUnknownConsent,
+      unknownConsent: unknownConsentTotal,
       deduped,
     },
     importSummaries,

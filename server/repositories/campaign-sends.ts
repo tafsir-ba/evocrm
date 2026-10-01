@@ -106,6 +106,47 @@ export async function countCampaignSendsForCampaign(
   );
 }
 
+export type CampaignSendStatusCounts = {
+  queued: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+};
+
+export async function countCampaignSendsByStatus(
+  workspaceId: string,
+  campaignId: string,
+): Promise<CampaignSendStatusCounts> {
+  await connectDb();
+
+  const rows = await CampaignSendModel.aggregate<{ _id: string; count: number }>([
+    {
+      $match: withWorkspaceScope(workspaceId, { campaignId }),
+    },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const counts: CampaignSendStatusCounts = {
+    queued: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
+  for (const row of rows) {
+    if (row._id === "queued" || row._id === "sent" || row._id === "failed" || row._id === "skipped") {
+      counts[row._id] = row.count;
+    }
+  }
+
+  return counts;
+}
+
 export type CreateCampaignSendInput = {
   campaignId: string;
   campaignStepId: string;

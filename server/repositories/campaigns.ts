@@ -36,6 +36,7 @@ export type CampaignAudienceSummary = {
   excludedSuppressed: number;
   excludedInvalid: number;
   excludedArchived: number;
+  excludedUnknownConsent: number;
   unknownConsent: number;
   deduped: number;
 };
@@ -59,6 +60,7 @@ export type CampaignRecord = {
   scheduledFor: Date | null;
   audienceLockedAt: Date | null;
   audienceSummary: CampaignAudienceSummary | null;
+  unknownConsentPolicy: "include_and_flag" | "require_subscribed";
   createdBy: string;
   ownerId: string | null;
   archivedAt: Date | null;
@@ -89,6 +91,7 @@ function toAudienceSummary(
     excludedSuppressed: summary.excludedSuppressed ?? 0,
     excludedInvalid: summary.excludedInvalid ?? 0,
     excludedArchived: summary.excludedArchived ?? 0,
+    excludedUnknownConsent: summary.excludedUnknownConsent ?? 0,
     unknownConsent: summary.unknownConsent ?? 0,
     deduped: summary.deduped ?? 0,
   };
@@ -116,6 +119,9 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
     scheduledFor: document.scheduledFor ?? null,
     audienceLockedAt: document.audienceLockedAt ?? null,
     audienceSummary: toAudienceSummary(document),
+    unknownConsentPolicy:
+      (document.unknownConsentPolicy as CampaignRecord["unknownConsentPolicy"] | undefined) ??
+      "include_and_flag",
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
     archivedAt: document.archivedAt ?? null,
@@ -259,6 +265,7 @@ export type CreateCampaignInput = {
   senderName?: string | null;
   senderEmail?: string | null;
   sendingDomainId?: string | null;
+  unknownConsentPolicy?: CampaignRecord["unknownConsentPolicy"];
   createdBy: string;
   ownerId?: string | null;
 };
@@ -294,6 +301,9 @@ export async function createCampaign(
     scheduledFor: null,
     audienceLockedAt: null,
     audienceSummary: null,
+    unknownConsentPolicy: isNewsletter
+      ? (input.unknownConsentPolicy ?? "include_and_flag")
+      : "include_and_flag",
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
     archivedAt: null,
@@ -320,6 +330,7 @@ export async function updateCampaign(
     scheduledFor: Date | null;
     audienceLockedAt: Date | null;
     audienceSummary: CampaignAudienceSummary | null;
+    unknownConsentPolicy: CampaignRecord["unknownConsentPolicy"];
     ownerId: string | null;
     archivedAt: Date | null;
   }>,

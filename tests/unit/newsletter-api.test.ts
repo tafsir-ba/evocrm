@@ -6,6 +6,7 @@ vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
 
 vi.mock("@/server/services/newsletters", () => ({
   previewNewsletterAudienceForWorkspace: vi.fn(),
+  exportNewsletterAudienceExclusionsCsvForWorkspace: vi.fn(),
   replaceNewsletterSegmentsForWorkspace: vi.fn(),
   listNewsletterSegmentsForWorkspace: vi.fn(),
   scheduleNewsletterForWorkspace: vi.fn(),

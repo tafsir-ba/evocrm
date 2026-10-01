@@ -19,7 +19,13 @@ import { workspacePath } from "@/lib/workspace-paths";
 import type { CampaignAnalyticsPeriodPreset } from "@/lib/campaign-analytics";
 
 type AnalyticsReport = {
-  campaign: { id: string; name: string; status: string; createdAt: string };
+  campaign: {
+    id: string;
+    name: string;
+    status: string;
+    kind?: "drip" | "newsletter";
+    createdAt: string;
+  };
   period: {
     preset: string;
     from: string;
@@ -47,6 +53,26 @@ type AnalyticsReport = {
     failed: number;
     clickToOpenRate: number | null;
   };
+  newsletterSummary: {
+    recipientsQueued: number;
+    stillQueued: number;
+    sent: number;
+    delivered: number;
+    failed: number;
+    bounced: number;
+    skipped: number;
+    uniqueOpens: number;
+    uniqueClicks: number;
+    unsubscribes: number;
+    audienceLockedAt: string | null;
+    unknownConsentAtLock: number | null;
+    sendStatusCounts: {
+      queued: number;
+      sent: number;
+      failed: number;
+      skipped: number;
+    };
+  } | null;
   cards: Array<{
     key: string;
     label: string;
@@ -106,6 +132,20 @@ type AnalyticsIssue = {
   eventAt: string;
 };
 
+type RecipientSendRow = {
+  id: string;
+  status: "queued" | "sent" | "failed" | "skipped";
+  leadName: string | null;
+  leadId: string | null;
+  error: string | null;
+  sentAt: string | null;
+  deliveredAt?: string | null;
+  firstOpenedAt?: string | null;
+  firstClickedAt?: string | null;
+  bouncedAt?: string | null;
+  scheduledFor: string;
+};
+
 const HEALTH_TONE: Record<
   AnalyticsReport["health"]["status"],
   "success" | "warn" | "danger" | "muted"
@@ -125,12 +165,16 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
   const [period, setPeriod] = useState<CampaignAnalyticsPeriodPreset>("30d");
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [issues, setIssues] = useState<AnalyticsIssue[]>([]);
+  const [recipientSends, setRecipientSends] = useState<RecipientSendRow[]>([]);
+  const [recipientTotal, setRecipientTotal] = useState(0);
+  const [recipientPage, setRecipientPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [seriesMode, setSeriesMode] = useState<"delivery" | "engagement">("delivery");
 
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}/analytics`;
+  const sendsApi = `/api/workspaces/${workspaceSlug}/campaigns/${campaignId}/sends`;
   const campaignPath = workspacePath(workspaceSlug, `dripping/${campaignId}`);
 
   const load = useCallback(async () => {
@@ -155,7 +199,8 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
         return;
       }
 
-      setReport(reportPayload.data);
+      const nextReport = reportPayload.data as AnalyticsReport;
+      setReport(nextReport);
 
       if (issuesRes.ok) {
         const issuesPayload = await issuesRes.json();
@@ -163,12 +208,31 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
       } else {
         setIssues([]);
       }
+
+      if (nextReport.campaign.kind === "newsletter" || nextReport.newsletterSummary) {
+        const sendsRes = await fetch(
+          `${sendsApi}?page=${recipientPage}&pageSize=25`,
+        );
+        if (sendsRes.ok) {
+          const sendsPayload = await sendsRes.json();
+          setRecipientSends(
+            Array.isArray(sendsPayload.data) ? sendsPayload.data : [],
+          );
+          setRecipientTotal(sendsPayload.pagination?.total ?? 0);
+        } else {
+          setRecipientSends([]);
+          setRecipientTotal(0);
+        }
+      } else {
+        setRecipientSends([]);
+        setRecipientTotal(0);
+      }
     } catch {
       setError("Failed to load analytics.");
     } finally {
       setLoading(false);
     }
-  }, [apiBase, period]);
+  }, [apiBase, period, recipientPage, sendsApi]);
 
   useEffect(() => {
     void load();
@@ -222,21 +286,32 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
   }
 
   const noSends = report.summary.sent === 0;
+  const isNewsletter =
+    report.campaign.kind === "newsletter" || Boolean(report.newsletterSummary);
+  const newsletter = report.newsletterSummary;
+  const newsletterBackPath = isNewsletter
+    ? workspacePath(workspaceSlug, `dripping/newsletters/${campaignId}`)
+    : campaignPath;
 
   return (
     <>
       <div className="mb-4">
         <Link
-          href={campaignPath}
+          href={newsletterBackPath}
           className="text-[13px] text-[var(--color-brand-700)] inline-flex items-center gap-1 hover:underline"
         >
-          <IconChevronLeft size={14} /> Back to campaign
+          <IconChevronLeft size={14} />{" "}
+          {isNewsletter ? "Back to newsletter" : "Back to campaign"}
         </Link>
       </div>
 
       <PageHeader
         title={`Analytics — ${report.campaign.name}`}
-        description="Monitor delivery health and recipient engagement across this campaign."
+        description={
+          isNewsletter
+            ? "See who was queued, what was delivered, and how people engaged with this newsletter."
+            : "Monitor delivery health and recipient engagement across this campaign."
+        }
         meta={
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={report.campaign.status} size="sm" />
@@ -272,6 +347,47 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
         {new Date(report.generatedAt).toLocaleString()}
       </p>
 
+      {newsletter ? (
+        <div className="mb-6">
+          <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-3">
+            Newsletter summary
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+            {[
+              { label: "Queued", value: newsletter.recipientsQueued },
+              { label: "Still sending", value: newsletter.stillQueued },
+              { label: "Sent", value: newsletter.sent },
+              { label: "Delivered", value: newsletter.delivered },
+              { label: "Failed", value: newsletter.failed },
+              { label: "Bounced", value: newsletter.bounced },
+              { label: "Skipped", value: newsletter.skipped },
+              { label: "Unique opens", value: newsletter.uniqueOpens },
+              { label: "Unique clicks", value: newsletter.uniqueClicks },
+              { label: "Unsubscribes", value: newsletter.unsubscribes },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5"
+              >
+                <p className="text-[11.5px] text-[var(--color-ink-muted)]">{item.label}</p>
+                <p className="mt-0.5 text-[18px] font-semibold tabular text-[var(--color-ink)]">
+                  {item.value.toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+          {newsletter.audienceLockedAt ? (
+            <p className="mt-2 text-[12px] text-[var(--color-ink-muted)]">
+              Audience locked{" "}
+              {new Date(newsletter.audienceLockedAt).toLocaleString()}
+              {newsletter.unknownConsentAtLock
+                ? ` · ${newsletter.unknownConsentAtLock.toLocaleString()} had unknown consent at lock`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {report.partialHistory ? (
         <Card className="mb-4 !p-4 border-[var(--color-warn-border)] bg-[var(--color-warn-bg)]">
           <p className="text-[13px] text-[var(--color-warn-fg)]">
@@ -296,7 +412,7 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
           <IconAlert size={18} className="mt-0.5 text-[var(--color-ink-muted)]" />
           <div>
             <p className="text-[15px] font-semibold text-[var(--color-ink)]">
-              Campaign health — {report.health.label}
+              {isNewsletter ? "Newsletter" : "Campaign"} health — {report.health.label}
             </p>
             <ul className="mt-2 space-y-1">
               {report.health.reasons.map((reason) => (
@@ -316,7 +432,7 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
         </div>
       </Card>
 
-      {noSends ? (
+      {noSends && !newsletter ? (
         <EmptyState
           title="No emails sent in this period"
           description="This campaign has not sent any emails in the selected period."
@@ -327,8 +443,20 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
             },
           }}
         />
+      ) : noSends && newsletter && newsletter.recipientsQueued === 0 ? (
+        <EmptyState
+          title="No newsletter activity yet"
+          description="Send or schedule this newsletter to see delivery results here."
+          primaryAction={{
+            label: "Back to newsletter",
+            onClick: () => {
+              window.location.href = newsletterBackPath;
+            },
+          }}
+        />
       ) : (
         <>
+          {!noSends ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {report.cards.map((card) => (
               <div
@@ -351,7 +479,9 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
               </div>
             ))}
           </div>
+          ) : null}
 
+          {!noSends ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
             <Card className="!p-5">
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -390,7 +520,7 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
 
             <Card className="!p-5">
               <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">
-                Campaign funnel
+                {isNewsletter ? "Newsletter funnel" : "Campaign funnel"}
               </h2>
               <BarChart
                 data={report.funnel.map((stage) => ({
@@ -417,15 +547,19 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
               </p>
             </Card>
           </div>
+          ) : null}
 
+          {!noSends && report.steps.length > 0 ? (
           <Card className="!p-5 mb-6 overflow-x-auto">
             <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-4">
-              Performance by email step
+              {isNewsletter ? "Email performance" : "Performance by email step"}
             </h2>
             <table className="w-full min-w-[720px] text-left text-[12.5px]">
               <thead>
                 <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
-                  <th className="py-2 pr-3 font-medium">Step</th>
+                  {!isNewsletter ? (
+                    <th className="py-2 pr-3 font-medium">Step</th>
+                  ) : null}
                   <th className="py-2 pr-3 font-medium">Subject</th>
                   <th className="py-2 pr-3 font-medium">Sent</th>
                   <th className="py-2 pr-3 font-medium">Delivered</th>
@@ -442,7 +576,9 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
                     key={step.stepId}
                     className="border-b border-[var(--color-line)] text-[var(--color-ink)]"
                   >
-                    <td className="py-2.5 pr-3">{step.order}</td>
+                    {!isNewsletter ? (
+                      <td className="py-2.5 pr-3">{step.order}</td>
+                    ) : null}
                     <td className="py-2.5 pr-3 max-w-[220px] truncate">
                       {step.subject || step.name || "—"}
                     </td>
@@ -486,7 +622,95 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
               </tbody>
             </table>
           </Card>
+          ) : null}
 
+          {isNewsletter ? (
+            <Card className="!p-5 mb-6 overflow-x-auto">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">
+                  Recipient status
+                </h2>
+                {recipientTotal > 25 ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={recipientPage <= 1}
+                      onClick={() => setRecipientPage((page) => Math.max(1, page - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-[12.5px] text-[var(--color-ink-muted)]">
+                      Page {recipientPage} of{" "}
+                      {Math.max(1, Math.ceil(recipientTotal / 25))}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={recipientPage * 25 >= recipientTotal}
+                      onClick={() => setRecipientPage((page) => page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-4">
+                Per-recipient send status for this newsletter.
+              </p>
+              {recipientSends.length === 0 ? (
+                <p className="text-[13px] text-[var(--color-ink-muted)]">
+                  No recipient send rows yet. They appear as the newsletter starts
+                  processing.
+                </p>
+              ) : (
+                <table className="w-full min-w-[640px] text-left text-[12.5px]">
+                  <thead>
+                    <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
+                      <th className="py-2 pr-3 font-medium">Contact</th>
+                      <th className="py-2 pr-3 font-medium">Status</th>
+                      <th className="py-2 pr-3 font-medium">Opened</th>
+                      <th className="py-2 pr-3 font-medium">Clicked</th>
+                      <th className="py-2 pr-3 font-medium">Detail</th>
+                      <th className="py-2 font-medium">When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recipientSends.map((send) => (
+                      <tr
+                        key={send.id}
+                        className="border-b border-[var(--color-line)] text-[var(--color-ink)]"
+                      >
+                        <td className="py-2.5 pr-3">{send.leadName ?? "Unknown"}</td>
+                        <td className="py-2.5 pr-3 capitalize">{send.status}</td>
+                        <td className="py-2.5 pr-3">
+                          {send.firstOpenedAt ? "Yes" : "—"}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          {send.firstClickedAt ? "Yes" : "—"}
+                        </td>
+                        <td className="py-2.5 pr-3 max-w-[240px] truncate">
+                          {send.error ??
+                            (send.bouncedAt
+                              ? "Bounced"
+                              : send.deliveredAt
+                                ? "Delivered"
+                                : "—")}
+                        </td>
+                        <td className="py-2.5">
+                          {send.sentAt
+                            ? new Date(send.sentAt).toLocaleString()
+                            : new Date(send.scheduledFor).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+          ) : null}
+
+          {!noSends ? (
           <Card className="!p-5 mb-6 overflow-x-auto">
             <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-1">
               Delivery issues
@@ -537,7 +761,9 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
               </table>
             )}
           </Card>
+          ) : null}
 
+          {!noSends ? (
           <Card className="!p-4">
             <p className="text-[12px] text-[var(--color-ink-faint)]">
               Formulas: {report.formulas.deliveryRate}; {report.formulas.openRate};{" "}
@@ -545,6 +771,7 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
               blocking and privacy features can hide opens.
             </p>
           </Card>
+          ) : null}
         </>
       )}
     </>

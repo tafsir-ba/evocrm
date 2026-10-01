@@ -82,6 +82,9 @@ export const createCampaignInputSchema = z
     senderEmail: z.string().email().optional(),
     sendingDomainId: objectIdSchema.optional(),
     ownerId: objectIdSchema.optional(),
+    unknownConsentPolicy: z
+      .enum(["include_and_flag", "require_subscribed"])
+      .optional(),
   })
   .strict();
 
@@ -99,6 +102,9 @@ export const updateCampaignInputSchema = z
     sendingDomainId: objectIdSchema.nullable().optional(),
     ownerId: objectIdSchema.nullable().optional(),
     status: campaignUpdateStatusSchema.optional(),
+    unknownConsentPolicy: z
+      .enum(["include_and_flag", "require_subscribed"])
+      .optional(),
   })
   .strict();
 
