@@ -142,11 +142,7 @@ async function resolveCsvImportSegmentLeadIds(
     );
   }
 
-  if (
-    job.newsletterCampaignId &&
-    segment.campaignId &&
-    job.newsletterCampaignId !== segment.campaignId
-  ) {
+  if (!job.newsletterCampaignId || job.newsletterCampaignId !== segment.campaignId) {
     throw new AppError(
       "VALIDATION_ERROR",
       "Newsletter CSV segment import belongs to a different newsletter.",

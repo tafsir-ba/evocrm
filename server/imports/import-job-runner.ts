@@ -78,10 +78,21 @@ export async function executeImportJob(
 
       if (rowResult.status === "error") {
         skippedCount += 1;
+        // Validation pre-marks "already exists" duplicates as errors before
+        // createRecord runs, so the CONFLICT path below never sees them.
+        // Retain entityId so newsletter CSV audience / list-tag apply include
+        // existing leads (locked Phase 2 rule).
+        const existingLeadId =
+          entityConfig.entityType === "lead"
+            ? await resolveExistingLeadIdForDuplicate(
+                context.workspaceId,
+                rowResult.row,
+              )
+            : null;
         rowResults.push({
           rowNumber: rowResult.rowNumber,
           status: "skipped",
-          entityId: null,
+          entityId: existingLeadId,
           errors: rowResult.issues.filter((issue) => issue.severity === "error"),
           warnings: rowResult.issues.filter((issue) => issue.severity === "warning"),
         });

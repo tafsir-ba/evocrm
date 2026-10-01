@@ -284,6 +284,42 @@ describe("newsletter audience resolve", () => {
     );
   });
 
+  it("rejects csv segments whose import is not linked to this newsletter", async () => {
+    vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
+      {
+        id: "seg-csv",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "csv_import",
+        order: 1,
+        projectId: "proj-1",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: "import-1",
+        applyTagId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(findImportJobById).mockResolvedValue({
+      id: "import-1",
+      workspaceId: "ws-1",
+      entityType: "lead",
+      status: "completed",
+      newsletterCampaignId: null,
+      createdCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [
+        { rowNumber: 1, status: "created", entityId: "lead-9", errors: [], warnings: [] },
+      ],
+    } as never);
+
+    await expect(resolveNewsletterAudience("ws-1", "camp-1")).rejects.toBeInstanceOf(
+      AppError,
+    );
+  });
+
   it("rejects audiences over the hard cap", async () => {
     vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
       {
