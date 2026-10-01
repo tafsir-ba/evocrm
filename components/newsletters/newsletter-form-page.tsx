@@ -273,11 +273,7 @@ export function NewsletterFormPage({
       );
       const payload = await response.json();
       if (response.ok) {
-        const preview = (payload.data?.preview ?? null) as AudiencePreview | null;
-        setAudiencePreview(preview);
-        if (preview?.unknownConsentPolicy) {
-          setUnknownConsentPolicy(preview.unknownConsentPolicy);
-        }
+        setAudiencePreview((payload.data?.preview ?? null) as AudiencePreview | null);
       }
     },
     [apiNewsletters, exclusionPage],
@@ -860,6 +856,12 @@ export function NewsletterFormPage({
       Boolean(segment.projectId) &&
       (segment.type === "project_tags" || Boolean(segment.importJobId)),
   );
+  const consentPreviewStale = Boolean(
+    audiencePreview &&
+      audiencePreview.unknownConsentPolicy &&
+      audiencePreview.unknownConsentPolicy !== unknownConsentPolicy,
+  );
+  const sendReady = contentReady && audienceReady && !consentPreviewStale;
 
   const steps = [
     { id: "content" as const, label: "1. Content", hint: "Subject & HTML" },
@@ -1454,6 +1456,12 @@ export function NewsletterFormPage({
               Unsubscribed and suppressed contacts are always skipped. Save draft to
               refresh counts after changing this.
             </p>
+            {consentPreviewStale ? (
+              <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                Consent setting changed. Save draft to refresh who is included before
+                you send.
+              </p>
+            ) : null}
           </div>
 
           {audiencePreview ? (
@@ -1489,7 +1497,8 @@ export function NewsletterFormPage({
               ) : null}
 
               {audiencePreview.summary.unknownConsent > 0 &&
-              unknownConsentPolicy === "include_and_flag" ? (
+              unknownConsentPolicy === "include_and_flag" &&
+              !consentPreviewStale ? (
                 <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
                   {audiencePreview.summary.unknownConsent.toLocaleString()} contacts have
                   unknown email consent and will still be included. Check that before you send.
@@ -1497,10 +1506,11 @@ export function NewsletterFormPage({
               ) : null}
 
               {audiencePreview.summary.unknownConsent > 0 &&
-              unknownConsentPolicy === "require_subscribed" ? (
+              unknownConsentPolicy === "require_subscribed" &&
+              !consentPreviewStale ? (
                 <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
-                  {(audiencePreview.exclusionCounts.unknownConsent ??
-                    audiencePreview.summary.excludedUnknownConsent ??
+                  {(audiencePreview.exclusionCounts.unknownConsent ||
+                    audiencePreview.summary.excludedUnknownConsent ||
                     audiencePreview.summary.unknownConsent
                   ).toLocaleString()}{" "}
                   contacts with unknown consent will be skipped.
@@ -1614,7 +1624,8 @@ export function NewsletterFormPage({
 
               {(audiencePreview.flaggedUnknownConsent?.total ??
                 audiencePreview.flaggedUnknownConsentSample.length) > 0 &&
-              unknownConsentPolicy === "include_and_flag" ? (
+              unknownConsentPolicy === "include_and_flag" &&
+              !consentPreviewStale ? (
                 <div className="space-y-2">
                   <p className="font-medium text-[var(--color-ink)]">
                     Included with unknown consent (
@@ -1688,11 +1699,20 @@ export function NewsletterFormPage({
             </p>
             <p>
               <span className="font-medium text-[var(--color-ink)]">Recipients:</span>{" "}
-              {audiencePreview?.summary.queued?.toLocaleString() ?? "Save draft to refresh"}
+              {consentPreviewStale
+                ? "Save draft to refresh after consent change"
+                : (audiencePreview?.summary.queued?.toLocaleString() ??
+                  "Save draft to refresh")}
             </p>
             <p className="text-[12px] text-[var(--color-ink-muted)]">
               Times use {formatWorkspaceTimezoneLabel(timezone)}.
             </p>
+            {consentPreviewStale ? (
+              <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                Consent setting changed since the last audience refresh. Save draft on
+                Audience, then confirm the recipient count before sending.
+              </p>
+            ) : null}
             {unsafeHtml ? (
               <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
                 Fix unsafe HTML on the Content step before sending.
@@ -1743,7 +1763,7 @@ export function NewsletterFormPage({
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={submitting || unsafeHtml || !contentReady || !audienceReady}
+                disabled={submitting || unsafeHtml || !sendReady}
                 onClick={() => void handleSendNow()}
               >
                 {submitting ? "Working…" : "Send now"}
@@ -1754,8 +1774,7 @@ export function NewsletterFormPage({
                 disabled={
                   submitting ||
                   unsafeHtml ||
-                  !contentReady ||
-                  !audienceReady ||
+                  !sendReady ||
                   !scheduledForLocal
                 }
                 onClick={() => void handleSchedule()}

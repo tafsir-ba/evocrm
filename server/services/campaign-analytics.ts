@@ -661,28 +661,61 @@ export async function getCampaignAnalyticsForWorkspace(
   const { CampaignEnrollmentModel } = await import("@/models/campaign-enrollment");
   const { connectDb } = await import("@/server/db/mongoose");
 
-  const [current, previous, unsubscribed, series, steps, sendStatusCounts, stillQueued] =
-    await Promise.all([
-      aggregateSendMetrics(workspaceId, campaignId, from, to),
-      aggregateSendMetrics(workspaceId, campaignId, previousFrom, previousTo),
-      countUnsubscribesInRange(workspaceId, campaignId, from, to),
-      buildSeries(workspaceId, campaignId, from, to),
-      buildStepRows(workspaceId, campaignId, from, to),
-      campaign.kind === "newsletter"
-        ? countCampaignSendsByStatus(workspaceId, campaignId)
-        : Promise.resolve(null),
-      campaign.kind === "newsletter"
-        ? (async () => {
-            await connectDb();
-            return CampaignEnrollmentModel.countDocuments(
-              withWorkspaceScope(workspaceId, {
-                campaignId,
-                status: "active",
-              }),
-            );
-          })()
-        : Promise.resolve(0),
-    ]);
+  const newsletterAllTimeFrom =
+    campaign.kind === "newsletter"
+      ? campaign.createdAt < CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        ? CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        : campaign.createdAt
+      : from;
+  const newsletterAllTimeTo = new Date();
+
+  const [
+    current,
+    previous,
+    unsubscribed,
+    series,
+    steps,
+    sendStatusCounts,
+    stillQueued,
+    newsletterLifetime,
+    newsletterUnsubscribed,
+  ] = await Promise.all([
+    aggregateSendMetrics(workspaceId, campaignId, from, to),
+    aggregateSendMetrics(workspaceId, campaignId, previousFrom, previousTo),
+    countUnsubscribesInRange(workspaceId, campaignId, from, to),
+    buildSeries(workspaceId, campaignId, from, to),
+    buildStepRows(workspaceId, campaignId, from, to),
+    campaign.kind === "newsletter"
+      ? countCampaignSendsByStatus(workspaceId, campaignId)
+      : Promise.resolve(null),
+    campaign.kind === "newsletter"
+      ? (async () => {
+          await connectDb();
+          return CampaignEnrollmentModel.countDocuments(
+            withWorkspaceScope(workspaceId, {
+              campaignId,
+              status: "active",
+            }),
+          );
+        })()
+      : Promise.resolve(0),
+    campaign.kind === "newsletter"
+      ? aggregateSendMetrics(
+          workspaceId,
+          campaignId,
+          newsletterAllTimeFrom,
+          newsletterAllTimeTo,
+        )
+      : Promise.resolve(null),
+    campaign.kind === "newsletter"
+      ? countUnsubscribesInRange(
+          workspaceId,
+          campaignId,
+          newsletterAllTimeFrom,
+          newsletterAllTimeTo,
+        )
+      : Promise.resolve(0),
+  ]);
 
   const health = evaluateCampaignDeliveryHealth({
     sent: current.sent,
@@ -695,7 +728,7 @@ export async function getCampaignAnalyticsForWorkspace(
   const cards = buildCards({ ...current, unsubscribed }, previous);
 
   const newsletterSummary =
-    campaign.kind === "newsletter" && sendStatusCounts
+    campaign.kind === "newsletter" && sendStatusCounts && newsletterLifetime
       ? {
           recipientsQueued:
             campaign.audienceSummary?.queued ??
@@ -705,13 +738,13 @@ export async function getCampaignAnalyticsForWorkspace(
               sendStatusCounts.skipped,
           stillQueued,
           sent: sendStatusCounts.sent,
-          delivered: current.delivered,
+          delivered: newsletterLifetime.delivered,
           failed: sendStatusCounts.failed,
-          bounced: current.bounced,
+          bounced: newsletterLifetime.bounced,
           skipped: sendStatusCounts.skipped,
-          uniqueOpens: current.opened,
-          uniqueClicks: current.clicked,
-          unsubscribes: unsubscribed,
+          uniqueOpens: newsletterLifetime.opened,
+          uniqueClicks: newsletterLifetime.clicked,
+          unsubscribes: newsletterUnsubscribed,
           audienceLockedAt: campaign.audienceLockedAt?.toISOString() ?? null,
           unknownConsentAtLock: campaign.audienceSummary?.unknownConsent ?? null,
           sendStatusCounts,

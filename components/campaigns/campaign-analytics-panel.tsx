@@ -349,13 +349,16 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
 
       {newsletter ? (
         <div className="mb-6">
-          <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-3">
+          <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-1">
             Newsletter summary
           </h2>
+          <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-3">
+            All-time totals for this newsletter (not limited to the period below).
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
             {[
               { label: "Queued", value: newsletter.recipientsQueued },
-              { label: "Still sending", value: newsletter.stillQueued },
+              { label: "Still queued", value: newsletter.stillQueued },
               { label: "Sent", value: newsletter.sent },
               { label: "Delivered", value: newsletter.delivered },
               { label: "Failed", value: newsletter.failed },

@@ -325,6 +325,13 @@ export async function createCampaignForWorkspace(
     validateAutoEnrollmentSettings(normalizedInput);
   }
 
+  if (!isNewsletter && normalizedInput.unknownConsentPolicy !== undefined) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Unknown-consent policy applies only to newsletters.",
+    );
+  }
+
   await validateOptionalAssignableMember(workspaceId, normalizedInput.ownerId, "Owner");
   await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
   if (!isNewsletter) {
@@ -348,9 +355,12 @@ export async function createCampaignForWorkspace(
     senderName: normalizedInput.senderName ?? normalizedInput.defaultFromName ?? null,
     senderEmail: normalizedInput.senderEmail ?? null,
     sendingDomainId: normalizedInput.sendingDomainId ?? null,
-    unknownConsentPolicy: isNewsletter
-      ? (normalizedInput.unknownConsentPolicy ?? "include_and_flag")
-      : undefined,
+    ...(isNewsletter
+      ? {
+          unknownConsentPolicy:
+            normalizedInput.unknownConsentPolicy ?? "include_and_flag",
+        }
+      : {}),
     createdBy: actorId,
     ownerId: normalizedInput.ownerId ?? null,
   });

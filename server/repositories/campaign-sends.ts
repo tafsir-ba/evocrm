@@ -113,19 +113,35 @@ export type CampaignSendStatusCounts = {
   skipped: number;
 };
 
+/**
+ * Count newsletter/campaign send outcomes by status.
+ * Failed/skipped use distinct enrollmentIds so retries do not inflate recipient totals.
+ * Sent uses row count (unique partial index already prevents duplicate sent rows).
+ */
 export async function countCampaignSendsByStatus(
   workspaceId: string,
   campaignId: string,
 ): Promise<CampaignSendStatusCounts> {
   await connectDb();
 
-  const rows = await CampaignSendModel.aggregate<{ _id: string; count: number }>([
+  const rows = await CampaignSendModel.aggregate<{
+    _id: string;
+    count: number;
+  }>([
     {
       $match: withWorkspaceScope(workspaceId, { campaignId }),
     },
     {
       $group: {
-        _id: "$status",
+        _id: {
+          status: "$status",
+          enrollmentId: "$enrollmentId",
+        },
+      },
+    },
+    {
+      $group: {
+        _id: "$_id.status",
         count: { $sum: 1 },
       },
     },
@@ -139,7 +155,12 @@ export async function countCampaignSendsByStatus(
   };
 
   for (const row of rows) {
-    if (row._id === "queued" || row._id === "sent" || row._id === "failed" || row._id === "skipped") {
+    if (
+      row._id === "queued" ||
+      row._id === "sent" ||
+      row._id === "failed" ||
+      row._id === "skipped"
+    ) {
       counts[row._id] = row.count;
     }
   }
