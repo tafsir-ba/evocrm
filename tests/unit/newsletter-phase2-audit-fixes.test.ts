@@ -80,6 +80,7 @@ describe("newsletter csv segment attach guards", () => {
       entityType: "lead",
       status: "completed",
       newsletterCampaignId: null,
+      defaults: { projectId: "507f1f77bcf86cd799439011" },
     } as never);
 
     await expect(
@@ -97,12 +98,37 @@ describe("newsletter csv segment attach guards", () => {
     expect(replaceNewsletterAudienceSegments).not.toHaveBeenCalled();
   });
 
+  it("rejects csv segments whose project does not match the import target", async () => {
+    vi.mocked(findImportJobById).mockResolvedValue({
+      id: "507f1f77bcf86cd799439022",
+      entityType: "lead",
+      status: "completed",
+      newsletterCampaignId: "camp-1",
+      defaults: { projectId: "507f1f77bcf86cd799439011" },
+    } as never);
+
+    await expect(
+      replaceNewsletterSegmentsForWorkspace("ws-1", "user-1", "camp-1", {
+        segments: [
+          {
+            type: "csv_import",
+            projectId: "507f1f77bcf86cd799439099",
+            importJobId: "507f1f77bcf86cd799439022",
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(replaceNewsletterAudienceSegments).not.toHaveBeenCalled();
+  });
+
   it("accepts csv imports scoped to this newsletter", async () => {
     vi.mocked(findImportJobById).mockResolvedValue({
       id: "507f1f77bcf86cd799439022",
       entityType: "lead",
       status: "completed",
       newsletterCampaignId: "camp-1",
+      defaults: { projectId: "507f1f77bcf86cd799439011" },
     } as never);
     vi.mocked(updateCampaign).mockResolvedValue({} as never);
     vi.mocked(replaceNewsletterAudienceSegments).mockResolvedValue([

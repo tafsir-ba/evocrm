@@ -35,7 +35,7 @@ describe("campaign step readiness", () => {
     expect(() => assertCampaignStepReady(baseStep())).not.toThrow();
   });
 
-  it("requires an unsubscribe link before marking ready", () => {
+  it("allows plain-text without an unsubscribe token (footer is added on send)", () => {
     expect(() =>
       assertCampaignStepReady(
         baseStep({
@@ -43,6 +43,19 @@ describe("campaign step readiness", () => {
           bodyText: "Thanks for joining.",
         }),
       ),
-    ).toThrowError(/unsubscribe/i);
+    ).not.toThrow();
+  });
+
+  it("rejects HTML steps with unsafe tags", () => {
+    expect(() =>
+      assertCampaignStepReady(
+        baseStep({
+          contentMode: "html",
+          body: "Hello",
+          bodyText: "Hello",
+          bodyHtml: "<p>Hi</p><script>alert(1)</script>",
+        }),
+      ),
+    ).toThrowError(/unsafe HTML/i);
   });
 });

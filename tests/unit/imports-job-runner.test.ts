@@ -8,10 +8,15 @@ vi.mock("@/server/repositories/import-jobs", () => ({
   updateImportJobExecution: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/leads", () => ({
+  findActiveLeadByEmailNormalized: vi.fn(),
+}));
+
 import { executeImportJob } from "@/server/imports/import-job-runner";
 import type { ImportEntityConfig } from "@/server/imports/import-entity-config";
 import { findImportRowResults } from "@/server/repositories/import-row-results";
 import { updateImportJobExecution } from "@/server/repositories/import-jobs";
+import { findActiveLeadByEmailNormalized } from "@/server/repositories/leads";
 
 const job = {
   id: "import-1",
@@ -157,5 +162,57 @@ describe("executeImportJob idempotency", () => {
         triggerAutomationForImportedLeads: true,
       }),
     );
+  });
+
+  it("retains entityId for validation-skipped existing lead duplicates", async () => {
+    vi.mocked(findImportRowResults).mockResolvedValue([]);
+    vi.mocked(findActiveLeadByEmailNormalized).mockResolvedValue({
+      id: "lead-existing",
+    } as never);
+
+    const result = await executeImportJob(
+      job,
+      entityConfig,
+      {
+        workspaceId: "ws-1",
+        actorId: "user-1",
+        defaultCurrency: "EUR",
+        dictionaryLookup: new Map(),
+        projectLookup: new Map(),
+        memberLookup: new Map(),
+        tagLookup: new Map(),
+      },
+      {
+        summary: { totalRows: 1, validRows: 0, warningRows: 0, errorRows: 1 },
+        issues: [],
+        normalizedRows: [
+          {
+            rowNumber: 1,
+            rawRow: { email: "alex@example.com", projectId: "proj-1" },
+            row: { email: "alex@example.com", projectId: "proj-1" },
+            status: "error",
+            issues: [
+              {
+                rowNumber: 1,
+                field: "email",
+                message: "A lead with this email already exists in this project.",
+                severity: "error",
+              },
+            ],
+          },
+        ],
+      },
+      "valid_rows_only",
+    );
+
+    expect(entityConfig.createRecord).not.toHaveBeenCalled();
+    expect(result.skippedCount).toBe(1);
+    expect(result.rowResults).toEqual([
+      expect.objectContaining({
+        rowNumber: 1,
+        status: "skipped",
+        entityId: "lead-existing",
+      }),
+    ]);
   });
 });

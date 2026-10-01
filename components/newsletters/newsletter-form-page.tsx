@@ -11,12 +11,8 @@ import {
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
 import { ImportWizard } from "@/components/imports/import-wizard";
-import {
-  FocusedFormActions,
-  FocusedFormLayout,
-} from "@/components/layout/focused-form-layout";
+import { FocusedFormLayout } from "@/components/layout/focused-form-layout";
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import {
@@ -189,8 +185,12 @@ export function NewsletterFormPage({
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!isCreate);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState<"content" | "audience" | "review">(
+    "content",
+  );
   const submittingRef = useRef(false);
   const createdIdRef = useRef<string | null>(campaignId ?? null);
+  const htmlEditorRef = useRef<HTMLTextAreaElement | null>(null);
 
   const apiCampaigns = `/api/workspaces/${workspaceSlug}/campaigns`;
   const apiNewsletters = `/api/workspaces/${workspaceSlug}/newsletters`;
@@ -216,7 +216,7 @@ export function NewsletterFormPage({
       projectsRes.json(),
       tagsRes.json(),
     ]);
-      if (projectsRes.ok) {
+    if (projectsRes.ok) {
       setProjects(projectsPayload.data?.projects ?? []);
     }
     if (tagsRes.ok) {
@@ -746,13 +746,42 @@ export function NewsletterFormPage({
     if (!file) {
       return;
     }
+    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
+      setFormError("Please upload an .html file.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
         setBodyHtml(reader.result);
+        setPreviewOpen(true);
+        setFormError(null);
       }
     };
+    reader.onerror = () => {
+      setFormError("Could not read that HTML file. Try pasting the HTML instead.");
+    };
     reader.readAsText(file);
+  }
+
+  function insertMergeField(token: string) {
+    if (readOnly) {
+      return;
+    }
+    const el = htmlEditorRef.current;
+    if (!el) {
+      setBodyHtml((current) => `${current}${token}`);
+      return;
+    }
+    const start = el.selectionStart ?? bodyHtml.length;
+    const end = el.selectionEnd ?? start;
+    const next = `${bodyHtml.slice(0, start)}${token}${bodyHtml.slice(end)}`;
+    setBodyHtml(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const cursor = start + token.length;
+      el.setSelectionRange(cursor, cursor);
+    });
   }
 
   const previewHtml = useMemo(() => {
@@ -766,19 +795,77 @@ export function NewsletterFormPage({
     });
   }, [bodyHtml, previewText]);
 
+  const contentReady =
+    Boolean(name.trim()) &&
+    Boolean(subject.trim()) &&
+    Boolean(bodyHtml.trim()) &&
+    !unsafeHtml;
+  const audienceReady = segments.every(
+    (segment) =>
+      Boolean(segment.projectId) &&
+      (segment.type === "project_tags" || Boolean(segment.importJobId)),
+  );
+
+  const steps = [
+    { id: "content" as const, label: "1. Content", hint: "Subject & HTML" },
+    { id: "audience" as const, label: "2. Audience", hint: "Who receives it" },
+    { id: "review" as const, label: "3. Review", hint: "Send or schedule" },
+  ];
+
+  function goToWizardStep(next: "content" | "audience" | "review") {
+    if (next === "audience" && !contentReady) {
+      setFormError(
+        unsafeHtml
+          ? "Fix the HTML warnings below before continuing."
+          : "Add a name, subject, and HTML content to continue.",
+      );
+      setWizardStep("content");
+      return;
+    }
+    if (next === "review") {
+      if (!contentReady) {
+        setFormError(
+          unsafeHtml
+            ? "Fix the HTML warnings on Content before reviewing."
+            : "Add a name, subject, and HTML content before reviewing.",
+        );
+        setWizardStep("content");
+        return;
+      }
+      if (!audienceReady) {
+        setFormError(
+          "Each audience segment needs a project. Finish any CSV import before continuing.",
+        );
+        setWizardStep("audience");
+        return;
+      }
+      setPreviewOpen(true);
+    }
+    setFormError(null);
+    setWizardStep(next);
+  }
+
   if (loading) {
     return (
-      <FocusedFormLayout title="Newsletter" closeHref={closeHref}>
-        <p className="text-[13px] text-[var(--color-ink-muted)]">Loading newsletter…</p>
+      <FocusedFormLayout title="Newsletter" closeHref={closeHref} maxWidth="3xl">
+        <div className="space-y-3 py-6 text-center">
+          <p className="text-[14px] font-medium text-[var(--color-ink)]">
+            Loading your newsletter…
+          </p>
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            Pulling content, audience, and send settings.
+          </p>
+        </div>
       </FocusedFormLayout>
     );
   }
 
   return (
     <FocusedFormLayout
-      title={isCreate ? "New newsletter" : "Edit newsletter"}
-      description="One email, audience snapshot, send or schedule. Uses drip sending infrastructure."
+      title={isCreate ? "New newsletter" : name.trim() || "Edit newsletter"}
+      description="Write one email, choose who should get it, then send now or schedule. We’ll snapshot the list so later tag changes don’t change who was included."
       closeHref={closeHref}
+      maxWidth="3xl"
       footer={
         readOnly ? (
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--color-line)] pt-4">
@@ -790,41 +877,129 @@ export function NewsletterFormPage({
             </Link>
           </div>
         ) : (
-          <FocusedFormActions
-            cancelHref={closeHref}
-            formId={formId}
-            submitLabel="Save draft"
-            submitting={submitting}
-            submitDisabled={!name.trim() || submitting}
-          />
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-line)] pt-4">
+            <div className="flex flex-wrap gap-2">
+              {wizardStep !== "content" ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={submitting}
+                  onClick={() =>
+                    setWizardStep((current) =>
+                      current === "review" ? "audience" : "content",
+                    )
+                  }
+                >
+                  Back
+                </Button>
+              ) : (
+                <Link
+                  href={closeHref}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white px-3.5 text-[13.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)]"
+                >
+                  Cancel
+                </Link>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                form={formId}
+                variant="secondary"
+                disabled={submitting || !name.trim()}
+              >
+                {submitting ? "Saving…" : "Save draft"}
+              </Button>
+              {wizardStep === "content" ? (
+                <Button
+                  type="button"
+                  disabled={!contentReady || submitting}
+                  onClick={() => goToWizardStep("audience")}
+                >
+                  Next: Audience
+                </Button>
+              ) : null}
+              {wizardStep === "audience" ? (
+                <Button
+                  type="button"
+                  disabled={!audienceReady || submitting}
+                  onClick={() => goToWizardStep("review")}
+                >
+                  Next: Review
+                </Button>
+              ) : null}
+            </div>
+          </div>
         )
       }
     >
       <form
         id={formId}
-        className="space-y-8"
+        className="space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           void saveDraft({ stay: !isCreate });
         }}
       >
+        <nav aria-label="Newsletter steps" className="flex flex-wrap gap-2">
+          {steps.map((step) => {
+            const active = wizardStep === step.id;
+            const reachable =
+              step.id === "content" ||
+              (step.id === "audience" && contentReady) ||
+              (step.id === "review" && contentReady && audienceReady);
+            return (
+              <button
+                key={step.id}
+                type="button"
+                className={
+                  active
+                    ? "rounded-md border border-[var(--color-ink)] bg-[var(--color-canvas)] px-3 py-2 text-left"
+                    : reachable
+                      ? "rounded-md border border-[var(--color-line)] px-3 py-2 text-left text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                      : "rounded-md border border-[var(--color-line)] px-3 py-2 text-left text-[var(--color-ink-faint)] opacity-70"
+                }
+                aria-current={active ? "step" : undefined}
+                aria-disabled={!reachable}
+                onClick={() => goToWizardStep(step.id)}
+              >
+                <span className="block text-[13px] font-semibold text-[var(--color-ink)]">
+                  {step.label}
+                </span>
+                <span className="block text-[12px]">{step.hint}</span>
+              </button>
+            );
+          })}
+        </nav>
+
         {formError ? (
-          <p className="text-[13px] text-[var(--color-danger)]">{formError}</p>
+          <div
+            role="alert"
+            className="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger-soft,rgba(180,40,40,0.08))] px-3 py-2 text-[13px] text-[var(--color-danger)]"
+          >
+            {formError}
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Fix the issue above, then try again. Your draft is not lost.
+            </p>
+          </div>
         ) : null}
 
         {readOnly ? (
-          <p className="rounded-lg border border-[var(--color-line)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
-            You have read-only access. Sending and edits require campaign update permission.
+          <p className="rounded-md border border-[var(--color-line)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
+            You’re viewing this newsletter. Ask for campaign update permission to edit or send.
           </p>
         ) : null}
 
         {campaign?.audienceLockedAt && campaign.status === "active" ? (
-          <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-[13px]">
-            Scheduled for{" "}
-            {campaign.scheduledFor
-              ? toDatetimeLocalInWorkspaceTimezone(campaign.scheduledFor, timezone)
-              : "immediate send"}
-            . You can edit or cancel until sending starts.
+          <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-[13px]">
+            <p className="font-medium text-[var(--color-ink)]">
+              {campaign.scheduledFor
+                ? `Scheduled for ${toDatetimeLocalInWorkspaceTimezone(campaign.scheduledFor, timezone)} (${formatWorkspaceTimezoneLabel(timezone)})`
+                : "Sending has been queued"}
+            </p>
+            <p className="mt-1 text-[var(--color-ink-muted)]">
+              You can still edit or cancel until the first email starts sending.
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {canUpdate ? (
                 <Button
@@ -839,23 +1014,26 @@ export function NewsletterFormPage({
               ) : null}
               <Link
                 href={workspacePath(workspaceSlug, `dripping/${campaign.id}/analytics`)}
-                className="text-[12px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]"
+                className="inline-flex h-8 items-center text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]"
               >
-                View analytics
+                View results
               </Link>
             </div>
           </div>
         ) : null}
 
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Content</h2>
-            <Badge tone="muted" size="sm">
-              HTML
-            </Badge>
+        {wizardStep === "content" ? (
+        <section className="space-y-4" aria-labelledby="newsletter-step-content">
+          <div>
+            <h2 id="newsletter-step-content" className="text-[15px] font-semibold text-[var(--color-ink)]">
+              Content
+            </h2>
+            <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+              Tell recipients who the email is from, what it’s about, and paste or upload your HTML.
+            </p>
           </div>
           <div>
-            <Label htmlFor="newsletter-name">Name</Label>
+            <Label htmlFor="newsletter-name">Internal name</Label>
             <Input
               id="newsletter-name"
               value={name}
@@ -863,10 +1041,14 @@ export function NewsletterFormPage({
               required
               maxLength={200}
               disabled={readOnly}
+              placeholder="e.g. Spring update — March"
             />
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Only your team sees this name in the Newsletters list.
+            </p>
           </div>
           <div>
-            <Label htmlFor="newsletter-subject">Subject</Label>
+            <Label htmlFor="newsletter-subject">Email subject</Label>
             <Input
               id="newsletter-subject"
               value={subject}
@@ -874,25 +1056,27 @@ export function NewsletterFormPage({
               required
               maxLength={500}
               disabled={readOnly}
+              placeholder="What people see in their inbox"
             />
           </div>
           <div>
-            <Label htmlFor="newsletter-preview">Preview text</Label>
+            <Label htmlFor="newsletter-preview">Inbox preview text</Label>
             <Input
               id="newsletter-preview"
               value={previewText}
               onChange={(event) => setPreviewText(event.target.value)}
               maxLength={500}
               disabled={readOnly}
+              placeholder="Short line under the subject (optional)"
             />
           </div>
           <div>
-            <Label htmlFor="newsletter-sender-name">Sender name</Label>
+            <Label htmlFor="newsletter-sender-name">From name</Label>
             <Input
               id="newsletter-sender-name"
               value={senderName}
               onChange={(event) => setSenderName(event.target.value)}
-              placeholder="What recipients see in their inbox"
+              placeholder="e.g. Evo Home Team"
               maxLength={120}
               disabled={readOnly}
             />
@@ -904,7 +1088,7 @@ export function NewsletterFormPage({
             disabled={readOnly}
           />
           <div>
-            <Label htmlFor="newsletter-html-file">Upload HTML</Label>
+            <Label htmlFor="newsletter-html-file">Upload HTML file</Label>
             <Input
               id="newsletter-html-file"
               type="file"
@@ -912,50 +1096,116 @@ export function NewsletterFormPage({
               disabled={readOnly}
               onChange={(event) => handleHtmlFile(event.target.files?.[0] ?? null)}
             />
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Accepts a single .html file. You can also paste HTML below.
+            </p>
           </div>
           <div>
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <Label htmlFor="newsletter-html">HTML content</Label>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="newsletter-html">HTML email</Label>
               <button
                 type="button"
                 className="text-[12px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]"
                 onClick={() => setPreviewOpen((open) => !open)}
               >
-                {previewOpen ? "Hide preview" : "Show preview"}
+                {previewOpen ? "Hide preview" : "Show preview with sample data"}
               </button>
+            </div>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {CAMPAIGN_EMAIL_VARIABLES.map((variable) => (
+                <button
+                  key={variable.key}
+                  type="button"
+                  disabled={readOnly}
+                  className="rounded border border-[var(--color-line)] px-2 py-1 text-[11.5px] text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                  onClick={() => insertMergeField(variable.token)}
+                  title={`Insert ${variable.label}`}
+                >
+                  {variable.label}
+                </button>
+              ))}
             </div>
             <Textarea
               id="newsletter-html"
+              ref={htmlEditorRef}
               value={bodyHtml}
               onChange={(event) => setBodyHtml(event.target.value)}
               rows={14}
               className="font-mono text-[12px]"
               disabled={readOnly}
+              placeholder="<html>… paste your email HTML here …</html>"
             />
             <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
-              Merge fields:{" "}
-              {CAMPAIGN_EMAIL_VARIABLES.map((variable) => variable.token).join(", ")}
+              Personalize with the buttons above. If your HTML doesn’t already include an
+              unsubscribe link, we add a safe footer automatically when sending.
             </p>
             {htmlWarnings.length > 0 ? (
-              <ul className="mt-2 space-y-1 text-[12px] text-[var(--color-danger)]">
-                {htmlWarnings.map((warning) => (
-                  <li key={`${warning.code}-${warning.message}`}>{warning.message}</li>
-                ))}
+              <ul className="mt-2 space-y-1.5 text-[12.5px]">
+                {htmlWarnings.map((warning) => {
+                  const blocking =
+                    warning.code === "unsafe_tags" || warning.code === "unsafe_javascript";
+                  return (
+                    <li
+                      key={`${warning.code}-${warning.message}`}
+                      className={
+                        blocking
+                          ? "rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[var(--color-danger)]"
+                          : "rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[var(--color-ink-soft)]"
+                      }
+                    >
+                      <span className="font-medium">
+                        {blocking ? "Must fix before send: " : "Check: "}
+                      </span>
+                      {warning.message}
+                    </li>
+                  );
+                })}
               </ul>
+            ) : bodyHtml.trim() ? (
+              <p className="mt-2 text-[12.5px] text-[var(--color-ink-muted)]">
+                HTML looks usable. Preview it with sample merge data before you send.
+              </p>
             ) : null}
           </div>
-          {previewOpen && previewHtml ? (
-            <iframe
-              title="Newsletter preview"
-              className="h-[420px] w-full rounded-lg border border-[var(--color-line)] bg-white"
-              srcDoc={previewHtml}
-            />
+          {previewOpen && unsafeHtml ? (
+            <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
+              Preview is hidden until you remove unsafe HTML tags or JavaScript.
+            </p>
+          ) : null}
+          {previewOpen && previewHtml && !unsafeHtml ? (
+            <div>
+              <p className="mb-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Preview uses sample data ({CAMPAIGN_EMAIL_PREVIEW_CONTEXT.firstName}{" "}
+                {CAMPAIGN_EMAIL_PREVIEW_CONTEXT.lastName},{" "}
+                {CAMPAIGN_EMAIL_PREVIEW_CONTEXT.projectName}).
+              </p>
+              <iframe
+                title="Newsletter preview"
+                className="h-[420px] w-full rounded-lg border border-[var(--color-line)] bg-white"
+                srcDoc={previewHtml}
+                sandbox=""
+                referrerPolicy="no-referrer"
+              />
+            </div>
           ) : null}
         </section>
+        ) : null}
 
-        <section className="space-y-4">
+        {wizardStep === "audience" ? (
+        <section className="space-y-4" aria-labelledby="newsletter-step-audience">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Audience</h2>
+            <div>
+              <h2
+                id="newsletter-step-audience"
+                className="text-[15px] font-semibold text-[var(--color-ink)]"
+              >
+                Audience
+              </h2>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Choose who should receive this email. You can combine projects, tags, and CSV
+                lists — duplicates are removed automatically.
+              </p>
+            </div>
             {!readOnly ? (
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -965,7 +1215,7 @@ export function NewsletterFormPage({
                     setSegments((current) => [...current, createProjectTagsSegment()])
                   }
                 >
-                  Add project segment
+                  Add project + tags
                 </Button>
                 <Button
                   type="button"
@@ -974,14 +1224,14 @@ export function NewsletterFormPage({
                     setSegments((current) => [...current, createCsvImportSegment()])
                   }
                 >
-                  Add CSV segment
+                  Add CSV list
                 </Button>
               </div>
             ) : null}
           </div>
           <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-            Final audience is the deduplicated union of all segments. Snapshot is taken at
-            send/schedule. CSV imports never enroll leads into drips.
+            When you send or schedule, we lock the recipient list so later tag changes don’t
+            change who was included. CSV imports never start drip campaigns.
           </p>
 
           <div className="space-y-4">
@@ -1124,65 +1374,114 @@ export function NewsletterFormPage({
           </div>
 
           {audiencePreview ? (
-            <div className="rounded-lg border border-[var(--color-line)] px-3 py-3 text-[13px]">
+            <div className="border-t border-[var(--color-line)] pt-3 text-[13px]">
               <p className="font-semibold text-[var(--color-ink)]">
-                {audiencePreview.summary.queued.toLocaleString()} recipients included
+                {audiencePreview.summary.queued.toLocaleString()} people will receive this
               </p>
               <p className="mt-1 text-[var(--color-ink-muted)]">
-                Exclusions — missing email: {audiencePreview.exclusionCounts.missingEmail},
+                Skipped — no email: {audiencePreview.exclusionCounts.missingEmail},
                 unsubscribed: {audiencePreview.exclusionCounts.unsubscribed}, suppressed:{" "}
                 {audiencePreview.exclusionCounts.suppressed}, invalid:{" "}
                 {audiencePreview.exclusionCounts.invalid}, archived:{" "}
-                {audiencePreview.exclusionCounts.archived}, deduped:{" "}
+                {audiencePreview.exclusionCounts.archived}, duplicates removed:{" "}
                 {audiencePreview.exclusionCounts.deduped}
               </p>
               {(audiencePreview.importSummaries?.length ?? 0) > 0 ? (
                 <ul className="mt-2 space-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
                   {audiencePreview.importSummaries?.map((summary) => (
                     <li key={summary.importJobId}>
-                      CSV import {summary.importJobId.slice(-6)}: created{" "}
-                      {summary.createdCount}, existing/skipped {summary.skippedCount}, failed{" "}
-                      {summary.failedCount}, resolved {summary.resolvedLeadCount} (
+                      CSV import …{summary.importJobId.slice(-6)}: created{" "}
+                      {summary.createdCount}, already in CRM {summary.skippedCount}, failed{" "}
+                      {summary.failedCount}, ready {summary.resolvedLeadCount} (
                       {summary.status})
                     </li>
                   ))}
                 </ul>
               ) : null}
               {audiencePreview.summary.unknownConsent > 0 ? (
-                <p className="mt-2 rounded-md bg-[var(--color-warn-soft,rgba(180,120,20,0.12))] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                <p className="mt-2 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
                   {audiencePreview.summary.unknownConsent.toLocaleString()} contacts have
-                  unknown email consent and will be included. Review carefully before send.
+                  unknown email consent and will still be included. Check that before you send.
                 </p>
               ) : null}
             </div>
           ) : (
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-              Save the draft to refresh live recipient counts.
+              Save draft to refresh who is included. You can still continue and save again on
+              Review.
             </p>
           )}
         </section>
+        ) : null}
 
-        <section className="space-y-4">
-          <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Review & send</h2>
-          <div className="rounded-lg border border-[var(--color-line)] px-3 py-3 text-[13px] text-[var(--color-ink-soft)]">
+        {wizardStep === "review" ? (
+        <section className="space-y-4" aria-labelledby="newsletter-step-review">
+          <div>
+            <h2
+              id="newsletter-step-review"
+              className="text-[15px] font-semibold text-[var(--color-ink)]"
+            >
+              Review & send
+            </h2>
+            <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+              Double-check the summary, preview the email, then send now or pick a time.
+            </p>
+          </div>
+          <div className="space-y-2 text-[13px] text-[var(--color-ink-soft)]">
             <p>
               <span className="font-medium text-[var(--color-ink)]">From:</span>{" "}
               {senderName || "—"} &lt;{sending.senderEmail || "—"}&gt;
             </p>
-            <p className="mt-1">
+            <p>
               <span className="font-medium text-[var(--color-ink)]">Subject:</span>{" "}
               {subject || "—"}
             </p>
-            <p className="mt-1">
+            <p>
+              <span className="font-medium text-[var(--color-ink)]">Preview text:</span>{" "}
+              {previewText.trim() || "—"}
+            </p>
+            <p>
               <span className="font-medium text-[var(--color-ink)]">Recipients:</span>{" "}
-              {audiencePreview?.summary.queued?.toLocaleString() ?? "Save to preview"}
+              {audiencePreview?.summary.queued?.toLocaleString() ?? "Save draft to refresh"}
             </p>
-            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
-              Workspace timezone: {formatWorkspaceTimezoneLabel(timezone)}
+            <p className="text-[12px] text-[var(--color-ink-muted)]">
+              Times use {formatWorkspaceTimezoneLabel(timezone)}.
             </p>
+            {unsafeHtml ? (
+              <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
+                Fix unsafe HTML on the Content step before sending.
+              </p>
+            ) : null}
+            {htmlWarnings.some((warning) => warning.code === "missing_unsubscribe") ? (
+              <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                No unsubscribe link in your HTML — a footer will be added automatically.
+              </p>
+            ) : null}
           </div>
+          {unsafeHtml ? (
+            <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
+              Preview is hidden until you remove unsafe HTML on the Content step.
+            </p>
+          ) : previewHtml ? (
+            <div>
+              <p className="mb-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Preview with sample merge data
+              </p>
+              <iframe
+                title="Newsletter review preview"
+                className="h-[360px] w-full rounded-lg border border-[var(--color-line)] bg-white"
+                srcDoc={previewHtml}
+                sandbox=""
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+              Add HTML on the Content step to see a preview here.
+            </p>
+          )}
           <div>
-            <Label htmlFor="newsletter-schedule">Schedule (optional)</Label>
+            <Label htmlFor="newsletter-schedule">Send later (optional)</Label>
             <Input
               id="newsletter-schedule"
               type="datetime-local"
@@ -1190,20 +1489,29 @@ export function NewsletterFormPage({
               disabled={readOnly}
               onChange={(event) => setScheduledForLocal(event.target.value)}
             />
+            <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+              Leave empty to use Send now. You can cancel a scheduled send until it starts.
+            </p>
           </div>
           {canUpdate ? (
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || unsafeHtml || !contentReady || !audienceReady}
                 onClick={() => void handleSendNow()}
               >
-                Send now
+                {submitting ? "Working…" : "Send now"}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
-                disabled={submitting || !scheduledForLocal}
+                disabled={
+                  submitting ||
+                  unsafeHtml ||
+                  !contentReady ||
+                  !audienceReady ||
+                  !scheduledForLocal
+                }
                 onClick={() => void handleSchedule()}
               >
                 Schedule send
@@ -1211,10 +1519,11 @@ export function NewsletterFormPage({
             </div>
           ) : (
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-              Send and schedule require campaign update permission.
+              Ask for campaign update permission to send or schedule.
             </p>
           )}
         </section>
+        ) : null}
       </form>
 
       {newsletterIdForImport && activeCsvSegment?.projectId ? (

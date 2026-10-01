@@ -162,7 +162,7 @@ export function CampaignsPanel({
         ? {
             title: "No newsletters yet",
             description:
-              "Create a one-off newsletter with HTML content, a project audience, and send or schedule.",
+              "Write one email, choose who should get it, then send now or schedule a time.",
             action: "New newsletter",
           }
         : {

@@ -195,7 +195,13 @@ export async function replaceNewsletterSegmentsForWorkspace(
   );
 
   if (campaign.audienceLockedAt) {
-    // Editable until send starts: unlock audience so a new snapshot is required.
+    // Editable until send starts: re-check immediately before unlock/cancel so a
+    // concurrent send tick cannot race past the earlier mutable gate.
+    await assertNewsletterSendNotStarted(
+      workspaceId,
+      campaignId,
+      "This newsletter has already started sending and can no longer be edited.",
+    );
     await updateCampaign(workspaceId, campaignId, {
       audienceLockedAt: null,
       audienceSummary: null,
@@ -244,6 +250,12 @@ export async function replaceNewsletterSegmentsForWorkspace(
       throw new AppError(
         "VALIDATION_ERROR",
         "CSV segments must use an import started from this newsletter (drip enrollment stays disabled).",
+      );
+    }
+    if (importJob.defaults.projectId && importJob.defaults.projectId !== segment.projectId) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "CSV segment project must match the import’s target project.",
       );
     }
 
