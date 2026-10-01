@@ -330,6 +330,17 @@ export async function saveImportJobMapping(
     defaults: input.defaults,
   });
 
+  // Newsletter imports lock target project + optional list tag so clients cannot
+  // clear them (and re-enable unintended drip scope via wrong project defaults).
+  if (job.newsletterCampaignId) {
+    if (job.defaults.projectId) {
+      sanitized.defaults.projectId = job.defaults.projectId;
+    }
+    if (job.defaults.tags) {
+      sanitized.defaults.tags = job.defaults.tags;
+    }
+  }
+
   const mappingIssues = validateMappingConfiguration(
     entityConfig,
     sanitized.mappings,

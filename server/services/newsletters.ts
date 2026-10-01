@@ -240,13 +240,10 @@ export async function replaceNewsletterSegmentsForWorkspace(
         "Finish the CSV import before attaching it as a newsletter audience segment.",
       );
     }
-    if (
-      importJob.newsletterCampaignId &&
-      importJob.newsletterCampaignId !== campaignId
-    ) {
+    if (importJob.newsletterCampaignId !== campaignId) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "This CSV import belongs to a different newsletter.",
+        "CSV segments must use an import started from this newsletter (drip enrollment stays disabled).",
       );
     }
 

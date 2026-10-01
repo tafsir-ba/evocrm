@@ -581,21 +581,18 @@ export function NewsletterFormPage({
         setStepId(stepBody.data?.step?.id ?? null);
       }
 
-      const segmentsForApi =
-        savableSegments.length > 0
-          ? savableSegments
-          : segments
-              .filter((segment) => Boolean(segment.projectId))
-              .slice(0, 1)
-              .map((segment) => ({
-                key: segment.key,
-                type: "project_tags" as const,
-                projectId: segment.projectId,
-                tagIds: [] as string[],
-                tagMatch: "any" as const,
-              }));
+      const segmentsForApi = savableSegments;
 
+      // CSV bootstrap (allowIncompleteCsv) may create the campaign before any
+      // import finishes. Never invent a project_tags stub — that would briefly
+      // target the entire project membership.
       if (segmentsForApi.length === 0) {
+        if (options?.allowIncompleteCsv) {
+          if (!options?.stay) {
+            router.replace(workspacePath(workspaceSlug, `dripping/newsletters/${id}`));
+          }
+          return id;
+        }
         setFormError("Add at least one audience segment with a project.");
         return null;
       }

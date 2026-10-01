@@ -250,6 +250,40 @@ describe("newsletter audience resolve", () => {
     expect(result.summary.deduped).toBe(0);
   });
 
+  it("rejects csv segments whose import is not finished", async () => {
+    vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
+      {
+        id: "seg-csv",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "csv_import",
+        order: 1,
+        projectId: "proj-1",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: "import-1",
+        applyTagId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(findImportJobById).mockResolvedValue({
+      id: "import-1",
+      workspaceId: "ws-1",
+      entityType: "lead",
+      status: "ready",
+      newsletterCampaignId: "camp-1",
+      createdCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      rowResults: [],
+    } as never);
+
+    await expect(resolveNewsletterAudience("ws-1", "camp-1")).rejects.toBeInstanceOf(
+      AppError,
+    );
+  });
+
   it("rejects audiences over the hard cap", async () => {
     vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
       {

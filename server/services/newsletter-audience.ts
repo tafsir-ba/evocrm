@@ -135,6 +135,24 @@ async function resolveCsvImportSegmentLeadIds(
     );
   }
 
+  if (job.status !== "completed" && job.status !== "completed_with_errors") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletter CSV segment import is not finished yet.",
+    );
+  }
+
+  if (
+    job.newsletterCampaignId &&
+    segment.campaignId &&
+    job.newsletterCampaignId !== segment.campaignId
+  ) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletter CSV segment import belongs to a different newsletter.",
+    );
+  }
+
   const leadIds = [
     ...new Set(
       (job.rowResults ?? [])
