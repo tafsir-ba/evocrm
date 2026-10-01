@@ -23,11 +23,16 @@ vi.mock("@/server/repositories/import-jobs", () => ({
   findImportJobById: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/campaigns", () => ({
+  findCampaignById: vi.fn(),
+}));
+
 import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findLeadsByIds } from "@/server/repositories/leads";
 import { findSuppressionsByEmails } from "@/server/repositories/email-suppressions";
 import { findNewsletterAudienceSegments } from "@/server/repositories/newsletter-audience-segments";
 import { findImportJobById } from "@/server/repositories/import-jobs";
+import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   assertNewsletterAudienceSendable,
   resolveNewsletterAudience,
@@ -79,6 +84,32 @@ function lead(overrides: Record<string, unknown> = {}) {
 describe("newsletter audience resolve", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(findCampaignById).mockResolvedValue({
+      id: "camp-1",
+      workspaceId: "ws-1",
+      name: "Newsletter",
+      status: "draft",
+      kind: "newsletter",
+      audienceType: "leads",
+      projectIds: ["proj-1"],
+      autoEnrollmentEnabled: false,
+      enrollmentTrigger: "manual_only",
+      enrollmentRules: { logic: "AND", conditions: [] },
+      frequency: null,
+      defaultFromName: null,
+      senderName: null,
+      senderEmail: null,
+      sendingDomainId: null,
+      scheduledFor: null,
+      audienceLockedAt: null,
+      audienceSummary: null,
+      unknownConsentPolicy: "include_and_flag",
+      createdBy: "user-1",
+      ownerId: null,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   });
 
   it("includes membership leads, flags unknown consent, and excludes unsubscribed", async () => {
@@ -365,6 +396,7 @@ describe("newsletter audience resolve", () => {
         included: [],
         exclusions: [],
         flaggedUnknownConsent: [],
+        unknownConsentPolicy: "include_and_flag",
         summary: {
           queued: 0,
           excludedMissingEmail: 0,
@@ -372,11 +404,55 @@ describe("newsletter audience resolve", () => {
           excludedSuppressed: 0,
           excludedInvalid: 0,
           excludedArchived: 0,
+          excludedUnknownConsent: 0,
           unknownConsent: 0,
           deduped: 0,
         },
         importSummaries: [],
       }),
     ).toThrow(AppError);
+  });
+
+  it("excludes unknown consent when policy requires subscribed", async () => {
+    vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
+      {
+        id: "seg-1",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "project_tags",
+        order: 1,
+        projectId: "proj-1",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(findLeadIdsForProjectMembership).mockResolvedValue(["lead-1", "lead-2"]);
+    vi.mocked(findLeadsByIds).mockResolvedValue([
+      lead({ id: "lead-1", emailConsentStatus: "unknown" }),
+      lead({
+        id: "lead-2",
+        email: "bob@example.com",
+        emailNormalized: "bob@example.com",
+        fullName: "Bob",
+        emailConsentStatus: "subscribed",
+      }),
+    ] as never);
+    vi.mocked(findSuppressionsByEmails).mockResolvedValue([]);
+
+    const result = await resolveNewsletterAudience("ws-1", "camp-1", {
+      unknownConsentPolicy: "require_subscribed",
+    });
+
+    expect(result.included).toHaveLength(1);
+    expect(result.included[0]?.leadId).toBe("lead-2");
+    expect(result.summary.excludedUnknownConsent).toBe(1);
+    expect(result.exclusions.some((row) => row.reason === "unknown_consent")).toBe(
+      true,
+    );
+    expect(result.flaggedUnknownConsent).toHaveLength(0);
   });
 });

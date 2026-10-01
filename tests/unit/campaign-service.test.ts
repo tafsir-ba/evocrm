@@ -437,4 +437,29 @@ describe("campaign service", () => {
     );
     expect(result).toEqual({ deleted: true });
   });
+
+  it("rejects unknownConsentPolicy on drip create and update", async () => {
+    await expect(
+      createCampaignForWorkspace("ws-1", "user-1", {
+        name: "Buyer Follow-up",
+        audienceType: "leads",
+        unknownConsentPolicy: "require_subscribed",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Unknown-consent policy applies only to newsletters.",
+    });
+    expect(createCampaign).not.toHaveBeenCalled();
+
+    vi.mocked(findCampaignById).mockResolvedValue(baseCampaign);
+    await expect(
+      updateCampaignForWorkspace("ws-1", "user-1", "camp-1", {
+        unknownConsentPolicy: "require_subscribed",
+      }),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Unknown-consent policy applies only to newsletters.",
+    });
+    expect(updateCampaign).not.toHaveBeenCalled();
+  });
 });

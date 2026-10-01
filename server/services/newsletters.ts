@@ -402,6 +402,10 @@ export async function previewNewsletterAudienceForWorkspace(
   workspaceId: string,
   campaignId: string,
   userId?: string,
+  query: {
+    exclusionPage?: number;
+    exclusionPageSize?: number;
+  } = {},
 ) {
   const campaign = await findCampaignById(workspaceId, campaignId);
   if (!campaign) {
@@ -416,22 +420,92 @@ export async function previewNewsletterAudienceForWorkspace(
   );
 
   const result = await resolveNewsletterAudience(workspaceId, campaignId);
+  const exclusionPage = query.exclusionPage ?? 1;
+  const exclusionPageSize = query.exclusionPageSize ?? 25;
+  const exclusionStart = (exclusionPage - 1) * exclusionPageSize;
+  const exclusionEnd = exclusionStart + exclusionPageSize;
 
   return {
     summary: result.summary,
+    unknownConsentPolicy: result.unknownConsentPolicy,
     includedSample: result.included.slice(0, 25),
     flaggedUnknownConsentSample: result.flaggedUnknownConsent.slice(0, 25),
-    exclusionSample: result.exclusions.slice(0, 50),
+    exclusionSample: result.exclusions.slice(exclusionStart, exclusionEnd),
+    exclusions: {
+      items: result.exclusions.slice(exclusionStart, exclusionEnd),
+      total: result.exclusions.length,
+      page: exclusionPage,
+      pageSize: exclusionPageSize,
+      totalPages: Math.max(1, Math.ceil(result.exclusions.length / exclusionPageSize)),
+    },
+    flaggedUnknownConsent: {
+      items: result.flaggedUnknownConsent.slice(0, 50),
+      total: result.flaggedUnknownConsent.length,
+    },
     exclusionCounts: {
       missingEmail: result.summary.excludedMissingEmail,
       unsubscribed: result.summary.excludedUnsubscribed,
       suppressed: result.summary.excludedSuppressed,
       invalid: result.summary.excludedInvalid,
       archived: result.summary.excludedArchived,
+      unknownConsent: result.summary.excludedUnknownConsent,
       deduped: result.summary.deduped,
     },
     importSummaries: result.importSummaries,
   };
+}
+
+export function buildNewsletterAudienceExclusionsCsv(
+  result: Awaited<ReturnType<typeof resolveNewsletterAudience>>,
+): string {
+  const header = "type,reason,fullName,email,leadId";
+  const exclusionRows = result.exclusions.map((row) =>
+    [
+      "excluded",
+      row.reason,
+      csvEscape(row.fullName),
+      csvEscape(row.email ?? ""),
+      row.leadId,
+    ].join(","),
+  );
+  const flaggedRows = result.flaggedUnknownConsent.map((row) =>
+    [
+      "flagged_unknown_consent",
+      "unknown_consent",
+      csvEscape(row.fullName),
+      csvEscape(row.email),
+      row.leadId,
+    ].join(","),
+  );
+  return [header, ...exclusionRows, ...flaggedRows].join("\n");
+}
+
+function csvEscape(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export async function exportNewsletterAudienceExclusionsCsvForWorkspace(
+  workspaceId: string,
+  campaignId: string,
+  userId?: string,
+): Promise<string> {
+  const campaign = await findCampaignById(workspaceId, campaignId);
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Newsletter not found.");
+  }
+  assertIsNewsletter(campaign);
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
+
+  const result = await resolveNewsletterAudience(workspaceId, campaignId);
+  return buildNewsletterAudienceExclusionsCsv(result);
 }
 
 async function assertNewsletterSendNotStarted(

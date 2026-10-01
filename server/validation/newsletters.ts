@@ -59,10 +59,19 @@ export const newsletterAudienceImportInputSchema = z
   })
   .strict();
 
+export const newsletterAudiencePreviewQuerySchema = z.object({
+  exclusionPage: z.coerce.number().int().min(1).default(1),
+  exclusionPageSize: z.coerce.number().int().min(1).max(100).default(25),
+  export: z.enum(["exclusions"]).optional(),
+});
+
 export type NewsletterAudienceSegmentsInput = z.infer<
   typeof newsletterAudienceSegmentsInputSchema
 >;
 export type NewsletterScheduleInput = z.infer<typeof newsletterScheduleInputSchema>;
 export type NewsletterAudienceImportInput = z.infer<
   typeof newsletterAudienceImportInputSchema
+>;
+export type NewsletterAudiencePreviewQuery = z.infer<
+  typeof newsletterAudiencePreviewQuerySchema
 >;

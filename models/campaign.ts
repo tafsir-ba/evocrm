@@ -2,6 +2,10 @@ import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
 const CAMPAIGN_STATUSES = ["draft", "active", "paused", "archived"] as const;
 const CAMPAIGN_KINDS = ["drip", "newsletter"] as const;
+const NEWSLETTER_UNKNOWN_CONSENT_POLICIES = [
+  "include_and_flag",
+  "require_subscribed",
+] as const;
 const CAMPAIGN_AUDIENCE_TYPES = ["leads", "opportunities"] as const;
 const ENROLLMENT_TRIGGERS = ["new_lead", "lead_updated", "manual_only"] as const;
 const ENROLLMENT_LOGIC = ["AND", "OR"] as const;
@@ -48,6 +52,7 @@ const audienceSummarySchema = new Schema(
     excludedSuppressed: { type: Number, default: 0 },
     excludedInvalid: { type: Number, default: 0 },
     excludedArchived: { type: Number, default: 0 },
+    excludedUnknownConsent: { type: Number, default: 0 },
     unknownConsent: { type: Number, default: 0 },
     deduped: { type: Number, default: 0 },
   },
@@ -101,6 +106,12 @@ const campaignSchema = new Schema(
     audienceSummary: {
       type: audienceSummarySchema,
       default: null,
+    },
+    /** Newsletter-only: include unknown consent (default) or require subscribed. */
+    unknownConsentPolicy: {
+      type: String,
+      enum: NEWSLETTER_UNKNOWN_CONSENT_POLICIES,
+      default: "include_and_flag",
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },

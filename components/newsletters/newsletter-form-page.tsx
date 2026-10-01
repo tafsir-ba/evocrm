@@ -42,6 +42,7 @@ type NewsletterCampaign = {
   defaultFromName: string | null;
   scheduledFor: string | null;
   audienceLockedAt: string | null;
+  unknownConsentPolicy?: "include_and_flag" | "require_subscribed";
   audienceSummary: {
     queued: number;
     excludedMissingEmail: number;
@@ -49,6 +50,7 @@ type NewsletterCampaign = {
     excludedSuppressed: number;
     excludedInvalid: number;
     excludedArchived: number;
+    excludedUnknownConsent?: number;
     unknownConsent: number;
     deduped: number;
   } | null;
@@ -65,6 +67,13 @@ type NewsletterStep = {
   fromName: string | null;
 };
 
+type AudienceExclusionRow = {
+  leadId: string;
+  email: string | null;
+  fullName: string;
+  reason: string;
+};
+
 type AudiencePreview = {
   summary: {
     queued: number;
@@ -73,20 +82,39 @@ type AudiencePreview = {
     excludedSuppressed: number;
     excludedInvalid: number;
     excludedArchived: number;
+    excludedUnknownConsent?: number;
     unknownConsent: number;
     deduped: number;
   };
+  unknownConsentPolicy?: "include_and_flag" | "require_subscribed";
   flaggedUnknownConsentSample: Array<{
     leadId: string;
     email: string;
     fullName: string;
   }>;
+  exclusionSample?: AudienceExclusionRow[];
+  exclusions?: {
+    items: AudienceExclusionRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+  flaggedUnknownConsent?: {
+    items: Array<{
+      leadId: string;
+      email: string;
+      fullName: string;
+    }>;
+    total: number;
+  };
   exclusionCounts: {
     missingEmail: number;
     unsubscribed: number;
     suppressed: number;
     invalid: number;
     archived: number;
+    unknownConsent?: number;
     deduped: number;
   };
   importSummaries?: Array<{
@@ -98,6 +126,16 @@ type AudiencePreview = {
     failedCount: number;
     resolvedLeadCount: number;
   }>;
+};
+
+const EXCLUSION_REASON_LABELS: Record<string, string> = {
+  missing_email: "No email",
+  invalid_email: "Invalid email",
+  unsubscribed: "Unsubscribed",
+  suppressed: "Suppressed",
+  archived: "Archived",
+  deduped: "Duplicate email",
+  unknown_consent: "Unknown consent",
 };
 
 type ProjectTagsSegmentDraft = {
@@ -180,6 +218,10 @@ export function NewsletterFormPage({
   const [campaign, setCampaign] = useState<NewsletterCampaign | null>(null);
   const [stepId, setStepId] = useState<string | null>(null);
   const [audiencePreview, setAudiencePreview] = useState<AudiencePreview | null>(null);
+  const [exclusionPage, setExclusionPage] = useState(1);
+  const [unknownConsentPolicy, setUnknownConsentPolicy] = useState<
+    "include_and_flag" | "require_subscribed"
+  >("include_and_flag");
   const [scheduledForLocal, setScheduledForLocal] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -225,14 +267,16 @@ export function NewsletterFormPage({
   }, [workspaceSlug]);
 
   const refreshAudiencePreview = useCallback(
-    async (id: string) => {
-      const response = await fetch(`${apiNewsletters}/${id}/audience/preview`);
+    async (id: string, page = exclusionPage) => {
+      const response = await fetch(
+        `${apiNewsletters}/${id}/audience/preview?exclusionPage=${page}&exclusionPageSize=25`,
+      );
       const payload = await response.json();
       if (response.ok) {
-        setAudiencePreview(payload.data?.preview ?? null);
+        setAudiencePreview((payload.data?.preview ?? null) as AudiencePreview | null);
       }
     },
-    [apiNewsletters],
+    [apiNewsletters, exclusionPage],
   );
 
   const loadExisting = useCallback(async () => {
@@ -272,6 +316,11 @@ export function NewsletterFormPage({
       setCampaign(nextCampaign);
       setName(nextCampaign.name ?? "");
       setSenderName(nextCampaign.senderName ?? nextCampaign.defaultFromName ?? "");
+      setUnknownConsentPolicy(
+        nextCampaign.unknownConsentPolicy === "require_subscribed"
+          ? "require_subscribed"
+          : "include_and_flag",
+      );
       setSending({
         sendingDomainId: nextCampaign.sendingDomainId ?? "",
         senderEmail: nextCampaign.senderEmail ?? "",
@@ -507,6 +556,7 @@ export function NewsletterFormPage({
             kind: "newsletter",
             audienceType: "leads",
             projectIds,
+            unknownConsentPolicy,
             ...senderFields,
           }),
         });
@@ -528,6 +578,7 @@ export function NewsletterFormPage({
             defaultFromName: senderName.trim() || null,
             sendingDomainId: sending.sendingDomainId || null,
             senderEmail: sending.senderEmail || null,
+            unknownConsentPolicy,
           }),
         });
         const updatePayload = await updateRes.json();
@@ -805,6 +856,12 @@ export function NewsletterFormPage({
       Boolean(segment.projectId) &&
       (segment.type === "project_tags" || Boolean(segment.importJobId)),
   );
+  const consentPreviewStale = Boolean(
+    audiencePreview &&
+      audiencePreview.unknownConsentPolicy &&
+      audiencePreview.unknownConsentPolicy !== unknownConsentPolicy,
+  );
+  const sendReady = contentReady && audienceReady && !consentPreviewStale;
 
   const steps = [
     { id: "content" as const, label: "1. Content", hint: "Subject & HTML" },
@@ -1373,21 +1430,61 @@ export function NewsletterFormPage({
             ))}
           </div>
 
+          <div className="space-y-2 border-t border-[var(--color-line)] pt-3">
+            <Label htmlFor="newsletter-consent-policy">
+              Contacts with unknown email consent
+            </Label>
+            <Select
+              id="newsletter-consent-policy"
+              value={unknownConsentPolicy}
+              disabled={readOnly}
+              onChange={(event) => {
+                const next = event.target.value as
+                  | "include_and_flag"
+                  | "require_subscribed";
+                setUnknownConsentPolicy(next);
+              }}
+            >
+              <option value="include_and_flag">
+                Include them, and flag for review (recommended)
+              </option>
+              <option value="require_subscribed">
+                Skip them — only send to subscribed contacts
+              </option>
+            </Select>
+            <p className="text-[12px] text-[var(--color-ink-muted)]">
+              Unsubscribed and suppressed contacts are always skipped. Save draft to
+              refresh counts after changing this.
+            </p>
+            {consentPreviewStale ? (
+              <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                Consent setting changed. Save draft to refresh who is included before
+                you send.
+              </p>
+            ) : null}
+          </div>
+
           {audiencePreview ? (
-            <div className="border-t border-[var(--color-line)] pt-3 text-[13px]">
-              <p className="font-semibold text-[var(--color-ink)]">
-                {audiencePreview.summary.queued.toLocaleString()} people will receive this
-              </p>
-              <p className="mt-1 text-[var(--color-ink-muted)]">
-                Skipped — no email: {audiencePreview.exclusionCounts.missingEmail},
-                unsubscribed: {audiencePreview.exclusionCounts.unsubscribed}, suppressed:{" "}
-                {audiencePreview.exclusionCounts.suppressed}, invalid:{" "}
-                {audiencePreview.exclusionCounts.invalid}, archived:{" "}
-                {audiencePreview.exclusionCounts.archived}, duplicates removed:{" "}
-                {audiencePreview.exclusionCounts.deduped}
-              </p>
+            <div className="border-t border-[var(--color-line)] pt-3 space-y-4 text-[13px]">
+              <div>
+                <p className="font-semibold text-[var(--color-ink)]">
+                  {audiencePreview.summary.queued.toLocaleString()} people will receive this
+                </p>
+                <p className="mt-1 text-[var(--color-ink-muted)]">
+                  Skipped — no email: {audiencePreview.exclusionCounts.missingEmail},
+                  unsubscribed: {audiencePreview.exclusionCounts.unsubscribed}, suppressed:{" "}
+                  {audiencePreview.exclusionCounts.suppressed}, invalid:{" "}
+                  {audiencePreview.exclusionCounts.invalid}, archived:{" "}
+                  {audiencePreview.exclusionCounts.archived}
+                  {audiencePreview.exclusionCounts.unknownConsent
+                    ? `, unknown consent: ${audiencePreview.exclusionCounts.unknownConsent}`
+                    : ""}
+                  , duplicates removed: {audiencePreview.exclusionCounts.deduped}
+                </p>
+              </div>
+
               {(audiencePreview.importSummaries?.length ?? 0) > 0 ? (
-                <ul className="mt-2 space-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                <ul className="space-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
                   {audiencePreview.importSummaries?.map((summary) => (
                     <li key={summary.importJobId}>
                       CSV import …{summary.importJobId.slice(-6)}: created{" "}
@@ -1398,11 +1495,171 @@ export function NewsletterFormPage({
                   ))}
                 </ul>
               ) : null}
-              {audiencePreview.summary.unknownConsent > 0 ? (
-                <p className="mt-2 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+
+              {audiencePreview.summary.unknownConsent > 0 &&
+              unknownConsentPolicy === "include_and_flag" &&
+              !consentPreviewStale ? (
+                <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
                   {audiencePreview.summary.unknownConsent.toLocaleString()} contacts have
                   unknown email consent and will still be included. Check that before you send.
                 </p>
+              ) : null}
+
+              {audiencePreview.summary.unknownConsent > 0 &&
+              unknownConsentPolicy === "require_subscribed" &&
+              !consentPreviewStale ? (
+                <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                  {(audiencePreview.exclusionCounts.unknownConsent ||
+                    audiencePreview.summary.excludedUnknownConsent ||
+                    audiencePreview.summary.unknownConsent
+                  ).toLocaleString()}{" "}
+                  contacts with unknown consent will be skipped.
+                </p>
+              ) : null}
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium text-[var(--color-ink)]">
+                    People not included
+                    {audiencePreview.exclusions
+                      ? ` (${audiencePreview.exclusions.total.toLocaleString()})`
+                      : ""}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      const id = newsletterIdForImport ?? createdIdRef.current;
+                      if (!id) {
+                        setFormError("Save draft before downloading exclusions.");
+                        return;
+                      }
+                      window.location.href = `${apiNewsletters}/${id}/audience/preview?export=exclusions`;
+                    }}
+                  >
+                    Download CSV
+                  </Button>
+                </div>
+                {(audiencePreview.exclusions?.items.length ??
+                  audiencePreview.exclusionSample?.length ??
+                  0) === 0 ? (
+                  <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                    No exclusions for the current audience.
+                  </p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto rounded-md border border-[var(--color-line)]">
+                      <table className="w-full min-w-[480px] text-left text-[12.5px]">
+                        <thead>
+                          <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
+                            <th className="px-2 py-1.5 font-medium">Name</th>
+                            <th className="px-2 py-1.5 font-medium">Email</th>
+                            <th className="px-2 py-1.5 font-medium">Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(
+                            audiencePreview.exclusions?.items ??
+                            audiencePreview.exclusionSample ??
+                            []
+                          ).map((row) => (
+                            <tr
+                              key={`${row.leadId}-${row.reason}`}
+                              className="border-b border-[var(--color-line)] text-[var(--color-ink)]"
+                            >
+                              <td className="px-2 py-1.5">{row.fullName || "—"}</td>
+                              <td className="px-2 py-1.5">{row.email || "—"}</td>
+                              <td className="px-2 py-1.5">
+                                {EXCLUSION_REASON_LABELS[row.reason] ?? row.reason}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {audiencePreview.exclusions &&
+                    audiencePreview.exclusions.totalPages > 1 ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={exclusionPage <= 1}
+                          onClick={() => {
+                            const nextPage = Math.max(1, exclusionPage - 1);
+                            setExclusionPage(nextPage);
+                            const id = createdIdRef.current;
+                            if (id) {
+                              void refreshAudiencePreview(id, nextPage);
+                            }
+                          }}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-[12px] text-[var(--color-ink-muted)]">
+                          Page {audiencePreview.exclusions.page} of{" "}
+                          {audiencePreview.exclusions.totalPages}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={
+                            exclusionPage >= audiencePreview.exclusions.totalPages
+                          }
+                          onClick={() => {
+                            const nextPage = exclusionPage + 1;
+                            setExclusionPage(nextPage);
+                            const id = createdIdRef.current;
+                            if (id) {
+                              void refreshAudiencePreview(id, nextPage);
+                            }
+                          }}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {(audiencePreview.flaggedUnknownConsent?.total ??
+                audiencePreview.flaggedUnknownConsentSample.length) > 0 &&
+              unknownConsentPolicy === "include_and_flag" &&
+              !consentPreviewStale ? (
+                <div className="space-y-2">
+                  <p className="font-medium text-[var(--color-ink)]">
+                    Included with unknown consent (
+                    {(
+                      audiencePreview.flaggedUnknownConsent?.total ??
+                      audiencePreview.flaggedUnknownConsentSample.length
+                    ).toLocaleString()}
+                    )
+                  </p>
+                  <div className="overflow-x-auto rounded-md border border-[var(--color-line)]">
+                    <table className="w-full min-w-[400px] text-left text-[12.5px]">
+                      <thead>
+                        <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
+                          <th className="px-2 py-1.5 font-medium">Name</th>
+                          <th className="px-2 py-1.5 font-medium">Email</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(
+                          audiencePreview.flaggedUnknownConsent?.items ??
+                          audiencePreview.flaggedUnknownConsentSample
+                        ).map((row) => (
+                          <tr
+                            key={row.leadId}
+                            className="border-b border-[var(--color-line)] text-[var(--color-ink)]"
+                          >
+                            <td className="px-2 py-1.5">{row.fullName || "—"}</td>
+                            <td className="px-2 py-1.5">{row.email}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ) : null}
             </div>
           ) : (
@@ -1442,11 +1699,20 @@ export function NewsletterFormPage({
             </p>
             <p>
               <span className="font-medium text-[var(--color-ink)]">Recipients:</span>{" "}
-              {audiencePreview?.summary.queued?.toLocaleString() ?? "Save draft to refresh"}
+              {consentPreviewStale
+                ? "Save draft to refresh after consent change"
+                : (audiencePreview?.summary.queued?.toLocaleString() ??
+                  "Save draft to refresh")}
             </p>
             <p className="text-[12px] text-[var(--color-ink-muted)]">
               Times use {formatWorkspaceTimezoneLabel(timezone)}.
             </p>
+            {consentPreviewStale ? (
+              <p className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
+                Consent setting changed since the last audience refresh. Save draft on
+                Audience, then confirm the recipient count before sending.
+              </p>
+            ) : null}
             {unsafeHtml ? (
               <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
                 Fix unsafe HTML on the Content step before sending.
@@ -1497,7 +1763,7 @@ export function NewsletterFormPage({
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={submitting || unsafeHtml || !contentReady || !audienceReady}
+                disabled={submitting || unsafeHtml || !sendReady}
                 onClick={() => void handleSendNow()}
               >
                 {submitting ? "Working…" : "Send now"}
@@ -1508,8 +1774,7 @@ export function NewsletterFormPage({
                 disabled={
                   submitting ||
                   unsafeHtml ||
-                  !contentReady ||
-                  !audienceReady ||
+                  !sendReady ||
                   !scheduledForLocal
                 }
                 onClick={() => void handleSchedule()}
@@ -1546,53 +1811,79 @@ export function NewsletterFormPage({
           lockedProjectId={activeCsvSegment.projectId}
           lockedTagId={activeCsvSegment.applyTagId}
           onCompleteWithJob={(jobId) => {
-            setSegments((current) => {
-              const next = current.map((segment) =>
-                segment.key === activeCsvSegment.key && segment.type === "csv_import"
-                  ? { ...segment, importJobId: jobId }
-                  : segment,
-              );
+            void (async () => {
+              let nextSegments: AudienceSegmentDraft[] = [];
+              setSegments((current) => {
+                nextSegments = current.map((segment) =>
+                  segment.key === activeCsvSegment.key && segment.type === "csv_import"
+                    ? { ...segment, importJobId: jobId }
+                    : segment,
+                );
+                return nextSegments;
+              });
 
               const id = newsletterIdForImport;
-              if (id) {
-                const payload = {
-                  segments: next
-                    .filter(
-                      (segment) =>
-                        segment.projectId &&
-                        (segment.type === "project_tags" ||
-                          (segment.type === "csv_import" && segment.importJobId)),
-                    )
-                    .map((segment, index) =>
-                      segment.type === "csv_import"
-                        ? {
-                            type: "csv_import" as const,
-                            order: index + 1,
-                            projectId: segment.projectId!,
-                            importJobId: segment.importJobId!,
-                            applyTagId: segment.applyTagId,
-                          }
-                        : {
-                            type: "project_tags" as const,
-                            order: index + 1,
-                            projectId: segment.projectId!,
-                            tagIds: segment.tagIds,
-                            tagMatch: segment.tagMatch,
-                          },
-                    ),
-                };
+              if (!id) {
+                return;
+              }
 
-                if (payload.segments.length > 0) {
-                  void fetch(`${apiNewsletters}/${id}/audience/segments`, {
+              const payload = {
+                segments: nextSegments
+                  .filter(
+                    (segment) =>
+                      segment.projectId &&
+                      (segment.type === "project_tags" ||
+                        (segment.type === "csv_import" && segment.importJobId)),
+                  )
+                  .map((segment, index) =>
+                    segment.type === "csv_import"
+                      ? {
+                          type: "csv_import" as const,
+                          order: index + 1,
+                          projectId: segment.projectId!,
+                          importJobId: segment.importJobId!,
+                          applyTagId: segment.applyTagId,
+                        }
+                      : {
+                          type: "project_tags" as const,
+                          order: index + 1,
+                          projectId: segment.projectId!,
+                          tagIds: segment.tagIds,
+                          tagMatch: segment.tagMatch,
+                        },
+                  ),
+              };
+
+              if (payload.segments.length === 0) {
+                return;
+              }
+
+              try {
+                const response = await fetch(
+                  `${apiNewsletters}/${id}/audience/segments`,
+                  {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
-                  }).then(() => refreshAudiencePreview(id));
+                  },
+                );
+                const body = await response.json().catch(() => null);
+                if (!response.ok) {
+                  setFormError(
+                    formatApiErrorMessage(
+                      body,
+                      "CSV imported, but saving the audience segment failed. Save draft to retry.",
+                    ),
+                  );
+                  return;
                 }
+                await refreshAudiencePreview(id);
+              } catch {
+                setFormError(
+                  "CSV imported, but saving the audience segment failed. Save draft to retry.",
+                );
               }
-
-              return next;
-            });
+            })();
           }}
         />
       ) : null}

@@ -88,6 +88,9 @@ function mergeCampaignUpdate(
     ...(input.sendingDomainId !== undefined ? { sendingDomainId: input.sendingDomainId } : {}),
     ...(input.ownerId !== undefined ? { ownerId: input.ownerId } : {}),
     ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.unknownConsentPolicy !== undefined
+      ? { unknownConsentPolicy: input.unknownConsentPolicy }
+      : {}),
   };
 }
 
@@ -322,6 +325,13 @@ export async function createCampaignForWorkspace(
     validateAutoEnrollmentSettings(normalizedInput);
   }
 
+  if (!isNewsletter && normalizedInput.unknownConsentPolicy !== undefined) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Unknown-consent policy applies only to newsletters.",
+    );
+  }
+
   await validateOptionalAssignableMember(workspaceId, normalizedInput.ownerId, "Owner");
   await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
   if (!isNewsletter) {
@@ -345,6 +355,12 @@ export async function createCampaignForWorkspace(
     senderName: normalizedInput.senderName ?? normalizedInput.defaultFromName ?? null,
     senderEmail: normalizedInput.senderEmail ?? null,
     sendingDomainId: normalizedInput.sendingDomainId ?? null,
+    ...(isNewsletter
+      ? {
+          unknownConsentPolicy:
+            normalizedInput.unknownConsentPolicy ?? "include_and_flag",
+        }
+      : {}),
     createdBy: actorId,
     ownerId: normalizedInput.ownerId ?? null,
   });
@@ -449,6 +465,11 @@ export async function updateCampaignForWorkspace(
         "Newsletter project scope is derived from audience segments and cannot be set directly.",
       );
     }
+  } else if (normalizedInput.unknownConsentPolicy !== undefined) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Unknown-consent policy applies only to newsletters.",
+    );
   }
 
   if (normalizedInput.status) {
@@ -536,6 +557,9 @@ export async function updateCampaignForWorkspace(
       : {}),
     ...(normalizedInput.ownerId !== undefined ? { ownerId: normalizedInput.ownerId } : {}),
     ...(normalizedInput.status !== undefined ? { status: normalizedInput.status } : {}),
+    ...(normalizedInput.unknownConsentPolicy !== undefined && isNewsletter
+      ? { unknownConsentPolicy: normalizedInput.unknownConsentPolicy }
+      : {}),
   });
 
   if (!updated) {

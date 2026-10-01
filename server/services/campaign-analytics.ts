@@ -89,6 +89,7 @@ export type CampaignAnalyticsReport = {
     id: string;
     name: string;
     status: string;
+    kind: "drip" | "newsletter";
     createdAt: string;
   };
   period: {
@@ -122,6 +123,27 @@ export type CampaignAnalyticsReport = {
     unsubscribeRate: number | null;
     complaintRate: number | null;
   };
+  /** Present when campaign.kind === "newsletter". */
+  newsletterSummary: {
+    recipientsQueued: number;
+    stillQueued: number;
+    sent: number;
+    delivered: number;
+    failed: number;
+    bounced: number;
+    skipped: number;
+    uniqueOpens: number;
+    uniqueClicks: number;
+    unsubscribes: number;
+    audienceLockedAt: string | null;
+    unknownConsentAtLock: number | null;
+    sendStatusCounts: {
+      queued: number;
+      sent: number;
+      failed: number;
+      skipped: number;
+    };
+  } | null;
   cards: MetricCardData[];
   funnel: Array<{
     stage: string;
@@ -533,7 +555,13 @@ export type ResolvedCampaignAnalyticsPeriod = {
     id: string;
     name: string;
     status: string;
+    kind: "drip" | "newsletter";
     createdAt: Date;
+    audienceLockedAt: Date | null;
+    audienceSummary: {
+      queued: number;
+      unknownConsent: number;
+    } | null;
   };
   preset: CampaignAnalyticsPeriodPreset | "custom";
   from: Date;
@@ -598,7 +626,15 @@ export async function resolveCampaignAnalyticsPeriod(
       id: campaign.id,
       name: campaign.name,
       status: campaign.status,
+      kind: campaign.kind,
       createdAt: campaign.createdAt,
+      audienceLockedAt: campaign.audienceLockedAt,
+      audienceSummary: campaign.audienceSummary
+        ? {
+            queued: campaign.audienceSummary.queued,
+            unknownConsent: campaign.audienceSummary.unknownConsent,
+          }
+        : null,
     },
     preset: query.dateFrom && query.dateTo ? "custom" : preset,
     from,
@@ -619,12 +655,66 @@ export async function getCampaignAnalyticsForWorkspace(
   const campaign = resolved.campaign;
 
   const envConfigured = Boolean(getEnv().RESEND_WEBHOOK_SECRET);
-  const [current, previous, unsubscribed, series, steps] = await Promise.all([
+  const { countCampaignSendsByStatus } = await import(
+    "@/server/repositories/campaign-sends"
+  );
+  const { CampaignEnrollmentModel } = await import("@/models/campaign-enrollment");
+  const { connectDb } = await import("@/server/db/mongoose");
+
+  const newsletterAllTimeFrom =
+    campaign.kind === "newsletter"
+      ? campaign.createdAt < CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        ? CAMPAIGN_ANALYTICS_AVAILABLE_FROM
+        : campaign.createdAt
+      : from;
+  const newsletterAllTimeTo = new Date();
+
+  const [
+    current,
+    previous,
+    unsubscribed,
+    series,
+    steps,
+    sendStatusCounts,
+    stillQueued,
+    newsletterLifetime,
+    newsletterUnsubscribed,
+  ] = await Promise.all([
     aggregateSendMetrics(workspaceId, campaignId, from, to),
     aggregateSendMetrics(workspaceId, campaignId, previousFrom, previousTo),
     countUnsubscribesInRange(workspaceId, campaignId, from, to),
     buildSeries(workspaceId, campaignId, from, to),
     buildStepRows(workspaceId, campaignId, from, to),
+    campaign.kind === "newsletter"
+      ? countCampaignSendsByStatus(workspaceId, campaignId)
+      : Promise.resolve(null),
+    campaign.kind === "newsletter"
+      ? (async () => {
+          await connectDb();
+          return CampaignEnrollmentModel.countDocuments(
+            withWorkspaceScope(workspaceId, {
+              campaignId,
+              status: "active",
+            }),
+          );
+        })()
+      : Promise.resolve(0),
+    campaign.kind === "newsletter"
+      ? aggregateSendMetrics(
+          workspaceId,
+          campaignId,
+          newsletterAllTimeFrom,
+          newsletterAllTimeTo,
+        )
+      : Promise.resolve(null),
+    campaign.kind === "newsletter"
+      ? countUnsubscribesInRange(
+          workspaceId,
+          campaignId,
+          newsletterAllTimeFrom,
+          newsletterAllTimeTo,
+        )
+      : Promise.resolve(0),
   ]);
 
   const health = evaluateCampaignDeliveryHealth({
@@ -637,11 +727,36 @@ export async function getCampaignAnalyticsForWorkspace(
 
   const cards = buildCards({ ...current, unsubscribed }, previous);
 
+  const newsletterSummary =
+    campaign.kind === "newsletter" && sendStatusCounts && newsletterLifetime
+      ? {
+          recipientsQueued:
+            campaign.audienceSummary?.queued ??
+            sendStatusCounts.queued +
+              sendStatusCounts.sent +
+              sendStatusCounts.failed +
+              sendStatusCounts.skipped,
+          stillQueued,
+          sent: sendStatusCounts.sent,
+          delivered: newsletterLifetime.delivered,
+          failed: sendStatusCounts.failed,
+          bounced: newsletterLifetime.bounced,
+          skipped: sendStatusCounts.skipped,
+          uniqueOpens: newsletterLifetime.opened,
+          uniqueClicks: newsletterLifetime.clicked,
+          unsubscribes: newsletterUnsubscribed,
+          audienceLockedAt: campaign.audienceLockedAt?.toISOString() ?? null,
+          unknownConsentAtLock: campaign.audienceSummary?.unknownConsent ?? null,
+          sendStatusCounts,
+        }
+      : null;
+
   return {
     campaign: {
       id: campaign.id,
       name: campaign.name,
       status: campaign.status,
+      kind: campaign.kind,
       createdAt: campaign.createdAt.toISOString(),
     },
     period: {
@@ -675,6 +790,7 @@ export async function getCampaignAnalyticsForWorkspace(
       unsubscribeRate: ratePercent(unsubscribed, current.delivered),
       complaintRate: ratePercent(current.complained, current.delivered),
     },
+    newsletterSummary,
     cards,
     funnel: [
       {
