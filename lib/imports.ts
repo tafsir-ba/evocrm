@@ -113,6 +113,8 @@ export type ImportJobSummary = {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present when the import was started from a newsletter audience flow. */
+  newsletterCampaignId?: string | null;
 };
 
 export const IMPORT_EXECUTE_MODES = ["valid_rows_only", "strict"] as const;

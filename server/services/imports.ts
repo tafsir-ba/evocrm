@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import {
   IMPORT_PREVIEW_ROW_LIMIT,
   MAX_IMPORT_FILE_SIZE_BYTES,
+  type ImportDefaults,
   type ImportEntityType,
   type ImportExecuteMode,
   type ImportJobSummary,
@@ -61,6 +62,9 @@ import type {
   ValidateImportInput,
 } from "@/server/validation/imports";
 import { createAuditLog } from "@/server/audit/create-audit-log";
+import { findLeadsByIds } from "@/server/repositories/leads";
+import { updateLeadForWorkspace } from "@/server/services/leads";
+import type { ImportRowResultRecord } from "@/server/repositories/import-jobs";
 
 function assertImportJobMutable(
   status: ImportJobRecord["status"],
@@ -152,6 +156,7 @@ function toImportJobSummary(job: ImportJobRecord): ImportJobSummary {
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
+    newsletterCampaignId: job.newsletterCampaignId,
   };
 }
 
@@ -168,6 +173,8 @@ export async function createImportJobForWorkspace(input: {
   fileSize: number;
   mimeType: string;
   fileData: Buffer;
+  newsletterCampaignId?: string | null;
+  defaults?: ImportDefaults;
 }) {
   const entityConfig = getImportEntityConfig(input.entityType);
 
@@ -199,6 +206,8 @@ export async function createImportJobForWorkspace(input: {
     storageKey,
     storageProvider,
     jobId: draftJobIdString,
+    newsletterCampaignId: input.newsletterCampaignId ?? null,
+    defaults: input.defaults,
   });
 
   const parsed = await parseImportJobFile(job, {
@@ -217,6 +226,9 @@ export async function createImportJobForWorkspace(input: {
       fileName: input.fileName,
       entityType: input.entityType,
       rowCount: parsed.rowCount,
+      ...(input.newsletterCampaignId
+        ? { newsletterCampaignId: input.newsletterCampaignId }
+        : {}),
     },
   });
 
@@ -317,6 +329,17 @@ export async function saveImportJobMapping(
     mappings: input.mappings,
     defaults: input.defaults,
   });
+
+  // Newsletter imports lock target project + optional list tag so clients cannot
+  // clear them (and re-enable unintended drip scope via wrong project defaults).
+  if (job.newsletterCampaignId) {
+    if (job.defaults.projectId) {
+      sanitized.defaults.projectId = job.defaults.projectId;
+    }
+    if (job.defaults.tags) {
+      sanitized.defaults.tags = job.defaults.tags;
+    }
+  }
 
   const mappingIssues = validateMappingConfiguration(
     entityConfig,
@@ -464,8 +487,10 @@ export async function executeImportJobForWorkspace(
     }
 
     const entityConfig = getImportEntityConfig(claimedJob.entityType);
+    // Newsletter audience imports must never auto-enroll into drips.
     const triggerAutomationForImportedLeads =
       claimedJob.entityType === "lead" &&
+      !claimedJob.newsletterCampaignId &&
       Boolean(input.triggerAutomationForImportedLeads);
 
     const executionContext: ImportContext = {
@@ -481,6 +506,15 @@ export async function executeImportJobForWorkspace(
       input.mode as ImportExecuteMode,
     );
 
+    if (claimedJob.newsletterCampaignId && claimedJob.entityType === "lead") {
+      await ensureNewsletterImportListTag({
+        workspaceId,
+        actorId,
+        job: claimedJob,
+        rowResults: result.rowResults,
+      });
+    }
+
     await createAuditLog({
       workspaceId,
       actorId,
@@ -493,6 +527,12 @@ export async function executeImportJobForWorkspace(
         failedCount: result.failedCount,
         ...(triggerAutomationForImportedLeads
           ? { triggerAutomationForImportedLeads: true }
+          : {}),
+        ...(claimedJob.newsletterCampaignId
+          ? {
+              newsletterCampaignId: claimedJob.newsletterCampaignId,
+              dripCampaignEvaluationEnabled: false,
+            }
           : {}),
       },
     });
@@ -519,6 +559,62 @@ export async function executeImportJobForWorkspace(
       error instanceof Error ? error.message : "Import failed.",
     );
     throw error;
+  }
+}
+
+/**
+ * Newsletter CSV imports may set an optional list tag for reuse.
+ * Newly created leads receive it via import defaults; existing (skipped) leads
+ * need an explicit merge so they are tagged without drip enrollment.
+ */
+async function ensureNewsletterImportListTag(input: {
+  workspaceId: string;
+  actorId: string;
+  job: ImportJobRecord;
+  rowResults: ImportRowResultRecord[];
+}): Promise<void> {
+  const applyTagId = input.job.defaults.tags?.trim() || null;
+  if (!applyTagId) {
+    return;
+  }
+
+  // defaults.tags may be a comma-separated list of names/ids from the mapping UI;
+  // newsletter flow sets a single tag id.
+  const tagId = applyTagId.split(",")[0]?.trim();
+  if (!tagId || !/^[a-fA-F0-9]{24}$/.test(tagId)) {
+    return;
+  }
+
+  const leadIds = [
+    ...new Set(
+      input.rowResults
+        .map((row) => row.entityId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  if (leadIds.length === 0) {
+    return;
+  }
+
+  const CHUNK = 100;
+  for (let index = 0; index < leadIds.length; index += CHUNK) {
+    const chunkIds = leadIds.slice(index, index + CHUNK);
+    const leads = await findLeadsByIds(input.workspaceId, chunkIds);
+
+    for (const lead of leads) {
+      if (lead.tags.includes(tagId)) {
+        continue;
+      }
+
+      await updateLeadForWorkspace(
+        input.workspaceId,
+        input.actorId,
+        lead.id,
+        { tags: [...lead.tags, tagId] },
+        { triggerAutomation: false },
+      );
+    }
   }
 }
 

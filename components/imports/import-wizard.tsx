@@ -93,6 +93,18 @@ type ImportWizardProps = {
   entityType: ImportEntityType;
   canCreateProject?: boolean;
   onComplete?: () => void;
+  /** Newsletter audience imports: force no drip enrollment and use newsletter upload API. */
+  newsletterMode?: boolean;
+  /** When set, POST uploads go here instead of the generic imports endpoint. */
+  createEndpoint?: string;
+  /** Extra multipart fields sent with the upload (e.g. targetProjectId). */
+  uploadFields?: Record<string, string>;
+  /** Prefill / lock project default for lead imports. */
+  lockedProjectId?: string;
+  /** Prefill list tag default (tag id) for lead imports. */
+  lockedTagId?: string | null;
+  /** Called when the user finishes results with the completed import job id. */
+  onCompleteWithJob?: (jobId: string) => void;
 };
 
 const STEP_LABELS: Record<WizardStep, string> = {
@@ -109,10 +121,18 @@ export function ImportWizard({
   entityType,
   canCreateProject = false,
   onComplete,
+  newsletterMode = false,
+  createEndpoint,
+  uploadFields,
+  lockedProjectId,
+  lockedTagId = null,
+  onCompleteWithJob,
 }: ImportWizardProps) {
   const apiBase = `/api/workspaces/${workspaceSlug}/imports`;
   const workspaceApiBase = `/api/workspaces/${workspaceSlug}`;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const showDripOption =
+    shouldShowImportDripCampaignOption(entityType) && !newsletterMode;
 
   const [step, setStep] = useState<WizardStep>("upload");
   const [loading, setLoading] = useState(false);
@@ -382,10 +402,19 @@ export function ImportWizard({
 
     try {
       const formData = new FormData();
-      formData.append("entityType", entityType);
+      if (!createEndpoint) {
+        formData.append("entityType", entityType);
+      }
       formData.append("file", file);
+      if (uploadFields) {
+        for (const [key, value] of Object.entries(uploadFields)) {
+          if (value) {
+            formData.append(key, value);
+          }
+        }
+      }
 
-      const response = await fetch(apiBase, {
+      const response = await fetch(createEndpoint ?? apiBase, {
         method: "POST",
         body: formData,
       });
@@ -398,7 +427,20 @@ export function ImportWizard({
       const data = payload.data as ParsePreviewResponse;
 
       setFileName(file.name);
-      setDefaults({});
+      const nextDefaults: Record<string, string> = {
+        ...(data.job && "defaults" in (data as object) ? {} : {}),
+      };
+      if (lockedProjectId) {
+        nextDefaults.projectId = lockedProjectId;
+      }
+      if (lockedTagId) {
+        nextDefaults.tags = lockedTagId;
+      }
+      // Prefer server-provided defaults from newsletter import create.
+      const serverDefaults =
+        (payload.data as { job?: { defaults?: Record<string, string> } })?.job
+          ?.defaults ?? {};
+      setDefaults({ ...nextDefaults, ...serverDefaults });
       applyParsePreview(data);
       setStep("map");
     } catch (uploadError) {
@@ -624,11 +666,13 @@ export function ImportWizard({
     setLoading(true);
     setError(null);
 
-    const includeDripEvaluation = isImportDripCampaignEvaluationRequested({
-      entityType,
-      mode,
-      triggerAutomationForImportedLeads,
-    });
+    const includeDripEvaluation =
+      !newsletterMode &&
+      isImportDripCampaignEvaluationRequested({
+        entityType,
+        mode,
+        triggerAutomationForImportedLeads,
+      });
 
     try {
       const response = await fetch(`${apiBase}/${importId}/execute`, {
@@ -667,6 +711,7 @@ export function ImportWizard({
 
   function requestExecute(mode: "valid_rows_only" | "strict") {
     if (
+      !newsletterMode &&
       shouldConfirmImportDripCampaignEvaluation({
         entityType,
         mode,
@@ -747,13 +792,13 @@ export function ImportWizard({
               loading={loading}
               disabled={!validationSummary || validationSummary.errorRows > 0}
             >
-              {shouldShowImportDripCampaignOption(entityType) &&
+              {showDripOption &&
               triggerAutomationForImportedLeads
                 ? "Strict import and evaluate drip campaigns"
                 : "Strict import"}
             </Button>
             <Button onClick={() => requestExecute("valid_rows_only")} loading={loading}>
-              {shouldShowImportDripCampaignOption(entityType) &&
+              {showDripOption &&
               triggerAutomationForImportedLeads
                 ? "Import and evaluate drip campaigns"
                 : "Import valid rows"}
@@ -763,6 +808,9 @@ export function ImportWizard({
         {step === "results" && (
           <Button
             onClick={() => {
+              if (importId) {
+                onCompleteWithJob?.(importId);
+              }
               onComplete?.();
               onClose();
             }}
@@ -856,6 +904,7 @@ export function ImportWizard({
             warningRows={warningRowDetails}
             config={config}
             entityType={entityType}
+            showDripOption={showDripOption}
             rowOverrides={rowOverrides}
             projects={projects}
             members={members}
@@ -877,6 +926,7 @@ export function ImportWizard({
             entityType={entityType}
             entityLabel={entityLabel}
             workspaceSlug={workspaceSlug}
+            showDripOption={showDripOption}
           />
         )}
       </div>
@@ -1228,6 +1278,7 @@ function ValidateStep({
   warningRows,
   config,
   entityType,
+  showDripOption,
   rowOverrides,
   projects,
   members,
@@ -1245,6 +1296,7 @@ function ValidateStep({
   warningRows: ImportErrorRowDetail[];
   config: ImportEntityConfigResponse;
   entityType: ImportEntityType;
+  showDripOption: boolean;
   rowOverrides: ImportRowOverrides;
   projects: ProjectItem[];
   members: MemberItem[];
@@ -1279,12 +1331,18 @@ function ValidateStep({
         <StatCard label="Errors" value={summary.errorRows} tone="danger" />
       </div>
 
-      {shouldShowImportDripCampaignOption(entityType) && (
+      {showDripOption && (
         <ImportDripCampaignOption
           checked={triggerAutomationForImportedLeads}
           disabled={loading}
           onChange={onTriggerAutomationChange}
         />
+      )}
+
+      {!showDripOption && entityType === "lead" && (
+        <p className="rounded-lg border border-[var(--color-line)] bg-[var(--color-panel-muted)] px-3 py-2 text-[12.5px] text-[var(--color-ink-muted)]">
+          Newsletter imports never auto-enroll leads into drip campaigns.
+        </p>
       )}
 
       {unknownProjectNames.length > 0 && (
@@ -1764,6 +1822,7 @@ function ResultsStep({
   entityType,
   entityLabel,
   workspaceSlug,
+  showDripOption,
 }: {
   result: {
     createdCount: number;
@@ -1777,6 +1836,7 @@ function ResultsStep({
   entityType: ImportEntityType;
   entityLabel: string;
   workspaceSlug: string;
+  showDripOption: boolean;
 }) {
   const listPath =
     entityType === "lead"
@@ -1798,12 +1858,20 @@ function ResultsStep({
         Import status: <span className="font-medium text-[var(--color-ink)]">{result.status}</span>
       </p>
 
-      {shouldShowImportDripCampaignOption(entityType) && (
+      {showDripOption && (
         <p className="text-[13px] text-[var(--color-ink-muted)]">
           Drip campaign evaluation:{" "}
           <span className="font-medium text-[var(--color-ink)]">
             {result.dripCampaignEvaluationEnabled ? "Enabled" : "Disabled"}
           </span>
+        </p>
+      )}
+
+      {!showDripOption && entityType === "lead" && (
+        <p className="text-[13px] text-[var(--color-ink-muted)]">
+          Drip campaign evaluation:{" "}
+          <span className="font-medium text-[var(--color-ink)]">Disabled</span>{" "}
+          (newsletter import)
         </p>
       )}
 

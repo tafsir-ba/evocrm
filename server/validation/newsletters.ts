@@ -4,9 +4,11 @@ import { z } from "zod";
 
 import { objectIdSchema } from "@/server/validation/campaigns";
 
-export const newsletterAudienceSegmentSchema = z
+export const NEWSLETTER_AUDIENCE_SEGMENT_MAX = 10;
+
+const projectTagsSegmentSchema = z
   .object({
-    type: z.literal("project_tags").default("project_tags"),
+    type: z.literal("project_tags"),
     order: z.number().int().min(1).optional(),
     projectId: objectIdSchema,
     tagIds: z.array(objectIdSchema).max(50).default([]),
@@ -14,9 +16,27 @@ export const newsletterAudienceSegmentSchema = z
   })
   .strict();
 
+const csvImportSegmentSchema = z
+  .object({
+    type: z.literal("csv_import"),
+    order: z.number().int().min(1).optional(),
+    projectId: objectIdSchema,
+    importJobId: objectIdSchema,
+    applyTagId: objectIdSchema.nullable().optional(),
+  })
+  .strict();
+
+export const newsletterAudienceSegmentSchema = z.discriminatedUnion("type", [
+  projectTagsSegmentSchema,
+  csvImportSegmentSchema,
+]);
+
 export const newsletterAudienceSegmentsInputSchema = z
   .object({
-    segments: z.array(newsletterAudienceSegmentSchema).min(1).max(1),
+    segments: z
+      .array(newsletterAudienceSegmentSchema)
+      .min(1)
+      .max(NEWSLETTER_AUDIENCE_SEGMENT_MAX),
   })
   .strict();
 
@@ -32,7 +52,17 @@ export const newsletterScheduleInputSchema = z
   })
   .strict();
 
+export const newsletterAudienceImportInputSchema = z
+  .object({
+    targetProjectId: objectIdSchema,
+    applyTagId: objectIdSchema.optional(),
+  })
+  .strict();
+
 export type NewsletterAudienceSegmentsInput = z.infer<
   typeof newsletterAudienceSegmentsInputSchema
 >;
 export type NewsletterScheduleInput = z.infer<typeof newsletterScheduleInputSchema>;
+export type NewsletterAudienceImportInput = z.infer<
+  typeof newsletterAudienceImportInputSchema
+>;

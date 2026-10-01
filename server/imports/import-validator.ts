@@ -122,6 +122,8 @@ export async function buildImportContext(
   for (const tag of tags) {
     if (!tag.entityTypes.includes(tagEntityType)) continue;
     registerImportLookupAliases(tagLookup, [tag.name], tag.id);
+    tagLookup.set(tag.id, tag.id);
+    tagLookup.set(tag.id.toLowerCase(), tag.id);
   }
 
   return {

@@ -43,6 +43,7 @@ const job = {
   startedAt: new Date(),
   completedAt: null,
   errorMessage: null,
+  newsletterCampaignId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

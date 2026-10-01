@@ -67,12 +67,19 @@ const importJobSchema = new Schema(
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     errorMessage: { type: String, default: null },
+    /** When set, this import was started from a newsletter audience flow. */
+    newsletterCampaignId: {
+      type: Schema.Types.ObjectId,
+      ref: "Campaign",
+      default: null,
+    },
   },
   { timestamps: true },
 );
 
 importJobSchema.index({ workspaceId: 1, createdAt: -1 });
 importJobSchema.index({ workspaceId: 1, entityType: 1, status: 1 });
+importJobSchema.index({ workspaceId: 1, newsletterCampaignId: 1 });
 
 export type ImportJobDocument = InferSchemaType<typeof importJobSchema> & {
   _id: mongoose.Types.ObjectId;

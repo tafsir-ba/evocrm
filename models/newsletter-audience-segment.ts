@@ -1,6 +1,6 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
-const SEGMENT_TYPES = ["project_tags"] as const;
+const SEGMENT_TYPES = ["project_tags", "csv_import"] as const;
 const TAG_MATCH_MODES = ["any", "all"] as const;
 
 const newsletterAudienceSegmentSchema = new Schema(
@@ -14,6 +14,7 @@ const newsletterAudienceSegmentSchema = new Schema(
       default: "project_tags",
     },
     order: { type: Number, required: true, default: 1 },
+    // Target project for project_tags membership scope and for csv_import new leads.
     projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
     tagIds: {
       type: [{ type: Schema.Types.ObjectId, ref: "Tag" }],
@@ -24,6 +25,9 @@ const newsletterAudienceSegmentSchema = new Schema(
       enum: TAG_MATCH_MODES,
       default: "any",
     },
+    // csv_import only
+    importJobId: { type: Schema.Types.ObjectId, ref: "ImportJob", default: null },
+    applyTagId: { type: Schema.Types.ObjectId, ref: "Tag", default: null },
   },
   { timestamps: true },
 );

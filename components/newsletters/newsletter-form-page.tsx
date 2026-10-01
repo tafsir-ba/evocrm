@@ -10,6 +10,7 @@ import {
 } from "@/components/campaigns/campaign-sending-domain-field";
 import { ProjectSelector, type ProjectSelectorProject } from "@/components/domain/project-selector";
 import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
+import { ImportWizard } from "@/components/imports/import-wizard";
 import {
   FocusedFormActions,
   FocusedFormLayout,
@@ -92,7 +93,56 @@ type AudiencePreview = {
     archived: number;
     deduped: number;
   };
+  importSummaries?: Array<{
+    segmentId: string;
+    importJobId: string;
+    status: string;
+    createdCount: number;
+    skippedCount: number;
+    failedCount: number;
+    resolvedLeadCount: number;
+  }>;
 };
+
+type ProjectTagsSegmentDraft = {
+  key: string;
+  type: "project_tags";
+  projectId: string | null;
+  tagIds: string[];
+  tagMatch: "any" | "all";
+};
+
+type CsvImportSegmentDraft = {
+  key: string;
+  type: "csv_import";
+  projectId: string | null;
+  importJobId: string | null;
+  applyTagId: string | null;
+  fileName: string | null;
+};
+
+type AudienceSegmentDraft = ProjectTagsSegmentDraft | CsvImportSegmentDraft;
+
+function createProjectTagsSegment(): ProjectTagsSegmentDraft {
+  return {
+    key: `seg-${Math.random().toString(36).slice(2, 10)}`,
+    type: "project_tags",
+    projectId: null,
+    tagIds: [],
+    tagMatch: "any",
+  };
+}
+
+function createCsvImportSegment(): CsvImportSegmentDraft {
+  return {
+    key: `seg-${Math.random().toString(36).slice(2, 10)}`,
+    type: "csv_import",
+    projectId: null,
+    importJobId: null,
+    applyTagId: null,
+    fileName: null,
+  };
+}
 
 type NewsletterFormPageProps = {
   workspaceSlug: string;
@@ -124,9 +174,11 @@ export function NewsletterFormPage({
   const [senderName, setSenderName] = useState("");
   const [sending, setSending] = useState<CampaignSendingDomainValue>(emptySending);
   const [bodyHtml, setBodyHtml] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [tagIds, setTagIds] = useState<string[]>([]);
-  const [tagMatch, setTagMatch] = useState<"any" | "all">("any");
+  const [segments, setSegments] = useState<AudienceSegmentDraft[]>([
+    createProjectTagsSegment(),
+  ]);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [csvImportSegmentKey, setCsvImportSegmentKey] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [campaign, setCampaign] = useState<NewsletterCampaign | null>(null);
@@ -239,12 +291,39 @@ export function NewsletterFormPage({
         setBodyHtml(step.bodyHtml ?? "");
       }
 
-      const segments = segmentsPayload.data?.segments ?? [];
-      const segment = segments[0];
-      if (segment) {
-        setProjectId(segment.projectId);
-        setTagIds(segment.tagIds ?? []);
-        setTagMatch(segment.tagMatch === "all" ? "all" : "any");
+      const loadedSegments = (segmentsPayload.data?.segments ?? []) as Array<{
+        id: string;
+        type?: string;
+        projectId: string;
+        tagIds?: string[];
+        tagMatch?: string;
+        importJobId?: string | null;
+        applyTagId?: string | null;
+      }>;
+
+      if (loadedSegments.length > 0) {
+        setSegments(
+          loadedSegments.map((segment) => {
+            if (segment.type === "csv_import") {
+              return {
+                key: segment.id,
+                type: "csv_import" as const,
+                projectId: segment.projectId,
+                importJobId: segment.importJobId ?? null,
+                applyTagId: segment.applyTagId ?? null,
+                fileName: null,
+              };
+            }
+
+            return {
+              key: segment.id,
+              type: "project_tags" as const,
+              projectId: segment.projectId,
+              tagIds: segment.tagIds ?? [],
+              tagMatch: segment.tagMatch === "all" ? ("all" as const) : ("any" as const),
+            };
+          }),
+        );
       }
 
       await refreshAudiencePreview(campaignId);
@@ -273,17 +352,76 @@ export function NewsletterFormPage({
     }
   }, [isCreate, loadExisting]);
 
-  function toggleTag(tagId: string) {
-    setTagIds((current) =>
-      current.includes(tagId)
-        ? current.filter((id) => id !== tagId)
-        : [...current, tagId],
+  function updateSegment(
+    key: string,
+    updater: (segment: AudienceSegmentDraft) => AudienceSegmentDraft,
+  ) {
+    setSegments((current) =>
+      current.map((segment) => (segment.key === key ? updater(segment) : segment)),
     );
   }
+
+  function removeSegment(key: string) {
+    setSegments((current) => {
+      if (current.length <= 1) {
+        return current;
+      }
+      return current.filter((segment) => segment.key !== key);
+    });
+  }
+
+  function toggleSegmentTag(key: string, tagId: string) {
+    updateSegment(key, (segment) => {
+      if (segment.type !== "project_tags") {
+        return segment;
+      }
+      return {
+        ...segment,
+        tagIds: segment.tagIds.includes(tagId)
+          ? segment.tagIds.filter((id) => id !== tagId)
+          : [...segment.tagIds, tagId],
+      };
+    });
+  }
+
+  async function openCsvImport(segmentKey: string) {
+    const segment = segments.find(
+      (row): row is CsvImportSegmentDraft =>
+        row.key === segmentKey && row.type === "csv_import",
+    );
+    if (!segment?.projectId) {
+      setFormError("Select a target project before uploading a CSV.");
+      return;
+    }
+
+    // Newsletter import API requires an existing campaign id.
+    let id = campaignId ?? campaign?.id ?? createdIdRef.current;
+    if (!id) {
+      id = await saveDraft({ stay: true, allowIncompleteCsv: true });
+      if (!id) {
+        return;
+      }
+    }
+
+    setCsvImportSegmentKey(segmentKey);
+    setCsvImportOpen(true);
+  }
+
+  const newsletterIdForImport =
+    campaignId ?? campaign?.id ?? createdIdRef.current ?? null;
+
+  const activeCsvSegment =
+    csvImportSegmentKey == null
+      ? null
+      : segments.find(
+          (segment): segment is CsvImportSegmentDraft =>
+            segment.key === csvImportSegmentKey && segment.type === "csv_import",
+        );
 
   async function saveDraft(options?: {
     stay?: boolean;
     keepSubmitting?: boolean;
+    allowIncompleteCsv?: boolean;
   }): Promise<string | null> {
     if (readOnly) {
       setFormError("You do not have permission to edit newsletters.");
@@ -301,10 +439,43 @@ export function NewsletterFormPage({
         setFormError("Name is required.");
         return null;
       }
-      if (!projectId) {
-        setFormError("Select a project audience.");
+
+      const savableSegments = options?.allowIncompleteCsv
+        ? segments.filter(
+            (segment) =>
+              segment.type === "project_tags" ||
+              (segment.type === "csv_import" && Boolean(segment.importJobId)),
+          )
+        : segments;
+
+      const projectIds = [
+        ...new Set(
+          segments
+            .map((segment) => segment.projectId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+
+      if (projectIds.length === 0) {
+        setFormError("Add at least one audience segment with a project.");
         return null;
       }
+
+      if (!options?.allowIncompleteCsv) {
+        for (const [index, segment] of segments.entries()) {
+          if (!segment.projectId) {
+            setFormError(`Segment ${index + 1} needs a target project.`);
+            return null;
+          }
+          if (segment.type === "csv_import" && !segment.importJobId) {
+            setFormError(
+              `CSV segment ${index + 1} still needs an import. Upload and finish the CSV first.`,
+            );
+            return null;
+          }
+        }
+      }
+
       if (!subject.trim()) {
         setFormError("Subject is required.");
         return null;
@@ -335,7 +506,7 @@ export function NewsletterFormPage({
             name: name.trim(),
             kind: "newsletter",
             audienceType: "leads",
-            projectIds: [projectId],
+            projectIds,
             ...senderFields,
           }),
         });
@@ -353,7 +524,6 @@ export function NewsletterFormPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
-            projectIds: [projectId],
             senderName: senderName.trim() || null,
             defaultFromName: senderName.trim() || null,
             sendingDomainId: sending.sendingDomainId || null,
@@ -411,20 +581,48 @@ export function NewsletterFormPage({
         setStepId(stepBody.data?.step?.id ?? null);
       }
 
+      const segmentsForApi = savableSegments;
+
+      // CSV bootstrap (allowIncompleteCsv) may create the campaign before any
+      // import finishes. Never invent a project_tags stub — that would briefly
+      // target the entire project membership.
+      if (segmentsForApi.length === 0) {
+        if (options?.allowIncompleteCsv) {
+          if (!options?.stay) {
+            router.replace(workspacePath(workspaceSlug, `dripping/newsletters/${id}`));
+          }
+          return id;
+        }
+        setFormError("Add at least one audience segment with a project.");
+        return null;
+      }
+
+      const segmentsPayloadBody = {
+        segments: segmentsForApi.map((segment, index) => {
+          if (segment.type === "csv_import") {
+            return {
+              type: "csv_import" as const,
+              order: index + 1,
+              projectId: segment.projectId!,
+              importJobId: segment.importJobId!,
+              applyTagId: segment.applyTagId,
+            };
+          }
+
+          return {
+            type: "project_tags" as const,
+            order: index + 1,
+            projectId: segment.projectId!,
+            tagIds: segment.tagIds,
+            tagMatch: segment.tagMatch,
+          };
+        }),
+      };
+
       const segmentsRes = await fetch(`${apiNewsletters}/${id}/audience/segments`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          segments: [
-            {
-              type: "project_tags",
-              order: 1,
-              projectId,
-              tagIds,
-              tagMatch,
-            },
-          ],
-        }),
+        body: JSON.stringify(segmentsPayloadBody),
       });
       const segmentsPayload = await segmentsRes.json();
       if (!segmentsRes.ok) {
@@ -756,42 +954,174 @@ export function NewsletterFormPage({
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Audience</h2>
-          <div>
-            <Label>Project</Label>
-            <ProjectSelector
-              projects={projects}
-              selectedProjectId={projectId}
-              onChange={readOnly ? undefined : setProjectId}
-              disabled={readOnly}
-              searchable
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">Audience</h2>
+            {!readOnly ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    setSegments((current) => [...current, createProjectTagsSegment()])
+                  }
+                >
+                  Add project segment
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    setSegments((current) => [...current, createCsvImportSegment()])
+                  }
+                >
+                  Add CSV segment
+                </Button>
+              </div>
+            ) : null}
           </div>
-          <div>
-            <Label>Lead tags (optional)</Label>
-            <TagSelector
-              tags={tags}
-              selectedTagIds={tagIds}
-              entityType="lead"
-              onToggle={readOnly ? undefined : toggleTag}
-              readOnly={readOnly}
-              emptyLabel="No lead tags yet"
-            />
-          </div>
-          {tagIds.length > 0 ? (
-            <div>
-              <Label htmlFor="newsletter-tag-match">Tag match</Label>
-              <Select
-                id="newsletter-tag-match"
-                value={tagMatch}
-                disabled={readOnly}
-                onChange={(event) => setTagMatch(event.target.value as "any" | "all")}
+          <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+            Final audience is the deduplicated union of all segments. Snapshot is taken at
+            send/schedule. CSV imports never enroll leads into drips.
+          </p>
+
+          <div className="space-y-4">
+            {segments.map((segment, index) => (
+              <div
+                key={segment.key}
+                className="space-y-3 border-t border-[var(--color-line)] pt-4 first:border-t-0 first:pt-0"
               >
-                <option value="any">Match any selected tag</option>
-                <option value="all">Match all selected tags</option>
-              </Select>
-            </div>
-          ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] font-medium text-[var(--color-ink)]">
+                    Segment {index + 1}:{" "}
+                    {segment.type === "csv_import" ? "CSV import" : "Project + tags"}
+                  </p>
+                  {!readOnly && segments.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-[12px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-danger)]"
+                      onClick={() => removeSegment(segment.key)}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+
+                <div>
+                  <Label>Target project</Label>
+                  <ProjectSelector
+                    projects={projects}
+                    selectedProjectId={segment.projectId}
+                    onChange={
+                      readOnly
+                        ? undefined
+                        : (projectId) =>
+                            updateSegment(segment.key, (current) => ({
+                              ...current,
+                              projectId,
+                            }))
+                    }
+                    disabled={readOnly}
+                    searchable
+                  />
+                </div>
+
+                {segment.type === "project_tags" ? (
+                  <>
+                    <div>
+                      <Label>Lead tags (optional)</Label>
+                      <TagSelector
+                        tags={tags}
+                        selectedTagIds={segment.tagIds}
+                        entityType="lead"
+                        onToggle={
+                          readOnly
+                            ? undefined
+                            : (tagId) => toggleSegmentTag(segment.key, tagId)
+                        }
+                        readOnly={readOnly}
+                        emptyLabel="No lead tags yet"
+                      />
+                    </div>
+                    {segment.tagIds.length > 0 ? (
+                      <div>
+                        <Label htmlFor={`newsletter-tag-match-${segment.key}`}>
+                          Tag match
+                        </Label>
+                        <Select
+                          id={`newsletter-tag-match-${segment.key}`}
+                          value={segment.tagMatch}
+                          disabled={readOnly}
+                          onChange={(event) =>
+                            updateSegment(segment.key, (current) =>
+                              current.type === "project_tags"
+                                ? {
+                                    ...current,
+                                    tagMatch: event.target.value as "any" | "all",
+                                  }
+                                : current,
+                            )
+                          }
+                        >
+                          <option value="any">Match any selected tag</option>
+                          <option value="all">Match all selected tags</option>
+                        </Select>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label>List tag for reuse (optional)</Label>
+                      <TagSelector
+                        tags={tags}
+                        selectedTagIds={segment.applyTagId ? [segment.applyTagId] : []}
+                        entityType="lead"
+                        onToggle={
+                          readOnly
+                            ? undefined
+                            : (tagId) =>
+                                updateSegment(segment.key, (current) =>
+                                  current.type === "csv_import"
+                                    ? {
+                                        ...current,
+                                        applyTagId:
+                                          current.applyTagId === tagId ? null : tagId,
+                                      }
+                                    : current,
+                                )
+                        }
+                        readOnly={readOnly}
+                        emptyLabel="No lead tags yet"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!readOnly ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={!segment.projectId}
+                          onClick={() => void openCsvImport(segment.key)}
+                        >
+                          {segment.importJobId ? "Re-import CSV" : "Upload CSV"}
+                        </Button>
+                      ) : null}
+                      {segment.importJobId ? (
+                        <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                          Import ready
+                          {segment.fileName ? `: ${segment.fileName}` : ""} (
+                          {segment.importJobId.slice(-6)})
+                        </p>
+                      ) : (
+                        <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                          Map email (required); name, language, tags, and project are optional.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
 
           {audiencePreview ? (
             <div className="rounded-lg border border-[var(--color-line)] px-3 py-3 text-[13px]">
@@ -806,6 +1136,18 @@ export function NewsletterFormPage({
                 {audiencePreview.exclusionCounts.archived}, deduped:{" "}
                 {audiencePreview.exclusionCounts.deduped}
               </p>
+              {(audiencePreview.importSummaries?.length ?? 0) > 0 ? (
+                <ul className="mt-2 space-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                  {audiencePreview.importSummaries?.map((summary) => (
+                    <li key={summary.importJobId}>
+                      CSV import {summary.importJobId.slice(-6)}: created{" "}
+                      {summary.createdCount}, existing/skipped {summary.skippedCount}, failed{" "}
+                      {summary.failedCount}, resolved {summary.resolvedLeadCount} (
+                      {summary.status})
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {audiencePreview.summary.unknownConsent > 0 ? (
                 <p className="mt-2 rounded-md bg-[var(--color-warn-soft,rgba(180,120,20,0.12))] px-2 py-1.5 text-[12.5px] text-[var(--color-ink)]">
                   {audiencePreview.summary.unknownConsent.toLocaleString()} contacts have
@@ -874,6 +1216,77 @@ export function NewsletterFormPage({
           )}
         </section>
       </form>
+
+      {newsletterIdForImport && activeCsvSegment?.projectId ? (
+        <ImportWizard
+          open={csvImportOpen}
+          onClose={() => {
+            setCsvImportOpen(false);
+            setCsvImportSegmentKey(null);
+          }}
+          workspaceSlug={workspaceSlug}
+          entityType="lead"
+          newsletterMode
+          createEndpoint={`${apiNewsletters}/${newsletterIdForImport}/audience/import`}
+          uploadFields={{
+            targetProjectId: activeCsvSegment.projectId,
+            ...(activeCsvSegment.applyTagId
+              ? { applyTagId: activeCsvSegment.applyTagId }
+              : {}),
+          }}
+          lockedProjectId={activeCsvSegment.projectId}
+          lockedTagId={activeCsvSegment.applyTagId}
+          onCompleteWithJob={(jobId) => {
+            setSegments((current) => {
+              const next = current.map((segment) =>
+                segment.key === activeCsvSegment.key && segment.type === "csv_import"
+                  ? { ...segment, importJobId: jobId }
+                  : segment,
+              );
+
+              const id = newsletterIdForImport;
+              if (id) {
+                const payload = {
+                  segments: next
+                    .filter(
+                      (segment) =>
+                        segment.projectId &&
+                        (segment.type === "project_tags" ||
+                          (segment.type === "csv_import" && segment.importJobId)),
+                    )
+                    .map((segment, index) =>
+                      segment.type === "csv_import"
+                        ? {
+                            type: "csv_import" as const,
+                            order: index + 1,
+                            projectId: segment.projectId!,
+                            importJobId: segment.importJobId!,
+                            applyTagId: segment.applyTagId,
+                          }
+                        : {
+                            type: "project_tags" as const,
+                            order: index + 1,
+                            projectId: segment.projectId!,
+                            tagIds: segment.tagIds,
+                            tagMatch: segment.tagMatch,
+                          },
+                    ),
+                };
+
+                if (payload.segments.length > 0) {
+                  void fetch(`${apiNewsletters}/${id}/audience/segments`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  }).then(() => refreshAudiencePreview(id));
+                }
+              }
+
+              return next;
+            });
+          }}
+        />
+      ) : null}
     </FocusedFormLayout>
   );
 }
