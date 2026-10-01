@@ -1428,6 +1428,34 @@ export function NewsletterFormPage({
             ))}
           </div>
 
+          <div className="space-y-2 border-t border-[var(--color-line)] pt-3">
+            <Label htmlFor="newsletter-consent-policy">
+              Contacts with unknown email consent
+            </Label>
+            <Select
+              id="newsletter-consent-policy"
+              value={unknownConsentPolicy}
+              disabled={readOnly}
+              onChange={(event) => {
+                const next = event.target.value as
+                  | "include_and_flag"
+                  | "require_subscribed";
+                setUnknownConsentPolicy(next);
+              }}
+            >
+              <option value="include_and_flag">
+                Include them, and flag for review (recommended)
+              </option>
+              <option value="require_subscribed">
+                Skip them — only send to subscribed contacts
+              </option>
+            </Select>
+            <p className="text-[12px] text-[var(--color-ink-muted)]">
+              Unsubscribed and suppressed contacts are always skipped. Save draft to
+              refresh counts after changing this.
+            </p>
+          </div>
+
           {audiencePreview ? (
             <div className="border-t border-[var(--color-line)] pt-3 space-y-4 text-[13px]">
               <div>
@@ -1444,34 +1472,6 @@ export function NewsletterFormPage({
                     ? `, unknown consent: ${audiencePreview.exclusionCounts.unknownConsent}`
                     : ""}
                   , duplicates removed: {audiencePreview.exclusionCounts.deduped}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="newsletter-consent-policy">
-                  Contacts with unknown email consent
-                </Label>
-                <Select
-                  id="newsletter-consent-policy"
-                  value={unknownConsentPolicy}
-                  disabled={readOnly}
-                  onChange={(event) => {
-                    const next = event.target.value as
-                      | "include_and_flag"
-                      | "require_subscribed";
-                    setUnknownConsentPolicy(next);
-                  }}
-                >
-                  <option value="include_and_flag">
-                    Include them, and flag for review (recommended)
-                  </option>
-                  <option value="require_subscribed">
-                    Skip them — only send to subscribed contacts
-                  </option>
-                </Select>
-                <p className="text-[12px] text-[var(--color-ink-muted)]">
-                  Unsubscribed and suppressed contacts are always skipped. Save draft to
-                  refresh counts after changing this.
                 </p>
               </div>
 
