@@ -38,6 +38,11 @@ export {
 } from "@/server/advertising/platforms/adapter";
 
 export {
+  MetaAdvertisingPlatformAdapter,
+  assertMetaReadOnlyCapabilities,
+} from "@/server/advertising/platforms/meta/adapter";
+
+export {
   assertGrowthCampaignProjectId,
   assertProjectReassignAllowed,
   resolveTrustedDestinationProjectId,

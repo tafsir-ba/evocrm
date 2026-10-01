@@ -872,7 +872,7 @@ Verifies `X-HubSpot-Signature-v3`. Mutations are **gated** (`HUBSPOT_ONGOING_SYN
 
 ---
 
-## Advertising / Growth Copilot (Phase 0)
+## Advertising / Growth Copilot (Phase 0–1)
 
 Feature flag: `ADVERTISING_ENABLED` (default **off**). When off, advertising routes return `409 CONFLICT` (“Paid ads tools are turned off…” / unavailable).
 
@@ -883,8 +883,29 @@ GET /api/workspaces/[workspaceSlug]/advertising/status
 - Requires active membership + `advertising:read`
 - Requires feature flag on
 - Returns module status, adopted defaults, approval vocabulary hints, job conventions
-- **No** Meta / Google / TikTok network calls
 - Plain-language `summary` / `nextStepHint` for non-technical operators
+
+### Phase 1 — Meta read-only
+
+Pilot: Satigny duplex / Geneva, CH. **No** mutate, publish, or customer-list export endpoints.
+
+```txt
+GET  /api/workspaces/[workspaceSlug]/advertising/connections
+POST /api/workspaces/[workspaceSlug]/advertising/connections
+POST /api/workspaces/[workspaceSlug]/advertising/sync
+POST /api/workspaces/[workspaceSlug]/advertising/pilot/ensure
+GET  /api/workspaces/[workspaceSlug]/advertising/overview?projectId=
+```
+
+| Route | Permission | Notes |
+|-------|------------|-------|
+| `GET connections` | `advertising:read` | Lists connections + freshness labels (no secrets) |
+| `POST connections` | `advertising:connect` | Body: `{ accessToken?, businessId?, useFixture?, name? }`. Always stores `writeScopesEnabled: false` |
+| `POST sync` | `advertising:connect` | Body: `{ connectionId, growthCampaignId? }`. Fixture path = no live Graph |
+| `POST pilot/ensure` | `advertising:create` | Ensures Growth Campaign for `satigny_duplex` project |
+| `GET overview` | `advertising:read` | Project-scoped hierarchy + media-tier analytics + freshness |
+
+UI: Settings → Paid ads; Project → Paid ads tab (both hidden when flag off).
 
 ---
 

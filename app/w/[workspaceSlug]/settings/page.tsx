@@ -4,8 +4,10 @@ import { PageContainer, PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { isAdvertisingEnabled } from "@/lib/advertising-feature";
 import {
   IconBuilding,
+  IconChart,
   IconCreditCard,
   IconChevronRight,
   IconFolder,
@@ -109,6 +111,14 @@ export default async function SettingsPage({ params }: { params: Params }) {
       Icon: IconPlug,
       href: "integrations",
       visible: true,
+    },
+    {
+      key: "advertising",
+      label: "Paid ads",
+      desc: "Connect Meta and refresh read-only ads for the Satigny pilot",
+      Icon: IconChart,
+      href: "advertising",
+      visible: isAdvertisingEnabled(),
     },
     {
       key: "sending-domains",
