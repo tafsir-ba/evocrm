@@ -28,6 +28,9 @@ export const WORKSPACE_WIDE_PERMISSIONS = [
   "roles:manage",
   "billing:manage",
   "project:create",
+  "advertising:connect",
+  "advertising:approve",
+  "advertising:archive",
 ] as const satisfies readonly PermissionKey[];
 
 const WORKSPACE_WIDE_PERMISSION_SET = new Set<string>(WORKSPACE_WIDE_PERMISSIONS);

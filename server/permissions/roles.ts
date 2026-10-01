@@ -50,6 +50,12 @@ const OWNER_PERMISSIONS = validatePermissions([
   "campaign:update",
   "campaign:archive",
   "campaign:delete",
+  "advertising:read",
+  "advertising:create",
+  "advertising:update",
+  "advertising:archive",
+  "advertising:connect",
+  "advertising:approve",
   "settings:read",
   "settings:update",
   "users:manage",
@@ -93,6 +99,12 @@ const ADMIN_PERMISSIONS = validatePermissions([
   "campaign:update",
   "campaign:archive",
   "campaign:delete",
+  "advertising:read",
+  "advertising:create",
+  "advertising:update",
+  "advertising:archive",
+  "advertising:connect",
+  "advertising:approve",
   "settings:read",
   "settings:update",
   "users:manage",
@@ -117,6 +129,7 @@ const AGENT_PERMISSIONS = validatePermissions([
   "document:create",
   "document:read",
   "campaign:read",
+  "advertising:read",
   "settings:read",
 ]);
 
@@ -129,6 +142,7 @@ const VIEWER_PERMISSIONS = validatePermissions([
   "activity:read",
   "document:read",
   "campaign:read",
+  "advertising:read",
   "settings:read",
 ]);
 

@@ -65,6 +65,7 @@ Phase 0 env validation must require **only Phase 0 variables**. Feature-specific
 | `INTEGRATION_API_KEY_PEPPER` | Phase 12 (optional) | Dedicated pepper for website integration API key hashing. When unset, `NEXTAUTH_SECRET` is used. Set this in production so rotating auth secrets does not invalidate integration keys. |
 | `GOOGLE_CLIENT_ID` | Phase 2 | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Phase 2 | Google OAuth client secret |
+| `ADVERTISING_ENABLED` | Growth Copilot Phase 0+ (optional) | Enable advertising module routes. Default **off** (`false` / unset). Set `true` only for pilot workspaces. |
 
 Phase 0 and Phase 1 must boot without these configured. Phase 2 auth requires `NEXTAUTH_SECRET` and Google OAuth credentials at **production runtime** — the app fails closed if `NEXTAUTH_SECRET` is missing when `NODE_ENV=production`. Development and test may use local fallbacks. Production builds use a build-only placeholder during `next build` page collection; that placeholder is never used at runtime.
 

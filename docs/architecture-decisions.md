@@ -337,3 +337,6 @@ When schemas, APIs, permissions, architecture, or behavior change, update the re
 | Dictionary-driven statuses | Backend-driven UI; no label-based logic | Approved |
 | Signed URLs for documents | Security; no public file exposure | Approved |
 | Stripe later | Billing not in early MVP | Approved |
+| Growth Copilot modular advertising seam | Separate `GrowthCampaign` + adapters; flag off by default; no platform network in Phase 0 | Approved |
+| Generic credential vault | HubSpot + future AdConnection share opaque encrypt/decrypt; HubSpot helpers unchanged | Approved |
+| Kids-friendly UX + audit gate | Non-negotiable Project principles from Phase 0 onward | Approved |

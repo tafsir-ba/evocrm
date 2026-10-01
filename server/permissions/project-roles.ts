@@ -38,6 +38,7 @@ const PROJECT_ADMIN_PERMISSIONS = validatePermissions([
   "document:read",
   "document:archive",
   "campaign:read",
+  "advertising:read",
 ]);
 
 const CONTRIBUTOR_PERMISSIONS = validatePermissions([
@@ -57,6 +58,7 @@ const CONTRIBUTOR_PERMISSIONS = validatePermissions([
   "document:create",
   "document:read",
   "campaign:read",
+  "advertising:read",
 ]);
 
 const VIEWER_PERMISSIONS = validatePermissions([
@@ -68,6 +70,7 @@ const VIEWER_PERMISSIONS = validatePermissions([
   "activity:read",
   "document:read",
   "campaign:read",
+  "advertising:read",
 ]);
 
 export const PROJECT_ROLE_DEFINITIONS: ProjectRoleDefinition[] = [

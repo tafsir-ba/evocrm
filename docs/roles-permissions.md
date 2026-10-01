@@ -100,6 +100,19 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `campaign:archive` | Archive campaigns (soft) |
 | `campaign:delete` | Permanently delete draft campaigns with zero enrollments |
 
+### Advertising (Growth Copilot)
+
+Feature-flagged (`ADVERTISING_ENABLED`, default **off**). Separate from email-drip `campaign:*` keys.
+
+| Key | Description |
+|-----|-------------|
+| `advertising:read` | View Growth Campaigns, ad connections/accounts, read-only analytics |
+| `advertising:create` | Create Growth Campaigns and draft advertising config |
+| `advertising:update` | Edit Growth Campaigns and advertising config |
+| `advertising:archive` | Archive advertising entities |
+| `advertising:connect` | Connect / rotate ad-platform credentials (workspace-wide) |
+| `advertising:approve` | Approve publish, spend increases, exports (workspace-wide) |
+
 ### Settings
 
 | Key | Description |
@@ -141,6 +154,12 @@ Permissions are string keys stored on `Role.permissions[]`.
 | `campaign:update` | ✓ | ✓ | | |
 | `campaign:archive` | ✓ | ✓ | | |
 | `campaign:delete` | ✓ | ✓ | | |
+| `advertising:read` | ✓ | ✓ | ✓ | ✓ |
+| `advertising:create` | ✓ | ✓ | | |
+| `advertising:update` | ✓ | ✓ | | |
+| `advertising:archive` | ✓ | ✓ | | |
+| `advertising:connect` | ✓ | ✓ | | |
+| `advertising:approve` | ✓ | ✓ | | |
 | `settings:read` | ✓ | ✓ | ✓ | ✓ |
 | `settings:update` | ✓ | ✓ | | |
 | `users:manage` | ✓ | ✓ | | |
