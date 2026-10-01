@@ -95,6 +95,17 @@ export async function findCampaignSends(
   };
 }
 
+export async function countCampaignSendsForCampaign(
+  workspaceId: string,
+  campaignId: string,
+): Promise<number> {
+  await connectDb();
+
+  return CampaignSendModel.countDocuments(
+    withWorkspaceScope(workspaceId, { campaignId }),
+  );
+}
+
 export type CreateCampaignSendInput = {
   campaignId: string;
   campaignStepId: string;

@@ -41,6 +41,31 @@ export async function findSuppressionByEmail(
   return document ? toRecord(document as EmailSuppressionDocument) : null;
 }
 
+export async function findSuppressionsByEmails(
+  workspaceId: string,
+  emails: string[],
+): Promise<EmailSuppressionRecord[]> {
+  const normalized = [
+    ...new Set(
+      emails
+        .map((email) => email.toLowerCase().trim())
+        .filter((email) => email.length > 0),
+    ),
+  ];
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+
+  const documents = await EmailSuppressionModel.find(
+    withWorkspaceScope(workspaceId, { email: { $in: normalized } }),
+  ).lean();
+
+  return documents.map((document) => toRecord(document as EmailSuppressionDocument));
+}
+
 export async function upsertEmailSuppression(
   workspaceId: string,
   input: {

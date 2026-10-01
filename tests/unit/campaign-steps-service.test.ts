@@ -5,6 +5,7 @@ import {
   normalizeStepContent,
   updateCampaignStepForWorkspace,
 } from "@/server/services/campaign-steps";
+import { campaignRecordExtras } from "@/tests/helpers/crm-fixtures";
 
 vi.mock("@/server/repositories/campaigns", () => ({
   findCampaignById: vi.fn(),
@@ -44,15 +45,10 @@ const campaign = {
   name: "Test campaign",
   status: "draft" as const,
   audienceType: "leads" as const,
-  projectIds: [],
-  autoEnrollmentEnabled: false,
-  enrollmentTrigger: "manual_only" as const,
-  enrollmentRules: { logic: "AND" as const, conditions: [] },
+  ...campaignRecordExtras,
   frequency: null,
   defaultFromName: null,
   senderName: "EvoHome",
-  senderEmail: null,
-  sendingDomainId: null,
   createdBy: "user-1",
   ownerId: null,
   archivedAt: null,
@@ -91,7 +87,8 @@ describe("campaign step service readiness enforcement", () => {
     vi.mocked(findCampaignSteps).mockResolvedValue([readyStep]);
   });
 
-  it("rejects create requests that mark a step ready without unsubscribe support", async () => {
+  it("allows creating a ready step without an explicit unsubscribe token", async () => {
+    vi.mocked(findCampaignSteps).mockResolvedValue([]);
     vi.mocked(createCampaignStep).mockResolvedValue({
       ...readyStep,
       id: "step-new",
@@ -100,22 +97,18 @@ describe("campaign step service readiness enforcement", () => {
       bodyText: "Hello only",
     });
 
-    await expect(
-      createCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", {
-        order: 1,
-        delayDays: 0,
-        sendTime: "09:00",
-        channel: "email",
-        status: "ready",
-        subject: "Hello",
-        body: "Hello only",
-      }),
-    ).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      message: expect.stringContaining("unsubscribe"),
+    const created = await createCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", {
+      order: 1,
+      delayDays: 0,
+      sendTime: "09:00",
+      channel: "email",
+      status: "ready",
+      subject: "Hello",
+      body: "Hello only",
     });
 
-    expect(createCampaignStep).not.toHaveBeenCalled();
+    expect(created.id).toBe("step-new");
+    expect(createCampaignStep).toHaveBeenCalled();
   });
 
   it("stores an explicit step fromName and falls back to campaign sender name", async () => {
@@ -192,20 +185,27 @@ describe("campaign step service readiness enforcement", () => {
     expect(updateCampaignStep).toHaveBeenCalled();
   });
 
-  it("rejects content edits on ready steps that remove unsubscribe support", async () => {
+  it("allows content edits on ready steps without an explicit unsubscribe token", async () => {
     vi.mocked(findCampaignStepById).mockResolvedValue(readyStep);
-
-    await expect(
-      updateCampaignStepForWorkspace("ws-1", "user-1", "campaign-1", "step-1", {
-        body: "Updated body only",
-        bodyText: "Updated body only",
-      }),
-    ).rejects.toMatchObject({
-      code: "VALIDATION_ERROR",
-      message: expect.stringContaining("unsubscribe"),
+    vi.mocked(updateCampaignStep).mockResolvedValue({
+      ...readyStep,
+      body: "Updated body only",
+      bodyText: "Updated body only",
     });
 
-    expect(updateCampaignStep).not.toHaveBeenCalled();
+    const updated = await updateCampaignStepForWorkspace(
+      "ws-1",
+      "user-1",
+      "campaign-1",
+      "step-1",
+      {
+        body: "Updated body only",
+        bodyText: "Updated body only",
+      },
+    );
+
+    expect(updated.body).toBe("Updated body only");
+    expect(updateCampaignStep).toHaveBeenCalled();
   });
 
   it("allows schedule-only updates while the campaign is active", async () => {

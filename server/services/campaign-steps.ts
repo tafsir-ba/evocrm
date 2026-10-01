@@ -280,7 +280,14 @@ export async function createCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
-  assertCampaignEditable(campaign.status);
+  if (campaign.kind === "newsletter") {
+    const { assertNewsletterMutableBeforeSend } = await import(
+      "@/server/services/newsletters"
+    );
+    await assertNewsletterMutableBeforeSend(workspaceId, campaign);
+  } else {
+    assertCampaignEditable(campaign.status);
+  }
 
   if (input.channel !== "email") {
     throw new AppError("VALIDATION_ERROR", "Only email channel is supported.");
@@ -296,24 +303,38 @@ export async function createCampaignStepForWorkspace(
   }
 
   const existingSteps = await findCampaignSteps(workspaceId, campaignId);
+
+  if (campaign.kind === "newsletter" && existingSteps.length >= 1) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletters may only have a single email step.",
+    );
+  }
+
   const proposedStep = {
-    order: normalizedInput.order,
-    delayDays: normalizedInput.delayDays,
+    order: campaign.kind === "newsletter" ? 1 : normalizedInput.order,
+    delayDays: campaign.kind === "newsletter" ? 0 : normalizedInput.delayDays,
     sendTime: normalizedInput.sendTime,
   };
   assertStepScheduleAgainstPredecessor(proposedStep, [...existingSteps, proposedStep]);
 
   const step = await createCampaignStep(workspaceId, {
     campaignId,
-    order: normalizedInput.order,
+    order: proposedStep.order,
     name: normalizedInput.name,
-    delayDays: normalizedInput.delayDays,
-    delayAmount: normalizedInput.delayAmount,
-    delayUnit: normalizedInput.delayUnit,
+    delayDays: proposedStep.delayDays,
+    delayAmount:
+      campaign.kind === "newsletter"
+        ? 0
+        : (normalizedInput.delayAmount ?? normalizedInput.delayDays),
+    delayUnit: campaign.kind === "newsletter" ? "days" : normalizedInput.delayUnit,
     sendTime: normalizedInput.sendTime,
     fromName: normalizedInput.fromName ?? campaign.senderName ?? campaign.defaultFromName,
     status: normalizedInput.status,
-    contentMode: normalizedInput.contentMode,
+    contentMode:
+      campaign.kind === "newsletter"
+        ? (normalizedInput.contentMode ?? "html")
+        : normalizedInput.contentMode,
     subject: normalizedInput.subject,
     previewText: normalizedInput.previewText,
     body: normalizedInput.body,
@@ -355,10 +376,19 @@ export async function updateCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign step not found.");
   }
 
-  assertCampaignStepUpdateAllowed(campaign.status, existing, input);
+  if (campaign.kind === "newsletter") {
+    const { assertNewsletterMutableBeforeSend } = await import(
+      "@/server/services/newsletters"
+    );
+    await assertNewsletterMutableBeforeSend(workspaceId, campaign);
+  } else {
+    assertCampaignStepUpdateAllowed(campaign.status, existing, input);
+  }
 
   const scopedInput =
-    campaign.status === "active" ? pickActiveCampaignScheduleUpdate(input) : input;
+    campaign.kind !== "newsletter" && campaign.status === "active"
+      ? pickActiveCampaignScheduleUpdate(input)
+      : input;
 
   const documentIds =
     scopedInput.documentIds !== undefined
