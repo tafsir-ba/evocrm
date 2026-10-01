@@ -50,6 +50,7 @@ export const enrollmentRulesSchema = z
 const campaignListStatusSchema = z.enum(["draft", "active", "paused", "archived"]);
 const campaignUpdateStatusSchema = z.enum(["draft", "active", "paused"]);
 const audienceTypeSchema = z.enum(["leads", "opportunities"]);
+const campaignKindSchema = z.enum(["drip", "newsletter"]);
 const enrollmentTriggerSchema = z.enum(["new_lead", "lead_updated", "manual_only"]);
 
 export const campaignListQuerySchema = z.object({
@@ -60,6 +61,7 @@ export const campaignListQuerySchema = z.object({
     .optional()
     .transform((value) => value === "true"),
   status: campaignListStatusSchema.optional(),
+  kind: campaignKindSchema.optional(),
   audienceType: audienceTypeSchema.optional(),
   projectId: objectIdSchema.optional(),
   search: z.string().trim().max(120).optional(),
@@ -68,6 +70,7 @@ export const campaignListQuerySchema = z.object({
 export const createCampaignInputSchema = z
   .object({
     name: z.string().trim().min(1).max(200),
+    kind: campaignKindSchema.optional(),
     audienceType: audienceTypeSchema,
     projectIds: z.array(objectIdSchema).max(50).optional(),
     autoEnrollmentEnabled: z.boolean().optional(),

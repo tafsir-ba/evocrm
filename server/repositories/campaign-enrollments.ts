@@ -322,6 +322,58 @@ export async function createCampaignEnrollment(
   }
 }
 
+export async function createCampaignEnrollmentsBulk(
+  workspaceId: string,
+  inputs: CreateEnrollmentInput[],
+): Promise<number> {
+  if (inputs.length === 0) {
+    return 0;
+  }
+
+  await connectDb();
+
+  try {
+    const result = await CampaignEnrollmentModel.insertMany(
+      inputs.map((input) => ({
+        workspaceId,
+        campaignId: input.campaignId,
+        leadId: input.leadId ?? null,
+        opportunityId: input.opportunityId ?? null,
+        projectId: input.projectId ?? null,
+        enrollmentSource: input.enrollmentSource ?? "manual",
+        enrollmentReason: input.enrollmentReason ?? null,
+        status: "active",
+        currentStep: input.currentStep,
+        nextSendAt: input.nextSendAt,
+        lastSentAt: null,
+        completedAt: null,
+        unsubscribedAt: null,
+        failedAt: null,
+        failureReason: null,
+        sendClaimExpiresAt: null,
+      })),
+      { ordered: false },
+    );
+
+    return result.length;
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "insertedDocs" in error &&
+      Array.isArray((error as { insertedDocs?: unknown[] }).insertedDocs)
+    ) {
+      return (error as { insertedDocs: unknown[] }).insertedDocs.length;
+    }
+
+    if (isDuplicateKeyError(error)) {
+      return 0;
+    }
+
+    throw error;
+  }
+}
+
 export async function updateCampaignEnrollment(
   workspaceId: string,
   enrollmentId: string,

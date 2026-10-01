@@ -36,6 +36,7 @@ type Campaign = {
   id: string;
   name: string;
   status: "draft" | "active" | "paused" | "archived";
+  kind?: "drip" | "newsletter";
   audienceType: "leads" | "opportunities";
   frequency: string | null;
   defaultFromName: string | null;
@@ -198,6 +199,14 @@ export function CampaignDetailPanel({
         return;
       }
 
+      const loadedCampaign = campaignPayload.data?.campaign as Campaign | null;
+      if (loadedCampaign?.kind === "newsletter") {
+        router.replace(
+          workspacePath(workspaceSlug, `dripping/newsletters/${campaignId}`),
+        );
+        return;
+      }
+
       const warnings: string[] = [];
 
       if (!stepsRes.ok) {
@@ -216,7 +225,7 @@ export function CampaignDetailPanel({
         warnings.push("Failed to load enrollment suggestions.");
       }
 
-      setCampaign(campaignPayload.data?.campaign ?? null);
+      setCampaign(loadedCampaign);
       setSteps(stepsRes.ok ? (stepsPayload.data?.steps ?? []) : []);
       setEnrollments(
         enrollRes.ok && Array.isArray(enrollPayload.data) ? enrollPayload.data : [],
@@ -241,7 +250,7 @@ export function CampaignDetailPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, campaignId, router, workspaceSlug]);
 
   const reloadAfterCampaignMutation = useCallback(async () => {
     await loadAll();

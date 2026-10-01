@@ -53,12 +53,15 @@ function campaignSnapshot(campaign: CampaignRecord): Record<string, unknown> {
     id: campaign.id,
     name: campaign.name,
     status: campaign.status,
+    kind: campaign.kind,
     audienceType: campaign.audienceType,
     frequency: campaign.frequency,
     defaultFromName: campaign.defaultFromName,
     senderName: campaign.senderName,
     senderEmail: campaign.senderEmail,
     sendingDomainId: campaign.sendingDomainId,
+    scheduledFor: campaign.scheduledFor,
+    audienceLockedAt: campaign.audienceLockedAt,
     ownerId: campaign.ownerId,
   };
 }
@@ -111,7 +114,7 @@ async function validateCampaignSenderInput(
   }
 }
 
-async function enrichCampaign(
+export async function enrichCampaign(
   workspaceId: string,
   campaign: CampaignRecord,
 ): Promise<CampaignListItem> {
@@ -301,19 +304,41 @@ export async function createCampaignForWorkspace(
   actorId: string,
   input: CreateCampaignInput,
 ): Promise<CampaignDetail> {
-  const normalizedInput = normalizeAutoEnrollmentInput(input);
-  validateAutoEnrollmentSettings(normalizedInput);
+  const kind = input.kind ?? "drip";
+  const isNewsletter = kind === "newsletter";
+
+  const normalizedInput = isNewsletter
+    ? {
+        ...input,
+        kind,
+        audienceType: "leads" as const,
+        autoEnrollmentEnabled: false,
+        enrollmentTrigger: "manual_only" as const,
+        enrollmentRules: { logic: "AND" as const, conditions: [] },
+      }
+    : normalizeAutoEnrollmentInput(input);
+
+  if (!isNewsletter) {
+    validateAutoEnrollmentSettings(normalizedInput);
+  }
 
   await validateOptionalAssignableMember(workspaceId, normalizedInput.ownerId, "Owner");
   await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
-  await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  if (!isNewsletter) {
+    await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  }
 
   const campaign = await createCampaign(workspaceId, {
     name: normalizedInput.name,
+    kind,
     audienceType: normalizedInput.audienceType,
     projectIds: normalizedInput.projectIds ?? [],
-    autoEnrollmentEnabled: normalizedInput.autoEnrollmentEnabled ?? false,
-    enrollmentTrigger: normalizedInput.enrollmentTrigger ?? "manual_only",
+    autoEnrollmentEnabled: isNewsletter
+      ? false
+      : (normalizedInput.autoEnrollmentEnabled ?? false),
+    enrollmentTrigger: isNewsletter
+      ? "manual_only"
+      : (normalizedInput.enrollmentTrigger ?? "manual_only"),
     enrollmentRules: normalizedInput.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: normalizedInput.frequency ?? null,
     defaultFromName: normalizedInput.defaultFromName ?? normalizedInput.senderName ?? null,
@@ -383,10 +408,60 @@ export async function updateCampaignForWorkspace(
     );
   }
 
+  const isNewsletter = existing.kind === "newsletter";
+
+  if (isNewsletter) {
+    const { assertNewsletterMutableBeforeSend } = await import(
+      "@/server/services/newsletters"
+    );
+    await assertNewsletterMutableBeforeSend(workspaceId, existing);
+
+    if (normalizedInput.autoEnrollmentEnabled === true) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters cannot use automatic enrollment.",
+      );
+    }
+
+    if (
+      normalizedInput.enrollmentTrigger !== undefined &&
+      normalizedInput.enrollmentTrigger !== "manual_only"
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters only support manual enrollment.",
+      );
+    }
+
+    if (
+      normalizedInput.enrollmentRules !== undefined &&
+      (normalizedInput.enrollmentRules.conditions?.length ?? 0) > 0
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters do not support drip enrollment rules. Configure audience segments instead.",
+      );
+    }
+
+    if (normalizedInput.projectIds !== undefined) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletter project scope is derived from audience segments and cannot be set directly.",
+      );
+    }
+  }
+
   if (normalizedInput.status) {
     assertAllowedStatusTransition(existing.status, normalizedInput.status);
 
     if (normalizedInput.status === "active") {
+      if (isNewsletter) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Use the newsletter send or schedule action to activate a newsletter.",
+        );
+      }
+
       const stepCount = await countCampaignSteps(workspaceId, campaignId);
 
       if (stepCount < 1) {
@@ -408,21 +483,35 @@ export async function updateCampaignForWorkspace(
   }
 
   await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
-  await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  if (!isNewsletter) {
+    await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  }
   await validateCampaignSenderInput(workspaceId, normalizedInput);
 
-  const effectiveEnrollment = resolveEffectiveEnrollmentSettings(existing, normalizedInput);
-  validateAutoEnrollmentSettings(effectiveEnrollment);
+  const effectiveEnrollment = isNewsletter
+    ? {
+        autoEnrollmentEnabled: false as const,
+        enrollmentTrigger: "manual_only" as const,
+      }
+    : resolveEffectiveEnrollmentSettings(existing, normalizedInput);
 
-  const shouldPersistEnrollmentSettings =
-    normalizedInput.autoEnrollmentEnabled !== undefined ||
-    normalizedInput.enrollmentTrigger !== undefined ||
-    effectiveEnrollment.autoEnrollmentEnabled !== existing.autoEnrollmentEnabled ||
-    effectiveEnrollment.enrollmentTrigger !== existing.enrollmentTrigger;
+  if (!isNewsletter) {
+    validateAutoEnrollmentSettings(effectiveEnrollment);
+  }
+
+  const shouldPersistEnrollmentSettings = isNewsletter
+    ? existing.autoEnrollmentEnabled !== false ||
+      existing.enrollmentTrigger !== "manual_only" ||
+      normalizedInput.autoEnrollmentEnabled !== undefined ||
+      normalizedInput.enrollmentTrigger !== undefined
+    : normalizedInput.autoEnrollmentEnabled !== undefined ||
+      normalizedInput.enrollmentTrigger !== undefined ||
+      effectiveEnrollment.autoEnrollmentEnabled !== existing.autoEnrollmentEnabled ||
+      effectiveEnrollment.enrollmentTrigger !== existing.enrollmentTrigger;
 
   const updated = await updateCampaign(workspaceId, campaignId, {
     ...(normalizedInput.name !== undefined ? { name: normalizedInput.name } : {}),
-    ...(normalizedInput.projectIds !== undefined
+    ...(normalizedInput.projectIds !== undefined && !isNewsletter
       ? { projectIds: normalizedInput.projectIds }
       : {}),
     ...(shouldPersistEnrollmentSettings
@@ -431,7 +520,7 @@ export async function updateCampaignForWorkspace(
           enrollmentTrigger: effectiveEnrollment.enrollmentTrigger,
         }
       : {}),
-    ...(normalizedInput.enrollmentRules !== undefined
+    ...(normalizedInput.enrollmentRules !== undefined && !isNewsletter
       ? { enrollmentRules: normalizedInput.enrollmentRules }
       : {}),
     ...(normalizedInput.frequency !== undefined ? { frequency: normalizedInput.frequency } : {}),
@@ -741,6 +830,12 @@ export async function purgeCampaignForWorkspace(
   }
 
   await deleteCampaignStepsForCampaign(workspaceId, campaignId);
+  if (existing.kind === "newsletter") {
+    const { deleteNewsletterAudienceSegmentsForCampaign } = await import(
+      "@/server/repositories/newsletter-audience-segments"
+    );
+    await deleteNewsletterAudienceSegmentsForCampaign(workspaceId, campaignId);
+  }
   const deleted = await deleteCampaignById(workspaceId, campaignId);
 
   if (!deleted) {

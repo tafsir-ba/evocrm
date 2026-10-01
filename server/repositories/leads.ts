@@ -140,6 +140,8 @@ export type LeadListFilter = {
   assignedTo?: string;
   ownerId?: string;
   tagId?: string;
+  tagIds?: string[];
+  tagMatch?: "any" | "all";
   propertyTypeInterest?: PropertyTypeInterest;
   transactionIntent?: TransactionIntent;
   usagePurpose?: UsagePurpose;
@@ -186,6 +188,12 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   }
   if (filter.tagId) {
     query.tags = filter.tagId;
+  } else if (filter.tagIds && filter.tagIds.length > 0) {
+    if (filter.tagMatch === "all") {
+      query.tags = { $all: filter.tagIds };
+    } else {
+      query.tags = { $in: filter.tagIds };
+    }
   }
   if (filter.propertyTypeInterest) {
     query.propertyTypeInterests = filter.propertyTypeInterest;

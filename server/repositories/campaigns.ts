@@ -29,11 +29,23 @@ export type EnrollmentRules = {
   conditions: EnrollmentCondition[];
 };
 
+export type CampaignAudienceSummary = {
+  queued: number;
+  excludedMissingEmail: number;
+  excludedUnsubscribed: number;
+  excludedSuppressed: number;
+  excludedInvalid: number;
+  excludedArchived: number;
+  unknownConsent: number;
+  deduped: number;
+};
+
 export type CampaignRecord = {
   id: string;
   workspaceId: string;
   name: string;
   status: "draft" | "active" | "paused" | "archived";
+  kind: "drip" | "newsletter";
   audienceType: "leads" | "opportunities";
   projectIds: string[];
   autoEnrollmentEnabled: boolean;
@@ -44,6 +56,9 @@ export type CampaignRecord = {
   senderName: string | null;
   senderEmail: string | null;
   sendingDomainId: string | null;
+  scheduledFor: Date | null;
+  audienceLockedAt: Date | null;
+  audienceSummary: CampaignAudienceSummary | null;
   createdBy: string;
   ownerId: string | null;
   archivedAt: Date | null;
@@ -59,12 +74,33 @@ function toEnrollmentRules(document: CampaignDocument): EnrollmentRules {
   };
 }
 
+function toAudienceSummary(
+  document: CampaignDocument,
+): CampaignAudienceSummary | null {
+  const summary = document.audienceSummary as CampaignAudienceSummary | null | undefined;
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    queued: summary.queued ?? 0,
+    excludedMissingEmail: summary.excludedMissingEmail ?? 0,
+    excludedUnsubscribed: summary.excludedUnsubscribed ?? 0,
+    excludedSuppressed: summary.excludedSuppressed ?? 0,
+    excludedInvalid: summary.excludedInvalid ?? 0,
+    excludedArchived: summary.excludedArchived ?? 0,
+    unknownConsent: summary.unknownConsent ?? 0,
+    deduped: summary.deduped ?? 0,
+  };
+}
+
 function toCampaignRecord(document: CampaignDocument): CampaignRecord {
   return {
     id: document._id.toString(),
     workspaceId: document.workspaceId.toString(),
     name: document.name,
     status: document.status as CampaignRecord["status"],
+    kind: (document.kind as CampaignRecord["kind"] | undefined) ?? "drip",
     audienceType: document.audienceType as CampaignRecord["audienceType"],
     projectIds: (document.projectIds ?? []).map((id) => id.toString()),
     autoEnrollmentEnabled: document.autoEnrollmentEnabled ?? false,
@@ -77,6 +113,9 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
     senderName: document.senderName ?? document.defaultFromName ?? null,
     senderEmail: document.senderEmail ?? null,
     sendingDomainId: document.sendingDomainId?.toString() ?? null,
+    scheduledFor: document.scheduledFor ?? null,
+    audienceLockedAt: document.audienceLockedAt ?? null,
+    audienceSummary: toAudienceSummary(document),
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
     archivedAt: document.archivedAt ?? null,
@@ -88,6 +127,7 @@ function toCampaignRecord(document: CampaignDocument): CampaignRecord {
 export type CampaignListFilter = {
   includeArchived?: boolean;
   status?: CampaignRecord["status"];
+  kind?: CampaignRecord["kind"];
   audienceType?: CampaignRecord["audienceType"];
   projectId?: string;
   projectIds?: string[];
@@ -106,6 +146,15 @@ function buildListQuery(filter: CampaignListFilter): Record<string, unknown> {
 
   if (filter.status) {
     query.status = filter.status;
+  }
+
+  if (filter.kind) {
+    if (filter.kind === "drip") {
+      // Back-compat: legacy rows without kind are drips.
+      query.kind = { $nin: ["newsletter"] };
+    } else {
+      query.kind = filter.kind;
+    }
   }
 
   if (filter.audienceType) {
@@ -180,6 +229,9 @@ export async function findActiveAutoEnrollmentCampaigns(
       archivedAt: null,
       audienceType: filter.audienceType,
       autoEnrollmentEnabled: true,
+      // Newsletters are snapshot/manual-only; never auto-enroll into them.
+      // Legacy drip rows without `kind` remain eligible via $nin.
+      kind: { $nin: ["newsletter"] },
       ...(filter.trigger === "new_lead"
         ? {
             // Include legacy rows saved before trigger normalization (auto on + manual_only).
@@ -196,6 +248,7 @@ export async function findActiveAutoEnrollmentCampaigns(
 
 export type CreateCampaignInput = {
   name: string;
+  kind?: CampaignRecord["kind"];
   audienceType: CampaignRecord["audienceType"];
   projectIds?: string[];
   autoEnrollmentEnabled?: boolean;
@@ -216,20 +269,31 @@ export async function createCampaign(
 ): Promise<CampaignRecord> {
   await connectDb();
 
+  const kind = input.kind ?? "drip";
+  const isNewsletter = kind === "newsletter";
+
   const document = await CampaignModel.create({
     workspaceId,
     name: input.name.trim(),
     status: "draft",
+    kind,
     audienceType: input.audienceType,
     projectIds: input.projectIds ?? [],
-    autoEnrollmentEnabled: input.autoEnrollmentEnabled ?? false,
-    enrollmentTrigger: input.enrollmentTrigger ?? "manual_only",
+    autoEnrollmentEnabled: isNewsletter
+      ? false
+      : (input.autoEnrollmentEnabled ?? false),
+    enrollmentTrigger: isNewsletter
+      ? "manual_only"
+      : (input.enrollmentTrigger ?? "manual_only"),
     enrollmentRules: input.enrollmentRules ?? { logic: "AND", conditions: [] },
     frequency: input.frequency ?? null,
     defaultFromName: input.defaultFromName?.trim() ?? input.senderName?.trim() ?? null,
     senderName: input.senderName?.trim() ?? input.defaultFromName?.trim() ?? null,
     senderEmail: input.senderEmail?.trim().toLowerCase() ?? null,
     sendingDomainId: input.sendingDomainId ?? null,
+    scheduledFor: null,
+    audienceLockedAt: null,
+    audienceSummary: null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
     archivedAt: null,
@@ -253,6 +317,9 @@ export async function updateCampaign(
     senderName: string | null;
     senderEmail: string | null;
     sendingDomainId: string | null;
+    scheduledFor: Date | null;
+    audienceLockedAt: Date | null;
+    audienceSummary: CampaignAudienceSummary | null;
     ownerId: string | null;
     archivedAt: Date | null;
   }>,

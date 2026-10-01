@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import {
@@ -26,17 +26,20 @@ import { formatRelativeAge } from "@/lib/list-view";
 import { appendProjectIdToSearchParams } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
+import { cn } from "@/lib/utils";
 
 type CampaignListItem = {
   id: string;
   name: string;
   status: "draft" | "active" | "paused" | "archived";
+  kind?: "drip" | "newsletter";
   audienceType: "leads" | "opportunities";
   frequency: string | null;
   defaultFromName: string | null;
   stepCount: number;
   enrollmentCount: number;
   updatedAt: string;
+  scheduledFor?: string | null;
 };
 
 const STATUS_TONE: Record<CampaignListItem["status"], "neutral" | "success" | "warn" | "muted"> = {
@@ -53,12 +56,17 @@ type CampaignsPanelProps = {
   canArchive: boolean;
 };
 
+type KindTab = "drip" | "newsletter";
+
 export function CampaignsPanel({
   workspaceSlug,
   canCreate,
 }: CampaignsPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = useWorkspaceProjectFilter();
+  const initialTab = searchParams.get("tab") === "newsletters" ? "newsletter" : "drip";
+  const [kindTab, setKindTab] = useState<KindTab>(initialTab);
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,7 +78,20 @@ export function CampaignsPanel({
   const [search, setSearch] = useState("");
 
   const apiBase = `/api/workspaces/${workspaceSlug}/campaigns`;
-  const newCampaignPath = workspacePath(workspaceSlug, "dripping/new");
+  const isNewsletters = kindTab === "newsletter";
+  const newPath = isNewsletters
+    ? workspacePath(workspaceSlug, "dripping/newsletters/new")
+    : workspacePath(workspaceSlug, "dripping/new");
+
+  const detailPath = useCallback(
+    (campaign: CampaignListItem) => {
+      if (campaign.kind === "newsletter" || isNewsletters) {
+        return workspacePath(workspaceSlug, `dripping/newsletters/${campaign.id}`);
+      }
+      return workspacePath(workspaceSlug, `dripping/${campaign.id}`);
+    },
+    [isNewsletters, workspaceSlug],
+  );
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -79,9 +100,10 @@ export function CampaignsPanel({
 
     try {
       const params = new URLSearchParams();
+      params.set("kind", kindTab);
       if (showArchived) params.set("includeArchived", "true");
       if (statusFilter) params.set("status", statusFilter);
-      if (audienceFilter) params.set("audienceType", audienceFilter);
+      if (!isNewsletters && audienceFilter) params.set("audienceType", audienceFilter);
       if (search.trim()) params.set("search", search.trim());
       appendProjectIdToSearchParams(params, projectId);
 
@@ -105,11 +127,52 @@ export function CampaignsPanel({
     } finally {
       setLoading(false);
     }
-  }, [apiBase, audienceFilter, projectId, search, showArchived, statusFilter]);
+  }, [
+    apiBase,
+    audienceFilter,
+    isNewsletters,
+    kindTab,
+    projectId,
+    search,
+    showArchived,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     void loadCampaigns();
   }, [loadCampaigns]);
+
+  useEffect(() => {
+    const next = searchParams.get("tab") === "newsletters" ? "newsletter" : "drip";
+    setKindTab(next);
+  }, [searchParams]);
+
+  function selectTab(next: KindTab) {
+    setKindTab(next);
+    const href =
+      next === "newsletter"
+        ? workspacePath(workspaceSlug, "dripping?tab=newsletters")
+        : workspacePath(workspaceSlug, "dripping");
+    router.replace(href);
+  }
+
+  const emptyCopy = useMemo(
+    () =>
+      isNewsletters
+        ? {
+            title: "No newsletters yet",
+            description:
+              "Create a one-off newsletter with HTML content, a project audience, and send or schedule.",
+            action: "New newsletter",
+          }
+        : {
+            title: "No campaigns yet",
+            description:
+              "Create your first email drip campaign to automate follow-up with leads and opportunities.",
+            action: "New campaign",
+          },
+    [isNewsletters],
+  );
 
   if (forbidden) {
     return (
@@ -127,26 +190,53 @@ export function CampaignsPanel({
         title="Dripping"
         meta={
           <Badge tone="muted" size="sm">
-            {total} campaigns
+            {total} {isNewsletters ? "newsletters" : "campaigns"}
           </Badge>
         }
         actions={
           canCreate ? (
             <Button
               leadingIcon={<IconPlus size={14} />}
-              onClick={() => router.push(newCampaignPath)}
+              onClick={() => router.push(newPath)}
             >
-              New campaign
+              {isNewsletters ? "New newsletter" : "New campaign"}
             </Button>
           ) : undefined
         }
       />
 
+      <div className="mb-3 flex gap-1 border-b border-[var(--color-line)]">
+        <button
+          type="button"
+          className={cn(
+            "px-3 py-2 text-[13px] font-medium",
+            !isNewsletters
+              ? "border-b-2 border-[var(--color-ink)] text-[var(--color-ink)]"
+              : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]",
+          )}
+          onClick={() => selectTab("drip")}
+        >
+          Drips
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "px-3 py-2 text-[13px] font-medium",
+            isNewsletters
+              ? "border-b-2 border-[var(--color-ink)] text-[var(--color-ink)]"
+              : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]",
+          )}
+          onClick={() => selectTab("newsletter")}
+        >
+          Newsletters
+        </button>
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <div className="min-w-[200px] max-w-xs flex-1">
           <Input
-            placeholder="Search campaigns…"
-            aria-label="Search campaigns"
+            placeholder={isNewsletters ? "Search newsletters…" : "Search campaigns…"}
+            aria-label={isNewsletters ? "Search newsletters" : "Search campaigns"}
             fieldSize="sm"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -165,17 +255,19 @@ export function CampaignsPanel({
           <option value="paused">Paused</option>
           <option value="archived">Archived</option>
         </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[140px]"
-          aria-label="Filter by audience"
-          value={audienceFilter}
-          onChange={(event) => setAudienceFilter(event.target.value)}
-        >
-          <option value="">All audiences</option>
-          <option value="leads">Leads</option>
-          <option value="opportunities">Opportunities</option>
-        </Select>
+        {!isNewsletters ? (
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[140px]"
+            aria-label="Filter by audience"
+            value={audienceFilter}
+            onChange={(event) => setAudienceFilter(event.target.value)}
+          >
+            <option value="">All audiences</option>
+            <option value="leads">Leads</option>
+            <option value="opportunities">Opportunities</option>
+          </Select>
+        ) : null}
         <label className="inline-flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
           <input
             type="checkbox"
@@ -194,17 +286,17 @@ export function CampaignsPanel({
         </div>
       ) : error ? (
         <ErrorState
-          title="Could not load campaigns"
+          title={isNewsletters ? "Could not load newsletters" : "Could not load campaigns"}
           description={error}
           primaryAction={{ label: "Retry", onClick: () => void loadCampaigns() }}
         />
       ) : campaigns.length === 0 ? (
         <EmptyState
-          title="No campaigns yet"
-          description="Create your first email drip campaign to automate follow-up with leads and opportunities."
+          title={emptyCopy.title}
+          description={emptyCopy.description}
           primaryAction={
             canCreate
-              ? { label: "New campaign", onClick: () => router.push(newCampaignPath) }
+              ? { label: emptyCopy.action, onClick: () => router.push(newPath) }
               : undefined
           }
         />
@@ -214,11 +306,17 @@ export function CampaignsPanel({
             <Table density="compact">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell>Campaign</TableHeaderCell>
+                  <TableHeaderCell>{isNewsletters ? "Newsletter" : "Campaign"}</TableHeaderCell>
                   <TableHeaderCell className="w-[6rem]">Status</TableHeaderCell>
-                  <TableHeaderCell className="w-[7.5rem]">Audience</TableHeaderCell>
-                  <TableHeaderCell className="w-[4.5rem] text-right">Steps</TableHeaderCell>
-                  <TableHeaderCell className="w-[5.5rem] text-right">Enrolled</TableHeaderCell>
+                  {!isNewsletters ? (
+                    <TableHeaderCell className="w-[7.5rem]">Audience</TableHeaderCell>
+                  ) : null}
+                  <TableHeaderCell className="w-[4.5rem] text-right">
+                    {isNewsletters ? "Emails" : "Steps"}
+                  </TableHeaderCell>
+                  <TableHeaderCell className="w-[5.5rem] text-right">
+                    {isNewsletters ? "Recipients" : "Enrolled"}
+                  </TableHeaderCell>
                   <TableHeaderCell className="w-[5rem]">Updated</TableHeaderCell>
                   <TableHeaderCell className="w-[5.5rem] text-right">Actions</TableHeaderCell>
                 </TableRow>
@@ -231,7 +329,7 @@ export function CampaignsPanel({
                   >
                     <TableCell>
                       <Link
-                        href={workspacePath(workspaceSlug, `dripping/${campaign.id}`)}
+                        href={detailPath(campaign)}
                         className="truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                       >
                         {campaign.name}
@@ -244,9 +342,11 @@ export function CampaignsPanel({
                         size="sm"
                       />
                     </TableCell>
-                    <TableCell className="capitalize text-[var(--color-ink-soft)]">
-                      {campaign.audienceType}
-                    </TableCell>
+                    {!isNewsletters ? (
+                      <TableCell className="capitalize text-[var(--color-ink-soft)]">
+                        {campaign.audienceType}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="text-right tabular text-[var(--color-ink-soft)]">
                       {campaign.stepCount}
                     </TableCell>
@@ -275,7 +375,7 @@ export function CampaignsPanel({
               <li key={campaign.id} className="px-3 py-2">
                 <div className="flex items-start justify-between gap-2">
                   <Link
-                    href={workspacePath(workspaceSlug, `dripping/${campaign.id}`)}
+                    href={detailPath(campaign)}
                     className="min-w-0 truncate font-semibold text-[var(--color-ink)]"
                   >
                     {campaign.name}
@@ -287,8 +387,10 @@ export function CampaignsPanel({
                   />
                 </div>
                 <p className="mt-0.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                  {campaign.audienceType} · {campaign.stepCount} steps · {campaign.enrollmentCount}{" "}
-                  enrolled · {formatRelativeAge(campaign.updatedAt)}
+                  {isNewsletters ? "Newsletter" : campaign.audienceType} · {campaign.stepCount}{" "}
+                  {isNewsletters ? "email" : "steps"} · {campaign.enrollmentCount}{" "}
+                  {isNewsletters ? "recipients" : "enrolled"} ·{" "}
+                  {formatRelativeAge(campaign.updatedAt)}
                 </p>
                 <Link
                   href={workspacePath(workspaceSlug, `dripping/${campaign.id}/analytics`)}

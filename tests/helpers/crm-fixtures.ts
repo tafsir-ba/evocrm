@@ -36,6 +36,10 @@ export const campaignRecordExtras: Pick<
   | "senderName"
   | "senderEmail"
   | "sendingDomainId"
+  | "kind"
+  | "scheduledFor"
+  | "audienceLockedAt"
+  | "audienceSummary"
 > = {
   projectIds: [],
   autoEnrollmentEnabled: false,
@@ -44,6 +48,10 @@ export const campaignRecordExtras: Pick<
   senderName: null,
   senderEmail: null,
   sendingDomainId: null,
+  kind: "drip",
+  scheduledFor: null,
+  audienceLockedAt: null,
+  audienceSummary: null,
 };
 
 export const enrollmentRecordExtras: Pick<

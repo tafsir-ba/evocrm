@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, Schema } from "mongoose";
 
 const CAMPAIGN_STATUSES = ["draft", "active", "paused", "archived"] as const;
+const CAMPAIGN_KINDS = ["drip", "newsletter"] as const;
 const CAMPAIGN_AUDIENCE_TYPES = ["leads", "opportunities"] as const;
 const ENROLLMENT_TRIGGERS = ["new_lead", "lead_updated", "manual_only"] as const;
 const ENROLLMENT_LOGIC = ["AND", "OR"] as const;
@@ -39,6 +40,20 @@ const enrollmentRulesSchema = new Schema(
   { _id: false },
 );
 
+const audienceSummarySchema = new Schema(
+  {
+    queued: { type: Number, default: 0 },
+    excludedMissingEmail: { type: Number, default: 0 },
+    excludedUnsubscribed: { type: Number, default: 0 },
+    excludedSuppressed: { type: Number, default: 0 },
+    excludedInvalid: { type: Number, default: 0 },
+    excludedArchived: { type: Number, default: 0 },
+    unknownConsent: { type: Number, default: 0 },
+    deduped: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
 const campaignSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
@@ -47,6 +62,11 @@ const campaignSchema = new Schema(
       type: String,
       enum: CAMPAIGN_STATUSES,
       default: "draft",
+    },
+    kind: {
+      type: String,
+      enum: CAMPAIGN_KINDS,
+      default: "drip",
     },
     audienceType: {
       type: String,
@@ -76,6 +96,12 @@ const campaignSchema = new Schema(
       ref: "SendingDomain",
       default: null,
     },
+    scheduledFor: { type: Date, default: null },
+    audienceLockedAt: { type: Date, default: null },
+    audienceSummary: {
+      type: audienceSummarySchema,
+      default: null,
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     archivedAt: { type: Date, default: null },
@@ -87,6 +113,7 @@ campaignSchema.index({ workspaceId: 1 });
 campaignSchema.index({ workspaceId: 1, projectIds: 1 });
 campaignSchema.index({ workspaceId: 1, autoEnrollmentEnabled: 1, enrollmentTrigger: 1 });
 campaignSchema.index({ workspaceId: 1, status: 1 });
+campaignSchema.index({ workspaceId: 1, kind: 1, status: 1, createdAt: -1 });
 campaignSchema.index({ workspaceId: 1, audienceType: 1 });
 campaignSchema.index({ workspaceId: 1, createdAt: -1 });
 campaignSchema.index({ workspaceId: 1, archivedAt: 1 });
