@@ -277,6 +277,16 @@ export async function previewNewsletterAudienceForWorkspace(
   };
 }
 
+async function assertNewsletterSendNotStarted(
+  workspaceId: string,
+  campaignId: string,
+  message: string,
+): Promise<void> {
+  if (await hasNewsletterSendStarted(workspaceId, campaignId)) {
+    throw new AppError("VALIDATION_ERROR", message);
+  }
+}
+
 async function lockAndActivateNewsletter(input: {
   workspaceId: string;
   actorId: string;
@@ -291,24 +301,22 @@ async function lockAndActivateNewsletter(input: {
     throw new AppError("NOT_FOUND", "Newsletter not found.");
   }
   assertIsNewsletter(campaign);
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
 
   if (campaign.status === "archived") {
     throw new AppError("VALIDATION_ERROR", "Archived newsletters cannot be sent.");
   }
 
   if (campaign.audienceLockedAt) {
-    const started = await hasNewsletterSendStarted(workspaceId, campaignId);
-    if (started) {
-      throw new AppError(
-        "VALIDATION_ERROR",
-        "This newsletter has already started sending.",
-      );
-    }
-    // Re-snapshot: cancel prior enrollments first.
-    await cancelEnrollmentsForCampaign(
+    await assertNewsletterSendNotStarted(
       workspaceId,
       campaignId,
-      "Newsletter audience re-locked before send.",
+      "This newsletter has already started sending.",
     );
   }
 
@@ -339,6 +347,21 @@ async function lockAndActivateNewsletter(input: {
   const firstStep = await findFirstCampaignStep(workspaceId, campaignId);
   if (!firstStep) {
     throw new AppError("VALIDATION_ERROR", "Newsletter is missing its email step.");
+  }
+
+  // Final TOCTOU guard immediately before mutating enrollments / lock state.
+  await assertNewsletterSendNotStarted(
+    workspaceId,
+    campaignId,
+    "This newsletter has already started sending.",
+  );
+
+  if (campaign.audienceLockedAt) {
+    await cancelEnrollmentsForCampaign(
+      workspaceId,
+      campaignId,
+      "Newsletter audience re-locked before send.",
+    );
   }
 
   const lockedAt = new Date();
@@ -481,6 +504,12 @@ export async function cancelNewsletterScheduleForWorkspace(
     throw new AppError("NOT_FOUND", "Newsletter not found.");
   }
   assertIsNewsletter(campaign);
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
   await assertNewsletterMutableBeforeSend(workspaceId, campaign);
 
   if (!campaign.audienceLockedAt && campaign.status === "draft") {
@@ -489,6 +518,13 @@ export async function cancelNewsletterScheduleForWorkspace(
       "This newsletter is not scheduled.",
     );
   }
+
+  // Re-check immediately before canceling enrollments (TOCTOU guard).
+  await assertNewsletterSendNotStarted(
+    workspaceId,
+    campaignId,
+    "This newsletter has started sending and can no longer be cancelled.",
+  );
 
   await cancelEnrollmentsForCampaign(
     workspaceId,

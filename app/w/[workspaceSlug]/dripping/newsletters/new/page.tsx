@@ -24,9 +24,18 @@ export default async function NewNewsletterPage({ params }: { params: Params }) 
     );
   }
 
+  const canUpdate = hasPermission(
+    access.context.membership.role.permissions,
+    "campaign:update",
+  );
+
   return (
     <PageContainer>
-      <NewsletterFormPage workspaceSlug={workspaceSlug} mode="create" />
+      <NewsletterFormPage
+        workspaceSlug={workspaceSlug}
+        mode="create"
+        canUpdate={canUpdate}
+      />
     </PageContainer>
   );
 }

@@ -120,8 +120,8 @@ describe("campaign service", () => {
 
     expect(createCampaign).toHaveBeenCalledWith("ws-1", {
       name: "Buyer Follow-up",
+      kind: "drip",
       audienceType: "leads",
-  ...campaignRecordExtras,
       projectIds: [],
       autoEnrollmentEnabled: false,
       enrollmentTrigger: "manual_only",

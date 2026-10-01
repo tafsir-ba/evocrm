@@ -229,6 +229,9 @@ export async function findActiveAutoEnrollmentCampaigns(
       archivedAt: null,
       audienceType: filter.audienceType,
       autoEnrollmentEnabled: true,
+      // Newsletters are snapshot/manual-only; never auto-enroll into them.
+      // Legacy drip rows without `kind` remain eligible via $nin.
+      kind: { $nin: ["newsletter"] },
       ...(filter.trigger === "new_lead"
         ? {
             // Include legacy rows saved before trigger normalization (auto on + manual_only).

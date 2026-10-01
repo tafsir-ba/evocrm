@@ -29,22 +29,13 @@ export default async function EditNewsletterPage({ params }: { params: Params })
     "campaign:update",
   );
 
-  if (!canUpdate) {
-    return (
-      <PageContainer>
-        <p className="text-[13px] text-[var(--color-ink-muted)]">
-          You do not have permission to edit newsletters.
-        </p>
-      </PageContainer>
-    );
-  }
-
   return (
     <PageContainer>
       <NewsletterFormPage
         workspaceSlug={workspaceSlug}
         mode="edit"
         campaignId={campaignId}
+        canUpdate={canUpdate}
       />
     </PageContainer>
   );

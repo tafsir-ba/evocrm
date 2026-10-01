@@ -486,6 +486,13 @@ export async function deleteCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  if (campaign.kind === "newsletter") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletter email content cannot be deleted via step delete. Edit the newsletter content instead.",
+    );
+  }
+
   assertCampaignEditable(campaign.status);
 
   const existing = await findCampaignStepById(workspaceId, campaignId, stepId);
@@ -528,6 +535,13 @@ export async function reorderCampaignStepsForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  if (campaign.kind === "newsletter") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletters have a single email step and cannot be reordered.",
+    );
+  }
+
   assertCampaignEditable(campaign.status);
 
   const steps = await reorderCampaignSteps(workspaceId, campaignId, input.stepIds);
@@ -557,6 +571,13 @@ export async function duplicateCampaignStepForWorkspace(
 
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  if (campaign.kind === "newsletter") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletters may only have a single email step.",
+    );
   }
 
   assertCampaignEditable(campaign.status);

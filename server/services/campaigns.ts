@@ -408,18 +408,54 @@ export async function updateCampaignForWorkspace(
     );
   }
 
-  if (existing.kind === "newsletter") {
+  const isNewsletter = existing.kind === "newsletter";
+
+  if (isNewsletter) {
     const { assertNewsletterMutableBeforeSend } = await import(
       "@/server/services/newsletters"
     );
     await assertNewsletterMutableBeforeSend(workspaceId, existing);
+
+    if (normalizedInput.autoEnrollmentEnabled === true) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters cannot use automatic enrollment.",
+      );
+    }
+
+    if (
+      normalizedInput.enrollmentTrigger !== undefined &&
+      normalizedInput.enrollmentTrigger !== "manual_only"
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters only support manual enrollment.",
+      );
+    }
+
+    if (
+      normalizedInput.enrollmentRules !== undefined &&
+      (normalizedInput.enrollmentRules.conditions?.length ?? 0) > 0
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletters do not support drip enrollment rules. Configure audience segments instead.",
+      );
+    }
+
+    if (normalizedInput.projectIds !== undefined) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Newsletter project scope is derived from audience segments and cannot be set directly.",
+      );
+    }
   }
 
   if (normalizedInput.status) {
     assertAllowedStatusTransition(existing.status, normalizedInput.status);
 
     if (normalizedInput.status === "active") {
-      if (existing.kind === "newsletter") {
+      if (isNewsletter) {
         throw new AppError(
           "VALIDATION_ERROR",
           "Use the newsletter send or schedule action to activate a newsletter.",
@@ -447,21 +483,35 @@ export async function updateCampaignForWorkspace(
   }
 
   await validateCampaignProjectIds(workspaceId, normalizedInput.projectIds);
-  await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  if (!isNewsletter) {
+    await validateEnrollmentRules(workspaceId, normalizedInput.enrollmentRules);
+  }
   await validateCampaignSenderInput(workspaceId, normalizedInput);
 
-  const effectiveEnrollment = resolveEffectiveEnrollmentSettings(existing, normalizedInput);
-  validateAutoEnrollmentSettings(effectiveEnrollment);
+  const effectiveEnrollment = isNewsletter
+    ? {
+        autoEnrollmentEnabled: false as const,
+        enrollmentTrigger: "manual_only" as const,
+      }
+    : resolveEffectiveEnrollmentSettings(existing, normalizedInput);
 
-  const shouldPersistEnrollmentSettings =
-    normalizedInput.autoEnrollmentEnabled !== undefined ||
-    normalizedInput.enrollmentTrigger !== undefined ||
-    effectiveEnrollment.autoEnrollmentEnabled !== existing.autoEnrollmentEnabled ||
-    effectiveEnrollment.enrollmentTrigger !== existing.enrollmentTrigger;
+  if (!isNewsletter) {
+    validateAutoEnrollmentSettings(effectiveEnrollment);
+  }
+
+  const shouldPersistEnrollmentSettings = isNewsletter
+    ? existing.autoEnrollmentEnabled !== false ||
+      existing.enrollmentTrigger !== "manual_only" ||
+      normalizedInput.autoEnrollmentEnabled !== undefined ||
+      normalizedInput.enrollmentTrigger !== undefined
+    : normalizedInput.autoEnrollmentEnabled !== undefined ||
+      normalizedInput.enrollmentTrigger !== undefined ||
+      effectiveEnrollment.autoEnrollmentEnabled !== existing.autoEnrollmentEnabled ||
+      effectiveEnrollment.enrollmentTrigger !== existing.enrollmentTrigger;
 
   const updated = await updateCampaign(workspaceId, campaignId, {
     ...(normalizedInput.name !== undefined ? { name: normalizedInput.name } : {}),
-    ...(normalizedInput.projectIds !== undefined
+    ...(normalizedInput.projectIds !== undefined && !isNewsletter
       ? { projectIds: normalizedInput.projectIds }
       : {}),
     ...(shouldPersistEnrollmentSettings
@@ -470,7 +520,7 @@ export async function updateCampaignForWorkspace(
           enrollmentTrigger: effectiveEnrollment.enrollmentTrigger,
         }
       : {}),
-    ...(normalizedInput.enrollmentRules !== undefined
+    ...(normalizedInput.enrollmentRules !== undefined && !isNewsletter
       ? { enrollmentRules: normalizedInput.enrollmentRules }
       : {}),
     ...(normalizedInput.frequency !== undefined ? { frequency: normalizedInput.frequency } : {}),

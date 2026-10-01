@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CampaignSendingDomainField,
@@ -98,6 +98,7 @@ type NewsletterFormPageProps = {
   workspaceSlug: string;
   mode: "create" | "edit";
   campaignId?: string;
+  canUpdate?: boolean;
 };
 
 const emptySending: CampaignSendingDomainValue = {
@@ -109,11 +110,13 @@ export function NewsletterFormPage({
   workspaceSlug,
   mode,
   campaignId,
+  canUpdate = false,
 }: NewsletterFormPageProps) {
   const router = useRouter();
   const { workspace } = useWorkspaceShell();
   const timezone = workspace?.timezone ?? "UTC";
   const isCreate = mode === "create";
+  const readOnly = !canUpdate && !isCreate;
 
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
@@ -134,6 +137,8 @@ export function NewsletterFormPage({
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!isCreate);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const submittingRef = useRef(false);
+  const createdIdRef = useRef<string | null>(campaignId ?? null);
 
   const apiCampaigns = `/api/workspaces/${workspaceSlug}/campaigns`;
   const apiNewsletters = `/api/workspaces/${workspaceSlug}/newsletters`;
@@ -201,7 +206,17 @@ export function NewsletterFormPage({
         return;
       }
 
-      const nextCampaign = campaignPayload.data?.campaign as NewsletterCampaign;
+      const nextCampaign = campaignPayload.data?.campaign as NewsletterCampaign & {
+        kind?: string;
+      };
+      if (!nextCampaign || nextCampaign.kind !== "newsletter") {
+        setFormError("This campaign is not a newsletter.");
+        if (nextCampaign?.id) {
+          router.replace(workspacePath(workspaceSlug, `dripping/${nextCampaign.id}`));
+        }
+        return;
+      }
+      createdIdRef.current = nextCampaign.id;
       setCampaign(nextCampaign);
       setName(nextCampaign.name ?? "");
       setSenderName(nextCampaign.senderName ?? nextCampaign.defaultFromName ?? "");
@@ -238,7 +253,15 @@ export function NewsletterFormPage({
     } finally {
       setLoading(false);
     }
-  }, [apiCampaigns, apiNewsletters, campaignId, refreshAudiencePreview, timezone]);
+  }, [
+    apiCampaigns,
+    apiNewsletters,
+    campaignId,
+    refreshAudiencePreview,
+    router,
+    timezone,
+    workspaceSlug,
+  ]);
 
   useEffect(() => {
     void loadReferenceData();
@@ -258,7 +281,18 @@ export function NewsletterFormPage({
     );
   }
 
-  async function saveDraft(options?: { stay?: boolean }): Promise<string | null> {
+  async function saveDraft(options?: {
+    stay?: boolean;
+    keepSubmitting?: boolean;
+  }): Promise<string | null> {
+    if (readOnly) {
+      setFormError("You do not have permission to edit newsletters.");
+      return null;
+    }
+    if (submittingRef.current) {
+      return null;
+    }
+    submittingRef.current = true;
     setFormError(null);
     setSubmitting(true);
 
@@ -291,7 +325,7 @@ export function NewsletterFormPage({
         defaultFromName: senderName.trim() || undefined,
       };
 
-      let id = campaignId ?? campaign?.id ?? null;
+      let id = campaignId ?? campaign?.id ?? createdIdRef.current ?? null;
 
       if (!id) {
         const createRes = await fetch(apiCampaigns, {
@@ -311,6 +345,7 @@ export function NewsletterFormPage({
           return null;
         }
         id = createPayload.data?.campaign?.id as string;
+        createdIdRef.current = id;
         setCampaign(createPayload.data?.campaign ?? null);
       } else {
         const updateRes = await fetch(`${apiCampaigns}/${id}`, {
@@ -408,16 +443,23 @@ export function NewsletterFormPage({
       setFormError("Failed to save newsletter.");
       return null;
     } finally {
-      setSubmitting(false);
+      if (!options?.keepSubmitting) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
   }
 
   async function handleSendNow() {
-    const id = await saveDraft({ stay: true });
-    if (!id) {
+    if (!canUpdate || submittingRef.current) {
       return;
     }
-    setSubmitting(true);
+    const id = await saveDraft({ stay: true, keepSubmitting: true });
+    if (!id) {
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
     setFormError(null);
     try {
       const response = await fetch(`${apiNewsletters}/${id}/send`, { method: "POST" });
@@ -430,20 +472,25 @@ export function NewsletterFormPage({
     } catch {
       setFormError("Failed to send newsletter.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleSchedule() {
+    if (!canUpdate || submittingRef.current) {
+      return;
+    }
     if (!scheduledForLocal.trim()) {
       setFormError("Choose a schedule date and time.");
       return;
     }
-    const id = await saveDraft({ stay: true });
+    const id = await saveDraft({ stay: true, keepSubmitting: true });
     if (!id) {
+      submittingRef.current = false;
+      setSubmitting(false);
       return;
     }
-    setSubmitting(true);
     setFormError(null);
     try {
       const response = await fetch(`${apiNewsletters}/${id}/schedule`, {
@@ -461,15 +508,20 @@ export function NewsletterFormPage({
     } catch {
       setFormError("Failed to schedule newsletter.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleCancelSchedule() {
-    const id = campaignId ?? campaign?.id;
+    if (!canUpdate || submittingRef.current) {
+      return;
+    }
+    const id = campaignId ?? campaign?.id ?? createdIdRef.current;
     if (!id) {
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setFormError(null);
     try {
@@ -487,6 +539,7 @@ export function NewsletterFormPage({
     } catch {
       setFormError("Failed to cancel schedule.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -529,13 +582,24 @@ export function NewsletterFormPage({
       description="One email, audience snapshot, send or schedule. Uses drip sending infrastructure."
       closeHref={closeHref}
       footer={
-        <FocusedFormActions
-          cancelHref={closeHref}
-          formId={formId}
-          submitLabel="Save draft"
-          submitting={submitting}
-          submitDisabled={!name.trim()}
-        />
+        readOnly ? (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--color-line)] pt-4">
+            <Link
+              href={closeHref}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white px-3.5 text-[13.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)]"
+            >
+              Close
+            </Link>
+          </div>
+        ) : (
+          <FocusedFormActions
+            cancelHref={closeHref}
+            formId={formId}
+            submitLabel="Save draft"
+            submitting={submitting}
+            submitDisabled={!name.trim() || submitting}
+          />
+        )
       }
     >
       <form
@@ -550,6 +614,12 @@ export function NewsletterFormPage({
           <p className="text-[13px] text-[var(--color-danger)]">{formError}</p>
         ) : null}
 
+        {readOnly ? (
+          <p className="rounded-lg border border-[var(--color-line)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
+            You have read-only access. Sending and edits require campaign update permission.
+          </p>
+        ) : null}
+
         {campaign?.audienceLockedAt && campaign.status === "active" ? (
           <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-[13px]">
             Scheduled for{" "}
@@ -558,9 +628,17 @@ export function NewsletterFormPage({
               : "immediate send"}
             . You can edit or cancel until sending starts.
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => void handleCancelSchedule()}>
-                Cancel schedule
-              </Button>
+              {canUpdate ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={submitting}
+                  onClick={() => void handleCancelSchedule()}
+                >
+                  Cancel schedule
+                </Button>
+              ) : null}
               <Link
                 href={workspacePath(workspaceSlug, `dripping/${campaign.id}/analytics`)}
                 className="text-[12px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]"
@@ -586,6 +664,7 @@ export function NewsletterFormPage({
               onChange={(event) => setName(event.target.value)}
               required
               maxLength={200}
+              disabled={readOnly}
             />
           </div>
           <div>
@@ -596,6 +675,7 @@ export function NewsletterFormPage({
               onChange={(event) => setSubject(event.target.value)}
               required
               maxLength={500}
+              disabled={readOnly}
             />
           </div>
           <div>
@@ -605,6 +685,7 @@ export function NewsletterFormPage({
               value={previewText}
               onChange={(event) => setPreviewText(event.target.value)}
               maxLength={500}
+              disabled={readOnly}
             />
           </div>
           <div>
@@ -615,12 +696,14 @@ export function NewsletterFormPage({
               onChange={(event) => setSenderName(event.target.value)}
               placeholder="What recipients see in their inbox"
               maxLength={120}
+              disabled={readOnly}
             />
           </div>
           <CampaignSendingDomainField
             workspaceSlug={workspaceSlug}
             value={sending}
             onChange={setSending}
+            disabled={readOnly}
           />
           <div>
             <Label htmlFor="newsletter-html-file">Upload HTML</Label>
@@ -628,6 +711,7 @@ export function NewsletterFormPage({
               id="newsletter-html-file"
               type="file"
               accept=".html,text/html"
+              disabled={readOnly}
               onChange={(event) => handleHtmlFile(event.target.files?.[0] ?? null)}
             />
           </div>
@@ -648,6 +732,7 @@ export function NewsletterFormPage({
               onChange={(event) => setBodyHtml(event.target.value)}
               rows={14}
               className="font-mono text-[12px]"
+              disabled={readOnly}
             />
             <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
               Merge fields:{" "}
@@ -677,7 +762,8 @@ export function NewsletterFormPage({
             <ProjectSelector
               projects={projects}
               selectedProjectId={projectId}
-              onChange={setProjectId}
+              onChange={readOnly ? undefined : setProjectId}
+              disabled={readOnly}
               searchable
             />
           </div>
@@ -687,7 +773,8 @@ export function NewsletterFormPage({
               tags={tags}
               selectedTagIds={tagIds}
               entityType="lead"
-              onToggle={toggleTag}
+              onToggle={readOnly ? undefined : toggleTag}
+              readOnly={readOnly}
               emptyLabel="No lead tags yet"
             />
           </div>
@@ -697,6 +784,7 @@ export function NewsletterFormPage({
               <Select
                 id="newsletter-tag-match"
                 value={tagMatch}
+                disabled={readOnly}
                 onChange={(event) => setTagMatch(event.target.value as "any" | "all")}
               >
                 <option value="any">Match any selected tag</option>
@@ -757,26 +845,33 @@ export function NewsletterFormPage({
               id="newsletter-schedule"
               type="datetime-local"
               value={scheduledForLocal}
+              disabled={readOnly}
               onChange={(event) => setScheduledForLocal(event.target.value)}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              disabled={submitting}
-              onClick={() => void handleSendNow()}
-            >
-              Send now
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={submitting || !scheduledForLocal}
-              onClick={() => void handleSchedule()}
-            >
-              Schedule send
-            </Button>
-          </div>
+          {canUpdate ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={submitting}
+                onClick={() => void handleSendNow()}
+              >
+                Send now
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={submitting || !scheduledForLocal}
+                onClick={() => void handleSchedule()}
+              >
+                Schedule send
+              </Button>
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+              Send and schedule require campaign update permission.
+            </p>
+          )}
         </section>
       </form>
     </FocusedFormLayout>
