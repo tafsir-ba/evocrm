@@ -35,10 +35,10 @@ test("recording waveform animates with silent/fake mic", async ({ page, context 
           fftSize: 2048,
           frequencyBinCount: 1024,
           smoothingTimeConstant: 0.5,
-          getByteTimeDomainData(target) {
+          getByteTimeDomainData(target: Uint8Array) {
             target.fill(128);
           },
-          getByteFrequencyData(target) {
+          getByteFrequencyData(target: Uint8Array) {
             target.fill(0);
           },
         };
@@ -51,8 +51,9 @@ test("recording waveform animates with silent/fake mic", async ({ page, context 
         return Promise.resolve();
       }
     }
-    window.AudioContext = FakeAudioContext;
-    window.webkitAudioContext = FakeAudioContext;
+    (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    (window as unknown as { webkitAudioContext: unknown }).webkitAudioContext =
+      FakeAudioContext;
 
     const silentTrack = {
       kind: "audio",
@@ -72,14 +73,13 @@ test("recording waveform animates with silent/fake mic", async ({ page, context 
         return this;
       },
     };
-    navigator.mediaDevices.getUserMedia = async () => silentStream;
+    navigator.mediaDevices.getUserMedia = async () =>
+      silentStream as unknown as MediaStream;
 
     class FakeMediaRecorder {
-      constructor() {
-        this.state = "inactive";
-        this.ondataavailable = null;
-        this.onstop = null;
-      }
+      state = "inactive";
+      ondataavailable: ((event: BlobEvent) => void) | null = null;
+      onstop: (() => void) | null = null;
       start() {
         this.state = "recording";
       }
@@ -91,7 +91,8 @@ test("recording waveform animates with silent/fake mic", async ({ page, context 
         return true;
       }
     }
-    window.MediaRecorder = FakeMediaRecorder;
+    (window as unknown as { MediaRecorder: unknown }).MediaRecorder =
+      FakeMediaRecorder;
   });
 
   await page.goto("http://localhost:3000/login");

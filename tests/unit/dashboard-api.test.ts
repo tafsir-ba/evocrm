@@ -87,6 +87,8 @@ function mockWorkspaceAccess() {
       status: "active",
       permissions: ["dashboard:read"],
     },
+    permissions: ["dashboard:read"],
+    accessMode: "member" as const,
   });
 }
 

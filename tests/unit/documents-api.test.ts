@@ -70,6 +70,8 @@ function mockWorkspaceAccess(permissions: string[]) {
       status: "active",
       permissions,
     },
+    permissions: permissions as never,
+    accessMode: "member" as const,
   });
 }
 

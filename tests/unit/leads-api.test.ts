@@ -96,6 +96,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listLeadsForWorkspace).mockResolvedValue({
       leads: [sampleLead as never],
@@ -134,6 +136,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listLeadsForWorkspace).mockResolvedValue({
       leads: [],
@@ -178,6 +182,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:create"],
       },
+      permissions: ["lead:create"],
+      accessMode: "member" as const,
     });
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: sampleLead as never,
@@ -302,6 +308,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(getLeadForWorkspace).mockResolvedValue(sampleLead as never);
 
@@ -335,6 +343,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:update"],
       },
+      permissions: ["lead:update"],
+      accessMode: "member" as const,
     });
     vi.mocked(updateLeadForWorkspace).mockResolvedValue({
       lead: sampleLead as never,
@@ -374,6 +384,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:archive"],
       },
+      permissions: ["lead:archive"],
+      accessMode: "member" as const,
     });
     vi.mocked(archiveLeadForWorkspace).mockResolvedValue({
       ...sampleLead,
@@ -438,6 +450,8 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:delete"],
       },
+      permissions: ["lead:delete"],
+      accessMode: "member" as const,
     });
     vi.mocked(purgeLeadsForWorkspace).mockResolvedValue({
       deletedCount: 2,

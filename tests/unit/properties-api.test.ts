@@ -97,6 +97,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:read"],
       },
+      permissions: ["property:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listPropertiesForWorkspace).mockResolvedValue({
       properties: [sampleProperty as never],
@@ -158,6 +160,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:create"],
       },
+      permissions: ["property:create"],
+      accessMode: "member" as const,
     });
     vi.mocked(createPropertyForWorkspace).mockResolvedValue(sampleProperty as never);
 
@@ -206,6 +210,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:create"],
       },
+      permissions: ["property:create"],
+      accessMode: "member" as const,
     });
     vi.mocked(createPropertyForWorkspace).mockRejectedValue(
       new AppError("CONFLICT", "A property with this reference already exists in this workspace."),
@@ -279,6 +285,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:read"],
       },
+      permissions: ["property:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(getPropertyForWorkspace).mockResolvedValue(sampleProperty as never);
 
@@ -317,6 +325,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:update"],
       },
+      permissions: ["property:update"],
+      accessMode: "member" as const,
     });
     vi.mocked(updatePropertyForWorkspace).mockResolvedValue({
       ...sampleProperty,
@@ -399,6 +409,8 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:archive"],
       },
+      permissions: ["property:archive"],
+      accessMode: "member" as const,
     });
     vi.mocked(archivePropertyForWorkspace).mockResolvedValue({
       ...sampleProperty,

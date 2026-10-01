@@ -74,6 +74,8 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listProjectsForWorkspace).mockResolvedValue([
       {
@@ -128,6 +130,8 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listProjectsPageForWorkspace).mockResolvedValue({
       projects: [
@@ -253,6 +257,8 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:create"],
       },
+      permissions: ["project:create"],
+      accessMode: "member" as const,
     });
 
     const response = await postProject(
@@ -288,6 +294,8 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:archive"],
       },
+      permissions: ["project:archive"],
+      accessMode: "member" as const,
     });
     vi.mocked(archiveProjectForWorkspace).mockResolvedValue({
       id: "p1",
@@ -339,6 +347,8 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(getProjectForWorkspace).mockResolvedValue({
       id: "p1",

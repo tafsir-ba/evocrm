@@ -37,6 +37,9 @@ describe("campaign enrollment candidates API route", () => {
         status: "active",
         permissions: ["campaign:read"],
       },
+      permissions: ["campaign:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listEnrollmentCandidatesForWorkspace).mockResolvedValue({
       candidates: [

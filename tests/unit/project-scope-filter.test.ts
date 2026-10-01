@@ -87,8 +87,9 @@ describe("applyUserProjectScope", () => {
   it("injects projectIds when no explicit filter is requested", async () => {
     vi.mocked(resolveAllowedProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
 
+    const filter = { search: "villa", projectId: undefined };
     await expect(
-      applyUserProjectScope("ws-1", "user-1", { search: "villa" }),
+      applyUserProjectScope("ws-1", "user-1", filter),
     ).resolves.toEqual({
       search: "villa",
       projectId: undefined,
@@ -99,9 +100,10 @@ describe("applyUserProjectScope", () => {
   it("leaves admin filters unchanged when no projectId is set", async () => {
     vi.mocked(resolveAllowedProjectIds).mockResolvedValue(null);
 
+    const filter = { search: "villa", projectId: undefined };
     await expect(
-      applyUserProjectScope("ws-1", "user-1", { search: "villa" }),
-    ).resolves.toEqual({ search: "villa" });
+      applyUserProjectScope("ws-1", "user-1", filter),
+    ).resolves.toEqual({ search: "villa", projectId: undefined });
   });
 
   it("leaves ordinary member filters unchanged when resolveAllowedProjectIds is null", async () => {

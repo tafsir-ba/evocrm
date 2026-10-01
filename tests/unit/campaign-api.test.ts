@@ -107,6 +107,8 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:read"],
       },
+      permissions: ["campaign:read"],
+      accessMode: "member" as const,
     });
     vi.mocked(listCampaignsForWorkspace).mockResolvedValue({
       campaigns: [sampleCampaign],
@@ -142,6 +144,8 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:create"],
       },
+      permissions: ["campaign:create"],
+      accessMode: "member" as const,
     });
     vi.mocked(createCampaignForWorkspace).mockResolvedValue(sampleCampaign);
 
@@ -185,6 +189,8 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:archive"],
       },
+      permissions: ["campaign:archive"],
+      accessMode: "member" as const,
     });
     vi.mocked(archiveCampaignForWorkspace).mockResolvedValue({
       ...sampleCampaign,
@@ -223,6 +229,8 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:update"],
       },
+      permissions: ["campaign:update"],
+      accessMode: "member" as const,
     });
     vi.mocked(restoreCampaignForWorkspace).mockResolvedValue({
       ...sampleCampaign,
@@ -262,6 +270,8 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:delete"],
       },
+      permissions: ["campaign:delete"],
+      accessMode: "member" as const,
     });
     vi.mocked(purgeCampaignForWorkspace).mockResolvedValue({ deleted: true });
 
