@@ -812,6 +812,39 @@ export function NewsletterFormPage({
     { id: "review" as const, label: "3. Review", hint: "Send or schedule" },
   ];
 
+  function goToWizardStep(next: "content" | "audience" | "review") {
+    if (next === "audience" && !contentReady) {
+      setFormError(
+        unsafeHtml
+          ? "Fix the HTML warnings below before continuing."
+          : "Add a name, subject, and HTML content to continue.",
+      );
+      setWizardStep("content");
+      return;
+    }
+    if (next === "review") {
+      if (!contentReady) {
+        setFormError(
+          unsafeHtml
+            ? "Fix the HTML warnings on Content before reviewing."
+            : "Add a name, subject, and HTML content before reviewing.",
+        );
+        setWizardStep("content");
+        return;
+      }
+      if (!audienceReady) {
+        setFormError(
+          "Each audience segment needs a project. Finish any CSV import before continuing.",
+        );
+        setWizardStep("audience");
+        return;
+      }
+      setPreviewOpen(true);
+    }
+    setFormError(null);
+    setWizardStep(next);
+  }
+
   if (loading) {
     return (
       <FocusedFormLayout title="Newsletter" closeHref={closeHref} maxWidth="3xl">
@@ -881,18 +914,7 @@ export function NewsletterFormPage({
                 <Button
                   type="button"
                   disabled={!contentReady || submitting}
-                  onClick={() => {
-                    if (!contentReady) {
-                      setFormError(
-                        unsafeHtml
-                          ? "Fix the HTML warnings below before continuing."
-                          : "Add a name, subject, and HTML content to continue.",
-                      );
-                      return;
-                    }
-                    setFormError(null);
-                    setWizardStep("audience");
-                  }}
+                  onClick={() => goToWizardStep("audience")}
                 >
                   Next: Audience
                 </Button>
@@ -900,18 +922,8 @@ export function NewsletterFormPage({
               {wizardStep === "audience" ? (
                 <Button
                   type="button"
-                  disabled={submitting}
-                  onClick={() => {
-                    if (!audienceReady) {
-                      setFormError(
-                        "Each audience segment needs a project. Finish any CSV import before continuing.",
-                      );
-                      return;
-                    }
-                    setFormError(null);
-                    setWizardStep("review");
-                    setPreviewOpen(true);
-                  }}
+                  disabled={!audienceReady || submitting}
+                  onClick={() => goToWizardStep("review")}
                 >
                   Next: Review
                 </Button>
@@ -932,6 +944,10 @@ export function NewsletterFormPage({
         <nav aria-label="Newsletter steps" className="flex flex-wrap gap-2">
           {steps.map((step) => {
             const active = wizardStep === step.id;
+            const reachable =
+              step.id === "content" ||
+              (step.id === "audience" && contentReady) ||
+              (step.id === "review" && contentReady && audienceReady);
             return (
               <button
                 key={step.id}
@@ -939,9 +955,13 @@ export function NewsletterFormPage({
                 className={
                   active
                     ? "rounded-md border border-[var(--color-ink)] bg-[var(--color-canvas)] px-3 py-2 text-left"
-                    : "rounded-md border border-[var(--color-line)] px-3 py-2 text-left text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                    : reachable
+                      ? "rounded-md border border-[var(--color-line)] px-3 py-2 text-left text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                      : "rounded-md border border-[var(--color-line)] px-3 py-2 text-left text-[var(--color-ink-faint)] opacity-70"
                 }
-                onClick={() => setWizardStep(step.id)}
+                aria-current={active ? "step" : undefined}
+                aria-disabled={!reachable}
+                onClick={() => goToWizardStep(step.id)}
               >
                 <span className="block text-[13px] font-semibold text-[var(--color-ink)]">
                   {step.label}
@@ -1147,7 +1167,12 @@ export function NewsletterFormPage({
               </p>
             ) : null}
           </div>
-          {previewOpen && previewHtml ? (
+          {previewOpen && unsafeHtml ? (
+            <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
+              Preview is hidden until you remove unsafe HTML tags or JavaScript.
+            </p>
+          ) : null}
+          {previewOpen && previewHtml && !unsafeHtml ? (
             <div>
               <p className="mb-1 text-[12.5px] text-[var(--color-ink-muted)]">
                 Preview uses sample data ({CAMPAIGN_EMAIL_PREVIEW_CONTEXT.firstName}{" "}
@@ -1158,6 +1183,8 @@ export function NewsletterFormPage({
                 title="Newsletter preview"
                 className="h-[420px] w-full rounded-lg border border-[var(--color-line)] bg-white"
                 srcDoc={previewHtml}
+                sandbox=""
+                referrerPolicy="no-referrer"
               />
             </div>
           ) : null}
@@ -1431,7 +1458,11 @@ export function NewsletterFormPage({
               </p>
             ) : null}
           </div>
-          {previewHtml ? (
+          {unsafeHtml ? (
+            <p className="rounded-md border border-[var(--color-danger)]/25 px-2 py-1.5 text-[12.5px] text-[var(--color-danger)]">
+              Preview is hidden until you remove unsafe HTML on the Content step.
+            </p>
+          ) : previewHtml ? (
             <div>
               <p className="mb-1 text-[12.5px] text-[var(--color-ink-muted)]">
                 Preview with sample merge data
@@ -1440,6 +1471,8 @@ export function NewsletterFormPage({
                 title="Newsletter review preview"
                 className="h-[360px] w-full rounded-lg border border-[var(--color-line)] bg-white"
                 srcDoc={previewHtml}
+                sandbox=""
+                referrerPolicy="no-referrer"
               />
             </div>
           ) : (
