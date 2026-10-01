@@ -114,11 +114,16 @@ describe("campaign enrollment candidates API route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(listEnrollmentCandidatesForWorkspace).toHaveBeenCalledWith("ws-1", "camp-1", {
-      page: 2,
-      pageSize: 25,
-      search: "tafsir",
-    });
+    expect(listEnrollmentCandidatesForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "camp-1",
+      {
+        page: 2,
+        pageSize: 25,
+        search: "tafsir",
+      },
+      "user-1",
+    );
 
     const payload = await response.json();
     expect(payload.data).toHaveLength(1);

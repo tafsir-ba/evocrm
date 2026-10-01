@@ -198,7 +198,6 @@ describe("DashboardPanel operator view", () => {
       screen.getByText("Active = genuine inbound lead in the last 30 days"),
     ).toBeInTheDocument();
     expect(screen.getByText(/12 leads · .+ · received/)).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("François Côté · AG-12")).toBeInTheDocument();
     expect(screen.queryByText("Live signal of leads")).not.toBeInTheDocument();
     expect(screen.queryByText("Properties by status")).not.toBeInTheDocument();

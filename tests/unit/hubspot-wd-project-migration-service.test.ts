@@ -13,6 +13,14 @@ import {
 const DEST_ID = "6a1111111111111111111111";
 const DEST_REF = "LEPARCDESCRETS";
 
+vi.mock("@/server/services/lead-duplicate-reconciliation", () => ({
+  assertLeadDuplicateWriteGate: vi.fn(async () => undefined),
+  evaluateLiveLeadUniqueIndexWriteGate: vi.fn(async () => ({
+    ready: true,
+    blockers: [],
+  })),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));

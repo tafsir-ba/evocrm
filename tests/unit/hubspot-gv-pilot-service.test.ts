@@ -12,6 +12,14 @@ import {
   hubspotContactIdempotencyKey,
 } from "@/lib/hubspot-gv-pilot";
 
+vi.mock("@/server/services/lead-duplicate-reconciliation", () => ({
+  assertLeadDuplicateWriteGate: vi.fn(async () => undefined),
+  evaluateLiveLeadUniqueIndexWriteGate: vi.fn(async () => ({
+    ready: true,
+    blockers: [],
+  })),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));

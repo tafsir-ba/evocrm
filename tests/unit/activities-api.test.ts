@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/activities", () => ({
@@ -34,7 +34,7 @@ import {
 import { PATCH as completeActivity } from "@/app/api/workspaces/[workspaceSlug]/activities/[activityId]/complete/route";
 import { PATCH as cancelActivityRoute } from "@/app/api/workspaces/[workspaceSlug]/activities/[activityId]/cancel/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveActivityForWorkspace,
   cancelActivityForWorkspace,
@@ -72,18 +72,27 @@ function mockWorkspaceAccess(permission: string) {
     timezone: "UTC",
     defaultCurrency: "USD",
   });
-  vi.mocked(requirePermission).mockResolvedValue({
-    membership: {
-      id: "m1",
+  vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
-      permissions: [permission],
-    },
-    permissions: [permission] as never,
-    accessMode: "member" as const,
-  });
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: [permission] as never,
+      },
+      permissions: [permission] as never,
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
 }
 
 describe("activity API routes", () => {
@@ -92,7 +101,7 @@ describe("activity API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -117,7 +126,7 @@ describe("activity API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "activity:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "activity:read");
     const body = await response.json();
     expect(body.data).toHaveLength(1);
   });
@@ -141,7 +150,7 @@ describe("activity API routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "activity:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "activity:create");
   });
 
   it("archives activity with activity:archive permission", async () => {
