@@ -3,6 +3,10 @@ import "server-only";
 import type { ImportExecuteMode } from "@/lib/imports";
 import { AppError } from "@/server/errors";
 import type { ImportEntityConfig, ImportContext } from "@/server/imports/import-entity-config";
+import {
+  isValidEmail,
+  normalizeEmailValue,
+} from "@/server/imports/import-normalizers";
 import type { ImportValidationResult } from "@/server/imports/import-validator";
 import { findImportRowResults } from "@/server/repositories/import-row-results";
 import {
@@ -10,8 +14,33 @@ import {
   type ImportJobRecord,
   type ImportRowResultRecord,
 } from "@/server/repositories/import-jobs";
+import { findActiveLeadByEmailNormalized } from "@/server/repositories/leads";
 
 const BATCH_SIZE = 100;
+
+async function resolveExistingLeadIdForDuplicate(
+  workspaceId: string,
+  row: Record<string, unknown>,
+): Promise<string | null> {
+  const emailRaw = typeof row.email === "string" ? row.email : null;
+  const projectId = typeof row.projectId === "string" ? row.projectId : null;
+  if (!emailRaw || !projectId) {
+    return null;
+  }
+
+  const normalized = normalizeEmailValue(emailRaw);
+  if (!normalized || !isValidEmail(normalized)) {
+    return null;
+  }
+
+  const existing = await findActiveLeadByEmailNormalized(
+    workspaceId,
+    normalized,
+    undefined,
+    projectId,
+  );
+  return existing?.id ?? null;
+}
 
 export async function executeImportJob(
   job: ImportJobRecord,
@@ -84,10 +113,18 @@ export async function executeImportJob(
 
         if (isDuplicate) {
           skippedCount += 1;
+          const existingLeadId =
+            entityConfig.entityType === "lead"
+              ? await resolveExistingLeadIdForDuplicate(
+                  context.workspaceId,
+                  rowResult.row,
+                )
+              : null;
+
           rowResults.push({
             rowNumber: rowResult.rowNumber,
             status: "skipped",
-            entityId: null,
+            entityId: existingLeadId,
             errors: [
               {
                 rowNumber: rowResult.rowNumber,

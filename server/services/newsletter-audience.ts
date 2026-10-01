@@ -12,6 +12,7 @@ import {
   type LeadRecord,
 } from "@/server/repositories/leads";
 import { findSuppressionsByEmails } from "@/server/repositories/email-suppressions";
+import { findImportJobById } from "@/server/repositories/import-jobs";
 import {
   findNewsletterAudienceSegments,
   type NewsletterAudienceSegmentRecord,
@@ -46,6 +47,15 @@ export type NewsletterAudienceResolveResult = {
   exclusions: NewsletterAudienceExclusion[];
   flaggedUnknownConsent: NewsletterAudienceLead[];
   summary: CampaignAudienceSummary;
+  importSummaries: Array<{
+    segmentId: string;
+    importJobId: string;
+    status: string;
+    createdCount: number;
+    skippedCount: number;
+    failedCount: number;
+    resolvedLeadCount: number;
+  }>;
 };
 
 function leadMatchesTags(
@@ -65,7 +75,7 @@ function leadMatchesTags(
   return tagIds.some((tagId) => leadTags.has(tagId));
 }
 
-async function resolveSegmentLeadIds(
+async function resolveProjectTagsSegmentLeadIds(
   workspaceId: string,
   segment: NewsletterAudienceSegmentRecord,
 ): Promise<string[]> {
@@ -78,7 +88,6 @@ async function resolveSegmentLeadIds(
     return [];
   }
 
-  // Load in chunks; filter tags in memory to keep membership semantics clear.
   const CHUNK = 500;
   const matched: string[] = [];
 
@@ -98,6 +107,71 @@ async function resolveSegmentLeadIds(
   }
 
   return matched;
+}
+
+async function resolveCsvImportSegmentLeadIds(
+  workspaceId: string,
+  segment: NewsletterAudienceSegmentRecord,
+): Promise<{ leadIds: string[]; importSummary: NewsletterAudienceResolveResult["importSummaries"][number] | null }> {
+  if (!segment.importJobId) {
+    return { leadIds: [], importSummary: null };
+  }
+
+  const job = await findImportJobById(workspaceId, segment.importJobId, {
+    includeRowResults: true,
+  });
+
+  if (!job) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletter CSV segment references a missing import job.",
+    );
+  }
+
+  if (job.entityType !== "lead") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Newsletter CSV segments only support lead imports.",
+    );
+  }
+
+  const leadIds = [
+    ...new Set(
+      (job.rowResults ?? [])
+        .map((row) => row.entityId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  return {
+    leadIds,
+    importSummary: {
+      segmentId: segment.id,
+      importJobId: job.id,
+      status: job.status,
+      createdCount: job.createdCount,
+      skippedCount: job.skippedCount,
+      failedCount: job.failedCount,
+      resolvedLeadCount: leadIds.length,
+    },
+  };
+}
+
+async function resolveSegmentLeadIds(
+  workspaceId: string,
+  segment: NewsletterAudienceSegmentRecord,
+): Promise<{
+  leadIds: string[];
+  importSummary: NewsletterAudienceResolveResult["importSummaries"][number] | null;
+}> {
+  if (segment.type === "csv_import") {
+    return resolveCsvImportSegmentLeadIds(workspaceId, segment);
+  }
+
+  return {
+    leadIds: await resolveProjectTagsSegmentLeadIds(workspaceId, segment),
+    importSummary: null,
+  };
 }
 
 function preferLeadForDedupe(
@@ -142,14 +216,23 @@ export async function resolveNewsletterAudience(
         unknownConsent: 0,
         deduped: 0,
       },
+      importSummaries: [],
     };
   }
 
   const leadSegmentMap = new Map<string, Set<string>>();
   const leadProjectHint = new Map<string, string>();
+  const importSummaries: NewsletterAudienceResolveResult["importSummaries"] = [];
 
   for (const segment of segments) {
-    const leadIds = await resolveSegmentLeadIds(workspaceId, segment);
+    const { leadIds, importSummary } = await resolveSegmentLeadIds(
+      workspaceId,
+      segment,
+    );
+    if (importSummary) {
+      importSummaries.push(importSummary);
+    }
+
     for (const leadId of leadIds) {
       const existing = leadSegmentMap.get(leadId) ?? new Set<string>();
       existing.add(segment.id);
@@ -339,6 +422,7 @@ export async function resolveNewsletterAudience(
       unknownConsent: flaggedUnknownConsent.length,
       deduped,
     },
+    importSummaries,
   };
 }
 

@@ -59,6 +59,7 @@ export type ImportJobRecord = {
   startedAt: Date | null;
   completedAt: Date | null;
   errorMessage: string | null;
+  newsletterCampaignId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -108,6 +109,9 @@ function toImportJobRecord(
     startedAt: document.startedAt ?? null,
     completedAt: document.completedAt ?? null,
     errorMessage: document.errorMessage ?? null,
+    newsletterCampaignId: document.newsletterCampaignId
+      ? document.newsletterCampaignId.toString()
+      : null,
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   };
@@ -123,6 +127,8 @@ export async function createImportJob(input: {
   storageKey: string;
   storageProvider: ImportFileStorageProvider;
   jobId?: string;
+  newsletterCampaignId?: string | null;
+  defaults?: ImportDefaults;
 }): Promise<ImportJobRecord> {
   await connectDb();
 
@@ -137,6 +143,8 @@ export async function createImportJob(input: {
     uploadedBy: input.uploadedBy,
     storageKey: input.storageKey,
     storageProvider: input.storageProvider,
+    newsletterCampaignId: input.newsletterCampaignId ?? null,
+    defaults: input.defaults ?? {},
   });
 
   return toImportJobRecord(document.toObject() as ImportJobDocument);

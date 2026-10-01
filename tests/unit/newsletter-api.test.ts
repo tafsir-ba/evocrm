@@ -11,10 +11,12 @@ vi.mock("@/server/services/newsletters", () => ({
   scheduleNewsletterForWorkspace: vi.fn(),
   sendNewsletterNowForWorkspace: vi.fn(),
   cancelNewsletterScheduleForWorkspace: vi.fn(),
+  createNewsletterAudienceImportForWorkspace: vi.fn(),
 }));
 
 import { GET as previewAudience } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/audience/preview/route";
 import { PUT as putSegments } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/audience/segments/route";
+import { POST as importAudience } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/audience/import/route";
 import { POST as scheduleNewsletter } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/schedule/route";
 import { POST as sendNewsletter } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/send/route";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
@@ -23,6 +25,7 @@ import {
   replaceNewsletterSegmentsForWorkspace,
   scheduleNewsletterForWorkspace,
   sendNewsletterNowForWorkspace,
+  createNewsletterAudienceImportForWorkspace,
 } from "@/server/services/newsletters";
 import { campaignRecordExtras } from "@/tests/helpers/crm-fixtures";
 
@@ -58,7 +61,7 @@ describe("newsletter API routes", () => {
         defaultCurrency: "CHF",
       },
       membership: null,
-      permissions: ["campaign:read", "campaign:update"],
+      permissions: ["campaign:read", "campaign:update", "lead:create"],
       accessMode: "member",
       isWorkspaceAdmin: true,
     } as never);
@@ -87,6 +90,7 @@ describe("newsletter API routes", () => {
         archived: 0,
         deduped: 0,
       },
+      importSummaries: [],
     });
 
     const response = await previewAudience(new Request("http://localhost"), {
@@ -99,7 +103,7 @@ describe("newsletter API routes", () => {
     expect(body.data.preview.summary.unknownConsent).toBe(1);
   });
 
-  it("replaces audience segments", async () => {
+  it("replaces multi-type audience segments", async () => {
     vi.mocked(replaceNewsletterSegmentsForWorkspace).mockResolvedValue([
       {
         id: "seg-1",
@@ -110,6 +114,22 @@ describe("newsletter API routes", () => {
         projectId: "507f1f77bcf86cd799439011",
         tagIds: [],
         tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "seg-2",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "csv_import",
+        order: 2,
+        projectId: "507f1f77bcf86cd799439011",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: "507f1f77bcf86cd799439022",
+        applyTagId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -127,6 +147,11 @@ describe("newsletter API routes", () => {
               tagIds: [],
               tagMatch: "any",
             },
+            {
+              type: "csv_import",
+              projectId: "507f1f77bcf86cd799439011",
+              importJobId: "507f1f77bcf86cd799439022",
+            },
           ],
         }),
       }),
@@ -135,7 +160,52 @@ describe("newsletter API routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.data.segments).toHaveLength(1);
+    expect(body.data.segments).toHaveLength(2);
+    expect(replaceNewsletterSegmentsForWorkspace).toHaveBeenCalled();
+  });
+
+  it("starts a newsletter CSV import without drip enrollment", async () => {
+    vi.mocked(createNewsletterAudienceImportForWorkspace).mockResolvedValue({
+      job: { id: "import-1", newsletterCampaignId: "camp-1" },
+      columns: [],
+      previewRows: [],
+      rowCount: 2,
+      warnings: [],
+      newsletter: {
+        campaignId: "camp-1",
+        targetProjectId: "507f1f77bcf86cd799439011",
+        applyTagId: null,
+        dripCampaignEvaluationEnabled: false,
+      },
+    } as never);
+
+    const file = new File(["email\nada@example.com"], "list.csv", { type: "text/csv" });
+    const formData = {
+      get(key: string) {
+        if (key === "file") return file;
+        if (key === "targetProjectId") return "507f1f77bcf86cd799439011";
+        if (key === "applyTagId") return null;
+        return null;
+      },
+    };
+
+    const request = {
+      formData: async () => formData,
+    } as unknown as Request;
+
+    const response = await importAudience(request, {
+      params: Promise.resolve({ workspaceSlug: "demo", campaignId: "camp-1" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.data.newsletter.dripCampaignEvaluationEnabled).toBe(false);
+    expect(createNewsletterAudienceImportForWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        campaignId: "camp-1",
+        targetProjectId: "507f1f77bcf86cd799439011",
+      }),
+    );
   });
 
   it("schedules and sends newsletters", async () => {

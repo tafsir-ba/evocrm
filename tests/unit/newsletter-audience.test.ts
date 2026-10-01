@@ -19,10 +19,15 @@ vi.mock("@/server/repositories/newsletter-audience-segments", () => ({
   findNewsletterAudienceSegments: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/import-jobs", () => ({
+  findImportJobById: vi.fn(),
+}));
+
 import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findLeadsByIds } from "@/server/repositories/leads";
 import { findSuppressionsByEmails } from "@/server/repositories/email-suppressions";
 import { findNewsletterAudienceSegments } from "@/server/repositories/newsletter-audience-segments";
+import { findImportJobById } from "@/server/repositories/import-jobs";
 import {
   assertNewsletterAudienceSendable,
   resolveNewsletterAudience,
@@ -87,6 +92,8 @@ describe("newsletter audience resolve", () => {
         projectId: "proj-1",
         tagIds: [],
         tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -139,6 +146,8 @@ describe("newsletter audience resolve", () => {
         projectId: "proj-1",
         tagIds: [],
         tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -170,6 +179,77 @@ describe("newsletter audience resolve", () => {
     expect(result.summary.deduped).toBe(1);
   });
 
+  it("unions project and csv segments with email dedupe", async () => {
+    vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
+      {
+        id: "seg-project",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "project_tags",
+        order: 1,
+        projectId: "proj-1",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "seg-csv",
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        type: "csv_import",
+        order: 2,
+        projectId: "proj-1",
+        tagIds: [],
+        tagMatch: "any",
+        importJobId: "import-1",
+        applyTagId: "tag-list",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(findLeadIdsForProjectMembership).mockResolvedValue(["lead-1"]);
+    vi.mocked(findImportJobById).mockResolvedValue({
+      id: "import-1",
+      workspaceId: "ws-1",
+      entityType: "lead",
+      status: "completed",
+      createdCount: 1,
+      skippedCount: 1,
+      failedCount: 0,
+      newsletterCampaignId: "camp-1",
+      rowResults: [
+        { rowNumber: 1, status: "created", entityId: "lead-2", errors: [], warnings: [] },
+        { rowNumber: 2, status: "skipped", entityId: "lead-1", errors: [], warnings: [] },
+      ],
+    } as never);
+    vi.mocked(findLeadsByIds).mockImplementation(async (_ws, ids) =>
+      ids.map((id) =>
+        lead({
+          id,
+          email: id === "lead-1" ? "ada@example.com" : "new@example.com",
+          emailNormalized: id === "lead-1" ? "ada@example.com" : "new@example.com",
+          emailConsentStatus: "subscribed",
+          fullName: id,
+        }),
+      ),
+    );
+    vi.mocked(findSuppressionsByEmails).mockResolvedValue([]);
+
+    const result = await resolveNewsletterAudience("ws-1", "camp-1");
+
+    expect(result.included).toHaveLength(2);
+    expect(result.included.map((row) => row.email).sort()).toEqual([
+      "ada@example.com",
+      "new@example.com",
+    ]);
+    expect(result.importSummaries).toHaveLength(1);
+    expect(result.importSummaries[0]?.resolvedLeadCount).toBe(2);
+    expect(result.summary.deduped).toBe(0);
+  });
+
   it("rejects audiences over the hard cap", async () => {
     vi.mocked(findNewsletterAudienceSegments).mockResolvedValue([
       {
@@ -181,6 +261,8 @@ describe("newsletter audience resolve", () => {
         projectId: "proj-1",
         tagIds: [],
         tagMatch: "any",
+        importJobId: null,
+        applyTagId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -223,6 +305,7 @@ describe("newsletter audience resolve", () => {
           unknownConsent: 0,
           deduped: 0,
         },
+        importSummaries: [],
       }),
     ).toThrow(AppError);
   });

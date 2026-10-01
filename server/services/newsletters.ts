@@ -26,7 +26,9 @@ import {
   findNewsletterAudienceSegments,
   replaceNewsletterAudienceSegments,
   type NewsletterAudienceSegmentRecord,
+  type UpsertNewsletterAudienceSegmentInput,
 } from "@/server/repositories/newsletter-audience-segments";
+import { findImportJobById } from "@/server/repositories/import-jobs";
 import { findTagById } from "@/server/repositories/tags";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
 import {
@@ -42,11 +44,13 @@ import {
   enrichCampaign,
   type CampaignDetail,
 } from "@/server/services/campaigns";
+import { createImportJobForWorkspace } from "@/server/services/imports";
 import { validateActiveProjectId } from "@/server/services/project-scope";
 import type {
   NewsletterAudienceSegmentsInput,
   NewsletterScheduleInput,
 } from "@/server/validation/newsletters";
+import { MAX_IMPORT_FILE_SIZE_BYTES } from "@/lib/imports";
 
 function assertIsNewsletter(campaign: CampaignRecord): void {
   if (campaign.kind !== "newsletter") {
@@ -207,10 +211,52 @@ export async function replaceNewsletterSegmentsForWorkspace(
 
   for (const segment of input.segments) {
     await validateActiveProjectId(workspaceId, segment.projectId);
-    for (const tagId of segment.tagIds) {
-      const tag = await findTagById(workspaceId, tagId);
-      if (!tag) {
-        throw new AppError("VALIDATION_ERROR", "Invalid tag in newsletter audience.");
+
+    if (segment.type === "project_tags") {
+      for (const tagId of segment.tagIds) {
+        const tag = await findTagById(workspaceId, tagId);
+        if (!tag) {
+          throw new AppError("VALIDATION_ERROR", "Invalid tag in newsletter audience.");
+        }
+      }
+      continue;
+    }
+
+    const importJob = await findImportJobById(workspaceId, segment.importJobId, {
+      includeRowResults: true,
+    });
+    if (!importJob) {
+      throw new AppError("VALIDATION_ERROR", "CSV import job not found for newsletter segment.");
+    }
+    if (importJob.entityType !== "lead") {
+      throw new AppError("VALIDATION_ERROR", "Newsletter CSV segments require a lead import.");
+    }
+    if (
+      importJob.status !== "completed" &&
+      importJob.status !== "completed_with_errors"
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Finish the CSV import before attaching it as a newsletter audience segment.",
+      );
+    }
+    if (
+      importJob.newsletterCampaignId &&
+      importJob.newsletterCampaignId !== campaignId
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "This CSV import belongs to a different newsletter.",
+      );
+    }
+
+    if (segment.applyTagId) {
+      const tag = await findTagById(workspaceId, segment.applyTagId);
+      if (!tag || tag.archivedAt || !tag.entityTypes.includes("lead")) {
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Invalid list tag for newsletter CSV segment.",
+        );
       }
     }
   }
@@ -218,16 +264,32 @@ export async function replaceNewsletterSegmentsForWorkspace(
   const projectIds = [...new Set(input.segments.map((segment) => segment.projectId))];
   await updateCampaign(workspaceId, campaignId, { projectIds });
 
+  const upsertInputs: UpsertNewsletterAudienceSegmentInput[] = input.segments.map(
+    (segment, index) => {
+      if (segment.type === "csv_import") {
+        return {
+          type: "csv_import" as const,
+          order: segment.order ?? index + 1,
+          projectId: segment.projectId,
+          importJobId: segment.importJobId,
+          applyTagId: segment.applyTagId ?? null,
+        };
+      }
+
+      return {
+        type: "project_tags" as const,
+        order: segment.order ?? index + 1,
+        projectId: segment.projectId,
+        tagIds: segment.tagIds,
+        tagMatch: segment.tagMatch,
+      };
+    },
+  );
+
   const segments = await replaceNewsletterAudienceSegments(
     workspaceId,
     campaignId,
-    input.segments.map((segment, index) => ({
-      type: "project_tags" as const,
-      order: segment.order ?? index + 1,
-      projectId: segment.projectId,
-      tagIds: segment.tagIds,
-      tagMatch: segment.tagMatch,
-    })),
+    upsertInputs,
   );
 
   await createAuditLog({
@@ -236,10 +298,95 @@ export async function replaceNewsletterSegmentsForWorkspace(
     action: "newsletter.audience_updated",
     entityType: "campaign",
     entityId: campaignId,
-    after: { segmentCount: segments.length, projectIds },
+    after: {
+      segmentCount: segments.length,
+      projectIds,
+      segmentTypes: segments.map((segment) => segment.type),
+    },
   });
 
   return segments;
+}
+
+export async function createNewsletterAudienceImportForWorkspace(input: {
+  workspaceId: string;
+  actorId: string;
+  campaignId: string;
+  targetProjectId: string;
+  applyTagId?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  fileData: Buffer;
+}) {
+  const campaign = await findCampaignById(input.workspaceId, input.campaignId);
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Newsletter not found.");
+  }
+  assertIsNewsletter(campaign);
+  await assertNewsletterMutableBeforeSend(input.workspaceId, campaign);
+  await assertMultiProjectRecordAccess(
+    input.workspaceId,
+    input.actorId,
+    [...new Set([...campaign.projectIds, input.targetProjectId])],
+    "campaign:update",
+  );
+
+  await validateActiveProjectId(input.workspaceId, input.targetProjectId);
+
+  if (input.applyTagId) {
+    const tag = await findTagById(input.workspaceId, input.applyTagId);
+    if (!tag || tag.archivedAt || !tag.entityTypes.includes("lead")) {
+      throw new AppError("VALIDATION_ERROR", "Invalid list tag for newsletter import.");
+    }
+  }
+
+  if (input.fileSize > MAX_IMPORT_FILE_SIZE_BYTES) {
+    throw new AppError("VALIDATION_ERROR", "Import file is too large.");
+  }
+
+  const defaults: Record<string, string> = {
+    projectId: input.targetProjectId,
+  };
+  if (input.applyTagId) {
+    defaults.tags = input.applyTagId;
+  }
+
+  const parsed = await createImportJobForWorkspace({
+    workspaceId: input.workspaceId,
+    actorId: input.actorId,
+    entityType: "lead",
+    fileName: input.fileName,
+    fileSize: input.fileSize,
+    mimeType: input.mimeType,
+    fileData: input.fileData,
+    newsletterCampaignId: input.campaignId,
+    defaults,
+  });
+
+  await createAuditLog({
+    workspaceId: input.workspaceId,
+    actorId: input.actorId,
+    action: "newsletter.audience_import_started",
+    entityType: "campaign",
+    entityId: input.campaignId,
+    after: {
+      importJobId: parsed.job.id,
+      targetProjectId: input.targetProjectId,
+      applyTagId: input.applyTagId ?? null,
+      dripCampaignEvaluationEnabled: false,
+    },
+  });
+
+  return {
+    ...parsed,
+    newsletter: {
+      campaignId: input.campaignId,
+      targetProjectId: input.targetProjectId,
+      applyTagId: input.applyTagId ?? null,
+      dripCampaignEvaluationEnabled: false,
+    },
+  };
 }
 
 export async function previewNewsletterAudienceForWorkspace(
@@ -274,6 +421,7 @@ export async function previewNewsletterAudienceForWorkspace(
       archived: result.summary.excludedArchived,
       deduped: result.summary.deduped,
     },
+    importSummaries: result.importSummaries,
   };
 }
 
