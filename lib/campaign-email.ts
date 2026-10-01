@@ -260,7 +260,7 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   if (!html.trim()) {
     warnings.push({
       code: "missing_body",
-      message: "This email does not contain any HTML body content.",
+      message: "Paste or upload your email HTML to continue.",
     });
     return warnings;
   }
@@ -268,7 +268,8 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   if (countUnclosedHtmlTags(html) > 5) {
     warnings.push({
       code: "broken_tags",
-      message: "This email may contain broken or unclosed HTML tags.",
+      message:
+        "Some HTML tags look unfinished. Open the file in an HTML editor, fix unclosed tags, then paste again.",
     });
   }
 
@@ -284,14 +285,17 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
     ];
     warnings.push({
       code: "unsafe_tags",
-      message: `This email contains unsupported tags: ${tags.map((tag) => `<${tag}>`).join(", ")}. These may be removed or may not render correctly in email clients.`,
+      message: `Remove these tags before sending — email inboxes block them: ${tags
+        .map((tag) => `<${tag}>`)
+        .join(", ")}.`,
     });
   }
 
   if (INLINE_EVENT_HANDLER_PATTERN.test(html) || JAVASCRIPT_URL_PATTERN.test(html)) {
     warnings.push({
       code: "unsafe_javascript",
-      message: "This email contains inline JavaScript, which is not supported in most email clients.",
+      message:
+        "Remove JavaScript (onclick/onload or javascript: links). Email clients will not run it, and we block it for safety.",
     });
   }
 
@@ -302,7 +306,17 @@ export function validateCampaignHtml(html: string): HtmlValidationWarning[] {
   if (unknown.length > 0) {
     warnings.push({
       code: "unknown_variables",
-      message: `This email contains variables that may not be supported: ${[...new Set(unknown)].join(", ")}.`,
+      message: `These merge fields are not recognized and will not be filled in: ${[
+        ...new Set(unknown),
+      ].join(", ")}. Use the buttons above the editor for supported fields.`,
+    });
+  }
+
+  if (!emailBodyHasUnsubscribe(html)) {
+    warnings.push({
+      code: "missing_unsubscribe",
+      message:
+        "No unsubscribe link found yet. We will add a safe unsubscribe footer automatically when this email sends.",
     });
   }
 

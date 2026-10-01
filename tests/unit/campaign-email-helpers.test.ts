@@ -227,5 +227,12 @@ describe("campaign email helpers", () => {
 
       expect(warnings.map((warning) => warning.code)).not.toContain("unsafe_tags");
     });
+
+    it("explains that a missing unsubscribe link gets an automatic footer", () => {
+      const warnings = validateCampaignHtml("<p>Hello {first_name}</p>");
+      const tip = warnings.find((warning) => warning.code === "missing_unsubscribe");
+
+      expect(tip?.message).toMatch(/automatically/i);
+    });
   });
 });
