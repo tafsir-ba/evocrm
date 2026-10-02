@@ -17,6 +17,10 @@ vi.mock("@/server/repositories/leads", () => ({
   findLeadById: vi.fn(),
 }));
 
+vi.mock("@/server/services/sending-domains", () => ({
+  syncSendingDomainFromProviderWebhook: vi.fn(),
+}));
+
 vi.mock("@/server/env", () => ({
   getEnv: vi.fn(() => ({
     NODE_ENV: "test",
@@ -31,11 +35,88 @@ import {
 } from "@/server/repositories/campaign-sends";
 import { upsertEmailSuppression } from "@/server/repositories/email-suppressions";
 import { findLeadById } from "@/server/repositories/leads";
+import { syncSendingDomainFromProviderWebhook } from "@/server/services/sending-domains";
 import { processResendWebhookPayload } from "@/server/services/resend-webhook";
 
 describe("resend webhook processing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("syncs sending domain status on domain.updated via GET refresh path", async () => {
+    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue({
+      id: "domain-1",
+      workspaceId: "ws-1",
+      domain: "example.com",
+      provider: "resend",
+      providerDomainId: "d91cd9bd-1176-453e-8fc1-35364d380206",
+      status: "verified",
+      spfStatus: "valid",
+      dkimStatus: "valid",
+      dmarcStatus: "missing",
+      defaultSenderEmail: "hello@example.com",
+      dnsRecords: [],
+      lastCheckedAt: new Date(),
+      verifiedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await processResendWebhookPayload(
+      {
+        type: "domain.updated",
+        created_at: "2026-10-02T12:00:00.000Z",
+        data: {
+          id: "d91cd9bd-1176-453e-8fc1-35364d380206",
+          name: "example.com",
+          status: "verified",
+        },
+      },
+      "svix_domain_1",
+    );
+
+    expect(result).toEqual({
+      received: true,
+      domainSynced: true,
+      domainId: "domain-1",
+    });
+    expect(syncSendingDomainFromProviderWebhook).toHaveBeenCalledWith(
+      "d91cd9bd-1176-453e-8fc1-35364d380206",
+    );
+    expect(findCampaignSendByProviderMessageId).not.toHaveBeenCalled();
+  });
+
+  it("ignores domain.updated when no local sending domain matches", async () => {
+    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue(null);
+
+    const result = await processResendWebhookPayload(
+      {
+        type: "domain.updated",
+        data: { id: "unknown-provider-domain" },
+      },
+      "svix_domain_unknown",
+    );
+
+    expect(result).toEqual({
+      ignored: true,
+      reason: "unknown_provider_domain_id",
+    });
+  });
+
+  it("ignores incomplete domain.updated payloads", async () => {
+    const result = await processResendWebhookPayload(
+      {
+        type: "domain.updated",
+        data: { name: "example.com" },
+      },
+      "svix_domain_incomplete",
+    );
+
+    expect(result).toEqual({
+      ignored: true,
+      reason: "unsupported_or_incomplete_payload",
+    });
+    expect(syncSendingDomainFromProviderWebhook).not.toHaveBeenCalled();
   });
 
   it("ignores unknown non-campaign provider email ids without throwing", async () => {

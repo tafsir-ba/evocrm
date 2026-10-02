@@ -92,10 +92,18 @@ export function mapProviderDomainStatus(
   if (status === "verified") {
     return "verified";
   }
-  if (status === "failed" || status === "failure") {
+  if (
+    status === "failed" ||
+    status === "failure" ||
+    status === "partially_failed"
+  ) {
     return "failed";
   }
-  if (status === "temporary_failure" || status === "not_started") {
+  if (
+    status === "temporary_failure" ||
+    status === "not_started" ||
+    status === "partially_verified"
+  ) {
     return "needs_attention";
   }
   return "pending";
@@ -201,6 +209,18 @@ export async function findSendingDomainByName(
   const document = await SendingDomainModel.findOne(
     withWorkspaceScope(workspaceId, { domain: domain.toLowerCase().trim() }),
   ).lean();
+
+  return document ? toSendingDomainRecord(document as SendingDomainDocument) : null;
+}
+
+export async function findSendingDomainByProviderDomainId(
+  providerDomainId: string,
+): Promise<SendingDomainRecord | null> {
+  await connectDb();
+
+  const document = await SendingDomainModel.findOne({
+    providerDomainId: providerDomainId.trim(),
+  }).lean();
 
   return document ? toSendingDomainRecord(document as SendingDomainDocument) : null;
 }

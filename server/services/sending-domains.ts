@@ -15,6 +15,7 @@ import {
   deleteSendingDomain,
   findSendingDomainById,
   findSendingDomainByName,
+  findSendingDomainByProviderDomainId,
   findSendingDomains,
   mapProviderDomainStatus,
   updateSendingDomain,
@@ -104,22 +105,37 @@ export async function createSendingDomainForWorkspace(
   return domain;
 }
 
+/**
+ * Persist the current Resend domain snapshot (GET only — never triggers verify).
+ */
+async function persistProviderDomainSnapshot(
+  domain: SendingDomainRecord,
+  providerDomain: Awaited<ReturnType<typeof getProviderDomain>>,
+): Promise<SendingDomainRecord> {
+  const updated = await updateSendingDomain(
+    domain.workspaceId,
+    domain.id,
+    mapProviderDomainToUpdate(providerDomain, {
+      existingVerifiedAt: domain.verifiedAt,
+    }),
+  );
+
+  if (!updated) {
+    throw new AppError("NOT_FOUND", "Sending domain not found.");
+  }
+
+  return updated;
+}
+
 export async function refreshSendingDomainForWorkspace(
   workspaceId: string,
   userId: string,
   domainId: string,
 ): Promise<SendingDomainRecord> {
   const domain = await getSendingDomainForWorkspace(workspaceId, domainId);
+  // Refresh must only GET — never re-trigger domains.verify.
   const providerDomain = await getProviderDomain(domain.providerDomainId);
-  const updated = await updateSendingDomain(
-    workspaceId,
-    domainId,
-    mapProviderDomainToUpdate(providerDomain, { existingVerifiedAt: domain.verifiedAt }),
-  );
-
-  if (!updated) {
-    throw new AppError("NOT_FOUND", "Sending domain not found.");
-  }
+  const updated = await persistProviderDomainSnapshot(domain, providerDomain);
 
   await createAuditLog({
     workspaceId,
@@ -133,22 +149,31 @@ export async function refreshSendingDomainForWorkspace(
   return updated;
 }
 
+/**
+ * Sync a CRM sending domain from Resend after a provider webhook (GET only).
+ * Returns null when no local row matches the provider domain id.
+ */
+export async function syncSendingDomainFromProviderWebhook(
+  providerDomainId: string,
+): Promise<SendingDomainRecord | null> {
+  const domain = await findSendingDomainByProviderDomainId(providerDomainId);
+  if (!domain) {
+    return null;
+  }
+
+  const providerDomain = await getProviderDomain(providerDomainId);
+  return persistProviderDomainSnapshot(domain, providerDomain);
+}
+
 export async function verifySendingDomainForWorkspace(
   workspaceId: string,
   userId: string,
   domainId: string,
 ): Promise<SendingDomainRecord> {
   const domain = await getSendingDomainForWorkspace(workspaceId, domainId);
+  // Triggers verify once, then polls GET until terminal status or timeout.
   const providerDomain = await verifyProviderDomain(domain.providerDomainId);
-  const updated = await updateSendingDomain(
-    workspaceId,
-    domainId,
-    mapProviderDomainToUpdate(providerDomain, { existingVerifiedAt: domain.verifiedAt }),
-  );
-
-  if (!updated) {
-    throw new AppError("NOT_FOUND", "Sending domain not found.");
-  }
+  const updated = await persistProviderDomainSnapshot(domain, providerDomain);
 
   await createAuditLog({
     workspaceId,

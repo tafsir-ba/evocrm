@@ -2,6 +2,8 @@ import { handleRouteError, successResponse } from "@/server/api/responses";
 import { verifySendingDomainForWorkspace } from "@/server/services/sending-domains";
 import { requireWorkspaceMemberApiAccess } from "@/server/workspaces/require-workspace-api-access";
 
+export const maxDuration = 60;
+
 type RouteContext = {
   params: Promise<{ workspaceSlug: string; domainId: string }>;
 };

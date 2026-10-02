@@ -10,6 +10,7 @@ import { upsertEmailSuppression } from "@/server/repositories/email-suppressions
 import { findLeadById } from "@/server/repositories/leads";
 import { getEnv } from "@/server/env";
 import { AppError } from "@/server/errors";
+import { syncSendingDomainFromProviderWebhook } from "@/server/services/sending-domains";
 import { isPermanentResendBounce } from "@/server/utils/resend-bounce";
 import { Webhook } from "svix";
 
@@ -17,15 +18,32 @@ type ResendWebhookTags =
   | Record<string, string>
   | Array<{ name?: string; value?: string }>;
 
+type ResendDomainRecordPayload = {
+  record?: string;
+  name?: string;
+  type?: string;
+  value?: string;
+  priority?: number;
+  ttl?: string;
+  status?: string;
+};
+
 type ResendWebhookPayload = {
   type?: string;
   created_at?: string;
   data?: {
+    // Email events
     email_id?: string;
     created_at?: string;
     bounce?: { message?: string; type?: string; subType?: string };
     failed?: { reason?: string };
     tags?: ResendWebhookTags;
+    // Domain events (domain.updated / domain.created / …)
+    id?: string;
+    name?: string;
+    status?: string;
+    region?: string;
+    records?: ResendDomainRecordPayload[];
   };
 };
 
@@ -43,7 +61,8 @@ const EVENT_TYPE_MAP: Record<string, CampaignSendProviderEventType> = {
 export type ResendWebhookProcessResult =
   | { ignored: true; reason: string }
   | { retry: true; reason: string }
-  | { received: true; created: boolean; duplicate: boolean };
+  | { received: true; created: boolean; duplicate: boolean }
+  | { received: true; domainSynced: true; domainId: string };
 
 function normalizeWebhookTags(tags: ResendWebhookTags | undefined): Record<string, string> {
   if (!tags) {
@@ -126,6 +145,20 @@ export async function processResendWebhookPayload(
   payload: ResendWebhookPayload,
   providerEventId: string | null,
 ): Promise<ResendWebhookProcessResult> {
+  if (payload.type === "domain.updated") {
+    const providerDomainId = payload.data?.id?.trim();
+    if (!providerDomainId) {
+      return { ignored: true, reason: "unsupported_or_incomplete_payload" };
+    }
+
+    const synced = await syncSendingDomainFromProviderWebhook(providerDomainId);
+    if (!synced) {
+      return { ignored: true, reason: "unknown_provider_domain_id" };
+    }
+
+    return { received: true, domainSynced: true, domainId: synced.id };
+  }
+
   const eventType = payload.type ? EVENT_TYPE_MAP[payload.type] : undefined;
 
   if (!eventType || !payload.data?.email_id) {
