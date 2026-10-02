@@ -417,6 +417,13 @@ export async function updateCampaignForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    existing.projectIds,
+    "campaign:update",
+  );
+
   if (existing.status === "archived") {
     throw new AppError(
       "VALIDATION_ERROR",

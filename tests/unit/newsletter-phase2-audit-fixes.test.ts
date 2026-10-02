@@ -7,6 +7,7 @@ vi.mock("@/server/repositories/campaigns", () => ({
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   cancelEnrollmentsForCampaign: vi.fn(),
+  countActiveSendClaimsForCampaign: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("@/server/repositories/newsletter-audience-segments", () => ({

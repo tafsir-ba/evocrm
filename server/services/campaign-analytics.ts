@@ -18,6 +18,7 @@ import { CampaignEnrollmentModel } from "@/models/campaign-enrollment";
 import { findCampaignById } from "@/server/repositories/campaigns";
 import { findCampaignSteps } from "@/server/repositories/campaign-steps";
 import { findWorkspaceById } from "@/server/repositories/workspaces";
+import { assertMultiProjectRecordAccess } from "@/server/services/apply-project-scope";
 import { resolveDashboardDateRange } from "@/server/utils/workspace-date-range";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
 import { getEnv } from "@/server/env";
@@ -26,6 +27,8 @@ export type CampaignAnalyticsQuery = {
   period?: CampaignAnalyticsPeriodPreset;
   dateFrom?: Date;
   dateTo?: Date;
+  /** Actor for project-scope enforcement when PROJECT_SHARING_ENABLED. */
+  userId?: string;
 };
 
 export type MetricCardData = {
@@ -585,6 +588,13 @@ export async function resolveCampaignAnalyticsPeriod(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    query.userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
+
   const workspace = await findWorkspaceById(workspaceId);
   const timezone = workspace?.timezone ?? "UTC";
   const preset = query.period ?? "30d";
@@ -846,6 +856,7 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
     to: Date;
     page?: number;
     pageSize?: number;
+    userId?: string;
   },
 ): Promise<{ issues: CampaignAnalyticsIssue[]; total: number }> {
   const campaign = await findCampaignById(workspaceId, campaignId);
@@ -853,6 +864,13 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    input.userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
 
   await connectDb();
 

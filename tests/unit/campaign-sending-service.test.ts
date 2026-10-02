@@ -169,6 +169,7 @@ describe("campaign sending service", () => {
     });
     vi.mocked(findDueEnrollments).mockResolvedValue([enrollment]);
     vi.mocked(claimEnrollmentForSend).mockResolvedValue(enrollment);
+    vi.mocked(findEnrollmentByIdOnly).mockResolvedValue(enrollment);
     vi.mocked(findSentCampaignSendForEnrollmentStep).mockResolvedValue(null);
     vi.mocked(releaseEnrollmentSendClaim).mockResolvedValue(undefined);
     vi.mocked(findCampaignById).mockResolvedValue({
@@ -439,6 +440,62 @@ describe("campaign sending service", () => {
     expect(sendCampaignEmail).toHaveBeenCalledWith(
       expect.objectContaining({ fromName: "Grosvenor" }),
     );
+  });
+
+  it("aborts before Resend when enrollment is no longer active after claim", async () => {
+    vi.mocked(findLeadById).mockResolvedValue({
+      id: "lead-1",
+      workspaceId: "ws-1",
+      ...leadRecordExtras,
+      statusId: "s1",
+      sourceId: null,
+      ownerId: null,
+      assignedTo: null,
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      email: "jane@example.com",
+      emailNormalized: "jane@example.com",
+      phone: null,
+      phoneNormalized: null,
+      language: null,
+      preferredContactMethod: null,
+      budgetMin: null,
+      budgetMax: null,
+      preferredAreas: [],
+      propertyTypeInterests: [],
+      transactionIntent: null,
+      usagePurpose: null,
+      notes: null,
+      tags: [],
+      attributes: {},
+      emailConsentStatus: "subscribed",
+      emailUnsubscribedAt: null,
+      emailUnsubscribeReason: null,
+      lastContactedAt: null,
+      createdBy: "user-1",
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(claimEnrollmentForSend).mockResolvedValue({
+      ...enrollment,
+      sendClaimExpiresAt: new Date(Date.now() + 60_000),
+    });
+    // Cancel raced after claim: enrollment marked failed before ESP send.
+    vi.mocked(findEnrollmentByIdOnly).mockResolvedValue({
+      ...enrollment,
+      status: "failed",
+      failedAt: new Date(),
+      failureReason: "Newsletter schedule cancelled before send.",
+      sendClaimExpiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const summary = await sendDueCampaignEmails(50);
+
+    expect(summary.skipped).toBe(1);
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(createCampaignSend).not.toHaveBeenCalled();
   });
 
   it("uses campaign default from name when step from name is blank", async () => {
