@@ -15,7 +15,7 @@ import {
   deleteSendingDomain,
   findSendingDomainById,
   findSendingDomainByName,
-  findSendingDomainByProviderDomainId,
+  findSendingDomainsByProviderDomainId,
   findSendingDomains,
   mapProviderDomainStatus,
   updateSendingDomain,
@@ -150,19 +150,25 @@ export async function refreshSendingDomainForWorkspace(
 }
 
 /**
- * Sync a CRM sending domain from Resend after a provider webhook (GET only).
- * Returns null when no local row matches the provider domain id.
+ * Sync all CRM sending domains that share a Resend provider domain id (GET only).
+ * Returns an empty array when no local rows match.
  */
 export async function syncSendingDomainFromProviderWebhook(
   providerDomainId: string,
-): Promise<SendingDomainRecord | null> {
-  const domain = await findSendingDomainByProviderDomainId(providerDomainId);
-  if (!domain) {
-    return null;
+): Promise<SendingDomainRecord[]> {
+  const domains = await findSendingDomainsByProviderDomainId(providerDomainId);
+  if (domains.length === 0) {
+    return [];
   }
 
   const providerDomain = await getProviderDomain(providerDomainId);
-  return persistProviderDomainSnapshot(domain, providerDomain);
+  const updated: SendingDomainRecord[] = [];
+
+  for (const domain of domains) {
+    updated.push(await persistProviderDomainSnapshot(domain, providerDomain));
+  }
+
+  return updated;
 }
 
 export async function verifySendingDomainForWorkspace(

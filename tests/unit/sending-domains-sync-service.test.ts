@@ -6,7 +6,7 @@ vi.mock("@/server/repositories/campaigns", () => ({
 
 vi.mock("@/server/repositories/sending-domains", () => ({
   findSendingDomainById: vi.fn(),
-  findSendingDomainByProviderDomainId: vi.fn(),
+  findSendingDomainsByProviderDomainId: vi.fn(),
   updateSendingDomain: vi.fn(),
   deleteSendingDomain: vi.fn(),
   mapProviderDomainStatus: vi.fn((status: string) =>
@@ -48,7 +48,7 @@ import {
 } from "@/server/email/resend-domains";
 import {
   findSendingDomainById,
-  findSendingDomainByProviderDomainId,
+  findSendingDomainsByProviderDomainId,
   updateSendingDomain,
 } from "@/server/repositories/sending-domains";
 import {
@@ -140,33 +140,63 @@ describe("sending domain status sync", () => {
     );
   });
 
-  it("webhook sync GETs provider state and persists without calling verify", async () => {
-    vi.mocked(findSendingDomainByProviderDomainId).mockResolvedValue(domainRecord);
+  it("webhook sync GETs provider state once and updates every matching workspace row", async () => {
+    const secondWorkspaceDomain = {
+      ...domainRecord,
+      id: "domain-2",
+      workspaceId: "ws-2",
+    };
+    vi.mocked(findSendingDomainsByProviderDomainId).mockResolvedValue([
+      domainRecord,
+      secondWorkspaceDomain,
+    ]);
     vi.mocked(getProviderDomain).mockResolvedValue({
       id: "resend-domain-1",
       name: "example.com",
-      status: "failed",
+      status: "verified",
       records: [],
     });
-    vi.mocked(updateSendingDomain).mockResolvedValue({
-      ...domainRecord,
-      status: "failed",
-    });
+    vi.mocked(updateSendingDomain)
+      .mockResolvedValueOnce({
+        ...domainRecord,
+        status: "verified",
+        verifiedAt: new Date(),
+      })
+      .mockResolvedValueOnce({
+        ...secondWorkspaceDomain,
+        status: "verified",
+        verifiedAt: new Date(),
+      });
 
     const updated = await syncSendingDomainFromProviderWebhook("resend-domain-1");
 
-    expect(updated?.status).toBe("failed");
+    expect(updated).toHaveLength(2);
+    expect(updated.map((domain) => domain.id)).toEqual(["domain-1", "domain-2"]);
+    expect(getProviderDomain).toHaveBeenCalledTimes(1);
     expect(getProviderDomain).toHaveBeenCalledWith("resend-domain-1");
+    expect(updateSendingDomain).toHaveBeenCalledTimes(2);
+    expect(updateSendingDomain).toHaveBeenNthCalledWith(
+      1,
+      "ws-1",
+      "domain-1",
+      expect.objectContaining({ status: "verified" }),
+    );
+    expect(updateSendingDomain).toHaveBeenNthCalledWith(
+      2,
+      "ws-2",
+      "domain-2",
+      expect.objectContaining({ status: "verified" }),
+    );
     expect(verifyProviderDomain).not.toHaveBeenCalled();
     expect(createAuditLog).not.toHaveBeenCalled();
   });
 
-  it("webhook sync returns null when provider domain is unknown locally", async () => {
-    vi.mocked(findSendingDomainByProviderDomainId).mockResolvedValue(null);
+  it("webhook sync returns an empty list when provider domain is unknown locally", async () => {
+    vi.mocked(findSendingDomainsByProviderDomainId).mockResolvedValue([]);
 
     const updated = await syncSendingDomainFromProviderWebhook("missing-provider-id");
 
-    expect(updated).toBeNull();
+    expect(updated).toEqual([]);
     expect(getProviderDomain).not.toHaveBeenCalled();
   });
 });

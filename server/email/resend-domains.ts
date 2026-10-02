@@ -248,6 +248,15 @@ export function isTerminalProviderDomainStatus(status: string): boolean {
   );
 }
 
+export function isFailedProviderDomainStatus(status: string): boolean {
+  const normalized = status.toLowerCase().trim();
+  return (
+    normalized === "failed" ||
+    normalized === "failure" ||
+    normalized === "partially_failed"
+  );
+}
+
 export type PollProviderDomainOptions = {
   /** Total GETs including the initial one. Default: delays.length + 1. */
   maxAttempts?: number;
@@ -255,6 +264,12 @@ export type PollProviderDomainOptions = {
   delaysMs?: number[];
   sleep?: (ms: number) => Promise<void>;
   getDomain?: (providerDomainId: string) => Promise<ProviderDomain>;
+  /**
+   * After a freshly triggered domains.verify, Resend may briefly return the
+   * prior failed snapshot. When true, failure on the first GET is not treated
+   * as terminal — at least one delayed GET is required.
+   */
+  ignoreInitialFailure?: boolean;
 };
 
 /**
@@ -268,10 +283,17 @@ export async function pollProviderDomainUntilSettled(
   const getDomain = options?.getDomain ?? getProviderDomain;
   const sleepFn = options?.sleep ?? sleep;
   const delaysMs = options?.delaysMs ?? [1000, 2000, 3000, 5000, 8000];
-  const maxAttempts = Math.max(1, options?.maxAttempts ?? delaysMs.length + 1);
+  const ignoreInitialFailure = options?.ignoreInitialFailure === true;
+  const maxAttempts = Math.max(
+    ignoreInitialFailure ? 2 : 1,
+    options?.maxAttempts ?? delaysMs.length + 1,
+  );
 
   let latest = await getDomain(providerDomainId);
-  if (isTerminalProviderDomainStatus(latest.status)) {
+  const initialIsStaleFailure =
+    ignoreInitialFailure && isFailedProviderDomainStatus(latest.status);
+
+  if (isTerminalProviderDomainStatus(latest.status) && !initialIsStaleFailure) {
     return latest;
   }
 
@@ -302,7 +324,12 @@ export async function verifyProviderDomain(
     throw providerAppError(verifyResult.error, "Could not verify this domain yet.");
   }
 
-  return pollProviderDomainUntilSettled(providerDomainId, pollOptions);
+  // Always ignore a failed snapshot on the first post-verify GET — it can be
+  // the pre-trigger state before Resend flips to pending / verified.
+  return pollProviderDomainUntilSettled(providerDomainId, {
+    ...pollOptions,
+    ignoreInitialFailure: true,
+  });
 }
 
 export async function deleteProviderDomain(providerDomainId: string): Promise<void> {

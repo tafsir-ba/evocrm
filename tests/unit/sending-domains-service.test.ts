@@ -19,7 +19,7 @@ vi.mock("@/server/email/resend-domains", () => ({
 
 vi.mock("@/server/repositories/sending-domains", () => ({
   findSendingDomainById: vi.fn(),
-  findSendingDomainByProviderDomainId: vi.fn(),
+  findSendingDomainsByProviderDomainId: vi.fn(),
   updateSendingDomain: vi.fn(),
   deleteSendingDomain: vi.fn(),
 }));
