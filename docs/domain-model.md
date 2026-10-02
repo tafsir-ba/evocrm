@@ -815,21 +815,31 @@ All foreign keys must resolve within the same workspace:
 
 ---
 
-## Advertising / Growth Copilot (Phase 0 foundation)
+## Advertising / Growth Copilot (Phase 0–1)
 
 Feature-flagged via `ADVERTISING_ENABLED` (default **off**). **Do not** overload email-drip `Campaign`.
 
+**Phase 1 pilot:** Satigny duplex (`projectReference: satigny_duplex`), Geneva, Switzerland (CH). Meta read-only (`ads_read`, `business_management`). No campaign writes, customer-list exports, or AI actions.
+
 ### AdConnection
 
-Workspace-scoped platform credentials + health. Credentials use the generic vault (`credentialsEncrypted`).
+Workspace-scoped platform credentials + health. Credentials use the generic vault (`credentialsEncrypted`). Phase 1 forces `writeScopesEnabled: false`.
 
 ### AdAccount
 
-External ad account under a connection (currency, timezone, sync freshness).
+External ad account under a connection (currency, timezone, sync freshness). Multi-account under one Meta Business identity.
 
 ### GrowthCampaign
 
 Coordinating parent for one CRM `projectId` (required). Trusted destinations are project-locked. Separate from drip `Campaign` (optional `linkedDripCampaignId` only).
+
+### AdvertisingCampaign / AdGroup / Ad
+
+Platform hierarchy under `AdAccount` (Meta campaign → ad set → ad). Optional `growthCampaignId` link. Observed state only in Phase 1.
+
+### MetricSnapshot
+
+Immutable dated delivery facts (`spend`, impressions, reach, clicks, CPC/CPM/CTR). Must not overwrite configuration records. Media-efficiency tier (5) by default.
 
 ### AttributionTouchpoint / ConversionEvent
 
@@ -860,6 +870,8 @@ Workspace
   │    └─ ConversionEvent
   ├─ AdConnection
   │    └─ AdAccount
+  │         └─ AdvertisingCampaign ── AdGroup ── Ad
+  │         └─ MetricSnapshot
   ├─ Dictionary
   │    └─ DictionaryItem
   ├─ Tag

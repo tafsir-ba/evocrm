@@ -64,7 +64,7 @@ type ProjectDetail = {
   }>;
 };
 
-const TABS = [
+const BASE_TABS = [
   { key: "overview", label: "Overview" },
   { key: "leads", label: "Leads", href: "leads" },
   { key: "properties", label: "Properties", href: "properties" },
@@ -80,6 +80,8 @@ type ProjectDetailPanelProps = {
   projectId: string;
   canUpdate: boolean;
   canArchive: boolean;
+  /** Growth Copilot Phase 1 — only when ADVERTISING_ENABLED. */
+  showPaidAds?: boolean;
 };
 
 function projectTypeLabel(value: string | null): string | null {
@@ -103,6 +105,7 @@ export function ProjectDetailPanel({
   projectId,
   canUpdate,
   canArchive,
+  showPaidAds = false,
 }: ProjectDetailPanelProps) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,7 +196,13 @@ export function ProjectDetailPanel({
       />
 
       <div className="flex flex-wrap gap-2 mb-5">
-        {TABS.map((tab) => {
+        {[
+          ...BASE_TABS.slice(0, 6),
+          ...(showPaidAds
+            ? [{ key: "paid-ads", label: "Paid ads", href: "paid-ads" } as const]
+            : []),
+          ...BASE_TABS.slice(6),
+        ].map((tab) => {
           if (tab.key === "overview") {
             return (
               <span
@@ -206,7 +215,7 @@ export function ProjectDetailPanel({
           }
 
           const baseHref =
-            tab.href === "edit" || tab.href === "sharing"
+            tab.href === "edit" || tab.href === "sharing" || tab.href === "paid-ads"
               ? workspacePath(workspaceSlug, "projects", projectId, tab.href)
               : withProjectIdQuery(workspaceNavPath(workspaceSlug, tab.href!), projectId);
 

@@ -62,6 +62,16 @@ export {
   ConversionEventModel,
   type ConversionEventDocument,
 } from "./conversion-event";
+export {
+  AdvertisingCampaignModel,
+  type AdvertisingCampaignDocument,
+} from "./advertising-campaign";
+export { AdGroupModel, type AdGroupDocument } from "./ad-group";
+export { AdModel, type AdDocument } from "./ad";
+export {
+  MetricSnapshotModel,
+  type MetricSnapshotDocument,
+} from "./metric-snapshot";
 export { IntegrationModel, type IntegrationDocument } from "./integration";
 export { IntegrationLogModel, type IntegrationLogDocument } from "./integration-log";
 export {

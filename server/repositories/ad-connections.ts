@@ -112,3 +112,28 @@ export async function createAdConnection(input: {
 
   return toRecord(document.toObject());
 }
+
+export async function updateAdConnection(
+  workspaceId: string,
+  connectionId: string,
+  patch: Partial<{
+    name: string;
+    status: AdConnectionStatus;
+    credentialsEncrypted: string | null;
+    externalBusinessId: string | null;
+    grantedScopes: string[];
+    healthMessage: string | null;
+    lastSuccessfulSyncAt: Date | null;
+    lastSyncAttemptAt: Date | null;
+    lastSyncError: string | null;
+  }>,
+): Promise<AdConnectionRecord | null> {
+  await connectDb();
+  const document = await AdConnectionModel.findOneAndUpdate(
+    withWorkspaceScope(workspaceId, { _id: connectionId, archivedAt: null }),
+    { $set: patch },
+    { new: true },
+  ).lean<AdConnectionDocument | null>();
+
+  return document ? toRecord(document) : null;
+}

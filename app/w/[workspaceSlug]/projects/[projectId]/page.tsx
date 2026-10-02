@@ -1,5 +1,6 @@
 import { ProjectDetailPanel } from "@/components/projects/project-detail-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { isAdvertisingEnabled } from "@/lib/advertising-feature";
 import { AppError } from "@/server/errors";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
@@ -52,6 +53,7 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
         projectId={projectId}
         canUpdate={hasPermission(permissions, "project:update")}
         canArchive={hasPermission(permissions, "project:archive")}
+        showPaidAds={isAdvertisingEnabled()}
       />
     </PageContainer>
   );

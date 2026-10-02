@@ -209,5 +209,6 @@ describe("job conventions + consent scaffolding", () => {
     expect(ADVERTISING_DEFAULTS.maxAutomatedBudgetAdjustment.percentOfDailyBudget).toBe(
       10,
     );
+    expect(ADVERTISING_DEFAULTS.pilotSelection.projectReference).toBe("satigny_duplex");
   });
 });

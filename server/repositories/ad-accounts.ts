@@ -104,3 +104,47 @@ export async function createAdAccount(input: {
 
   return toRecord(document.toObject());
 }
+
+export async function upsertAdAccount(input: {
+  workspaceId: string;
+  connectionId: string;
+  platform: AdPlatform;
+  externalAccountId: string;
+  name: string;
+  currency: string;
+  timezone: string;
+  status?: AdAccountStatus;
+  lastSuccessfulSyncAt?: Date | null;
+  lastSyncAttemptAt?: Date | null;
+}): Promise<AdAccountRecord> {
+  await connectDb();
+  const document = await AdAccountModel.findOneAndUpdate(
+    withWorkspaceScope(input.workspaceId, {
+      platform: input.platform,
+      externalAccountId: input.externalAccountId,
+      archivedAt: null,
+    }),
+    {
+      $set: {
+        connectionId: input.connectionId,
+        name: input.name,
+        currency: input.currency,
+        timezone: input.timezone,
+        status: input.status ?? "unknown",
+        lastSuccessfulSyncAt: input.lastSuccessfulSyncAt ?? null,
+        lastSyncAttemptAt: input.lastSyncAttemptAt ?? null,
+      },
+      $setOnInsert: {
+        workspaceId: input.workspaceId,
+        platform: input.platform,
+        externalAccountId: input.externalAccountId,
+      },
+    },
+    { upsert: true, new: true },
+  ).lean<AdAccountDocument>();
+
+  if (!document) {
+    throw new Error("Failed to upsert ad account");
+  }
+  return toRecord(document);
+}

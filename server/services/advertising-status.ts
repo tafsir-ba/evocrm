@@ -23,6 +23,8 @@ export type AdvertisingModuleStatus = {
     attributionPolicyV1: string;
     mediaStorage: string;
     consentMarketsFirst: readonly string[];
+    pilotProjectReference: string;
+    pilotMarketLabel: string;
   };
   approvalSubjectsRequiringHuman: readonly string[];
   jobConventions: {
@@ -53,13 +55,15 @@ export function getAdvertisingModuleStatus(options?: {
       ? "Paid ads tools are turned on for this workspace."
       : "Paid ads tools are turned off for now.",
     nextStepHint: enabled
-      ? "Connect a Meta ads account when your admin is ready (read-only first)."
-      : "Ask a workspace admin to turn on advertising when the pilot starts.",
+      ? "Open Settings → Paid ads to connect Meta for the Satigny duplex pilot (read only)."
+      : "Ask a workspace admin to turn on advertising when the Satigny pilot starts.",
     defaults: {
       readPilotPlatforms: ADVERTISING_DEFAULTS.readPilotPlatforms,
       attributionPolicyV1: ADVERTISING_DEFAULTS.attributionPolicyV1,
       mediaStorage: ADVERTISING_DEFAULTS.mediaStorage.provider,
       consentMarketsFirst: ADVERTISING_DEFAULTS.consent.marketsFirst,
+      pilotProjectReference: ADVERTISING_DEFAULTS.pilotSelection.projectReference,
+      pilotMarketLabel: ADVERTISING_DEFAULTS.pilotSelection.marketLabel,
     },
     approvalSubjectsRequiringHuman: ADVERTISING_HUMAN_APPROVAL_REQUIRED,
     jobConventions: {
