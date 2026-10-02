@@ -1,3 +1,10 @@
+export {
+  NEWSLETTER_TEST_EMAIL_MAX,
+  formatNewsletterTestEmailErrors,
+  parseNewsletterTestEmails,
+  type ParsedNewsletterTestEmails,
+} from "@/lib/newsletter-test-emails";
+
 /** Default hard cap for included newsletter recipients at lock/send time. */
 export const DEFAULT_NEWSLETTER_AUDIENCE_LIMIT = 10_000;
 

@@ -65,6 +65,13 @@ export const newsletterAudiencePreviewQuerySchema = z.object({
   export: z.enum(["exclusions"]).optional(),
 });
 
+/** Raw body shape — address parsing/validation happens in the route for clear errors. */
+export const newsletterTestSendInputSchema = z
+  .object({
+    emails: z.union([z.string(), z.array(z.string().trim().min(1).max(254))]),
+  })
+  .strict();
+
 export type NewsletterAudienceSegmentsInput = z.infer<
   typeof newsletterAudienceSegmentsInputSchema
 >;
@@ -75,3 +82,4 @@ export type NewsletterAudienceImportInput = z.infer<
 export type NewsletterAudiencePreviewQuery = z.infer<
   typeof newsletterAudiencePreviewQuerySchema
 >;
+export type NewsletterTestSendInput = z.infer<typeof newsletterTestSendInputSchema>;
