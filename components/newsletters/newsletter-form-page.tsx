@@ -237,10 +237,12 @@ export function NewsletterFormPage({
   );
   const [testEmailsRaw, setTestEmailsRaw] = useState("");
   const [testEmailError, setTestEmailError] = useState<string | null>(null);
+  const [testSendMessage, setTestSendMessage] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
   const submittingRef = useRef(false);
   const createdIdRef = useRef<string | null>(campaignId ?? null);
   const htmlEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const testSendPanelRef = useRef<HTMLDivElement | null>(null);
 
   const apiCampaigns = `/api/workspaces/${workspaceSlug}/campaigns`;
   const apiNewsletters = `/api/workspaces/${workspaceSlug}/newsletters`;
@@ -816,38 +818,72 @@ export function NewsletterFormPage({
     }
   }
 
+  function revealTestSendFeedback() {
+    // Keep feedback next to the CTA — top-of-form banners are easy to miss
+    // while scrolled to the test panel at the bottom of Content/Review.
+    requestAnimationFrame(() => {
+      const panel = testSendPanelRef.current;
+      if (panel && typeof panel.scrollIntoView === "function") {
+        panel.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
+      }
+    });
+  }
+
   async function handleTestSend() {
-    if (!canUpdate || testSending || submittingRef.current) {
+    if (!canUpdate || testSending) {
+      return;
+    }
+
+    if (submittingRef.current) {
+      setTestSendMessage(null);
+      setTestEmailError(
+        "Please wait for the current save to finish, then send the test again.",
+      );
+      revealTestSendFeedback();
       return;
     }
 
     const parsed = parseNewsletterTestEmails(testEmailsRaw);
     const validationError = formatNewsletterTestEmailErrors(parsed);
     if (validationError) {
+      setTestSendMessage(null);
       setTestEmailError(validationError);
+      revealTestSendFeedback();
       return;
     }
     setTestEmailError(null);
+    setTestSendMessage(null);
 
     if (!contentReady) {
-      setFormError(
-        unsafeHtml
-          ? "Fix unsafe HTML before sending a test."
-          : "Add a name, subject, and HTML content before sending a test.",
-      );
+      const message = unsafeHtml
+        ? "Fix unsafe HTML before sending a test."
+        : "Add a name, subject, and HTML content before sending a test.";
+      setFormError(message);
+      setTestEmailError(message);
       setWizardStep("content");
+      revealTestSendFeedback();
       return;
     }
 
     if (!sending.sendingDomainId || !sending.senderEmail) {
-      setFormError("Choose a verified sending domain and sender email before sending a test.");
+      const message =
+        "Choose a verified sending domain and sender email before sending a test.";
+      setFormError(message);
+      setTestEmailError(message);
       setWizardStep("content");
+      revealTestSendFeedback();
       return;
     }
 
     if (!senderName.trim()) {
-      setFormError("Add a from name before sending a test.");
+      const message = "Add a from name before sending a test.";
+      setFormError(message);
+      setTestEmailError(message);
       setWizardStep("content");
+      revealTestSendFeedback();
       return;
     }
 
@@ -862,6 +898,12 @@ export function NewsletterFormPage({
         contentOnly: true,
       });
       if (!id) {
+        // saveDraft usually sets formError at the top of the form; always mirror
+        // feedback beside the CTA so the control never looks like a silent no-op.
+        setTestEmailError(
+          "Could not save the draft before sending a test. Fix any errors shown above, then try again.",
+        );
+        revealTestSendFeedback();
         return;
       }
 
@@ -870,20 +912,34 @@ export function NewsletterFormPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emails: parsed.emails }),
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setFormError(formatApiErrorMessage(payload, "Failed to send test email."));
+        const message = formatApiErrorMessage(
+          payload,
+          "Failed to send test email.",
+        );
+        setFormError(message);
+        setTestEmailError(message);
+        setTestSendMessage(null);
+        revealTestSendFeedback();
         return;
       }
 
       const sent = payload.data?.sent ?? parsed.emails.length;
-      setFormMessage(
+      const successMessage =
         sent === 1
           ? "Test email sent. Check that inbox for the real rendered output."
-          : `Test emails sent to ${sent} addresses. Check those inboxes for the real rendered output.`,
-      );
+          : `Test emails sent to ${sent} addresses. Check those inboxes for the real rendered output.`;
+      setFormMessage(successMessage);
+      setTestSendMessage(successMessage);
+      setTestEmailError(null);
+      revealTestSendFeedback();
     } catch {
-      setFormError("Failed to send test email.");
+      const message = "Failed to send test email.";
+      setFormError(message);
+      setTestEmailError(message);
+      setTestSendMessage(null);
+      revealTestSendFeedback();
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -897,7 +953,10 @@ export function NewsletterFormPage({
     }
 
     return (
-      <div className="space-y-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-3">
+      <div
+        ref={testSendPanelRef}
+        className="space-y-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-3"
+      >
         <div>
           <h3 className="text-[14px] font-semibold text-[var(--color-ink)]">
             Send a test
@@ -915,6 +974,7 @@ export function NewsletterFormPage({
             onChange={(event) => {
               setTestEmailsRaw(event.target.value);
               setTestEmailError(null);
+              setTestSendMessage(null);
             }}
             rows={3}
             disabled={testSending || submitting}
@@ -929,6 +989,11 @@ export function NewsletterFormPage({
         {testEmailError ? (
           <p className="text-[12.5px] text-[var(--color-danger)]" role="alert">
             {testEmailError}
+          </p>
+        ) : null}
+        {testSendMessage ? (
+          <p className="text-[12.5px] text-[var(--color-ink)]" role="status">
+            {testSendMessage}
           </p>
         ) : null}
         <Button

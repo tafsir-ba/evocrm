@@ -209,6 +209,10 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
   });
 
   it("rejects when project scope denies access", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...newsletter,
+      projectIds: ["507f1f77bcf86cd799439011"],
+    } as never);
     vi.mocked(assertMultiProjectRecordAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "You do not have access to this project."),
     );
@@ -221,6 +225,23 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
 
     expect(sendCampaignEmail).not.toHaveBeenCalled();
     expect(assertNewsletterTestSendRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("explains empty projectIds denial for grant-only callers", async () => {
+    vi.mocked(assertMultiProjectRecordAccess).mockRejectedValue(
+      new AppError("PERMISSION_DENIED", "You do not have access to this record."),
+    );
+
+    await expect(
+      sendNewsletterTestEmailsForWorkspace("ws-1", "user-1", "camp-1", [
+        "ada@example.com",
+      ]),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringMatching(/audience project/i),
+    });
+
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
   });
 
   it("rejects drip campaigns", async () => {
