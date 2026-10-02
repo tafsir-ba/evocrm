@@ -31,6 +31,14 @@ vi.mock("@/server/services/sending-domains", () => ({
   assertVerifiedSenderEmail: vi.fn(),
 }));
 
+vi.mock("@/server/services/apply-project-scope", () => ({
+  assertMultiProjectRecordAccess: vi.fn(),
+}));
+
+vi.mock("@/server/security/newsletter-test-send-rate-limit", () => ({
+  assertNewsletterTestSendRateLimit: vi.fn(),
+}));
+
 vi.mock("@/server/email/resend", () => ({
   buildCampaignEmailHtml: vi.fn(
     (_body: string, unsubscribeUrl: string, options?: { htmlBody?: string | null }) =>
@@ -55,6 +63,8 @@ import {
 } from "@/server/repositories/campaign-enrollments";
 import { resolveNewsletterAudience } from "@/server/services/newsletter-audience";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
+import { assertMultiProjectRecordAccess } from "@/server/services/apply-project-scope";
+import { assertNewsletterTestSendRateLimit } from "@/server/security/newsletter-test-send-rate-limit";
 import { sendCampaignEmail } from "@/server/email/resend";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { sendNewsletterTestEmailsForWorkspace } from "@/server/services/newsletters";
@@ -113,6 +123,8 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
     vi.mocked(findCampaignById).mockResolvedValue(newsletter as never);
     vi.mocked(findFirstCampaignStep).mockResolvedValue(step as never);
     vi.mocked(assertVerifiedSenderEmail).mockResolvedValue(undefined as never);
+    vi.mocked(assertMultiProjectRecordAccess).mockResolvedValue(undefined as never);
+    vi.mocked(assertNewsletterTestSendRateLimit).mockReturnValue(undefined as never);
     vi.mocked(sendCampaignEmail).mockResolvedValue({
       success: true,
       messageId: "msg-1",
@@ -147,6 +159,25 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
       newsletter.sendingDomainId,
       newsletter.senderEmail,
     );
+    expect(assertMultiProjectRecordAccess).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      newsletter.projectIds,
+      "campaign:update",
+    );
+    expect(assertNewsletterTestSendRateLimit).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      2,
+    );
+    const auditCall = vi.mocked(createAuditLog).mock.calls[0]?.[0] as {
+      after: Record<string, unknown>;
+    };
+    expect(auditCall.after).toMatchObject({
+      recipientCount: 2,
+      messageIds: ["msg-1", "msg-1"],
+    });
+    expect(auditCall.after).not.toHaveProperty("recipients");
   });
 
   it("does not snapshot audience or create enrollments", async () => {
@@ -157,6 +188,39 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
     expect(resolveNewsletterAudience).not.toHaveBeenCalled();
     expect(createCampaignEnrollmentsBulk).not.toHaveBeenCalled();
     expect(cancelEnrollmentsForCampaign).not.toHaveBeenCalled();
+  });
+
+  it("allows test send while audience is locked without cancelling enrollments", async () => {
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...newsletter,
+      status: "active",
+      audienceLockedAt: new Date("2026-10-01T10:00:00.000Z"),
+      scheduledFor: new Date("2026-10-03T09:00:00.000Z"),
+    } as never);
+
+    await sendNewsletterTestEmailsForWorkspace("ws-1", "user-1", "camp-1", [
+      "ada@example.com",
+    ]);
+
+    expect(sendCampaignEmail).toHaveBeenCalledTimes(1);
+    expect(resolveNewsletterAudience).not.toHaveBeenCalled();
+    expect(createCampaignEnrollmentsBulk).not.toHaveBeenCalled();
+    expect(cancelEnrollmentsForCampaign).not.toHaveBeenCalled();
+  });
+
+  it("rejects when project scope denies access", async () => {
+    vi.mocked(assertMultiProjectRecordAccess).mockRejectedValue(
+      new AppError("PERMISSION_DENIED", "You do not have access to this project."),
+    );
+
+    await expect(
+      sendNewsletterTestEmailsForWorkspace("ws-1", "user-1", "camp-1", [
+        "ada@example.com",
+      ]),
+    ).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+
+    expect(sendCampaignEmail).not.toHaveBeenCalled();
+    expect(assertNewsletterTestSendRateLimit).not.toHaveBeenCalled();
   });
 
   it("rejects drip campaigns", async () => {
@@ -200,5 +264,28 @@ describe("sendNewsletterTestEmailsForWorkspace", () => {
       code: "VALIDATION_ERROR",
       message: expect.stringMatching(/sending domain/i),
     });
+  });
+
+  it("surfaces partial send failures without creating enrollments", async () => {
+    vi.mocked(sendCampaignEmail)
+      .mockResolvedValueOnce({ success: true, messageId: "msg-1" })
+      .mockResolvedValueOnce({ success: false, error: "Resend failed." });
+
+    await expect(
+      sendNewsletterTestEmailsForWorkspace("ws-1", "user-1", "camp-1", [
+        "ada@example.com",
+        "bob@example.com",
+      ]),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: expect.stringMatching(/Sent 1 test email/i),
+      details: expect.objectContaining({
+        sent: 1,
+        failedAt: "bob@example.com",
+      }),
+    });
+
+    expect(createCampaignEnrollmentsBulk).not.toHaveBeenCalled();
+    expect(cancelEnrollmentsForCampaign).not.toHaveBeenCalled();
   });
 });

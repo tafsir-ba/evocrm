@@ -2,6 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  NEWSLETTER_TEST_EMAIL_MAX,
+  NEWSLETTER_TEST_EMAILS_RAW_MAX,
+} from "@/lib/newsletter-test-emails";
 import { objectIdSchema } from "@/server/validation/campaigns";
 
 export const NEWSLETTER_AUDIENCE_SEGMENT_MAX = 10;
@@ -68,7 +72,12 @@ export const newsletterAudiencePreviewQuerySchema = z.object({
 /** Raw body shape — address parsing/validation happens in the route for clear errors. */
 export const newsletterTestSendInputSchema = z
   .object({
-    emails: z.union([z.string(), z.array(z.string().trim().min(1).max(254))]),
+    emails: z.union([
+      z.string().max(NEWSLETTER_TEST_EMAILS_RAW_MAX),
+      z
+        .array(z.string().trim().min(1).max(254))
+        .max(NEWSLETTER_TEST_EMAIL_MAX),
+    ]),
   })
   .strict();
 

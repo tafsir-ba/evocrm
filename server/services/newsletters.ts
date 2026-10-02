@@ -53,6 +53,7 @@ import {
 import { createImportJobForWorkspace } from "@/server/services/imports";
 import { validateActiveProjectId } from "@/server/services/project-scope";
 import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
+import { assertNewsletterTestSendRateLimit } from "@/server/security/newsletter-test-send-rate-limit";
 import { buildCampaignEmailHtml, sendCampaignEmail } from "@/server/email/resend";
 import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import type {
@@ -834,6 +835,12 @@ export async function sendNewsletterTestEmailsForWorkspace(
     throw new AppError("NOT_FOUND", "Newsletter not found.");
   }
   assertIsNewsletter(campaign);
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
 
   if (campaign.status === "archived") {
     throw new AppError(
@@ -841,6 +848,8 @@ export async function sendNewsletterTestEmailsForWorkspace(
       "Archived newsletters cannot send test emails. Restore the newsletter first.",
     );
   }
+
+  assertNewsletterTestSendRateLimit(workspaceId, actorId, emails.length);
 
   const step = await findFirstCampaignStep(workspaceId, campaignId);
   if (!step) {
@@ -943,12 +952,15 @@ export async function sendNewsletterTestEmailsForWorkspace(
     });
 
     if (!result.success) {
+      const sentCount = messageIds.length;
       throw new AppError(
         "VALIDATION_ERROR",
-        result.error ?? `Could not send the test email to ${to}.`,
+        sentCount > 0
+          ? `Sent ${sentCount} test email${sentCount === 1 ? "" : "s"}, then failed at ${to}: ${result.error ?? "send failed."}`
+          : (result.error ?? `Could not send the test email to ${to}.`),
         {
           details: {
-            sent: messageIds.length,
+            sent: sentCount,
             failedAt: to,
             messageIds,
           },
@@ -967,7 +979,6 @@ export async function sendNewsletterTestEmailsForWorkspace(
     entityId: campaignId,
     after: {
       recipientCount: emails.length,
-      recipients: emails,
       messageIds,
       subject,
     },

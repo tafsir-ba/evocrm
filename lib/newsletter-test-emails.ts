@@ -1,6 +1,9 @@
 /** Max addresses for a single newsletter test send. */
 export const NEWSLETTER_TEST_EMAIL_MAX = 10;
 
+/** Max raw `emails` string length accepted by the API. */
+export const NEWSLETTER_TEST_EMAILS_RAW_MAX = 4_000;
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type ParsedNewsletterTestEmails = {

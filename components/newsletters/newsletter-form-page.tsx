@@ -646,13 +646,22 @@ export function NewsletterFormPage({
         setStepId(stepBody.data?.step?.id ?? null);
       }
 
+      // Test-send / content-only must never touch audience segments — a PUT while
+      // audienceLockedAt would unlock, clear schedule, and cancel enrollments.
+      if (options?.contentOnly) {
+        if (!options?.stay) {
+          router.replace(workspacePath(workspaceSlug, `dripping/newsletters/${id}`));
+        }
+        return id;
+      }
+
       const segmentsForApi = savableSegments;
 
-      // CSV bootstrap / content-only saves may create or update the campaign
-      // before audience is ready. Never invent a project_tags stub — that would
-      // briefly target the entire project membership.
+      // CSV bootstrap may create the campaign before any import finishes.
+      // Never invent a project_tags stub — that would briefly target the entire
+      // project membership.
       if (segmentsForApi.length === 0) {
-        if (options?.allowIncompleteCsv || options?.contentOnly) {
+        if (options?.allowIncompleteCsv) {
           if (!options?.stay) {
             router.replace(workspacePath(workspaceSlug, `dripping/newsletters/${id}`));
           }
@@ -930,7 +939,10 @@ export function NewsletterFormPage({
             submitting ||
             !testEmailsRaw.trim() ||
             unsafeHtml ||
-            !contentReady
+            !contentReady ||
+            !sending.sendingDomainId ||
+            !sending.senderEmail ||
+            !senderName.trim()
           }
           onClick={() => void handleTestSend()}
         >
