@@ -143,9 +143,10 @@ describe("pollProviderDomainUntilSettled", () => {
     expect(sleep).toHaveBeenCalledTimes(2);
   });
 
-  it("after a new verify, ignores prior failed first GET and continues until verified", async () => {
+  it("after a new verify, ignores repeated failed GETs until pending then verified", async () => {
     const getDomain = vi
       .fn()
+      .mockResolvedValueOnce(providerDomain("failed"))
       .mockResolvedValueOnce(providerDomain("failed"))
       .mockResolvedValueOnce(providerDomain("pending"))
       .mockResolvedValueOnce(providerDomain("verified"));
@@ -154,17 +155,17 @@ describe("pollProviderDomainUntilSettled", () => {
     const result = await pollProviderDomainUntilSettled("resend-domain-1", {
       getDomain,
       sleep,
-      delaysMs: [1, 1],
-      maxAttempts: 4,
-      ignoreInitialFailure: true,
+      delaysMs: [1, 1, 1],
+      maxAttempts: 5,
+      ignoreStaleFailureUntilTransition: true,
     });
 
     expect(result.status).toBe("verified");
-    expect(getDomain).toHaveBeenCalledTimes(3);
-    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(getDomain).toHaveBeenCalledTimes(4);
+    expect(sleep).toHaveBeenCalledTimes(3);
   });
 
-  it("after a new verify, still accepts a later confirmed failed status", async () => {
+  it("after a new verify, still accepts failed once provider left and returned to failed", async () => {
     const getDomain = vi
       .fn()
       .mockResolvedValueOnce(providerDomain("failed"))
@@ -177,14 +178,31 @@ describe("pollProviderDomainUntilSettled", () => {
       sleep,
       delaysMs: [1, 1],
       maxAttempts: 4,
-      ignoreInitialFailure: true,
+      ignoreStaleFailureUntilTransition: true,
     });
 
     expect(result.status).toBe("failed");
     expect(getDomain).toHaveBeenCalledTimes(3);
   });
 
-  it("without ignoreInitialFailure, still stops on the first failed GET", async () => {
+  it("after a new verify, returns last failed when retries expire without transition", async () => {
+    const getDomain = vi.fn().mockResolvedValue(providerDomain("failed"));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    const result = await pollProviderDomainUntilSettled("resend-domain-1", {
+      getDomain,
+      sleep,
+      delaysMs: [1, 1],
+      maxAttempts: 3,
+      ignoreStaleFailureUntilTransition: true,
+    });
+
+    expect(result.status).toBe("failed");
+    expect(getDomain).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it("without ignoreStaleFailureUntilTransition, still stops on the first failed GET", async () => {
     const getDomain = vi.fn().mockResolvedValue(providerDomain("failed"));
     const sleep = vi.fn();
 
