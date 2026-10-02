@@ -2,6 +2,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { leadRecordExtras, projectRecordExtras, campaignRecordExtras, enrollmentRecordExtras, activityRecordExtras, opportunityRecordExtras } from "@/tests/helpers/crm-fixtures";
 
+vi.mock("@/server/permissions/require-project-access", () => ({
+  requireProjectAccess: vi.fn(async (_workspaceId: string, _userId: string, projectId: string) => ({
+    membership: {
+      id: "m1",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      roleId: "role-1",
+      status: "active",
+      permissions: [],
+    },
+    accessMode: "member" as const,
+    projectId,
+    projectRole: "contributor" as const,
+    effectivePermissions: [],
+    isWorkspaceAdmin: false,
+  })),
+  resolveAllowedProjectIds: vi.fn(async () => null),
+}));
+
 vi.mock("@/server/repositories/leads", () => ({
   findActiveLeadByEmailNormalized: vi.fn(),
   findLeadByPhoneNormalized: vi.fn(),

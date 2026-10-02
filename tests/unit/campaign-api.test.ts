@@ -10,8 +10,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/campaigns", () => ({
@@ -29,7 +29,7 @@ import { POST as restoreCampaign } from "@/app/api/workspaces/[workspaceSlug]/ca
 import { POST as purgeCampaign } from "@/app/api/workspaces/[workspaceSlug]/campaigns/[campaignId]/purge/route";
 import { POST as cronSendDue } from "@/app/api/cron/campaigns/send-due/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   createCampaignForWorkspace,
   listCampaignsForWorkspace,
@@ -75,7 +75,7 @@ describe("campaign API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -98,7 +98,15 @@ describe("campaign API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -107,6 +115,9 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:read"],
       },
+      permissions: ["campaign:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listCampaignsForWorkspace).mockResolvedValue({
       campaigns: [sampleCampaign],
@@ -119,7 +130,7 @@ describe("campaign API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:read");
   });
 
   it("creates campaign with campaign:create", async () => {
@@ -133,7 +144,15 @@ describe("campaign API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -142,6 +161,9 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:create"],
       },
+      permissions: ["campaign:create"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(createCampaignForWorkspace).mockResolvedValue(sampleCampaign);
 
@@ -162,7 +184,7 @@ describe("campaign API routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:create");
   });
 
   it("archives campaign with campaign:archive", async () => {
@@ -176,7 +198,15 @@ describe("campaign API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -185,6 +215,9 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:archive"],
       },
+      permissions: ["campaign:archive"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(archiveCampaignForWorkspace).mockResolvedValue({
       ...sampleCampaign,
@@ -200,7 +233,7 @@ describe("campaign API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:archive");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:archive");
   });
 
   it("restores campaign with campaign:update", async () => {
@@ -214,7 +247,15 @@ describe("campaign API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -223,6 +264,9 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:update"],
       },
+      permissions: ["campaign:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(restoreCampaignForWorkspace).mockResolvedValue({
       ...sampleCampaign,
@@ -238,7 +282,7 @@ describe("campaign API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:update");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:update");
     expect(restoreCampaignForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", "camp-1");
   });
 
@@ -253,7 +297,15 @@ describe("campaign API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -262,6 +314,9 @@ describe("campaign API routes", () => {
         status: "active",
         permissions: ["campaign:delete"],
       },
+      permissions: ["campaign:delete"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(purgeCampaignForWorkspace).mockResolvedValue({ deleted: true });
 
@@ -275,7 +330,7 @@ describe("campaign API routes", () => {
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.data).toEqual({ deleted: true });
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "campaign:delete");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:delete");
     expect(purgeCampaignForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", "camp-1");
   });
 

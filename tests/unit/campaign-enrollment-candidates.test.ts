@@ -225,12 +225,16 @@ describe("listEnrollmentCandidatesForWorkspace", () => {
 
     const result = await listEnrollmentCandidatesForWorkspace("ws-1", "camp-1");
 
-    expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith("ws-1", {
-      search: undefined,
-      excludeIds: [],
-      page: 1,
-      pageSize: 50,
-    });
+    expect(listOpportunitiesForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      {
+        search: undefined,
+        excludeIds: [],
+        page: 1,
+        pageSize: 50,
+      },
+      undefined,
+    );
     expect(result.candidates).toEqual([
       expect.objectContaining({
         audienceType: "opportunities",

@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/opportunities", () => ({
@@ -37,7 +37,7 @@ import {
   POST as postOpportunity,
 } from "@/app/api/workspaces/[workspaceSlug]/opportunities/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveOpportunityForWorkspace,
   createOpportunityForWorkspace,
@@ -104,16 +104,27 @@ function mockWorkspaceAccess(permission: string) {
     timezone: "UTC",
     defaultCurrency: "CHF",
   });
-  vi.mocked(requirePermission).mockResolvedValue({
-    membership: {
-      id: "m1",
+  vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
-      permissions: [permission],
-    },
-  });
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: [permission] as never,
+      },
+      permissions: [permission] as never,
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
 }
 
 describe("opportunity API routes", () => {
@@ -122,7 +133,7 @@ describe("opportunity API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -282,7 +293,7 @@ describe("opportunity API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

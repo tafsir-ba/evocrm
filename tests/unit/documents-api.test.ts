@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/documents", () => ({
@@ -30,7 +30,7 @@ import {
 } from "@/app/api/workspaces/[workspaceSlug]/documents/[documentId]/route";
 import { POST as postSignedUrl } from "@/app/api/workspaces/[workspaceSlug]/documents/[documentId]/signed-url/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveDocumentForWorkspace,
   confirmDocumentUploadForWorkspace,
@@ -61,16 +61,27 @@ function mockWorkspaceAccess(permissions: string[]) {
     timezone: "UTC",
     defaultCurrency: "USD",
   });
-  vi.mocked(requirePermission).mockResolvedValue({
-    membership: {
-      id: "m1",
+  vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
-      permissions,
-    },
-  });
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: permissions as never,
+      },
+      permissions: permissions as never,
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
 }
 
 describe("document API routes", () => {
@@ -79,7 +90,7 @@ describe("document API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -106,7 +117,7 @@ describe("document API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "document:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "document:read");
   });
 
   it("rejects list without required entity filter", async () => {
@@ -144,6 +155,7 @@ describe("document API routes", () => {
         mimeTypePrefix: "image/",
       }),
       expect.any(Array),
+      "user-1",
     );
   });
 
@@ -172,7 +184,7 @@ describe("document API routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "document:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "document:create");
   });
 
   it("confirms upload with document:create permission", async () => {
@@ -246,6 +258,6 @@ describe("document API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "document:archive");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "document:archive");
   });
 });

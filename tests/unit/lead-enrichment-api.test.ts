@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/server/auth/require-auth", () => ({ requireAuth: vi.fn() }));
-vi.mock("@/server/workspaces/resolve-workspace", () => ({ resolveWorkspace: vi.fn() }));
-vi.mock("@/server/permissions/require-permission", () => ({ requirePermission: vi.fn() }));
-vi.mock("@/server/permissions/require-membership", () => ({ requireMembership: vi.fn() }));
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
+}));
+
+vi.mock("@/server/services/leads", () => ({
+  getLeadForWorkspace: vi.fn().mockResolvedValue({ id: "lead-1" }),
+}));
+
 vi.mock("@/server/services/lead-enrichment", () => ({
   getLeadEnrichmentForLead: vi.fn(),
   startLeadEnrichment: vi.fn(),
@@ -11,30 +15,48 @@ vi.mock("@/server/services/lead-enrichment", () => ({
 }));
 
 import { GET, POST, DELETE } from "@/app/api/workspaces/[workspaceSlug]/leads/[leadId]/enrichment/route";
-import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
-import { requireMembership } from "@/server/permissions/require-membership";
-import { startLeadEnrichment } from "@/server/services/lead-enrichment";
-import { resolveWorkspace } from "@/server/workspaces/resolve-workspace";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
+import {
+  getLeadEnrichmentForLead,
+  startLeadEnrichment,
+} from "@/server/services/lead-enrichment";
 import { AppError } from "@/server/errors";
 
 const ctx = { params: Promise.resolve({ workspaceSlug: "demo", leadId: "lead-1" }) };
 
+const workspace = {
+  id: "ws-1",
+  slug: "demo",
+  name: "Demo",
+  timezone: "UTC",
+  defaultCurrency: "CHF",
+};
+
+function access(permissions: string[]) {
+  return {
+    userId: "user-1",
+    workspace,
+    membership: {
+      id: "m1",
+      userId: "user-1",
+      workspaceId: "ws-1",
+      roleId: "role-1",
+      status: "active" as const,
+      permissions,
+    },
+    permissions,
+    accessMode: "member" as const,
+    isWorkspaceAdmin: false,
+  };
+}
+
 describe("lead enrichment API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(resolveWorkspace).mockResolvedValue({
-      id: "ws-1",
-      slug: "demo",
-      name: "Demo",
-      timezone: "UTC",
-      defaultCurrency: "CHF",
-    });
   });
 
   it("requires lead:enrich to start a run", async () => {
-    vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1" } } as never);
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -50,10 +72,7 @@ describe("lead enrichment API", () => {
   });
 
   it("starts enrichment with lead:enrich", async () => {
-    vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1" } } as never);
-    vi.mocked(requirePermission).mockResolvedValue({
-      membership: { permissions: ["lead:enrich"] },
-    } as never);
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue(access(["lead:enrich"]) as never);
     vi.mocked(startLeadEnrichment).mockResolvedValue({ id: "run-1", suggestions: [] } as never);
 
     const response = await POST(
@@ -64,15 +83,14 @@ describe("lead enrichment API", () => {
       ctx,
     );
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:enrich");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:enrich");
     expect(startLeadEnrichment).toHaveBeenCalledWith(
       expect.objectContaining({ allowedSources: undefined }),
     );
   });
 
   it("requires lead:enrich_revoke to delete enrichment data", async () => {
-    vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1" } } as never);
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
     const response = await DELETE(new Request("http://localhost/api"), ctx);
@@ -80,13 +98,7 @@ describe("lead enrichment API", () => {
   });
 
   it("allows GET when the member has lead:read", async () => {
-    vi.mocked(requireAuth).mockResolvedValue({ user: { id: "user-1" } } as never);
-    vi.mocked(requireMembership).mockResolvedValue({
-      permissions: ["lead:read"],
-    } as never);
-    const { getLeadEnrichmentForLead } = await import(
-      "@/server/services/lead-enrichment"
-    );
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue(access(["lead:read"]) as never);
     vi.mocked(getLeadEnrichmentForLead).mockResolvedValue({
       capability: { enabled: false },
       overlay: { summary: { text: "accepted overlay" } },

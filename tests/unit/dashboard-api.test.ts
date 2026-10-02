@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/dashboard", () => ({
@@ -28,7 +28,7 @@ import { GET as getDashboardActivities } from "@/app/api/workspaces/[workspaceSl
 import { GET as getDashboardSources } from "@/app/api/workspaces/[workspaceSlug]/dashboard/sources/route";
 import { GET as getDashboardProperties } from "@/app/api/workspaces/[workspaceSlug]/dashboard/properties/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   getDashboardActivitiesForWorkspace,
   getDashboardForWorkspace,
@@ -78,16 +78,27 @@ function mockWorkspaceAccess() {
     timezone: "UTC",
     defaultCurrency: "USD",
   });
-  vi.mocked(requirePermission).mockResolvedValue({
-    membership: {
-      id: "m1",
+  vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["dashboard:read"],
+      },
       permissions: ["dashboard:read"],
-    },
-  });
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
 }
 
 describe("dashboard API routes", () => {
@@ -96,7 +107,7 @@ describe("dashboard API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -119,7 +130,7 @@ describe("dashboard API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -129,7 +140,7 @@ describe("dashboard API routes", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "dashboard:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "dashboard:read");
   });
 
   it("returns summary for dashboard:read member", async () => {

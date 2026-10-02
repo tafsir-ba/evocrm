@@ -8,8 +8,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/properties", () => ({
@@ -30,7 +30,7 @@ import {
   POST as postProperty,
 } from "@/app/api/workspaces/[workspaceSlug]/properties/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archivePropertyForWorkspace,
   createPropertyForWorkspace,
@@ -65,7 +65,7 @@ describe("property API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -88,7 +88,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -97,6 +105,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:read"],
       },
+      permissions: ["property:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listPropertiesForWorkspace).mockResolvedValue({
       properties: [sampleProperty as never],
@@ -110,7 +121,7 @@ describe("property API routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "property:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "property:read");
     expect(body.data).toHaveLength(1);
     expect(body.pagination.total).toBe(1);
   });
@@ -126,7 +137,7 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -149,7 +160,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "CHF",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -158,6 +177,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:create"],
       },
+      permissions: ["property:create"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(createPropertyForWorkspace).mockResolvedValue(sampleProperty as never);
 
@@ -175,7 +197,7 @@ describe("property API routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "property:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "property:create");
     expect(createPropertyForWorkspace).toHaveBeenCalledWith(
       "ws-1",
       "user-1",
@@ -197,7 +219,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "CHF",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -206,6 +236,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:create"],
       },
+      permissions: ["property:create"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(createPropertyForWorkspace).mockRejectedValue(
       new AppError("CONFLICT", "A property with this reference already exists in this workspace."),
@@ -239,7 +272,7 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -270,7 +303,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -279,6 +320,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:read"],
       },
+      permissions: ["property:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(getPropertyForWorkspace).mockResolvedValue(sampleProperty as never);
 
@@ -308,7 +352,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -317,6 +369,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:update"],
       },
+      permissions: ["property:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(updatePropertyForWorkspace).mockResolvedValue({
       ...sampleProperty,
@@ -338,7 +393,7 @@ describe("property API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "property:update");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "property:update");
     expect(updatePropertyForWorkspace).toHaveBeenCalledWith(
       "ws-1",
       "property-1",
@@ -358,7 +413,7 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -390,7 +445,15 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -399,6 +462,9 @@ describe("property API routes", () => {
         status: "active",
         permissions: ["property:archive"],
       },
+      permissions: ["property:archive"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(archivePropertyForWorkspace).mockResolvedValue({
       ...sampleProperty,
@@ -418,7 +484,7 @@ describe("property API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "property:archive");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "property:archive");
     expect(archivePropertyForWorkspace).toHaveBeenCalledWith(
       "ws-1",
       "property-1",
@@ -437,7 +503,7 @@ describe("property API routes", () => {
       timezone: "UTC",
       defaultCurrency: "CHF",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 

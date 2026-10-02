@@ -10,8 +10,17 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
+}));
+
+vi.mock("@/server/permissions/require-project-access", () => ({
+  requireProjectAccess: vi.fn().mockResolvedValue({
+    membership: null,
+    accessMode: "member",
+    permissions: [],
+    allowedProjectIds: null,
+  }),
 }));
 
 vi.mock("@/server/services/projects", () => ({
@@ -25,7 +34,7 @@ vi.mock("@/server/services/projects", () => ({
 import { GET as getProjects, POST as postProject } from "@/app/api/workspaces/[workspaceSlug]/projects/route";
 import { DELETE as deleteProjectById, GET as getProjectById } from "@/app/api/workspaces/[workspaceSlug]/projects/[projectId]/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveProjectForWorkspace,
   createProjectForWorkspace,
@@ -42,7 +51,7 @@ describe("project API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -65,7 +74,15 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -74,6 +91,9 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listProjectsForWorkspace).mockResolvedValue([
       {
@@ -104,7 +124,7 @@ describe("project API routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.projects).toHaveLength(1);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "project:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "project:read");
     expect(listProjectsPageForWorkspace).not.toHaveBeenCalled();
   });
 
@@ -119,7 +139,15 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -128,6 +156,9 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listProjectsPageForWorkspace).mockResolvedValue({
       projects: [
@@ -178,6 +209,7 @@ describe("project API routes", () => {
         sort: "inbound",
         withCounts: true,
       }),
+      "user-1",
     );
     expect(listProjectsForWorkspace).not.toHaveBeenCalled();
   });
@@ -193,7 +225,7 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -216,7 +248,7 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -230,7 +262,7 @@ describe("project API routes", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "project:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "project:create");
   });
 
   it("validates POST input", async () => {
@@ -244,7 +276,15 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -253,6 +293,9 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:create"],
       },
+      permissions: ["project:create"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
 
     const response = await postProject(
@@ -279,7 +322,15 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -288,6 +339,9 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:archive"],
       },
+      permissions: ["project:archive"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(archiveProjectForWorkspace).mockResolvedValue({
       id: "p1",
@@ -330,7 +384,15 @@ describe("project API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -339,6 +401,9 @@ describe("project API routes", () => {
         status: "active",
         permissions: ["project:read"],
       },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(getProjectForWorkspace).mockResolvedValue({
       id: "p1",
@@ -367,6 +432,6 @@ describe("project API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getProjectForWorkspace).toHaveBeenCalledWith("ws-1", "p1");
+    expect(getProjectForWorkspace).toHaveBeenCalledWith("ws-1", "p1", "user-1");
   });
 });

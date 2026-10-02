@@ -8,8 +8,12 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
+}));
+
+vi.mock("@/server/services/leads", () => ({
+  getLeadForWorkspace: vi.fn().mockResolvedValue({ id: "507f1f77bcf86cd799439011" }),
 }));
 
 vi.mock("@/server/services/lead-project-memberships", () => ({
@@ -31,7 +35,7 @@ import {
 } from "@/app/api/workspaces/[workspaceSlug]/leads/[leadId]/project-memberships/[membershipId]/route";
 import { requireAuth } from "@/server/auth/require-auth";
 import { AppError } from "@/server/errors";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   addLeadProjectMembership,
   listLeadProjectMemberships,
@@ -58,16 +62,27 @@ function authAs(permission: string) {
     timezone: "UTC",
     defaultCurrency: "USD",
   });
-  vi.mocked(requirePermission).mockResolvedValue({
-    membership: {
-      id: "m1",
+  vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
       userId: "user-1",
-      workspaceId: "ws-1",
-      roleId: "role-1",
-      status: "active",
-      permissions: [permission],
-    },
-  });
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: [permission] as never,
+      },
+      permissions: [permission] as never,
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
 }
 
 const params = Promise.resolve({
@@ -90,11 +105,11 @@ describe("lead project membership API", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:read");
   });
 
   it("rejects unauthorized membership writes", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -126,7 +141,7 @@ describe("lead project membership API", () => {
       { params },
     );
     expect(created.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:update");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:update");
 
     const patched = await patchMembership(
       new Request("http://localhost/memberships", {

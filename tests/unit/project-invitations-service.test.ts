@@ -106,7 +106,10 @@ describe("sendProjectInvitation", () => {
     } as never);
     vi.mocked(findPendingInvitation).mockResolvedValue(null);
     vi.mocked(findActiveProjectGrant).mockResolvedValue(null);
-    vi.mocked(sendCampaignEmail).mockResolvedValue({ success: true });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-test-invitation-1",
+    });
     vi.mocked(findUserByEmail).mockResolvedValue({
       id: "user-target",
       email: "member@example.com",

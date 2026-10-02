@@ -10,8 +10,8 @@ vi.mock("@/server/workspaces/resolve-workspace", () => ({
   resolveWorkspace: vi.fn(),
 }));
 
-vi.mock("@/server/permissions/require-permission", () => ({
-  requirePermission: vi.fn(),
+vi.mock("@/server/workspaces/require-workspace-api-access", () => ({
+  requireWorkspaceApiAccess: vi.fn(),
 }));
 
 vi.mock("@/server/services/leads", () => ({
@@ -31,7 +31,7 @@ import {
   PATCH as patchLeadById,
 } from "@/app/api/workspaces/[workspaceSlug]/leads/[leadId]/route";
 import { requireAuth } from "@/server/auth/require-auth";
-import { requirePermission } from "@/server/permissions/require-permission";
+import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   archiveLeadForWorkspace,
   createLeadForWorkspace,
@@ -64,7 +64,7 @@ describe("lead API routes", () => {
   });
 
   it("returns UNAUTHENTICATED when not logged in", async () => {
-    vi.mocked(requireAuth).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("UNAUTHENTICATED", "Authentication required."),
     );
 
@@ -87,7 +87,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -96,6 +104,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listLeadsForWorkspace).mockResolvedValue({
       leads: [sampleLead as never],
@@ -108,7 +119,7 @@ describe("lead API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:read");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:read");
     const body = await response.json();
     expect(body.data).toHaveLength(1);
     expect(body.pagination.total).toBe(1);
@@ -125,7 +136,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -134,6 +153,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(listLeadsForWorkspace).mockResolvedValue({
       leads: [],
@@ -169,7 +191,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -178,6 +208,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:create"],
       },
+      permissions: ["lead:create"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(createLeadForWorkspace).mockResolvedValue({
       lead: sampleLead as never,
@@ -199,7 +232,7 @@ describe("lead API routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:create");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:create");
   });
 
   it("returns PERMISSION_DENIED without lead:read", async () => {
@@ -213,7 +246,7 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -236,7 +269,7 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -268,7 +301,7 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -293,7 +326,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -302,6 +343,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:read"],
       },
+      permissions: ["lead:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(getLeadForWorkspace).mockResolvedValue(sampleLead as never);
 
@@ -326,7 +370,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -335,6 +387,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:update"],
       },
+      permissions: ["lead:update"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(updateLeadForWorkspace).mockResolvedValue({
       lead: sampleLead as never,
@@ -351,7 +406,7 @@ describe("lead API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:update");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:update");
   });
 
   it("archives lead with lead:archive permission", async () => {
@@ -365,7 +420,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -374,6 +437,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:archive"],
       },
+      permissions: ["lead:archive"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(archiveLeadForWorkspace).mockResolvedValue({
       ...sampleLead,
@@ -388,7 +454,7 @@ describe("lead API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:archive");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:archive");
   });
 
   it("requires lead:delete for bulk delete", async () => {
@@ -402,7 +468,7 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockRejectedValue(
+    vi.mocked(requireWorkspaceApiAccess).mockRejectedValue(
       new AppError("PERMISSION_DENIED", "Permission denied."),
     );
 
@@ -429,7 +495,15 @@ describe("lead API routes", () => {
       timezone: "UTC",
       defaultCurrency: "USD",
     });
-    vi.mocked(requirePermission).mockResolvedValue({
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
       membership: {
         id: "m1",
         userId: "user-1",
@@ -438,6 +512,9 @@ describe("lead API routes", () => {
         status: "active",
         permissions: ["lead:delete"],
       },
+      permissions: ["lead:delete"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
     });
     vi.mocked(purgeLeadsForWorkspace).mockResolvedValue({
       deletedCount: 2,
@@ -457,7 +534,7 @@ describe("lead API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requirePermission).toHaveBeenCalledWith("ws-1", "user-1", "lead:delete");
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "lead:delete");
     expect(purgeLeadsForWorkspace).toHaveBeenCalledWith("ws-1", "user-1", {
       selectAll: true,
       filters: { search: "hubspot" },

@@ -92,7 +92,10 @@ describe("sendProjectInvitation (email accept before grant)", () => {
     } as never);
     vi.mocked(findPendingInvitation).mockResolvedValue(null);
     vi.mocked(findActiveProjectGrant).mockResolvedValue(null);
-    vi.mocked(sendCampaignEmail).mockResolvedValue({ success: true });
+    vi.mocked(sendCampaignEmail).mockResolvedValue({
+      success: true,
+      messageId: "msg-test-share-grant-1",
+    });
     vi.mocked(createProjectInvitation).mockResolvedValue({
       id: "inv-1",
       workspaceId: "ws-1",
