@@ -62,7 +62,7 @@ export type ResendWebhookProcessResult =
   | { ignored: true; reason: string }
   | { retry: true; reason: string }
   | { received: true; created: boolean; duplicate: boolean }
-  | { received: true; domainSynced: true; domainId: string };
+  | { received: true; domainSynced: true; domainIds: string[] };
 
 function normalizeWebhookTags(tags: ResendWebhookTags | undefined): Record<string, string> {
   if (!tags) {
@@ -152,11 +152,15 @@ export async function processResendWebhookPayload(
     }
 
     const synced = await syncSendingDomainFromProviderWebhook(providerDomainId);
-    if (!synced) {
+    if (synced.length === 0) {
       return { ignored: true, reason: "unknown_provider_domain_id" };
     }
 
-    return { received: true, domainSynced: true, domainId: synced.id };
+    return {
+      received: true,
+      domainSynced: true,
+      domainIds: synced.map((domain) => domain.id),
+    };
   }
 
   const eventType = payload.type ? EVENT_TYPE_MAP[payload.type] : undefined;

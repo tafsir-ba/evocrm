@@ -44,23 +44,42 @@ describe("resend webhook processing", () => {
   });
 
   it("syncs sending domain status on domain.updated via GET refresh path", async () => {
-    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue({
-      id: "domain-1",
-      workspaceId: "ws-1",
-      domain: "example.com",
-      provider: "resend",
-      providerDomainId: "d91cd9bd-1176-453e-8fc1-35364d380206",
-      status: "verified",
-      spfStatus: "valid",
-      dkimStatus: "valid",
-      dmarcStatus: "missing",
-      defaultSenderEmail: "hello@example.com",
-      dnsRecords: [],
-      lastCheckedAt: new Date(),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue([
+      {
+        id: "domain-1",
+        workspaceId: "ws-1",
+        domain: "example.com",
+        provider: "resend",
+        providerDomainId: "d91cd9bd-1176-453e-8fc1-35364d380206",
+        status: "verified",
+        spfStatus: "valid",
+        dkimStatus: "valid",
+        dmarcStatus: "missing",
+        defaultSenderEmail: "hello@example.com",
+        dnsRecords: [],
+        lastCheckedAt: new Date(),
+        verifiedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "domain-2",
+        workspaceId: "ws-2",
+        domain: "example.com",
+        provider: "resend",
+        providerDomainId: "d91cd9bd-1176-453e-8fc1-35364d380206",
+        status: "verified",
+        spfStatus: "valid",
+        dkimStatus: "valid",
+        dmarcStatus: "missing",
+        defaultSenderEmail: "hello@example.com",
+        dnsRecords: [],
+        lastCheckedAt: new Date(),
+        verifiedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
 
     const result = await processResendWebhookPayload(
       {
@@ -78,7 +97,7 @@ describe("resend webhook processing", () => {
     expect(result).toEqual({
       received: true,
       domainSynced: true,
-      domainId: "domain-1",
+      domainIds: ["domain-1", "domain-2"],
     });
     expect(syncSendingDomainFromProviderWebhook).toHaveBeenCalledWith(
       "d91cd9bd-1176-453e-8fc1-35364d380206",
@@ -87,7 +106,7 @@ describe("resend webhook processing", () => {
   });
 
   it("ignores domain.updated when no local sending domain matches", async () => {
-    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue(null);
+    vi.mocked(syncSendingDomainFromProviderWebhook).mockResolvedValue([]);
 
     const result = await processResendWebhookPayload(
       {

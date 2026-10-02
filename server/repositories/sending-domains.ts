@@ -213,16 +213,18 @@ export async function findSendingDomainByName(
   return document ? toSendingDomainRecord(document as SendingDomainDocument) : null;
 }
 
-export async function findSendingDomainByProviderDomainId(
+export async function findSendingDomainsByProviderDomainId(
   providerDomainId: string,
-): Promise<SendingDomainRecord | null> {
+): Promise<SendingDomainRecord[]> {
   await connectDb();
 
-  const document = await SendingDomainModel.findOne({
+  const documents = await SendingDomainModel.find({
     providerDomainId: providerDomainId.trim(),
   }).lean();
 
-  return document ? toSendingDomainRecord(document as SendingDomainDocument) : null;
+  return documents.map((document) =>
+    toSendingDomainRecord(document as SendingDomainDocument),
+  );
 }
 
 export type CreateSendingDomainInput = {
