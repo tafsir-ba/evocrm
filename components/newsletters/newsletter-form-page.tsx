@@ -26,6 +26,10 @@ import {
 import { DEFAULT_CAMPAIGN_STEP_SEND_TIME } from "@/lib/campaign-defaults";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
 import {
+  formatNewsletterTestEmailErrors,
+  parseNewsletterTestEmails,
+} from "@/lib/newsletter-test-emails";
+import {
   formatWorkspaceTimezoneLabel,
   toDatetimeLocalInWorkspaceTimezone,
 } from "@/lib/workspace-datetime";
@@ -224,12 +228,16 @@ export function NewsletterFormPage({
   >("include_and_flag");
   const [scheduledForLocal, setScheduledForLocal] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [formMessage, setFormMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!isCreate);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<"content" | "audience" | "review">(
     "content",
   );
+  const [testEmailsRaw, setTestEmailsRaw] = useState("");
+  const [testEmailError, setTestEmailError] = useState<string | null>(null);
+  const [testSending, setTestSending] = useState(false);
   const submittingRef = useRef(false);
   const createdIdRef = useRef<string | null>(campaignId ?? null);
   const htmlEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -471,6 +479,8 @@ export function NewsletterFormPage({
     stay?: boolean;
     keepSubmitting?: boolean;
     allowIncompleteCsv?: boolean;
+    /** Save name/sender/HTML without requiring audience segments (e.g. test send). */
+    contentOnly?: boolean;
   }): Promise<string | null> {
     if (readOnly) {
       setFormError("You do not have permission to edit newsletters.");
@@ -481,6 +491,7 @@ export function NewsletterFormPage({
     }
     submittingRef.current = true;
     setFormError(null);
+    setFormMessage(null);
     setSubmitting(true);
 
     try {
@@ -489,13 +500,16 @@ export function NewsletterFormPage({
         return null;
       }
 
-      const savableSegments = options?.allowIncompleteCsv
-        ? segments.filter(
-            (segment) =>
-              segment.type === "project_tags" ||
-              (segment.type === "csv_import" && Boolean(segment.importJobId)),
-          )
-        : segments;
+      const contentOnly = Boolean(options?.contentOnly);
+      const savableSegments =
+        contentOnly || options?.allowIncompleteCsv
+          ? segments.filter(
+              (segment) =>
+                segment.type === "project_tags"
+                  ? Boolean(segment.projectId)
+                  : Boolean(segment.projectId && segment.importJobId),
+            )
+          : segments;
 
       const projectIds = [
         ...new Set(
@@ -505,12 +519,12 @@ export function NewsletterFormPage({
         ),
       ];
 
-      if (projectIds.length === 0) {
+      if (projectIds.length === 0 && !contentOnly) {
         setFormError("Add at least one audience segment with a project.");
         return null;
       }
 
-      if (!options?.allowIncompleteCsv) {
+      if (!options?.allowIncompleteCsv && !contentOnly) {
         for (const [index, segment] of segments.entries()) {
           if (!segment.projectId) {
             setFormError(`Segment ${index + 1} needs a target project.`);
@@ -632,11 +646,20 @@ export function NewsletterFormPage({
         setStepId(stepBody.data?.step?.id ?? null);
       }
 
+      // Test-send / content-only must never touch audience segments — a PUT while
+      // audienceLockedAt would unlock, clear schedule, and cancel enrollments.
+      if (options?.contentOnly) {
+        if (!options?.stay) {
+          router.replace(workspacePath(workspaceSlug, `dripping/newsletters/${id}`));
+        }
+        return id;
+      }
+
       const segmentsForApi = savableSegments;
 
-      // CSV bootstrap (allowIncompleteCsv) may create the campaign before any
-      // import finishes. Never invent a project_tags stub — that would briefly
-      // target the entire project membership.
+      // CSV bootstrap may create the campaign before any import finishes.
+      // Never invent a project_tags stub — that would briefly target the entire
+      // project membership.
       if (segmentsForApi.length === 0) {
         if (options?.allowIncompleteCsv) {
           if (!options?.stay) {
@@ -791,6 +814,142 @@ export function NewsletterFormPage({
       submittingRef.current = false;
       setSubmitting(false);
     }
+  }
+
+  async function handleTestSend() {
+    if (!canUpdate || testSending || submittingRef.current) {
+      return;
+    }
+
+    const parsed = parseNewsletterTestEmails(testEmailsRaw);
+    const validationError = formatNewsletterTestEmailErrors(parsed);
+    if (validationError) {
+      setTestEmailError(validationError);
+      return;
+    }
+    setTestEmailError(null);
+
+    if (!contentReady) {
+      setFormError(
+        unsafeHtml
+          ? "Fix unsafe HTML before sending a test."
+          : "Add a name, subject, and HTML content before sending a test.",
+      );
+      setWizardStep("content");
+      return;
+    }
+
+    if (!sending.sendingDomainId || !sending.senderEmail) {
+      setFormError("Choose a verified sending domain and sender email before sending a test.");
+      setWizardStep("content");
+      return;
+    }
+
+    if (!senderName.trim()) {
+      setFormError("Add a from name before sending a test.");
+      setWizardStep("content");
+      return;
+    }
+
+    setTestSending(true);
+    setFormError(null);
+    setFormMessage(null);
+
+    try {
+      const id = await saveDraft({
+        stay: true,
+        keepSubmitting: true,
+        contentOnly: true,
+      });
+      if (!id) {
+        return;
+      }
+
+      const response = await fetch(`${apiNewsletters}/${id}/test-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: parsed.emails }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setFormError(formatApiErrorMessage(payload, "Failed to send test email."));
+        return;
+      }
+
+      const sent = payload.data?.sent ?? parsed.emails.length;
+      setFormMessage(
+        sent === 1
+          ? "Test email sent. Check that inbox for the real rendered output."
+          : `Test emails sent to ${sent} addresses. Check those inboxes for the real rendered output.`,
+      );
+    } catch {
+      setFormError("Failed to send test email.");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+      setTestSending(false);
+    }
+  }
+
+  function renderTestSendPanel() {
+    if (readOnly || !canUpdate) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-3">
+        <div>
+          <h3 className="text-[14px] font-semibold text-[var(--color-ink)]">
+            Send a test
+          </h3>
+          <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+            Paste a few email addresses to see how this newsletter looks in a real inbox.
+            Tests use sample merge data and never add people to your audience or drips.
+          </p>
+        </div>
+        <div>
+          <Label htmlFor="newsletter-test-emails">Test addresses</Label>
+          <Textarea
+            id="newsletter-test-emails"
+            value={testEmailsRaw}
+            onChange={(event) => {
+              setTestEmailsRaw(event.target.value);
+              setTestEmailError(null);
+            }}
+            rows={3}
+            disabled={testSending || submitting}
+            placeholder={"you@company.com\nteammate@company.com"}
+            className="font-mono text-[12.5px]"
+          />
+          <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
+            Separate with commas, spaces, or new lines. Up to 10 addresses. Subject is
+            prefixed with [Test].
+          </p>
+        </div>
+        {testEmailError ? (
+          <p className="text-[12.5px] text-[var(--color-danger)]" role="alert">
+            {testEmailError}
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={
+            testSending ||
+            submitting ||
+            !testEmailsRaw.trim() ||
+            unsafeHtml ||
+            !contentReady ||
+            !sending.sendingDomainId ||
+            !sending.senderEmail ||
+            !senderName.trim()
+          }
+          onClick={() => void handleTestSend()}
+        >
+          {testSending ? "Sending test…" : "Send test email"}
+        </Button>
+      </div>
+    );
   }
 
   function handleHtmlFile(file: File | null) {
@@ -1041,6 +1200,15 @@ export function NewsletterFormPage({
           </div>
         ) : null}
 
+        {formMessage ? (
+          <div
+            role="status"
+            className="rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-[13px] text-[var(--color-ink)]"
+          >
+            {formMessage}
+          </div>
+        ) : null}
+
         {readOnly ? (
           <p className="rounded-md border border-[var(--color-line)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
             You’re viewing this newsletter. Ask for campaign update permission to edit or send.
@@ -1245,6 +1413,7 @@ export function NewsletterFormPage({
               />
             </div>
           ) : null}
+          {renderTestSendPanel()}
         </section>
         ) : null}
 
@@ -1746,6 +1915,7 @@ export function NewsletterFormPage({
               Add HTML on the Content step to see a preview here.
             </p>
           )}
+          {renderTestSendPanel()}
           <div>
             <Label htmlFor="newsletter-schedule">Send later (optional)</Label>
             <Input

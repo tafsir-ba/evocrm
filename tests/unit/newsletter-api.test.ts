@@ -13,6 +13,7 @@ vi.mock("@/server/services/newsletters", () => ({
   sendNewsletterNowForWorkspace: vi.fn(),
   cancelNewsletterScheduleForWorkspace: vi.fn(),
   createNewsletterAudienceImportForWorkspace: vi.fn(),
+  sendNewsletterTestEmailsForWorkspace: vi.fn(),
 }));
 
 import { GET as previewAudience } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/audience/preview/route";
@@ -20,6 +21,7 @@ import { PUT as putSegments } from "@/app/api/workspaces/[workspaceSlug]/newslet
 import { POST as importAudience } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/audience/import/route";
 import { POST as scheduleNewsletter } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/schedule/route";
 import { POST as sendNewsletter } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/send/route";
+import { POST as testSendNewsletter } from "@/app/api/workspaces/[workspaceSlug]/newsletters/[campaignId]/test-send/route";
 import { requireWorkspaceApiAccess } from "@/server/workspaces/require-workspace-api-access";
 import {
   previewNewsletterAudienceForWorkspace,
@@ -27,6 +29,7 @@ import {
   scheduleNewsletterForWorkspace,
   sendNewsletterNowForWorkspace,
   createNewsletterAudienceImportForWorkspace,
+  sendNewsletterTestEmailsForWorkspace,
 } from "@/server/services/newsletters";
 import { campaignRecordExtras } from "@/tests/helpers/crm-fixtures";
 
@@ -241,5 +244,50 @@ describe("newsletter API routes", () => {
     expect(sendResponse.status).toBe(200);
     expect(scheduleNewsletterForWorkspace).toHaveBeenCalled();
     expect(sendNewsletterNowForWorkspace).toHaveBeenCalled();
+  });
+
+  it("sends newsletter test emails with campaign:update", async () => {
+    vi.mocked(sendNewsletterTestEmailsForWorkspace).mockResolvedValue({
+      sent: 2,
+      messageIds: ["msg-1", "msg-2"],
+    });
+
+    const response = await testSendNewsletter(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: "ada@example.com, bob@example.com",
+        }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo", campaignId: "camp-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.sent).toBe(2);
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "campaign:update");
+    expect(sendNewsletterTestEmailsForWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      "camp-1",
+      ["ada@example.com", "bob@example.com"],
+    );
+  });
+
+  it("rejects invalid test-send addresses without calling the service", async () => {
+    const response = await testSendNewsletter(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: "not-an-email, also bad" }),
+      }),
+      { params: Promise.resolve({ workspaceSlug: "demo", campaignId: "camp-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error?.message).toMatch(/invalid/i);
+    expect(sendNewsletterTestEmailsForWorkspace).not.toHaveBeenCalled();
   });
 });

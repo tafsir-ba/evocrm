@@ -3,6 +3,12 @@ import "server-only";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { DEFAULT_CAMPAIGN_STEP_SEND_TIME } from "@/lib/campaign-defaults";
+import {
+  applyCampaignVariables,
+  buildCampaignEmailPlainText,
+  CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+  validateCampaignHtml,
+} from "@/lib/campaign-email";
 import { fromDatetimeLocalInWorkspaceTimezone } from "@/lib/workspace-datetime";
 import {
   cancelEnrollmentsForCampaign,
@@ -46,6 +52,10 @@ import {
 } from "@/server/services/campaigns";
 import { createImportJobForWorkspace } from "@/server/services/imports";
 import { validateActiveProjectId } from "@/server/services/project-scope";
+import { assertVerifiedSenderEmail } from "@/server/services/sending-domains";
+import { assertNewsletterTestSendRateLimit } from "@/server/security/newsletter-test-send-rate-limit";
+import { buildCampaignEmailHtml, sendCampaignEmail } from "@/server/email/resend";
+import { resolveCampaignStepFromName } from "@/server/utils/campaign-from-name";
 import type {
   NewsletterAudienceSegmentsInput,
   NewsletterScheduleInput,
@@ -808,4 +818,171 @@ export async function upsertNewsletterContentStep(
   },
 ): Promise<void> {
   await ensureSingleNewsletterStep(workspaceId, campaign, content);
+}
+
+/**
+ * Send a rendered test of the current newsletter draft to manually entered addresses.
+ * Does not snapshot audience, create enrollments, or enroll into drips.
+ */
+export async function sendNewsletterTestEmailsForWorkspace(
+  workspaceId: string,
+  actorId: string,
+  campaignId: string,
+  emails: string[],
+): Promise<{ sent: number; messageIds: string[] }> {
+  const campaign = await findCampaignById(workspaceId, campaignId);
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Newsletter not found.");
+  }
+  assertIsNewsletter(campaign);
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
+
+  if (campaign.status === "archived") {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Archived newsletters cannot send test emails. Restore the newsletter first.",
+    );
+  }
+
+  assertNewsletterTestSendRateLimit(workspaceId, actorId, emails.length);
+
+  const step = await findFirstCampaignStep(workspaceId, campaignId);
+  if (!step) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Save newsletter content before sending a test email.",
+    );
+  }
+
+  if (!step.subject?.trim()) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Add a subject line before sending a test email.",
+    );
+  }
+
+  const htmlSource = step.bodyHtml?.trim() || step.body?.trim() || "";
+  if (!htmlSource) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Add HTML content before sending a test email.",
+    );
+  }
+
+  if (step.bodyHtml?.trim()) {
+    const blocking = validateCampaignHtml(step.bodyHtml).filter(
+      (warning) =>
+        warning.code === "unsafe_tags" || warning.code === "unsafe_javascript",
+    );
+    if (blocking.length > 0) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        blocking[0]?.message ?? "Resolve unsafe HTML before sending a test email.",
+      );
+    }
+  }
+
+  const fromName = resolveCampaignStepFromName(step.fromName, campaign);
+  if (!fromName) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Set a from name before sending a test email.",
+    );
+  }
+
+  if (!campaign.sendingDomainId || !campaign.senderEmail) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Configure a verified sending domain and sender email before sending a test email.",
+    );
+  }
+
+  await assertVerifiedSenderEmail(
+    workspaceId,
+    campaign.sendingDomainId,
+    campaign.senderEmail,
+  );
+
+  // Sample unsubscribe URL — same treatment as drip step test-email (preview path).
+  const previewUnsubscribeUrl = "https://example.com/unsubscribe?token=preview";
+  const previewContext = {
+    ...CAMPAIGN_EMAIL_PREVIEW_CONTEXT,
+    unsubscribeUrl: previewUnsubscribeUrl,
+  };
+
+  const resolvedBody = applyCampaignVariables(step.body || "", previewContext);
+  const resolvedHtml = step.bodyHtml
+    ? applyCampaignVariables(step.bodyHtml, previewContext)
+    : null;
+  const html = buildCampaignEmailHtml(resolvedBody, previewUnsubscribeUrl, {
+    htmlBody: resolvedHtml,
+    previewText: step.previewText
+      ? applyCampaignVariables(step.previewText, previewContext)
+      : null,
+  });
+
+  const plainTextSource = step.bodyText?.trim() || resolvedBody || "";
+  const plainText = buildCampaignEmailPlainText(
+    applyCampaignVariables(plainTextSource, previewContext),
+    previewUnsubscribeUrl,
+  );
+
+  const subject = `[Test] ${applyCampaignVariables(step.subject, previewContext)}`;
+  const messageIds: string[] = [];
+
+  for (const to of emails) {
+    const result = await sendCampaignEmail({
+      to,
+      subject,
+      html,
+      text: plainText,
+      fromName,
+      fromEmail: campaign.senderEmail,
+      tags: [
+        { name: "workspace_id", value: workspaceId },
+        { name: "campaign_id", value: campaignId },
+        { name: "campaign_step_id", value: step.id },
+        { name: "newsletter_test", value: "true" },
+      ],
+    });
+
+    if (!result.success) {
+      const sentCount = messageIds.length;
+      throw new AppError(
+        "VALIDATION_ERROR",
+        sentCount > 0
+          ? `Sent ${sentCount} test email${sentCount === 1 ? "" : "s"}, then failed at ${to}: ${result.error ?? "send failed."}`
+          : (result.error ?? `Could not send the test email to ${to}.`),
+        {
+          details: {
+            sent: sentCount,
+            failedAt: to,
+            messageIds,
+          },
+        },
+      );
+    }
+
+    messageIds.push(result.messageId);
+  }
+
+  await createAuditLog({
+    workspaceId,
+    actorId,
+    action: "newsletter.test_sent",
+    entityType: "campaign",
+    entityId: campaignId,
+    after: {
+      recipientCount: emails.length,
+      messageIds,
+      subject,
+    },
+  });
+
+  return { sent: messageIds.length, messageIds };
 }
