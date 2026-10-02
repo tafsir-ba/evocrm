@@ -34,7 +34,16 @@ export type AuditEntityType =
   | "lead_project_membership"
   | "lead_enrichment_run"
   | "lead_financial_situation"
-  | "visit_session";
+  | "visit_session"
+  | "ad_connection"
+  | "ad_account"
+  | "growth_campaign"
+  | "attribution_touchpoint"
+  | "conversion_event"
+  | "advertising_approval"
+  | "action_command"
+  | "copilot_proposal"
+  | "metric_snapshot";
 
 export type CreateAuditLogInput = {
   workspaceId: string;

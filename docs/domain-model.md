@@ -809,6 +809,31 @@ All foreign keys must resolve within the same workspace:
 | `CampaignStep.documentIds` | Documents must be same workspace |
 | `CampaignEnrollment` | Lead/opportunity must be same workspace |
 | `LeadProjectMembership.leadId` / `projectId` | Lead and project must exist in same workspace |
+| `AdAccount.connectionId` | AdConnection must exist in same workspace |
+| `GrowthCampaign.projectId` | Project must exist in same workspace (required; browser cannot override) |
+| `AttributionTouchpoint.projectId` | Must match Growth Campaign locked project when linked |
+
+---
+
+## Advertising / Growth Copilot (Phase 0 foundation)
+
+Feature-flagged via `ADVERTISING_ENABLED` (default **off**). **Do not** overload email-drip `Campaign`.
+
+### AdConnection
+
+Workspace-scoped platform credentials + health. Credentials use the generic vault (`credentialsEncrypted`).
+
+### AdAccount
+
+External ad account under a connection (currency, timezone, sync freshness).
+
+### GrowthCampaign
+
+Coordinating parent for one CRM `projectId` (required). Trusted destinations are project-locked. Separate from drip `Campaign` (optional `linkedDripCampaignId` only).
+
+### AttributionTouchpoint / ConversionEvent
+
+First-class attribution records (not `Lead.attributes`). Consent state/snapshot required for later export gating.
 
 ---
 
@@ -830,6 +855,11 @@ Workspace
   │    ├─ CampaignStep
   │    ├─ CampaignEnrollment
   │    └─ CampaignSend
+  ├─ GrowthCampaign ── required Project
+  │    ├─ AttributionTouchpoint
+  │    └─ ConversionEvent
+  ├─ AdConnection
+  │    └─ AdAccount
   ├─ Dictionary
   │    └─ DictionaryItem
   ├─ Tag

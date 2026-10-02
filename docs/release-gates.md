@@ -198,6 +198,8 @@ Before requesting Codex review:
 [ ] build passes
 [ ] No secrets committed
 [ ] PR description lists what was built and how to test
+[ ] Ten commandments + audit gate + kids-friendly UX checklist addressed
+  (see Project store docs/ten-commandments-checklist.md)
 ```
 
 ---

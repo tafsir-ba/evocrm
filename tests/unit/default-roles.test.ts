@@ -23,6 +23,8 @@ describe("default role permission sets", () => {
     expect(ownerPermissions).toContain("lead:enrich");
     expect(ownerPermissions).toContain("lead:financial_read");
     expect(ownerPermissions).toContain("lead:delete");
+    expect(ownerPermissions).toContain("advertising:approve");
+    expect(ownerPermissions).toContain("advertising:connect");
   });
 
   it("gives admin same operational permissions as owner for V1", () => {
@@ -52,9 +54,11 @@ describe("default role permission sets", () => {
   it("gives viewer read-only permissions", () => {
     const viewerPermissions = getDefaultRolePermissions("viewer");
     expect(viewerPermissions).toContain("lead:read");
+    expect(viewerPermissions).toContain("advertising:read");
     expect(viewerPermissions).not.toContain("lead:enrich");
     expect(viewerPermissions).not.toContain("lead:financial_read");
     expect(viewerPermissions).not.toContain("lead:create");
     expect(viewerPermissions).not.toContain("settings:update");
+    expect(viewerPermissions).not.toContain("advertising:create");
   });
 });

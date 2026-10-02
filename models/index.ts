@@ -45,6 +45,23 @@ export {
   NewsletterAudienceSegmentModel,
   type NewsletterAudienceSegmentDocument,
 } from "./newsletter-audience-segment";
+export {
+  AdConnectionModel,
+  type AdConnectionDocument,
+} from "./ad-connection";
+export { AdAccountModel, type AdAccountDocument } from "./ad-account";
+export {
+  GrowthCampaignModel,
+  type GrowthCampaignDocument,
+} from "./growth-campaign";
+export {
+  AttributionTouchpointModel,
+  type AttributionTouchpointDocument,
+} from "./attribution-touchpoint";
+export {
+  ConversionEventModel,
+  type ConversionEventDocument,
+} from "./conversion-event";
 export { IntegrationModel, type IntegrationDocument } from "./integration";
 export { IntegrationLogModel, type IntegrationLogDocument } from "./integration-log";
 export {

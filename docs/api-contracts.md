@@ -872,6 +872,22 @@ Verifies `X-HubSpot-Signature-v3`. Mutations are **gated** (`HUBSPOT_ONGOING_SYN
 
 ---
 
+## Advertising / Growth Copilot (Phase 0)
+
+Feature flag: `ADVERTISING_ENABLED` (default **off**). When off, advertising routes return `409 CONFLICT` (“Paid ads tools are turned off…” / unavailable).
+
+```txt
+GET /api/workspaces/[workspaceSlug]/advertising/status
+```
+
+- Requires active membership + `advertising:read`
+- Requires feature flag on
+- Returns module status, adopted defaults, approval vocabulary hints, job conventions
+- **No** Meta / Google / TikTok network calls
+- Plain-language `summary` / `nextStepHint` for non-technical operators
+
+---
+
 ## Workspace Export (Phase 13)
 
 Workspace-scoped backup/export for admins:
