@@ -17,7 +17,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, campaignId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "campaign:read",
     );
@@ -32,6 +32,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const resolved = await resolveCampaignAnalyticsPeriod(workspace.id, campaignId, {
       period,
+      userId,
     });
 
     const { issues, total } = await listCampaignAnalyticsIssuesForWorkspace(
@@ -42,6 +43,7 @@ export async function GET(request: Request, context: RouteContext) {
         to: resolved.to,
         page,
         pageSize,
+        userId,
       },
     );
 

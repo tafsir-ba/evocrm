@@ -12,6 +12,7 @@ import {
 import { fromDatetimeLocalInWorkspaceTimezone } from "@/lib/workspace-datetime";
 import {
   cancelEnrollmentsForCampaign,
+  countActiveSendClaimsForCampaign,
   createCampaignEnrollmentsBulk,
   type CreateEnrollmentInput,
 } from "@/server/repositories/campaign-enrollments";
@@ -68,12 +69,43 @@ function assertIsNewsletter(campaign: CampaignRecord): void {
   }
 }
 
+export type NewsletterSendStartedBlocker =
+  | "sending_in_progress"
+  | "send_started";
+
+const NEWSLETTER_SEND_STARTED_MESSAGES = {
+  sending_in_progress:
+    "This newsletter is currently sending and cannot be cancelled or re-locked. Try again shortly.",
+  send_started:
+    "This newsletter has started sending and can no longer be edited or cancelled.",
+} as const;
+
+/**
+ * True when any CampaignSend exists or any enrollment has an unexpired send claim.
+ * Claim-aware so cancel/re-lock cannot race an in-flight worker.
+ */
 export async function hasNewsletterSendStarted(
   workspaceId: string,
   campaignId: string,
 ): Promise<boolean> {
+  return (await getNewsletterSendStartedBlocker(workspaceId, campaignId)) !== null;
+}
+
+export async function getNewsletterSendStartedBlocker(
+  workspaceId: string,
+  campaignId: string,
+): Promise<NewsletterSendStartedBlocker | null> {
+  const claimCount = await countActiveSendClaimsForCampaign(workspaceId, campaignId);
+  if (claimCount > 0) {
+    return "sending_in_progress";
+  }
+
   const sendCount = await countCampaignSendsForCampaign(workspaceId, campaignId);
-  return sendCount > 0;
+  if (sendCount > 0) {
+    return "send_started";
+  }
+
+  return null;
 }
 
 export async function assertNewsletterMutableBeforeSend(
@@ -90,11 +122,11 @@ export async function assertNewsletterMutableBeforeSend(
   }
 
   if (campaign.audienceLockedAt) {
-    const started = await hasNewsletterSendStarted(workspaceId, campaign.id);
-    if (started) {
+    const blocker = await getNewsletterSendStartedBlocker(workspaceId, campaign.id);
+    if (blocker) {
       throw new AppError(
         "VALIDATION_ERROR",
-        "This newsletter has started sending and can no longer be edited or cancelled.",
+        NEWSLETTER_SEND_STARTED_MESSAGES[blocker],
       );
     }
   }
@@ -207,10 +239,17 @@ export async function replaceNewsletterSegmentsForWorkspace(
   if (campaign.audienceLockedAt) {
     // Editable until send starts: re-check immediately before unlock/cancel so a
     // concurrent send tick cannot race past the earlier mutable gate.
+    await assertNewsletterSendNotStarted(workspaceId, campaignId);
+    await cancelEnrollmentsForCampaign(
+      workspaceId,
+      campaignId,
+      "Newsletter audience changed before send.",
+    );
+    // Fail closed if a send claim appeared during cancel — do not unlock yet.
     await assertNewsletterSendNotStarted(
       workspaceId,
       campaignId,
-      "This newsletter has already started sending and can no longer be edited.",
+      NEWSLETTER_SEND_STARTED_MESSAGES.sending_in_progress,
     );
     await updateCampaign(workspaceId, campaignId, {
       audienceLockedAt: null,
@@ -218,11 +257,6 @@ export async function replaceNewsletterSegmentsForWorkspace(
       scheduledFor: null,
       status: campaign.status === "active" ? "draft" : campaign.status,
     });
-    await cancelEnrollmentsForCampaign(
-      workspaceId,
-      campaignId,
-      "Newsletter audience changed before send.",
-    );
   }
 
   for (const segment of input.segments) {
@@ -521,10 +555,14 @@ export async function exportNewsletterAudienceExclusionsCsvForWorkspace(
 async function assertNewsletterSendNotStarted(
   workspaceId: string,
   campaignId: string,
-  message: string,
+  message?: string,
 ): Promise<void> {
-  if (await hasNewsletterSendStarted(workspaceId, campaignId)) {
-    throw new AppError("VALIDATION_ERROR", message);
+  const blocker = await getNewsletterSendStartedBlocker(workspaceId, campaignId);
+  if (blocker) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      message ?? NEWSLETTER_SEND_STARTED_MESSAGES[blocker],
+    );
   }
 }
 
@@ -554,11 +592,7 @@ async function lockAndActivateNewsletter(input: {
   }
 
   if (campaign.audienceLockedAt) {
-    await assertNewsletterSendNotStarted(
-      workspaceId,
-      campaignId,
-      "This newsletter has already started sending.",
-    );
+    await assertNewsletterSendNotStarted(workspaceId, campaignId);
   }
 
   if (campaign.audienceType !== "leads") {
@@ -591,21 +625,36 @@ async function lockAndActivateNewsletter(input: {
   }
 
   // Final TOCTOU guard immediately before mutating enrollments / lock state.
+  await assertNewsletterSendNotStarted(workspaceId, campaignId);
+
+  const lockedAt = new Date();
+
+  // Soft-lock before enrollment insert so a crash mid-batch leaves a fence
+  // that the next Send/retry will see and clean up.
+  const fenced = await updateCampaign(workspaceId, campaignId, {
+    audienceLockedAt: lockedAt,
+  });
+  if (!fenced) {
+    throw new AppError("NOT_FOUND", "Newsletter not found.");
+  }
+
+  // Re-check after fencing — refuse if a worker claimed during the race window.
+  await assertNewsletterSendNotStarted(workspaceId, campaignId);
+
+  // Always cancel non-terminal orphans (including unlocked crash leftovers).
+  await cancelEnrollmentsForCampaign(
+    workspaceId,
+    campaignId,
+    "Newsletter audience re-locked before send.",
+  );
+
+  // Claims must not remain after cancel (cancel skips claimed rows).
   await assertNewsletterSendNotStarted(
     workspaceId,
     campaignId,
-    "This newsletter has already started sending.",
+    NEWSLETTER_SEND_STARTED_MESSAGES.sending_in_progress,
   );
 
-  if (campaign.audienceLockedAt) {
-    await cancelEnrollmentsForCampaign(
-      workspaceId,
-      campaignId,
-      "Newsletter audience re-locked before send.",
-    );
-  }
-
-  const lockedAt = new Date();
   const enrollmentInputs: CreateEnrollmentInput[] = audience.included.map(
     (recipient) => ({
       campaignId,
@@ -624,10 +673,18 @@ async function lockAndActivateNewsletter(input: {
 
   // Insert in batches to avoid huge single writes.
   const BATCH = 500;
+  let insertedCount = 0;
   for (let index = 0; index < enrollmentInputs.length; index += BATCH) {
-    await createCampaignEnrollmentsBulk(
+    insertedCount += await createCampaignEnrollmentsBulk(
       workspaceId,
       enrollmentInputs.slice(index, index + BATCH),
+    );
+  }
+
+  if (insertedCount !== enrollmentInputs.length) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "Failed to lock newsletter audience (enrollment count mismatch). Please retry.",
     );
   }
 
@@ -760,17 +817,20 @@ export async function cancelNewsletterScheduleForWorkspace(
     );
   }
 
-  // Re-check immediately before canceling enrollments (TOCTOU guard).
-  await assertNewsletterSendNotStarted(
-    workspaceId,
-    campaignId,
-    "This newsletter has started sending and can no longer be cancelled.",
-  );
+  // Re-check immediately before canceling enrollments (TOCTOU + claim fence).
+  await assertNewsletterSendNotStarted(workspaceId, campaignId);
 
   await cancelEnrollmentsForCampaign(
     workspaceId,
     campaignId,
     "Newsletter schedule cancelled before send.",
+  );
+
+  // Fail closed if any claim appeared / remained (cancel skips claimed rows).
+  await assertNewsletterSendNotStarted(
+    workspaceId,
+    campaignId,
+    NEWSLETTER_SEND_STARTED_MESSAGES.sending_in_progress,
   );
 
   const updated = await updateCampaign(workspaceId, campaignId, {

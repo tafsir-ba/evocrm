@@ -15,7 +15,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, campaignId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "campaign:read",
     );
@@ -38,6 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
         status: query.status,
         page: query.page,
         pageSize: query.pageSize,
+        userId,
       },
     );
 

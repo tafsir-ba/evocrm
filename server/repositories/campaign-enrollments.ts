@@ -275,6 +275,25 @@ export async function countCampaignEnrollments(
   );
 }
 
+/**
+ * Count enrollments whose send claim lease is still unexpired.
+ * Used as a "send in flight" fence for newsletter cancel / re-lock.
+ */
+export async function countActiveSendClaimsForCampaign(
+  workspaceId: string,
+  campaignId: string,
+  now = new Date(),
+): Promise<number> {
+  await connectDb();
+
+  return CampaignEnrollmentModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      campaignId,
+      sendClaimExpiresAt: { $gt: now },
+    }),
+  );
+}
+
 export type CreateEnrollmentInput = {
   campaignId: string;
   leadId?: string | null;
@@ -442,10 +461,13 @@ export async function cancelEnrollmentsForCampaign(
   await connectDb();
 
   const now = new Date();
+  // Skip rows with an unexpired send claim so an in-flight worker is not
+  // falsely marked failed while it may still complete an ESP send.
   const result = await CampaignEnrollmentModel.updateMany(
     withWorkspaceScope(workspaceId, {
       campaignId,
       status: { $in: NON_TERMINAL_ENROLLMENT_STATUSES },
+      $or: [{ sendClaimExpiresAt: null }, { sendClaimExpiresAt: { $lte: now } }],
     }),
     {
       $set: {

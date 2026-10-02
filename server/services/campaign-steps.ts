@@ -13,6 +13,7 @@ import {
   type CampaignStepRecord,
 } from "@/server/repositories/campaign-steps";
 import { findCampaignById, type CampaignRecord } from "@/server/repositories/campaigns";
+import { assertMultiProjectRecordAccess } from "@/server/services/apply-project-scope";
 import { assertCampaignEditable } from "@/server/services/campaigns";
 import { rescheduleEnrollmentsForCampaignSchedule } from "@/server/services/campaign-enrollments";
 import type {
@@ -280,6 +281,13 @@ export async function createCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
+
   if (campaign.kind === "newsletter") {
     const { assertNewsletterMutableBeforeSend } = await import(
       "@/server/services/newsletters"
@@ -369,6 +377,13 @@ export async function updateCampaignStepForWorkspace(
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
 
   const existing = await findCampaignStepById(workspaceId, campaignId, stepId);
 
@@ -486,6 +501,13 @@ export async function deleteCampaignStepForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
+
   if (campaign.kind === "newsletter") {
     throw new AppError(
       "VALIDATION_ERROR",
@@ -535,6 +557,13 @@ export async function reorderCampaignStepsForWorkspace(
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
 
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
+
   if (campaign.kind === "newsletter") {
     throw new AppError(
       "VALIDATION_ERROR",
@@ -572,6 +601,13 @@ export async function duplicateCampaignStepForWorkspace(
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    actorId,
+    campaign.projectIds,
+    "campaign:update",
+  );
 
   if (campaign.kind === "newsletter") {
     throw new AppError(

@@ -22,6 +22,7 @@ vi.mock("@/server/repositories/campaign-steps", () => ({
 
 vi.mock("@/server/repositories/campaign-enrollments", () => ({
   countCampaignEnrollments: vi.fn().mockResolvedValue(0),
+  countActiveSendClaimsForCampaign: vi.fn().mockResolvedValue(0),
   pauseEnrollmentsForCampaign: vi.fn(),
   resumeEnrollmentsForCampaign: vi.fn(),
   cancelEnrollmentsForCampaign: vi.fn(),
@@ -83,7 +84,10 @@ import {
   updateCampaign,
 } from "@/server/repositories/campaigns";
 import { countCampaignSendsForCampaign } from "@/server/repositories/campaign-sends";
-import { cancelEnrollmentsForCampaign } from "@/server/repositories/campaign-enrollments";
+import {
+  cancelEnrollmentsForCampaign,
+  countActiveSendClaimsForCampaign,
+} from "@/server/repositories/campaign-enrollments";
 import { assertMultiProjectRecordAccess } from "@/server/services/apply-project-scope";
 import { updateCampaignForWorkspace } from "@/server/services/campaigns";
 import { cancelNewsletterScheduleForWorkspace } from "@/server/services/newsletters";
@@ -118,6 +122,7 @@ describe("newsletter audit P0/P1 guards", () => {
       ...input,
     }));
     vi.mocked(countCampaignSendsForCampaign).mockResolvedValue(0);
+    vi.mocked(countActiveSendClaimsForCampaign).mockResolvedValue(0);
   });
 
   it("rejects enabling auto-enrollment on a newsletter", async () => {

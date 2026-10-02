@@ -457,6 +457,16 @@ async function processEnrollment(
     return singleOutcomeResult("skipped");
   }
 
+  // Abort if cancel/re-lock marked this enrollment non-active after claim.
+  // Prevents double-send when a new active enrollment is inserted for the same lead.
+  const enrollmentBeforeSend = await findEnrollmentByIdOnly(
+    workspaceId,
+    enrollment.id,
+  );
+  if (!enrollmentBeforeSend || enrollmentBeforeSend.status !== "active") {
+    return singleOutcomeResult("skipped");
+  }
+
   const sendResult = await sendCampaignEmail({
     to: lead.email,
     subject: resolvedSubject,
@@ -715,13 +725,28 @@ export async function sendDueCampaignEmails(
 export async function listCampaignSendsForWorkspace(
   workspaceId: string,
   campaignId: string,
-  filter: { status?: "queued" | "sent" | "failed" | "skipped"; page?: number; pageSize?: number } = {},
+  filter: {
+    status?: "queued" | "sent" | "failed" | "skipped";
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+  } = {},
 ) {
   const campaign = await findCampaignById(workspaceId, campaignId);
 
   if (!campaign) {
     throw new AppError("NOT_FOUND", "Campaign not found.");
   }
+
+  const { assertMultiProjectRecordAccess } = await import(
+    "@/server/services/apply-project-scope"
+  );
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    filter.userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
 
   const { findCampaignSends } = await import("@/server/repositories/campaign-sends");
   const { sends, total } = await findCampaignSends(workspaceId, campaignId, filter);

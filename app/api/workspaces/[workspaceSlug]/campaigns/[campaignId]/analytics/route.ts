@@ -10,7 +10,7 @@ type RouteContext = {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { workspaceSlug, campaignId } = await context.params;
-    const { workspace } = await requireWorkspaceApiAccess(
+    const { workspace, userId } = await requireWorkspaceApiAccess(
       workspaceSlug,
       "campaign:read",
     );
@@ -25,6 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
       period,
       dateFrom: dateFromRaw ? new Date(dateFromRaw) : undefined,
       dateTo: dateToRaw ? new Date(dateToRaw) : undefined,
+      userId,
     });
 
     return successResponse(report);

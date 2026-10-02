@@ -30,6 +30,11 @@ vi.mock("@/server/services/campaign-enrollments", () => ({
   rescheduleEnrollmentsForCampaignSchedule: vi.fn(),
 }));
 
+vi.mock("@/server/services/apply-project-scope", () => ({
+  applyUserProjectScope: vi.fn(async (_ws, _user, filter) => filter),
+  assertMultiProjectRecordAccess: vi.fn(),
+}));
+
 import { findCampaignById } from "@/server/repositories/campaigns";
 import {
   createCampaignStep,
