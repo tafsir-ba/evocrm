@@ -835,12 +835,29 @@ export async function sendNewsletterTestEmailsForWorkspace(
     throw new AppError("NOT_FOUND", "Newsletter not found.");
   }
   assertIsNewsletter(campaign);
-  await assertMultiProjectRecordAccess(
-    workspaceId,
-    actorId,
-    campaign.projectIds,
-    "campaign:update",
-  );
+
+  try {
+    await assertMultiProjectRecordAccess(
+      workspaceId,
+      actorId,
+      campaign.projectIds,
+      "campaign:update",
+    );
+  } catch (error) {
+    // contentOnly draft create can leave projectIds: [] before Audience is set.
+    // Rewrite the generic grant-only denial into an actionable test-send message.
+    if (
+      error instanceof AppError &&
+      error.code === "PERMISSION_DENIED" &&
+      campaign.projectIds.length === 0
+    ) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Add an audience project on the Audience step before sending a test, then try again.",
+      );
+    }
+    throw error;
+  }
 
   if (campaign.status === "archived") {
     throw new AppError(
