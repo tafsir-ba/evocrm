@@ -606,6 +606,8 @@ export function NewsletterFormPage({
       }
 
       const bodyText = stripHtmlToPlainText(bodyHtml);
+      // Match drip step form: channel is create-only. Update schema is .strict()
+      // and omits channel — sending it yields 400 "Unrecognized key(s): 'channel'".
       const stepPayload = {
         order: 1,
         delayDays: 0,
@@ -613,7 +615,6 @@ export function NewsletterFormPage({
         delayUnit: "days",
         sendTime: DEFAULT_CAMPAIGN_STEP_SEND_TIME,
         fromName: senderName.trim() || undefined,
-        channel: "email",
         status: "ready",
         contentMode: "html",
         subject: subject.trim(),
@@ -638,7 +639,7 @@ export function NewsletterFormPage({
         const stepRes = await fetch(`${apiCampaigns}/${id}/steps`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(stepPayload),
+          body: JSON.stringify({ ...stepPayload, channel: "email" as const }),
         });
         const stepBody = await stepRes.json();
         if (!stepRes.ok) {

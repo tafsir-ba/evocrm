@@ -40,6 +40,57 @@ describe("campaign step validation", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts newsletter-shaped create payload with channel", () => {
+    const result = createCampaignStepInputSchema.safeParse({
+      order: 1,
+      delayDays: 0,
+      delayAmount: 0,
+      delayUnit: "days",
+      sendTime: "09:00",
+      fromName: "Evo Home",
+      channel: "email",
+      status: "ready",
+      contentMode: "html",
+      subject: "Spring update",
+      previewText: null,
+      body: "Hello",
+      bodyHtml: "<p>Hello</p>",
+      bodyText: "Hello",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects newsletter-shaped update payload that includes channel (strict)", () => {
+    const newsletterStepUpdate = {
+      order: 1,
+      delayDays: 0,
+      delayAmount: 0,
+      delayUnit: "days",
+      sendTime: "09:00",
+      fromName: "Evo Home",
+      channel: "email",
+      status: "ready",
+      contentMode: "html",
+      subject: "Spring update",
+      previewText: null,
+      body: "Hello",
+      bodyHtml: "<p>Hello</p>",
+      bodyText: "Hello",
+    };
+
+    const withChannel = updateCampaignStepInputSchema.safeParse(newsletterStepUpdate);
+    expect(withChannel.success).toBe(false);
+    if (!withChannel.success) {
+      const root = withChannel.error.flatten().formErrors.join(" ");
+      expect(root).toMatch(/Unrecognized key\(s\).*channel/i);
+    }
+
+    const { channel: _channel, ...withoutChannel } = newsletterStepUpdate;
+    const clean = updateCampaignStepInputSchema.safeParse(withoutChannel);
+    expect(clean.success).toBe(true);
+  });
+
   it("rejects empty name on update payloads", () => {
     const result = updateCampaignStepInputSchema.safeParse({ name: "" });
 
