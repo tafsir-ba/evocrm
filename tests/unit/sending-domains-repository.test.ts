@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveDomainHealth } from "@/server/repositories/sending-domains";
+import {
+  deriveDomainHealth,
+  mapProviderDomainStatus,
+} from "@/server/repositories/sending-domains";
 
 describe("sending domain repository health", () => {
   it("derives SPF and DKIM status from provider DNS records", () => {
@@ -28,5 +31,14 @@ describe("sending domain repository health", () => {
     expect(health.dkimStatus).toBe("valid");
     expect(health.spfStatus).toBe("pending");
     expect(health.dmarcStatus).toBe("missing");
+  });
+
+  it("maps Resend overall statuses onto CRM domain statuses", () => {
+    expect(mapProviderDomainStatus("verified")).toBe("verified");
+    expect(mapProviderDomainStatus("pending")).toBe("pending");
+    expect(mapProviderDomainStatus("failed")).toBe("failed");
+    expect(mapProviderDomainStatus("partially_failed")).toBe("failed");
+    expect(mapProviderDomainStatus("not_started")).toBe("needs_attention");
+    expect(mapProviderDomainStatus("partially_verified")).toBe("needs_attention");
   });
 });

@@ -10,14 +10,18 @@ vi.mock("@/server/repositories/campaigns", () => ({
   countCampaignsBySendingDomainId: vi.fn(),
 }));
 
-vi.mock("@/server/repositories/sending-domains", () => ({
-  findSendingDomainById: vi.fn(),
-  updateSendingDomain: vi.fn(),
-  deleteSendingDomain: vi.fn(),
-}));
-
 vi.mock("@/server/email/resend-domains", () => ({
   deleteProviderDomain: vi.fn(),
+  getProviderDomain: vi.fn(),
+  verifyProviderDomain: vi.fn(),
+  mapProviderDomainToUpdate: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/sending-domains", () => ({
+  findSendingDomainById: vi.fn(),
+  findSendingDomainByProviderDomainId: vi.fn(),
+  updateSendingDomain: vi.fn(),
+  deleteSendingDomain: vi.fn(),
 }));
 
 vi.mock("@/server/audit/create-audit-log", () => ({

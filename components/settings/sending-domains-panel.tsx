@@ -13,6 +13,7 @@ import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconPlus } from "@/lib/icons";
 import { formatDnsHostFqdn, providerIncludesDmarcRecord } from "@/lib/sending-domain-dns";
+import { formatApiErrorMessage } from "@/lib/format-api-error";
 
 type DnsRecord = {
   record: string;
@@ -36,6 +37,18 @@ type SendingDomain = {
   lastCheckedAt: string | null;
   verifiedAt: string | null;
 };
+
+const VERIFY_FOLLOWUP_DELAYS_MS = [2000, 3000, 5000, 8000, 10000];
+
+function isTerminalDomainStatus(status: SendingDomain["status"]): boolean {
+  return status === "verified" || status === "failed";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 const STATUS_LABELS: Record<SendingDomain["status"], string> = {
   pending: "DNS pending",
@@ -146,8 +159,10 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
     );
   }, [selectedDomain]);
 
-  const loadDomains = useCallback(async () => {
-    setLoading(true);
+  const loadDomains = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
     setForbidden(false);
 
@@ -161,7 +176,9 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
       }
 
       if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Failed to load sending domains.");
+        throw new Error(
+          formatApiErrorMessage(payload, "Failed to load sending domains."),
+        );
       }
 
       const nextDomains = payload.data.domains as SendingDomain[];
@@ -175,7 +192,9 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load.");
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, [apiBase]);
 
@@ -200,7 +219,9 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Could not add this domain.");
+        throw new Error(
+          formatApiErrorMessage(payload, "Could not add this domain."),
+        );
       }
 
       const domain = payload.data.domain as SendingDomain;
@@ -217,6 +238,34 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
     }
   }
 
+  async function pollDomainStatusUntilSettled(domainId: string): Promise<SendingDomain | null> {
+    let latest: SendingDomain | null = null;
+
+    for (const delayMs of VERIFY_FOLLOWUP_DELAYS_MS) {
+      await sleep(delayMs);
+
+      const response = await fetch(`${apiBase}/${domainId}/refresh`, { method: "POST" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          formatApiErrorMessage(payload, "Could not refresh domain status."),
+        );
+      }
+
+      latest = payload.data.domain as SendingDomain;
+      setDomains((current) =>
+        current.map((domain) => (domain.id === latest!.id ? latest! : domain)),
+      );
+
+      if (isTerminalDomainStatus(latest.status)) {
+        return latest;
+      }
+    }
+
+    return latest;
+  }
+
   async function handleVerify(domainId: string) {
     setSubmitting(true);
     setActionMessage(null);
@@ -227,13 +276,41 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
 
       if (!response.ok) {
         throw new Error(
-          payload.error?.message ??
+          formatApiErrorMessage(
+            payload,
             "We could not verify this domain yet. Please check that the DNS records below were added exactly as shown.",
+          ),
         );
       }
 
-      setActionMessage("Verification check started. DNS changes can take time to propagate.");
-      await loadDomains();
+      let domain = payload.data.domain as SendingDomain;
+      setDomains((current) =>
+        current.map((item) => (item.id === domain.id ? domain : item)),
+      );
+
+      if (!isTerminalDomainStatus(domain.status)) {
+        setActionMessage(
+          "Verification started. Checking DNS with Resend — this can take a minute…",
+        );
+        const polled = await pollDomainStatusUntilSettled(domainId);
+        if (polled) {
+          domain = polled;
+        }
+      }
+
+      if (domain.status === "verified") {
+        setActionMessage("Domain verified. Campaigns can send from this domain.");
+      } else if (domain.status === "failed") {
+        setActionMessage(
+          "Verification failed. Review the DNS records below, fix any mismatches, then try again.",
+        );
+      } else {
+        setActionMessage(
+          "Verification is still pending at Resend. DNS can take longer to propagate — use Refresh status in a few minutes, or wait for an automatic update.",
+        );
+      }
+
+      await loadDomains({ silent: true });
     } catch (verifyError) {
       setActionMessage(
         verifyError instanceof Error ? verifyError.message : "Could not verify this domain.",
@@ -252,11 +329,27 @@ export function SendingDomainsPanel({ workspaceSlug, canUpdate }: SendingDomains
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Could not refresh domain status.");
+        throw new Error(
+          formatApiErrorMessage(payload, "Could not refresh domain status."),
+        );
       }
 
-      setActionMessage("Domain status refreshed.");
-      await loadDomains();
+      const domain = payload.data.domain as SendingDomain;
+      setDomains((current) =>
+        current.map((item) => (item.id === domain.id ? domain : item)),
+      );
+
+      if (domain.status === "verified") {
+        setActionMessage("Domain status refreshed — domain is verified.");
+      } else if (domain.status === "failed") {
+        setActionMessage(
+          "Domain status refreshed — verification failed. Review DNS records below.",
+        );
+      } else {
+        setActionMessage("Domain status refreshed.");
+      }
+
+      await loadDomains({ silent: true });
     } catch (refreshError) {
       setActionMessage(
         refreshError instanceof Error ? refreshError.message : "Could not refresh domain status.",

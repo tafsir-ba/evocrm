@@ -119,6 +119,30 @@ function mapProviderError(error: ProviderError, fallbackMessage: string): string
   return `Could not complete this domain action: ${message}`;
 }
 
+function providerAppError(
+  error: ProviderError,
+  fallbackMessage: string,
+  fallbackCode: "VALIDATION_ERROR" | "NOT_FOUND" = "VALIDATION_ERROR",
+): AppError {
+  const message = mapProviderError(error, fallbackMessage);
+  const errorName = (error?.name ?? "").toLowerCase();
+  const normalized = (error?.message ?? "").toLowerCase();
+
+  if (errorName === "rate_limit_exceeded" || normalized.includes("rate limit")) {
+    return new AppError("RATE_LIMITED", message);
+  }
+
+  if (errorName === "not_found" || normalized.includes("not found")) {
+    return new AppError("NOT_FOUND", message);
+  }
+
+  if (errorName === "missing_api_key" || errorName === "invalid_api_key") {
+    return new AppError("INTERNAL_ERROR", message, { expose: true });
+  }
+
+  return new AppError(fallbackCode, message);
+}
+
 export async function createProviderDomain(domain: string): Promise<ProviderDomain> {
   const resend = getResendClient();
   const normalizedDomain = normalizeDomainName(domain);
@@ -152,10 +176,7 @@ export async function createProviderDomain(domain: string): Promise<ProviderDoma
   }
 
   if (result.error || !result.data) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      mapProviderError(result.error, "Could not add this domain."),
-    );
+    throw providerAppError(result.error, "Could not add this domain.");
   }
 
   const records = buildDnsRecordsFromProvider(
@@ -183,9 +204,10 @@ export async function getProviderDomain(providerDomainId: string): Promise<Provi
   const result = await resend.domains.get(providerDomainId);
 
   if (result.error || !result.data) {
-    throw new AppError(
+    throw providerAppError(
+      result.error,
+      "This sending domain could not be found.",
       "NOT_FOUND",
-      mapProviderError(result.error, "This sending domain could not be found."),
     );
   }
 
@@ -209,18 +231,78 @@ export async function getProviderDomain(providerDomainId: string): Promise<Provi
   };
 }
 
-export async function verifyProviderDomain(providerDomainId: string): Promise<ProviderDomain> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** Overall Resend statuses that mean verify has finished (success or failure). */
+export function isTerminalProviderDomainStatus(status: string): boolean {
+  const normalized = status.toLowerCase().trim();
+  return (
+    normalized === "verified" ||
+    normalized === "failed" ||
+    normalized === "failure" ||
+    normalized === "partially_failed"
+  );
+}
+
+export type PollProviderDomainOptions = {
+  /** Total GETs including the initial one. Default: delays.length + 1. */
+  maxAttempts?: number;
+  /** Backoff between GETs (ms). Default: 1s, 2s, 3s, 5s, 8s. */
+  delaysMs?: number[];
+  sleep?: (ms: number) => Promise<void>;
+  getDomain?: (providerDomainId: string) => Promise<ProviderDomain>;
+};
+
+/**
+ * Poll Resend GET /domains/:id until overall status is terminal, or attempts are exhausted.
+ * Never calls domains.verify — safe for refresh / post-verify follow-up / webhooks.
+ */
+export async function pollProviderDomainUntilSettled(
+  providerDomainId: string,
+  options?: PollProviderDomainOptions,
+): Promise<ProviderDomain> {
+  const getDomain = options?.getDomain ?? getProviderDomain;
+  const sleepFn = options?.sleep ?? sleep;
+  const delaysMs = options?.delaysMs ?? [1000, 2000, 3000, 5000, 8000];
+  const maxAttempts = Math.max(1, options?.maxAttempts ?? delaysMs.length + 1);
+
+  let latest = await getDomain(providerDomainId);
+  if (isTerminalProviderDomainStatus(latest.status)) {
+    return latest;
+  }
+
+  for (let attempt = 0; attempt < maxAttempts - 1; attempt += 1) {
+    const delay = delaysMs[Math.min(attempt, delaysMs.length - 1)] ?? 1000;
+    await sleepFn(delay);
+    latest = await getDomain(providerDomainId);
+    if (isTerminalProviderDomainStatus(latest.status)) {
+      return latest;
+    }
+  }
+
+  return latest;
+}
+
+/**
+ * Trigger Resend domain verification once, then poll GET until terminal (or timeout).
+ * Only this path may call domains.verify.
+ */
+export async function verifyProviderDomain(
+  providerDomainId: string,
+  pollOptions?: PollProviderDomainOptions,
+): Promise<ProviderDomain> {
   const resend = getResendClient();
   const verifyResult = await resend.domains.verify(providerDomainId);
 
   if (verifyResult.error) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      mapProviderError(verifyResult.error, "Could not verify this domain yet."),
-    );
+    throw providerAppError(verifyResult.error, "Could not verify this domain yet.");
   }
 
-  return getProviderDomain(providerDomainId);
+  return pollProviderDomainUntilSettled(providerDomainId, pollOptions);
 }
 
 export async function deleteProviderDomain(providerDomainId: string): Promise<void> {
@@ -228,10 +310,7 @@ export async function deleteProviderDomain(providerDomainId: string): Promise<vo
   const result = await resend.domains.remove(providerDomainId);
 
   if (result.error) {
-    throw new AppError(
-      "VALIDATION_ERROR",
-      mapProviderError(result.error, "Could not remove this domain."),
-    );
+    throw providerAppError(result.error, "Could not remove this domain.");
   }
 }
 
