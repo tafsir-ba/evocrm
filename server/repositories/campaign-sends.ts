@@ -1,8 +1,13 @@
 import "server-only";
 
+import mongoose from "mongoose";
 import { connectDb } from "@/server/db/mongoose";
 import { CampaignSendModel, type CampaignSendDocument } from "@/models/campaign-send";
 import { withWorkspaceScope } from "@/server/workspaces/with-workspace-scope";
+
+function oid(id: string): mongoose.Types.ObjectId {
+  return new mongoose.Types.ObjectId(id);
+}
 
 export type CampaignSendRecord = {
   id: string;
@@ -124,12 +129,17 @@ export async function countCampaignSendsByStatus(
 ): Promise<CampaignSendStatusCounts> {
   await connectDb();
 
+  // Aggregates do not cast string ids the way find/countDocuments do — match
+  // ObjectIds explicitly (same pattern as aggregateSendMetrics / oid()).
   const rows = await CampaignSendModel.aggregate<{
     _id: string;
     count: number;
   }>([
     {
-      $match: withWorkspaceScope(workspaceId, { campaignId }),
+      $match: {
+        workspaceId: oid(workspaceId),
+        campaignId: oid(campaignId),
+      },
     },
     {
       $group: {
