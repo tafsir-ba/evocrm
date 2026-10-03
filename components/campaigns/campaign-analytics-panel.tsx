@@ -56,16 +56,20 @@ type AnalyticsReport = {
   newsletterSummary: {
     recipientsQueued: number;
     stillQueued: number;
+    queued?: number;
     sent: number;
     delivered: number;
     failed: number;
     bounced: number;
     skipped: number;
+    attempted?: number;
+    deliveryRate?: number | null;
     uniqueOpens: number;
     uniqueClicks: number;
     unsubscribes: number;
     audienceLockedAt: string | null;
     unknownConsentAtLock: number | null;
+    notOpenedBasis?: string;
     sendStatusCounts: {
       queued: number;
       sent: number;
@@ -125,9 +129,10 @@ type AnalyticsIssue = {
   id: string;
   leadName: string | null;
   emailMasked: string | null;
+  email?: string | null;
   stepOrder: number | null;
   stepSubject: string | null;
-  issueType: "bounced" | "failed" | "complained" | "delayed";
+  issueType: "bounced" | "failed" | "complained" | "delayed" | "skipped";
   reason: string | null;
   eventAt: string;
 };
@@ -145,6 +150,18 @@ type RecipientSendRow = {
   bouncedAt?: string | null;
   scheduledFor: string;
 };
+
+type EngagementRecipient = {
+  id: string;
+  leadName: string | null;
+  email: string | null;
+  firstOpenedAt: string | null;
+  deliveredAt: string | null;
+  sentAt: string | null;
+};
+
+type EngagementTab = "opened" | "not_opened";
+type IssueFilter = "all" | AnalyticsIssue["issueType"];
 
 const HEALTH_TONE: Record<
   AnalyticsReport["health"]["status"],
@@ -165,9 +182,19 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
   const [period, setPeriod] = useState<CampaignAnalyticsPeriodPreset>("30d");
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [issues, setIssues] = useState<AnalyticsIssue[]>([]);
+  const [issueTotal, setIssueTotal] = useState(0);
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>("all");
+  const [issuePage, setIssuePage] = useState(1);
   const [recipientSends, setRecipientSends] = useState<RecipientSendRow[]>([]);
   const [recipientTotal, setRecipientTotal] = useState(0);
   const [recipientPage, setRecipientPage] = useState(1);
+  const [engagementTab, setEngagementTab] = useState<EngagementTab>("opened");
+  const [engagementRecipients, setEngagementRecipients] = useState<
+    EngagementRecipient[]
+  >([]);
+  const [engagementTotal, setEngagementTotal] = useState(0);
+  const [engagementPage, setEngagementPage] = useState(1);
+  const [notOpenedBasis, setNotOpenedBasis] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -183,9 +210,13 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
     setForbidden(false);
 
     try {
+      const issueTypeQuery =
+        issueFilter === "all" ? "" : `&issueType=${issueFilter}`;
       const [reportRes, issuesRes] = await Promise.all([
         fetch(`${apiBase}?period=${period}`),
-        fetch(`${apiBase}/issues?period=${period}&pageSize=25`),
+        fetch(
+          `${apiBase}/issues?period=${period}&page=${issuePage}&pageSize=25${issueTypeQuery}`,
+        ),
       ]);
 
       if (reportRes.status === 403) {
@@ -205,14 +236,24 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
       if (issuesRes.ok) {
         const issuesPayload = await issuesRes.json();
         setIssues(issuesPayload.data ?? []);
+        setIssueTotal(issuesPayload.pagination?.total ?? 0);
       } else {
         setIssues([]);
+        setIssueTotal(0);
       }
 
-      if (nextReport.campaign.kind === "newsletter" || nextReport.newsletterSummary) {
-        const sendsRes = await fetch(
-          `${sendsApi}?page=${recipientPage}&pageSize=25`,
-        );
+      const isNewsletter =
+        nextReport.campaign.kind === "newsletter" ||
+        Boolean(nextReport.newsletterSummary);
+
+      if (isNewsletter) {
+        const [sendsRes, engagementRes] = await Promise.all([
+          fetch(`${sendsApi}?page=${recipientPage}&pageSize=25`),
+          fetch(
+            `${apiBase}/engagement?partition=${engagementTab}&page=${engagementPage}&pageSize=25`,
+          ),
+        ]);
+
         if (sendsRes.ok) {
           const sendsPayload = await sendsRes.json();
           setRecipientSends(
@@ -223,16 +264,43 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
           setRecipientSends([]);
           setRecipientTotal(0);
         }
+
+        if (engagementRes.ok) {
+          const engagementPayload = await engagementRes.json();
+          setEngagementRecipients(
+            Array.isArray(engagementPayload.data) ? engagementPayload.data : [],
+          );
+          setEngagementTotal(engagementPayload.pagination?.total ?? 0);
+          setNotOpenedBasis(
+            engagementPayload.meta?.notOpenedBasis ??
+              nextReport.newsletterSummary?.notOpenedBasis ??
+              null,
+          );
+        } else {
+          setEngagementRecipients([]);
+          setEngagementTotal(0);
+        }
       } else {
         setRecipientSends([]);
         setRecipientTotal(0);
+        setEngagementRecipients([]);
+        setEngagementTotal(0);
       }
     } catch {
       setError("Failed to load analytics.");
     } finally {
       setLoading(false);
     }
-  }, [apiBase, period, recipientPage, sendsApi]);
+  }, [
+    apiBase,
+    engagementPage,
+    engagementTab,
+    issueFilter,
+    issuePage,
+    period,
+    recipientPage,
+    sendsApi,
+  ]);
 
   useEffect(() => {
     void load();
@@ -354,10 +422,30 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
           </h2>
           <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-3">
             All-time totals for this newsletter (not limited to the period below).
+            Delivery rate is delivered ÷ sent (emails accepted by the provider).
           </p>
+          <div className="mb-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
+            <p className="text-[12px] text-[var(--color-ink-muted)]">Delivery rate</p>
+            <p className="mt-0.5 text-[28px] font-semibold tabular text-[var(--color-ink)]">
+              {newsletter.deliveryRate == null
+                ? "—"
+                : `${newsletter.deliveryRate}%`}
+            </p>
+            <p className="mt-1 text-[12.5px] text-[var(--color-ink-soft)]">
+              {newsletter.delivered.toLocaleString()} delivered of{" "}
+              {newsletter.sent.toLocaleString()} sent
+              {newsletter.attempted != null
+                ? ` · ${newsletter.attempted.toLocaleString()} attempted`
+                : ""}
+            </p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
             {[
               { label: "Queued", value: newsletter.recipientsQueued },
+              {
+                label: "In send queue",
+                value: newsletter.queued ?? newsletter.sendStatusCounts.queued,
+              },
               { label: "Still queued", value: newsletter.stillQueued },
               { label: "Sent", value: newsletter.sent },
               { label: "Delivered", value: newsletter.delivered },
@@ -631,6 +719,110 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
             <Card className="!p-5 mb-6 overflow-x-auto">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                 <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">
+                  Who opened
+                </h2>
+                {engagementTotal > 25 ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={engagementPage <= 1}
+                      onClick={() =>
+                        setEngagementPage((page) => Math.max(1, page - 1))
+                      }
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-[12.5px] text-[var(--color-ink-muted)]">
+                      Page {engagementPage} of{" "}
+                      {Math.max(1, Math.ceil(engagementTotal / 25))}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={engagementPage * 25 >= engagementTotal}
+                      onClick={() => setEngagementPage((page) => page + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["opened", "Opened"],
+                    ["not_opened", "Did not open"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={engagementTab === value ? "primary" : "secondary"}
+                    onClick={() => {
+                      setEngagementTab(value);
+                      setEngagementPage(1);
+                    }}
+                  >
+                    {label}
+                    {value === "opened" && newsletter
+                      ? ` (${newsletter.uniqueOpens})`
+                      : ""}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-4">
+                {engagementTab === "opened"
+                  ? "People with a unique open event for this newsletter."
+                  : (notOpenedBasis ??
+                    "Delivered recipients with no unique open event.")}
+              </p>
+              {engagementRecipients.length === 0 ? (
+                <p className="text-[13px] text-[var(--color-ink-muted)]">
+                  {engagementTab === "opened"
+                    ? "No opens recorded yet. Opens require Resend webhook tracking."
+                    : "No delivered recipients without an open yet."}
+                </p>
+              ) : (
+                <table className="w-full min-w-[640px] text-left text-[12.5px]">
+                  <thead>
+                    <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
+                      <th className="py-2 pr-3 font-medium">Contact</th>
+                      <th className="py-2 pr-3 font-medium">Email</th>
+                      <th className="py-2 font-medium">
+                        {engagementTab === "opened" ? "Opened at" : "Delivered at"}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {engagementRecipients.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-[var(--color-line)] text-[var(--color-ink)]"
+                      >
+                        <td className="py-2.5 pr-3">{row.leadName ?? "Unknown"}</td>
+                        <td className="py-2.5 pr-3">{row.email ?? "—"}</td>
+                        <td className="py-2.5">
+                          {engagementTab === "opened"
+                            ? row.firstOpenedAt
+                              ? new Date(row.firstOpenedAt).toLocaleString()
+                              : "—"
+                            : row.deliveredAt
+                              ? new Date(row.deliveredAt).toLocaleString()
+                              : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+          ) : null}
+
+          {isNewsletter ? (
+            <Card className="!p-5 mb-6 overflow-x-auto">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">
                   Recipient status
                 </h2>
                 {recipientTotal > 25 ? (
@@ -713,27 +905,83 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
             </Card>
           ) : null}
 
-          {!noSends ? (
+          {!noSends || (isNewsletter && (newsletter?.failed ?? 0) + (newsletter?.skipped ?? 0) + (newsletter?.bounced ?? 0) > 0) ? (
           <Card className="!p-5 mb-6 overflow-x-auto">
-            <h2 className="text-[15px] font-semibold text-[var(--color-ink)] mb-1">
-              Delivery issues
-            </h2>
-            <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-4">
-              Bounces, failures, complaints, and delayed messages in this period.
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <h2 className="text-[15px] font-semibold text-[var(--color-ink)]">
+                Delivery issues
+              </h2>
+              {issueTotal > 25 ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={issuePage <= 1}
+                    onClick={() => setIssuePage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-[12.5px] text-[var(--color-ink-muted)]">
+                    Page {issuePage} of {Math.max(1, Math.ceil(issueTotal / 25))}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={issuePage * 25 >= issueTotal}
+                    onClick={() => setIssuePage((page) => page + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            <p className="text-[12.5px] text-[var(--color-ink-muted)] mb-3">
+              {isNewsletter
+                ? "Bounces, failures, skips, complaints, and delayed messages — with the reason when available."
+                : "Bounces, failures, complaints, and delayed messages in this period."}{" "}
               Hard-bounced and complained addresses are suppressed from future sends.
             </p>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All"],
+                  ["bounced", "Bounced"],
+                  ["failed", "Failed"],
+                  ["skipped", "Skipped"],
+                  ["delayed", "Delayed"],
+                  ["complained", "Complaints"],
+                ] as const
+              )
+                .filter(([value]) => isNewsletter || value !== "skipped")
+                .map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={issueFilter === value ? "primary" : "secondary"}
+                    onClick={() => {
+                      setIssueFilter(value);
+                      setIssuePage(1);
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+            </div>
             {issues.length === 0 ? (
               <p className="text-[13px] text-[var(--color-ink-muted)]">
-                No delivery issues recorded for this period.
+                No delivery issues recorded for this{" "}
+                {issueFilter === "all" ? "period" : "filter"}.
               </p>
             ) : (
               <table className="w-full min-w-[640px] text-left text-[12.5px]">
                 <thead>
                   <tr className="border-b border-[var(--color-line)] text-[var(--color-ink-muted)]">
                     <th className="py-2 pr-3 font-medium">Contact</th>
-                    <th className="py-2 pr-3 font-medium">Step</th>
+                    {!isNewsletter ? (
+                      <th className="py-2 pr-3 font-medium">Step</th>
+                    ) : null}
                     <th className="py-2 pr-3 font-medium">Issue</th>
-                    <th className="py-2 pr-3 font-medium">Reason</th>
+                    <th className="py-2 pr-3 font-medium">Reason / status</th>
                     <th className="py-2 font-medium">When</th>
                   </tr>
                 </thead>
@@ -746,15 +994,23 @@ export function CampaignAnalyticsPanel({ workspaceSlug, campaignId }: Props) {
                       <td className="py-2.5 pr-3">
                         <div>{issue.leadName ?? "Unknown"}</div>
                         <div className="text-[var(--color-ink-faint)]">
-                          {issue.emailMasked ?? "—"}
+                          {isNewsletter
+                            ? (issue.email ?? issue.emailMasked ?? "—")
+                            : (issue.emailMasked ?? "—")}
                         </div>
                       </td>
-                      <td className="py-2.5 pr-3">
-                        {issue.stepOrder ? `Step ${issue.stepOrder}` : "—"}
-                        {issue.stepSubject ? ` · ${issue.stepSubject}` : ""}
+                      {!isNewsletter ? (
+                        <td className="py-2.5 pr-3">
+                          {issue.stepOrder ? `Step ${issue.stepOrder}` : "—"}
+                          {issue.stepSubject ? ` · ${issue.stepSubject}` : ""}
+                        </td>
+                      ) : null}
+                      <td className="py-2.5 pr-3 capitalize">
+                        {issue.issueType.replace("_", " ")}
                       </td>
-                      <td className="py-2.5 pr-3 capitalize">{issue.issueType}</td>
-                      <td className="py-2.5 pr-3">{issue.reason ?? "—"}</td>
+                      <td className="py-2.5 pr-3 max-w-[280px] truncate">
+                        {issue.reason ?? "—"}
+                      </td>
                       <td className="py-2.5">
                         {new Date(issue.eventAt).toLocaleString()}
                       </td>
