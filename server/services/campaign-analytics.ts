@@ -938,9 +938,17 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
   const includeSendFailures =
     input.includeSendFailures ?? campaign.kind === "newsletter";
 
-  const providerIssueMatch = {
+  /**
+   * Match conditions must follow classifyNewsletterIssue priority
+   * (complained > bounced > provider failed > delayed) so countDocuments
+   * and returned rows stay aligned for issueType filters.
+   */
+  const sentInPeriod = {
     status: "sent" as const,
     sentAt: { $gte: input.from, $lte: input.to },
+  };
+  const providerIssueMatch = {
+    ...sentInPeriod,
     $or: [
       { bouncedAt: { $ne: null } },
       { providerFailedAt: { $ne: null } },
@@ -948,7 +956,6 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
       { deliveryDelayedAt: { $ne: null } },
     ],
   };
-
   const sendFailureMatch = {
     status: { $in: ["failed", "skipped"] as const },
     scheduledFor: { $gte: input.from, $lte: input.to },
@@ -957,46 +964,45 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
   const match: Record<string, unknown> = {
     workspaceId: oid(workspaceId),
     campaignId: oid(campaignId),
-    ...(includeSendFailures
-      ? { $or: [providerIssueMatch, sendFailureMatch] }
-      : providerIssueMatch),
   };
 
   if (input.issueType === "skipped") {
     match.status = "skipped";
     match.scheduledFor = { $gte: input.from, $lte: input.to };
-    delete match.$or;
-  } else if (input.issueType === "failed") {
-    match.$or = [
-      {
-        status: "sent",
-        sentAt: { $gte: input.from, $lte: input.to },
-        providerFailedAt: { $ne: null },
-      },
-      ...(includeSendFailures
-        ? [
-            {
-              status: "failed",
-              scheduledFor: { $gte: input.from, $lte: input.to },
-            },
-          ]
-        : []),
-    ];
-  } else if (input.issueType === "bounced") {
-    match.status = "sent";
-    match.sentAt = { $gte: input.from, $lte: input.to };
-    match.bouncedAt = { $ne: null };
-    delete match.$or;
   } else if (input.issueType === "complained") {
-    match.status = "sent";
-    match.sentAt = { $gte: input.from, $lte: input.to };
-    match.complainedAt = { $ne: null };
-    delete match.$or;
+    Object.assign(match, sentInPeriod, { complainedAt: { $ne: null } });
+  } else if (input.issueType === "bounced") {
+    Object.assign(match, sentInPeriod, {
+      bouncedAt: { $ne: null },
+      complainedAt: null,
+    });
+  } else if (input.issueType === "failed") {
+    const providerFailedExclusive = {
+      ...sentInPeriod,
+      providerFailedAt: { $ne: null },
+      complainedAt: null,
+      bouncedAt: null,
+    };
+    match.$or = includeSendFailures
+      ? [
+          providerFailedExclusive,
+          {
+            status: "failed",
+            scheduledFor: { $gte: input.from, $lte: input.to },
+          },
+        ]
+      : [providerFailedExclusive];
   } else if (input.issueType === "delayed") {
-    match.status = "sent";
-    match.sentAt = { $gte: input.from, $lte: input.to };
-    match.deliveryDelayedAt = { $ne: null };
-    delete match.$or;
+    Object.assign(match, sentInPeriod, {
+      deliveryDelayedAt: { $ne: null },
+      complainedAt: null,
+      bouncedAt: null,
+      providerFailedAt: null,
+    });
+  } else if (includeSendFailures) {
+    match.$or = [providerIssueMatch, sendFailureMatch];
+  } else {
+    Object.assign(match, providerIssueMatch);
   }
 
   const [total, docs] = await Promise.all([
@@ -1050,7 +1056,8 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
       leadId: lead?.id ?? null,
       leadName: lead?.fullName ?? null,
       emailMasked: maskEmail(lead?.email),
-      email: lead?.email ?? null,
+      // Cleartext email only for newsletters (product ask). Drips keep masked-only.
+      email: campaign.kind === "newsletter" ? (lead?.email ?? null) : null,
       stepId: doc.campaignStepId.toString(),
       stepOrder: step?.order ?? null,
       stepSubject: step?.subject ?? null,
@@ -1110,14 +1117,17 @@ export async function listCampaignAnalyticsEngagementForWorkspace(
     match.firstOpenedAt = null;
   }
 
-  const sort =
-    input.partition === "opened"
-      ? { firstOpenedAt: -1 as const }
-      : { deliveredAt: -1 as const };
-
   const [total, docs] = await Promise.all([
     CampaignSendModel.countDocuments(match),
-    CampaignSendModel.find(match).sort(sort).skip(skip).limit(pageSize).lean(),
+    CampaignSendModel.find(match)
+      .sort(
+        input.partition === "opened"
+          ? { firstOpenedAt: -1 }
+          : { deliveredAt: -1 },
+      )
+      .skip(skip)
+      .limit(pageSize)
+      .lean(),
   ]);
 
   const leadIds = [

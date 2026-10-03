@@ -359,4 +359,98 @@ describe("engagement + issues service listing", () => {
       }),
     ).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
   });
+
+  it("uses exclusive delayed match so bounced+delayed rows are not counted as delayed", async () => {
+    vi.mocked(CampaignSendModel.countDocuments).mockResolvedValue(0 as never);
+    mockFindChain([]);
+
+    await listCampaignAnalyticsIssuesForWorkspace(WORKSPACE_ID, CAMPAIGN_ID, {
+      from: new Date("2026-09-01T00:00:00.000Z"),
+      to: new Date("2026-10-03T00:00:00.000Z"),
+      userId: "user-1",
+      issueType: "delayed",
+    });
+
+    expect(CampaignSendModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "sent",
+        deliveryDelayedAt: { $ne: null },
+        bouncedAt: null,
+        providerFailedAt: null,
+        complainedAt: null,
+      }),
+    );
+  });
+
+  it("uses exclusive bounced match excluding complaints", async () => {
+    vi.mocked(CampaignSendModel.countDocuments).mockResolvedValue(0 as never);
+    mockFindChain([]);
+
+    await listCampaignAnalyticsIssuesForWorkspace(WORKSPACE_ID, CAMPAIGN_ID, {
+      from: new Date("2026-09-01T00:00:00.000Z"),
+      to: new Date("2026-10-03T00:00:00.000Z"),
+      userId: "user-1",
+      issueType: "bounced",
+    });
+
+    expect(CampaignSendModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "sent",
+        bouncedAt: { $ne: null },
+        complainedAt: null,
+      }),
+    );
+  });
+
+  it("returns cleartext email on newsletter issues only", async () => {
+    vi.mocked(CampaignSendModel.countDocuments).mockResolvedValue(1 as never);
+    mockFindChain([
+      {
+        _id: { toString: () => "507f1f77bcf86cd799439025" },
+        campaignStepId: { toString: () => "507f1f77bcf86cd799439031" },
+        leadId: { toString: () => LEAD_ID },
+        status: "sent",
+        error: null,
+        providerError: "550 mailbox unavailable",
+        bouncedAt: new Date("2026-10-01T09:12:00.000Z"),
+        providerFailedAt: null,
+        complainedAt: null,
+        deliveryDelayedAt: null,
+        sentAt: new Date("2026-10-01T09:00:00.000Z"),
+        scheduledFor: new Date("2026-10-01T09:00:00.000Z"),
+        createdAt: new Date("2026-10-01T09:00:00.000Z"),
+      },
+    ]);
+
+    const newsletterResult = await listCampaignAnalyticsIssuesForWorkspace(
+      WORKSPACE_ID,
+      CAMPAIGN_ID,
+      {
+        from: new Date("2026-09-01T00:00:00.000Z"),
+        to: new Date("2026-10-03T00:00:00.000Z"),
+        userId: "user-1",
+        issueType: "bounced",
+      },
+    );
+    expect(newsletterResult.issues[0]?.email).toBe("ada@example.com");
+    expect(newsletterResult.issues[0]?.emailMasked).toMatch(/@example\.com$/);
+
+    vi.mocked(findCampaignById).mockResolvedValue({
+      ...newsletter,
+      kind: "drip",
+    } as never);
+
+    const dripResult = await listCampaignAnalyticsIssuesForWorkspace(
+      WORKSPACE_ID,
+      CAMPAIGN_ID,
+      {
+        from: new Date("2026-09-01T00:00:00.000Z"),
+        to: new Date("2026-10-03T00:00:00.000Z"),
+        userId: "user-1",
+        issueType: "bounced",
+      },
+    );
+    expect(dripResult.issues[0]?.email).toBeNull();
+    expect(dripResult.issues[0]?.emailMasked).toMatch(/@example\.com$/);
+  });
 });
