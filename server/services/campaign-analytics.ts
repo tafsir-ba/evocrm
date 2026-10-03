@@ -11,6 +11,14 @@ import {
   type CampaignAnalyticsPeriodPreset,
   type CampaignHealthResult,
 } from "@/lib/campaign-analytics";
+import {
+  NEWSLETTER_DELIVERY_RATE_FORMULA,
+  NEWSLETTER_NOT_OPENED_BASIS,
+  buildNewsletterDeliveryRateSummary,
+  classifyNewsletterIssue,
+  type EngagementPartition,
+  type NewsletterIssueType,
+} from "@/lib/newsletter-engagement-analytics";
 import { AppError } from "@/server/errors";
 import { connectDb } from "@/server/db/mongoose";
 import { CampaignSendModel } from "@/models/campaign-send";
@@ -79,12 +87,23 @@ export type CampaignAnalyticsIssue = {
   leadId: string | null;
   leadName: string | null;
   emailMasked: string | null;
+  email: string | null;
   stepId: string;
   stepOrder: number | null;
   stepSubject: string | null;
-  issueType: "bounced" | "failed" | "complained" | "delayed";
+  issueType: NewsletterIssueType;
   reason: string | null;
   eventAt: string;
+};
+
+export type CampaignAnalyticsEngagementRecipient = {
+  id: string;
+  leadId: string | null;
+  leadName: string | null;
+  email: string | null;
+  firstOpenedAt: string | null;
+  deliveredAt: string | null;
+  sentAt: string | null;
 };
 
 export type CampaignAnalyticsReport = {
@@ -130,11 +149,16 @@ export type CampaignAnalyticsReport = {
   newsletterSummary: {
     recipientsQueued: number;
     stillQueued: number;
+    queued: number;
     sent: number;
     delivered: number;
     failed: number;
     bounced: number;
     skipped: number;
+    /** Provider-accepted sends (same as sent). */
+    attempted: number;
+    /** delivered / sent × 100. */
+    deliveryRate: number | null;
     uniqueOpens: number;
     uniqueClicks: number;
     unsubscribes: number;
@@ -146,6 +170,8 @@ export type CampaignAnalyticsReport = {
       failed: number;
       skipped: number;
     };
+    /** Documents not-opened basis for engagement lists. */
+    notOpenedBasis: string;
   } | null;
   cards: MetricCardData[];
   funnel: Array<{
@@ -739,26 +765,43 @@ export async function getCampaignAnalyticsForWorkspace(
 
   const newsletterSummary =
     campaign.kind === "newsletter" && sendStatusCounts && newsletterLifetime
-      ? {
-          recipientsQueued:
+      ? (() => {
+          const recipientsQueued =
             campaign.audienceSummary?.queued ??
             sendStatusCounts.queued +
               sendStatusCounts.sent +
               sendStatusCounts.failed +
-              sendStatusCounts.skipped,
-          stillQueued,
-          sent: sendStatusCounts.sent,
-          delivered: newsletterLifetime.delivered,
-          failed: sendStatusCounts.failed,
-          bounced: newsletterLifetime.bounced,
-          skipped: sendStatusCounts.skipped,
-          uniqueOpens: newsletterLifetime.opened,
-          uniqueClicks: newsletterLifetime.clicked,
-          unsubscribes: newsletterUnsubscribed,
-          audienceLockedAt: campaign.audienceLockedAt?.toISOString() ?? null,
-          unknownConsentAtLock: campaign.audienceSummary?.unknownConsent ?? null,
-          sendStatusCounts,
-        }
+              sendStatusCounts.skipped;
+          const delivery = buildNewsletterDeliveryRateSummary({
+            queued: sendStatusCounts.queued,
+            stillQueued,
+            sent: sendStatusCounts.sent,
+            delivered: newsletterLifetime.delivered,
+            failed: sendStatusCounts.failed,
+            bounced: newsletterLifetime.bounced,
+            skipped: sendStatusCounts.skipped,
+          });
+
+          return {
+            recipientsQueued,
+            stillQueued: delivery.stillQueued,
+            queued: delivery.queued,
+            sent: delivery.sent,
+            delivered: delivery.delivered,
+            failed: delivery.failed,
+            bounced: delivery.bounced,
+            skipped: delivery.skipped,
+            attempted: delivery.attempted,
+            deliveryRate: delivery.deliveryRate,
+            uniqueOpens: newsletterLifetime.opened,
+            uniqueClicks: newsletterLifetime.clicked,
+            unsubscribes: newsletterUnsubscribed,
+            audienceLockedAt: campaign.audienceLockedAt?.toISOString() ?? null,
+            unknownConsentAtLock: campaign.audienceSummary?.unknownConsent ?? null,
+            sendStatusCounts,
+            notOpenedBasis: NEWSLETTER_NOT_OPENED_BASIS,
+          };
+        })()
       : null;
 
   return {
@@ -844,8 +887,16 @@ export async function getCampaignAnalyticsForWorkspace(
       clickToOpenRate: "unique clicked / unique opened × 100",
       unsubscribeRate: "campaign unsubscribes / unique delivered × 100",
       complaintRate: "unique complained / unique delivered × 100",
+      newsletterDeliveryRate: NEWSLETTER_DELIVERY_RATE_FORMULA,
+      newsletterNotOpened: NEWSLETTER_NOT_OPENED_BASIS,
     },
   };
+}
+
+function toIso(value: Date | string | null | undefined, fallback: Date): string {
+  if (!value) return fallback.toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value).toISOString();
 }
 
 export async function listCampaignAnalyticsIssuesForWorkspace(
@@ -857,6 +908,13 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
     page?: number;
     pageSize?: number;
     userId?: string;
+    /** Optional filter; when omitted returns all issue types. */
+    issueType?: NewsletterIssueType;
+    /**
+     * When true (default for newsletters), include status failed/skipped rows
+     * in addition to provider outcomes on sent rows.
+     */
+    includeSendFailures?: boolean;
   },
 ): Promise<{ issues: CampaignAnalyticsIssue[]; total: number }> {
   const campaign = await findCampaignById(workspaceId, campaignId);
@@ -877,12 +935,20 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
   const page = input.page ?? 1;
   const pageSize = Math.min(input.pageSize ?? 25, 100);
   const skip = (page - 1) * pageSize;
+  const includeSendFailures =
+    input.includeSendFailures ?? campaign.kind === "newsletter";
 
-  const match = {
-    workspaceId: oid(workspaceId),
-    campaignId: oid(campaignId),
-    status: "sent",
+  /**
+   * Match conditions must follow classifyNewsletterIssue priority
+   * (complained > bounced > provider failed > delayed) so countDocuments
+   * and returned rows stay aligned for issueType filters.
+   */
+  const sentInPeriod = {
+    status: "sent" as const,
     sentAt: { $gte: input.from, $lte: input.to },
+  };
+  const providerIssueMatch = {
+    ...sentInPeriod,
     $or: [
       { bouncedAt: { $ne: null } },
       { providerFailedAt: { $ne: null } },
@@ -890,11 +956,59 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
       { deliveryDelayedAt: { $ne: null } },
     ],
   };
+  const sendFailureMatch = {
+    status: { $in: ["failed", "skipped"] as const },
+    scheduledFor: { $gte: input.from, $lte: input.to },
+  };
+
+  const match: Record<string, unknown> = {
+    workspaceId: oid(workspaceId),
+    campaignId: oid(campaignId),
+  };
+
+  if (input.issueType === "skipped") {
+    match.status = "skipped";
+    match.scheduledFor = { $gte: input.from, $lte: input.to };
+  } else if (input.issueType === "complained") {
+    Object.assign(match, sentInPeriod, { complainedAt: { $ne: null } });
+  } else if (input.issueType === "bounced") {
+    Object.assign(match, sentInPeriod, {
+      bouncedAt: { $ne: null },
+      complainedAt: null,
+    });
+  } else if (input.issueType === "failed") {
+    const providerFailedExclusive = {
+      ...sentInPeriod,
+      providerFailedAt: { $ne: null },
+      complainedAt: null,
+      bouncedAt: null,
+    };
+    match.$or = includeSendFailures
+      ? [
+          providerFailedExclusive,
+          {
+            status: "failed",
+            scheduledFor: { $gte: input.from, $lte: input.to },
+          },
+        ]
+      : [providerFailedExclusive];
+  } else if (input.issueType === "delayed") {
+    Object.assign(match, sentInPeriod, {
+      deliveryDelayedAt: { $ne: null },
+      complainedAt: null,
+      bouncedAt: null,
+      providerFailedAt: null,
+    });
+  } else if (includeSendFailures) {
+    match.$or = [providerIssueMatch, sendFailureMatch];
+  } else {
+    Object.assign(match, providerIssueMatch);
+  }
 
   const [total, docs] = await Promise.all([
     CampaignSendModel.countDocuments(match),
     CampaignSendModel.find(match)
-      .sort({ lastProviderEventAt: -1, sentAt: -1 })
+      .sort({ lastProviderEventAt: -1, sentAt: -1, scheduledFor: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean(),
@@ -915,38 +1029,136 @@ export async function listCampaignAnalyticsIssuesForWorkspace(
   const leads = await findLeadsByIds(workspaceId, leadIds);
   const leadMap = new Map(leads.map((lead) => [lead.id, lead]));
 
-  const issues: CampaignAnalyticsIssue[] = docs.map((doc) => {
+  const issues: CampaignAnalyticsIssue[] = [];
+
+  for (const doc of docs) {
+    const classified = classifyNewsletterIssue({
+      status: doc.status as "queued" | "sent" | "failed" | "skipped",
+      bouncedAt: doc.bouncedAt,
+      providerFailedAt: doc.providerFailedAt,
+      complainedAt: doc.complainedAt,
+      deliveryDelayedAt: doc.deliveryDelayedAt,
+      error: doc.error,
+      providerError: doc.providerError,
+      sentAt: doc.sentAt,
+      createdAt: doc.createdAt,
+      scheduledFor: doc.scheduledFor,
+    });
+
+    if (!classified) continue;
+    if (input.issueType && classified.issueType !== input.issueType) continue;
+
     const step = stepMap.get(doc.campaignStepId.toString());
     const lead = doc.leadId ? leadMap.get(doc.leadId.toString()) : null;
-    let issueType: CampaignAnalyticsIssue["issueType"] = "delayed";
-    let eventAt = doc.deliveryDelayedAt ?? doc.sentAt ?? doc.createdAt;
-    let reason = doc.providerError ?? null;
 
-    if (doc.complainedAt) {
-      issueType = "complained";
-      eventAt = doc.complainedAt;
-      reason = "Spam complaint";
-    } else if (doc.bouncedAt) {
-      issueType = "bounced";
-      eventAt = doc.bouncedAt;
-    } else if (doc.providerFailedAt) {
-      issueType = "failed";
-      eventAt = doc.providerFailedAt;
-    }
-
-    return {
+    issues.push({
       id: doc._id.toString(),
       leadId: lead?.id ?? null,
       leadName: lead?.fullName ?? null,
       emailMasked: maskEmail(lead?.email),
+      // Cleartext email only for newsletters (product ask). Drips keep masked-only.
+      email: campaign.kind === "newsletter" ? (lead?.email ?? null) : null,
       stepId: doc.campaignStepId.toString(),
       stepOrder: step?.order ?? null,
       stepSubject: step?.subject ?? null,
-      issueType,
-      reason,
-      eventAt: eventAt.toISOString(),
+      issueType: classified.issueType,
+      reason: classified.reason,
+      eventAt: toIso(classified.eventAt, doc.createdAt),
+    });
+  }
+
+  return { issues, total };
+}
+
+export async function listCampaignAnalyticsEngagementForWorkspace(
+  workspaceId: string,
+  campaignId: string,
+  input: {
+    partition: EngagementPartition;
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+  },
+): Promise<{
+  recipients: CampaignAnalyticsEngagementRecipient[];
+  total: number;
+  partition: EngagementPartition;
+  notOpenedBasis: string;
+}> {
+  const campaign = await findCampaignById(workspaceId, campaignId);
+
+  if (!campaign) {
+    throw new AppError("NOT_FOUND", "Campaign not found.");
+  }
+
+  await assertMultiProjectRecordAccess(
+    workspaceId,
+    input.userId,
+    campaign.projectIds,
+    "campaign:read",
+  );
+
+  await connectDb();
+
+  const page = input.page ?? 1;
+  const pageSize = Math.min(input.pageSize ?? 25, 100);
+  const skip = (page - 1) * pageSize;
+
+  const match: Record<string, unknown> = {
+    workspaceId: oid(workspaceId),
+    campaignId: oid(campaignId),
+    status: "sent",
+  };
+
+  if (input.partition === "opened") {
+    match.firstOpenedAt = { $ne: null };
+  } else {
+    match.deliveredAt = { $ne: null };
+    match.firstOpenedAt = null;
+  }
+
+  const [total, docs] = await Promise.all([
+    CampaignSendModel.countDocuments(match),
+    CampaignSendModel.find(match)
+      .sort(
+        input.partition === "opened"
+          ? { firstOpenedAt: -1 }
+          : { deliveredAt: -1 },
+      )
+      .skip(skip)
+      .limit(pageSize)
+      .lean(),
+  ]);
+
+  const leadIds = [
+    ...new Set(
+      docs
+        .map((doc) => doc.leadId?.toString())
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const { findLeadsByIds } = await import("@/server/repositories/leads");
+  const leads = await findLeadsByIds(workspaceId, leadIds);
+  const leadMap = new Map(leads.map((lead) => [lead.id, lead]));
+
+  const recipients: CampaignAnalyticsEngagementRecipient[] = docs.map((doc) => {
+    const lead = doc.leadId ? leadMap.get(doc.leadId.toString()) : null;
+    return {
+      id: doc._id.toString(),
+      leadId: lead?.id ?? null,
+      leadName: lead?.fullName ?? null,
+      email: lead?.email ?? null,
+      firstOpenedAt: doc.firstOpenedAt?.toISOString() ?? null,
+      deliveredAt: doc.deliveredAt?.toISOString() ?? null,
+      sentAt: doc.sentAt?.toISOString() ?? null,
     };
   });
 
-  return { issues, total };
+  return {
+    recipients,
+    total,
+    partition: input.partition,
+    notOpenedBasis: NEWSLETTER_NOT_OPENED_BASIS,
+  };
 }
