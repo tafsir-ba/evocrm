@@ -18,12 +18,17 @@ import {
   type AttributionTouchpointRecord,
 } from "@/server/repositories/attribution-touchpoints";
 import {
+  isPaidAdsQaExcludedLead,
+  paidAdsQaExclusionNotice,
+} from "@/lib/paid-ads-qa-exclusion";
+import {
   createConversionEvent,
   findConversionEvents,
   type ConversionEventRecord,
   type ConversionMilestone,
 } from "@/server/repositories/conversion-events";
 import { findGrowthCampaigns } from "@/server/repositories/growth-campaigns";
+import { findLeadsByIds } from "@/server/repositories/leads";
 
 const LAST_TOUCH_LABEL = "Last touch — the most recent paid click gets the credit (v1)";
 
@@ -209,17 +214,48 @@ export async function summarizeProjectOutcomeFunnel(
   costPerFormLead: number | null;
   costPerQualifiedLead: number | null;
   roas: number | null;
+  /** Distinct leads skipped as QA / synthetic (do not affect costs or advice). */
+  excludedTestLeads: number;
+  /** Kids-friendly notice when exclusions applied; null otherwise. */
+  exclusionNotice: string | null;
 }> {
   const events = await findConversionEvents(workspaceId, { projectId });
-  const formLeads = events.filter((e) => e.milestone === "form_lead").length;
-  const qualifiedLeads = events.filter((e) => e.milestone === "qualified_lead").length;
-  const opportunities = events.filter((e) => e.milestone === "opportunity_created").length;
-  const wonEvents = events.filter((e) => e.milestone === "won");
-  const lostCount = events.filter((e) => e.milestone === "lost").length;
+  const leadIds = [
+    ...new Set(
+      events
+        .map((event) => event.leadId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  const leads = await findLeadsByIds(workspaceId, leadIds);
+  const excludedLeadIds = new Set(
+    leads
+      .filter((lead) =>
+        isPaidAdsQaExcludedLead({
+          email: lead.email,
+          emailNormalized: lead.emailNormalized,
+          phone: lead.phone,
+          phoneNormalized: lead.phoneNormalized,
+          notes: lead.notes,
+          attributes: lead.attributes,
+        }),
+      )
+      .map((lead) => lead.id),
+  );
+  const counted = events.filter(
+    (event) => !event.leadId || !excludedLeadIds.has(event.leadId),
+  );
+
+  const formLeads = counted.filter((e) => e.milestone === "form_lead").length;
+  const qualifiedLeads = counted.filter((e) => e.milestone === "qualified_lead").length;
+  const opportunities = counted.filter((e) => e.milestone === "opportunity_created").length;
+  const wonEvents = counted.filter((e) => e.milestone === "won");
+  const lostCount = counted.filter((e) => e.milestone === "lost").length;
   const wonValue = wonEvents.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
-  const pipelineValue = events
+  const pipelineValue = counted
     .filter((e) => e.milestone === "opportunity_created")
     .reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+  const excludedTestLeads = excludedLeadIds.size;
 
   return {
     attributionModel: "last_touch",
@@ -234,5 +270,7 @@ export async function summarizeProjectOutcomeFunnel(
     costPerFormLead: formLeads > 0 ? spend / formLeads : null,
     costPerQualifiedLead: qualifiedLeads > 0 ? spend / qualifiedLeads : null,
     roas: spend > 0 && wonValue > 0 ? wonValue / spend : null,
+    excludedTestLeads,
+    exclusionNotice: paidAdsQaExclusionNotice(excludedTestLeads),
   };
 }

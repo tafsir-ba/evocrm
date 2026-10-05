@@ -246,6 +246,8 @@ describe("sync service write-guard + isolation", () => {
       costPerFormLead: null,
       costPerQualifiedLead: null,
       roas: null,
+      excludedTestLeads: 0,
+      exclusionNotice: null,
     }));
 
     vi.doMock("@/server/repositories/growth-campaigns", () => ({

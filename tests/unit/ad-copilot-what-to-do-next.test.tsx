@@ -128,6 +128,9 @@ describe("GrowthCampaignOverviewPanel", () => {
               costPerQualifiedLead: null,
               roas: null,
               freshnessLabel: "Updated recently",
+              excludedTestLeads: 1,
+              exclusionNotice:
+                "We hid 1 test form fill so it does not change your results.",
             },
             funnel,
             optimisation,
@@ -145,6 +148,9 @@ describe("GrowthCampaignOverviewPanel", () => {
     expect(await screen.findByText("What to do next")).toBeInTheDocument();
     expect(screen.getByText("Check the landing page tracking")).toBeInTheDocument();
     expect(screen.getByText("Paid ads for Satigny duplex")).toBeInTheDocument();
+    expect(
+      screen.getByText("We hid 1 test form fill so it does not change your results."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /publish|budget|pause/i })).not.toBeInTheDocument();
   });
 

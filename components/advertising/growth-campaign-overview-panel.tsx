@@ -54,6 +54,8 @@ type Overview = {
     costPerQualifiedLead: number | null;
     roas: number | null;
     freshnessLabel: string;
+    excludedTestLeads?: number;
+    exclusionNotice?: string | null;
   };
   analytics: {
     metricTierLabel: string;
@@ -170,6 +172,14 @@ export function GrowthCampaignOverviewPanel({
             "Last touch — the most recent paid click gets the credit (v1)"}
           . Freshness: {outcomes?.freshnessLabel ?? overview.analytics.freshnessLabel}.
         </p>
+        {outcomes?.exclusionNotice ? (
+          <p
+            className="text-[12.5px] text-[var(--color-ink-muted)]"
+            data-testid="paid-ads-qa-exclusion-notice"
+          >
+            {outcomes.exclusionNotice}
+          </p>
+        ) : null}
         {outcomes &&
         outcomes.formLeads +
           outcomes.qualifiedLeads +
