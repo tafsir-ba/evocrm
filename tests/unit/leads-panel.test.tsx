@@ -471,6 +471,89 @@ describe("LeadsPanel table", () => {
     expect(screen.queryByRole("button", { name: "Add quick note for François Côté" })).not.toBeInTheDocument();
   });
 
+  it("enriches a lead from its row and requests the market estimate after a unique match", async () => {
+    const user = userEvent.setup();
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith(`/leads/${sampleLead.id}/enrichment`) && init?.method === "POST") {
+        return jsonResponse({
+          data: {
+            run: {
+              id: "run-1",
+              status: "accepted",
+              identityMatch: "unique",
+              identityRationale: null,
+              failureMessage: null,
+              demoMode: false,
+              candidates: [],
+              selectedCandidateId: null,
+            },
+          },
+        });
+      }
+      if (url.endsWith(`/leads/${sampleLead.id}`) && (!init?.method || init.method === "GET")) {
+        return jsonResponse({
+          data: {
+            lead: { ...sampleLead, city: "Genève", country: "Switzerland", jobTitle: "Buyer" },
+          },
+        });
+      }
+      if (url.endsWith("/financial-situation/market-estimate") && init?.method === "POST") {
+        return jsonResponse({ data: { estimate: {} } });
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch;
+
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        canEnrich
+        canRequestMarketEstimate
+      />,
+    );
+
+    const enrichButtons = await screen.findAllByRole("button", { name: "Enrich François Côté" });
+    await user.click(enrichButtons[0]!);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls;
+      expect(
+        calls.some(
+          ([input, init]) =>
+            String(input) === `/api/workspaces/demo/leads/${sampleLead.id}/enrichment` &&
+            init?.method === "POST",
+        ),
+      ).toBe(true);
+      expect(
+        calls.some(
+          ([input, init]) =>
+            String(input).endsWith("/financial-situation/market-estimate") &&
+            init?.method === "POST",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("hides the enrich action without enrichment access or on archived leads", async () => {
+    const { unmount } = render(
+      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />,
+    );
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Enrich François Côté" })).not.toBeInTheDocument();
+    unmount();
+
+    mockLeadsFetch([{ ...sampleLead, archivedAt: "2026-08-29T12:00:00.000Z" }]);
+    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate canEnrich />);
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Enrich François Côté" })).not.toBeInTheDocument();
+  });
+
   it("hides assign and status controls when the user cannot update leads", async () => {
     const user = userEvent.setup();
     render(

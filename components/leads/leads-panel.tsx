@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  LeadEnrichmentModal,
+  type EnrichmentAppliedRun,
+} from "@/components/leads/lead-enrichment-modal";
 import { LeadsTable, type LeadTableMember } from "@/components/leads/leads-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +27,8 @@ import {
 } from "@/lib/lead-preferences";
 import { slugifyDictionaryKey } from "@/lib/dictionary-form-helpers";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
+import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
+import { requestMarketEstimateAfterEnrichment } from "@/lib/lead-enrichment-followup-client";
 import {
   canCreateLeadNote,
   createLeadNote,
@@ -105,6 +111,8 @@ type LeadsPanelProps = {
   canUpdate: boolean;
   canManageStatuses?: boolean;
   canCreateNotes?: boolean;
+  canEnrich?: boolean;
+  canRequestMarketEstimate?: boolean;
 };
 
 export function LeadsPanel({
@@ -116,6 +124,8 @@ export function LeadsPanel({
   canUpdate,
   canManageStatuses = false,
   canCreateNotes = false,
+  canEnrich = false,
+  canRequestMarketEstimate = false,
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,6 +174,7 @@ export function LeadsPanel({
   const [members, setMembers] = useState<LeadTableMember[]>([]);
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
   const [noteActivityIds, setNoteActivityIds] = useState<LeadNoteActivityIds>(NO_NOTE_ACTIVITY_IDS);
+  const [enrichLeadId, setEnrichLeadId] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -707,6 +718,18 @@ export function LeadsPanel({
     }
   }
 
+  async function handleEnriched(leadId: string, run: EnrichmentAppliedRun) {
+    await loadLeads({ silent: true });
+    if (!canRequestMarketEstimate || !isUniqueEnrichmentReveal(run)) {
+      return;
+    }
+    try {
+      await requestMarketEstimateAfterEnrichment({ apiBase, leadId });
+    } catch {
+      // The estimate is best-effort; the profile still offers it from the financial tab.
+    }
+  }
+
   async function handleAddNote(leadId: string, body: string, followUpIso: string | null) {
     await createLeadNote({ apiBase, leadId, body, followUpIso, ids: noteActivityIds });
     await loadLeads({ silent: true });
@@ -1119,6 +1142,7 @@ export function LeadsPanel({
             canDelete={canDelete}
             canManageStatuses={canManageStatuses}
             canAddNotes={canCreateNotes && canCreateLeadNote(noteActivityIds)}
+            canEnrich={canEnrich}
             selectedLeadIds={selectedLeadIds}
             selectAllMatching={selectAllMatching}
             excludedLeadIds={excludedLeadIds}
@@ -1131,6 +1155,7 @@ export function LeadsPanel({
             onStatusChange={(leadId, statusId) => void handleStatusChange(leadId, statusId)}
             onCreateStatus={handleCreateStatus}
             onAddNote={handleAddNote}
+            onEnrich={setEnrichLeadId}
             onArchive={(leadId, leadName) => void handleArchive(leadId, leadName)}
             onRestore={(leadId, leadName) => void handleRestore(leadId, leadName)}
           />
@@ -1171,6 +1196,16 @@ export function LeadsPanel({
         </div>
       )}
 
+      {canEnrich && enrichLeadId ? (
+        <LeadEnrichmentModal
+          key={enrichLeadId}
+          open
+          onClose={() => setEnrichLeadId(null)}
+          workspaceSlug={workspaceSlug}
+          leadId={enrichLeadId}
+          onApplied={(run) => void handleEnriched(enrichLeadId, run)}
+        />
+      ) : null}
     </div>
   );
 }

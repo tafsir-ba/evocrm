@@ -2,11 +2,21 @@ import { LeadsPanel } from "@/components/leads/leads-panel";
 import { PageContainer } from "@/components/layout/page-header";
 import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { hasPermission } from "@/server/permissions/permissions";
+import { getLeadEnrichmentCapability } from "@/server/services/lead-enrichment";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
 type Params = Promise<{ workspaceSlug: string }>;
 
 export const metadata = { title: "Leads — EvoHome CRM" };
+
+async function isLeadEnrichmentEnabled(workspaceId: string): Promise<boolean> {
+  try {
+    const capability = await getLeadEnrichmentCapability(workspaceId);
+    return capability.enabled;
+  } catch {
+    return false;
+  }
+}
 
 export default async function LeadsPage({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
@@ -23,6 +33,9 @@ export default async function LeadsPage({ params }: { params: Params }) {
   }
 
   const permissions = access.context.membership.role.permissions;
+  const canEnrich =
+    hasPermission(permissions, "lead:enrich") &&
+    (await isLeadEnrichmentEnabled(access.context.workspace.id));
 
   return (
     <PageContainer className="flex min-h-0 flex-1 flex-col">
@@ -36,6 +49,8 @@ export default async function LeadsPage({ params }: { params: Params }) {
           canUpdate={hasPermission(permissions, "lead:update")}
           canManageStatuses={hasPermission(permissions, "settings:update")}
           canCreateNotes={hasPermission(permissions, "activity:create")}
+          canEnrich={canEnrich}
+          canRequestMarketEstimate={hasPermission(permissions, "lead:financial_update")}
         />
       </ProjectFilterSuspense>
     </PageContainer>

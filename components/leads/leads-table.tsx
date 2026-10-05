@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
-import { IconChevronDown, IconChevronRight, IconMail, IconPhone } from "@/lib/icons";
+import { IconChevronDown, IconChevronRight, IconMail, IconPhone, IconSparkles } from "@/lib/icons";
 import {
   formatLeadRoleLine,
   formatNextStepCell,
@@ -81,6 +81,7 @@ type LeadsTableProps = {
   canDelete: boolean;
   canManageStatuses: boolean;
   canAddNotes: boolean;
+  canEnrich?: boolean;
   selectedLeadIds: Set<string>;
   selectAllMatching: boolean;
   excludedLeadIds: Set<string>;
@@ -93,6 +94,7 @@ type LeadsTableProps = {
   onStatusChange: (leadId: string, statusId: string) => void;
   onCreateStatus: (leadId: string, label: string) => Promise<void>;
   onAddNote: (leadId: string, body: string, followUpIso: string | null) => Promise<void>;
+  onEnrich?: (leadId: string) => void;
   onArchive: (leadId: string, leadName: string) => void;
   onRestore: (leadId: string, leadName: string) => void;
 };
@@ -380,14 +382,31 @@ function RowActions({
   lead,
   expanded,
   onToggleExpanded,
+  onEnrich,
 }: {
   workspaceSlug: string;
   lead: LeadTableItem;
   expanded: boolean;
   onToggleExpanded: () => void;
+  onEnrich?: () => void;
 }) {
   return (
     <div className="inline-flex items-center justify-end gap-0.5">
+      {onEnrich && !lead.archivedAt ? (
+        <button
+          type="button"
+          className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
+          aria-label={`Enrich ${lead.fullName}`}
+          title="Enrich from public professional sources"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEnrich();
+          }}
+        >
+          <IconSparkles size={12} />
+          Enrich
+        </button>
+      ) : null}
       <button
         type="button"
         className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
@@ -490,6 +509,7 @@ export function LeadsTable({
   canDelete,
   canManageStatuses,
   canAddNotes,
+  canEnrich = false,
   selectedLeadIds,
   selectAllMatching,
   excludedLeadIds,
@@ -502,9 +522,12 @@ export function LeadsTable({
   onStatusChange,
   onCreateStatus,
   onAddNote,
+  onEnrich,
   onArchive,
   onRestore,
 }: LeadsTableProps) {
+  const enrichHandler = (leadId: string) =>
+    canEnrich && onEnrich ? () => onEnrich(leadId) : undefined;
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
   const columnCount = (canDelete ? 1 : 0) + 12;
 
@@ -556,7 +579,9 @@ export function LeadsTable({
               <th className="w-[12rem] px-1.5 py-1 text-left">Next</th>
               <th className="w-[5.5rem] px-1.5 py-1 text-left">Urgency</th>
               <th className="w-[6.5rem] px-1.5 py-1 text-left">Tags</th>
-              <th className="w-[5.5rem] px-1.5 py-1 text-right">Actions</th>
+              <th className={cn("px-1.5 py-1 text-right", canEnrich ? "w-[9rem]" : "w-[5.5rem]")}>
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -696,6 +721,7 @@ export function LeadsTable({
                         lead={lead}
                         expanded={expanded}
                         onToggleExpanded={() => toggleExpanded(lead.id)}
+                        onEnrich={enrichHandler(lead.id)}
                       />
                     </td>
                   </tr>
@@ -810,6 +836,7 @@ export function LeadsTable({
                   lead={lead}
                   expanded={expanded}
                   onToggleExpanded={() => toggleExpanded(lead.id)}
+                  onEnrich={enrichHandler(lead.id)}
                 />
               </div>
               {expanded ? (
