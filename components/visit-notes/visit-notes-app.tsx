@@ -27,6 +27,7 @@ import {
   IconArrowLeft,
   IconBuilding,
   IconCamera,
+  IconChart,
   IconClose,
   IconDashboard,
   IconDripping,
@@ -98,6 +99,7 @@ const NOTES_NAV_ICONS: Record<V1NavSegment, typeof IconDashboard> = {
   activities: IconActivities,
   notes: IconNote,
   dripping: IconDripping,
+  advertising: IconChart,
   settings: IconSettings,
 };
 

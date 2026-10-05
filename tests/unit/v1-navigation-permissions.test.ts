@@ -5,6 +5,8 @@ import {
   V1_NAV_ITEMS,
   buildPermissionAwareNavigation,
   getRequiredPermissionForSegment,
+  isPrimaryNavItemActive,
+  navHrefForSegment,
 } from "@/lib/v1-navigation";
 
 describe("permission-aware navigation", () => {
@@ -71,5 +73,77 @@ describe("permission-aware navigation", () => {
     }
 
     expect(labels).toEqual(V1_NAV_ITEMS.map((item) => item.label));
+  });
+
+  it("hides Paid ads when advertising feature flag is off", () => {
+    const navigation = buildPermissionAwareNavigation(
+      "demo",
+      ["settings:read", "advertising:read"],
+      { advertisingEnabled: false },
+    );
+
+    expect(navigation.map((item) => item.label)).toEqual(["Settings"]);
+    expect(
+      navigation.find((item) => item.segment === "advertising"),
+    ).toBeUndefined();
+  });
+
+  it("hides Paid ads when user lacks advertising:read", () => {
+    const navigation = buildPermissionAwareNavigation(
+      "demo",
+      ["settings:read"],
+      { advertisingEnabled: true },
+    );
+
+    expect(navigation.map((item) => item.label)).toEqual(["Settings"]);
+  });
+
+  it("shows Paid ads before Settings when flag on and advertising:read granted", () => {
+    const navigation = buildPermissionAwareNavigation(
+      "demo",
+      ["settings:read", "advertising:read", "dashboard:read"],
+      { advertisingEnabled: true },
+    );
+
+    expect(navigation.map((item) => item.label)).toEqual([
+      "Dashboard",
+      "Paid ads",
+      "Settings",
+    ]);
+    expect(navigation.find((item) => item.segment === "advertising")).toEqual({
+      label: "Paid ads",
+      href: "/w/demo/settings/advertising",
+      permission: "advertising:read",
+      segment: "advertising",
+    });
+  });
+
+  it("links Paid ads to the existing Settings hub", () => {
+    expect(navHrefForSegment("demo", "advertising")).toBe(
+      "/w/demo/settings/advertising",
+    );
+  });
+
+  it("maps advertising segment to advertising:read", () => {
+    expect(getRequiredPermissionForSegment("advertising")).toBe(
+      "advertising:read",
+    );
+  });
+
+  it("activates Paid ads over Settings on the hub path", () => {
+    const navigation = buildPermissionAwareNavigation(
+      "demo",
+      ["settings:read", "advertising:read"],
+      { advertisingEnabled: true },
+    );
+    const paidAds = navigation.find((item) => item.segment === "advertising")!;
+    const settings = navigation.find((item) => item.segment === "settings")!;
+    const hub = "/w/demo/settings/advertising";
+
+    expect(isPrimaryNavItemActive(hub, paidAds, navigation)).toBe(true);
+    expect(isPrimaryNavItemActive(hub, settings, navigation)).toBe(false);
+    expect(
+      isPrimaryNavItemActive("/w/demo/settings/users", settings, navigation),
+    ).toBe(true);
   });
 });

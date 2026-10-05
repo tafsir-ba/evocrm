@@ -108,4 +108,43 @@ describe("app shell navigation", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Leads" })).not.toBeInTheDocument();
   });
+
+  it("does not render Paid ads when advertising is disabled", () => {
+    renderSidebar();
+    expect(
+      screen.queryByRole("link", { name: "Paid ads" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders Paid ads linking to the Settings hub when enabled", () => {
+    render(
+      <WorkspaceShellProvider
+        value={{
+          ...shellValue,
+          navigation: buildPermissionAwareNavigation(
+            "demo-workspace",
+            [
+              "dashboard:read",
+              "project:read",
+              "opportunity:read",
+              "lead:read",
+              "property:read",
+              "activity:read",
+              "campaign:read",
+              "settings:read",
+              "advertising:read",
+            ],
+            { advertisingEnabled: true },
+          ),
+        }}
+      >
+        <Sidebar />
+      </WorkspaceShellProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Paid ads" })).toHaveAttribute(
+      "href",
+      "/w/demo-workspace/settings/advertising",
+    );
+  });
 });

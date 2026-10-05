@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FEATURE_NAV_ITEMS,
   FORBIDDEN_PRIMARY_NAV_LABELS,
   V1_NAV_ITEMS,
   navHrefForSegment,
@@ -21,6 +22,17 @@ describe("V1 navigation scope", () => {
     ]);
   });
 
+  it("keeps Paid ads as a feature-flagged entry outside the locked core list", () => {
+    expect(V1_NAV_ITEMS.map((item) => item.label)).not.toContain("Paid ads");
+    expect(FEATURE_NAV_ITEMS).toEqual([
+      {
+        segment: "advertising",
+        label: "Paid ads",
+        permission: "advertising:read",
+      },
+    ]);
+  });
+
   it("routes Notes to the top-level /notes app", () => {
     expect(navHrefForSegment("demo-workspace", "notes")).toBe("/notes");
     expect(navHrefForSegment("demo-workspace", "dashboard")).toBe(
@@ -29,7 +41,10 @@ describe("V1 navigation scope", () => {
   });
 
   it("does not include forbidden primary nav labels", () => {
-    const labels = V1_NAV_ITEMS.map((item) => item.label);
+    const labels = [
+      ...V1_NAV_ITEMS.map((item) => item.label),
+      ...FEATURE_NAV_ITEMS.map((item) => item.label),
+    ];
     for (const forbidden of FORBIDDEN_PRIMARY_NAV_LABELS) {
       expect(labels).not.toContain(forbidden);
     }

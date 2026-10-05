@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
+import { isAdvertisingEnabled } from "@/lib/advertising-feature";
 import {
   buildPermissionAwareNavigation,
   type WorkspaceNavigationItem,
@@ -237,6 +238,7 @@ export async function getWorkspaceContext(
     const navigation = buildPermissionAwareNavigation(
       workspace.slug,
       access.permissions,
+      { advertisingEnabled: isAdvertisingEnabled() },
     );
 
     return {
@@ -263,6 +265,7 @@ export async function getWorkspaceContext(
   const navigation = buildPermissionAwareNavigation(
     workspace.slug,
     access.permissions,
+    { advertisingEnabled: isAdvertisingEnabled() },
   );
 
   return {

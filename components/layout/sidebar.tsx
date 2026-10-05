@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import {
   IconActivities,
+  IconChart,
   IconChevronDown,
   IconDashboard,
   IconDripping,
@@ -19,7 +20,7 @@ import {
   IconShield,
 } from "@/lib/icons";
 import { workspaceNavPath } from "@/lib/workspace-paths";
-import type { V1NavSegment } from "@/lib/v1-navigation";
+import { isPrimaryNavItemActive, type V1NavSegment } from "@/lib/v1-navigation";
 import { cn } from "@/lib/utils";
 
 const NAV_ICONS = {
@@ -31,6 +32,7 @@ const NAV_ICONS = {
   activities: IconActivities,
   notes: IconNote,
   dripping: IconDripping,
+  advertising: IconChart,
   settings: IconSettings,
 } as const;
 
@@ -103,8 +105,7 @@ export function Sidebar({
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto" aria-label="Primary">
         {navigation.map(({ segment, label, href }) => {
           const Icon = NAV_ICONS[segment as V1NavSegment];
-          const isActive =
-            pathname === href || Boolean(pathname?.startsWith(`${href}/`));
+          const isActive = isPrimaryNavItemActive(pathname, { href }, navigation);
           return (
             <Link
               key={segment}
