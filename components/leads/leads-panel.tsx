@@ -21,7 +21,15 @@ import {
   USAGE_PURPOSES,
   USAGE_PURPOSE_LABELS,
 } from "@/lib/lead-preferences";
+import { slugifyDictionaryKey } from "@/lib/dictionary-form-helpers";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
+import {
+  canCreateLeadNote,
+  createLeadNote,
+  resolveLeadNoteActivityIds,
+  type LeadNoteActivityIds,
+  type LeadNoteDictionaryItem,
+} from "@/lib/lead-notes-client";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -31,6 +39,25 @@ type DictionaryItem = {
   color: string;
   key: string;
   isDefault?: boolean;
+  dictionaryId?: string;
+};
+
+const NEW_STATUS_COLORS = [
+  "#8B5CF6",
+  "#EC4899",
+  "#14B8A6",
+  "#F97316",
+  "#0EA5E9",
+  "#84CC16",
+  "#EF4444",
+  "#6366F1",
+];
+
+const NO_NOTE_ACTIVITY_IDS: LeadNoteActivityIds = {
+  noteTypeId: null,
+  taskTypeId: null,
+  completedStatusId: null,
+  pendingStatusId: null,
 };
 
 type LeadListItem = {
@@ -76,6 +103,8 @@ type LeadsPanelProps = {
   canArchive: boolean;
   canDelete: boolean;
   canUpdate: boolean;
+  canManageStatuses?: boolean;
+  canCreateNotes?: boolean;
 };
 
 export function LeadsPanel({
@@ -85,6 +114,8 @@ export function LeadsPanel({
   canArchive,
   canDelete,
   canUpdate,
+  canManageStatuses = false,
+  canCreateNotes = false,
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -132,6 +163,7 @@ export function LeadsPanel({
   const [showArchived, setShowArchived] = useState(false);
   const [members, setMembers] = useState<LeadTableMember[]>([]);
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
+  const [noteActivityIds, setNoteActivityIds] = useState<LeadNoteActivityIds>(NO_NOTE_ACTIVITY_IDS);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -210,8 +242,40 @@ export function LeadsPanel({
     }
   }, [apiBase]);
 
-  const loadLeads = useCallback(async () => {
-    setLoading(true);
+  const loadNoteActivityIds = useCallback(async () => {
+    if (!canCreateNotes) {
+      setNoteActivityIds(NO_NOTE_ACTIVITY_IDS);
+      return;
+    }
+
+    try {
+      const [typesRes, statusesRes] = await Promise.all([
+        fetch(`${apiBase}/dictionary-items?type=activity_type`),
+        fetch(`${apiBase}/dictionary-items?type=activity_status`),
+      ]);
+      if (!typesRes.ok || !statusesRes.ok) {
+        setNoteActivityIds(NO_NOTE_ACTIVITY_IDS);
+        return;
+      }
+      const [typesPayload, statusesPayload] = await Promise.all([
+        typesRes.json(),
+        statusesRes.json(),
+      ]);
+      setNoteActivityIds(
+        resolveLeadNoteActivityIds(
+          (typesPayload?.data?.items as LeadNoteDictionaryItem[] | undefined) ?? [],
+          (statusesPayload?.data?.items as LeadNoteDictionaryItem[] | undefined) ?? [],
+        ),
+      );
+    } catch {
+      setNoteActivityIds(NO_NOTE_ACTIVITY_IDS);
+    }
+  }, [apiBase, canCreateNotes]);
+
+  const loadLeads = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
     setForbidden(false);
 
@@ -274,6 +338,10 @@ export function LeadsPanel({
   useEffect(() => {
     void loadOptions();
   }, [loadOptions]);
+
+  useEffect(() => {
+    void loadNoteActivityIds();
+  }, [loadNoteActivityIds]);
 
   useEffect(() => {
     void loadLeads();
@@ -552,9 +620,9 @@ export function LeadsPanel({
     leadId: string,
     payload: { statusId?: string; assignedTo?: string | null },
     failureMessage: string,
-  ) {
+  ): Promise<boolean> {
     if (!canUpdate || pendingLeadId) {
-      return;
+      return false;
     }
 
     setPendingLeadId(leadId);
@@ -567,10 +635,11 @@ export function LeadsPanel({
       if (!response.ok) {
         const body = await response.json();
         window.alert(body.error?.message ?? failureMessage);
-        return;
+        return false;
       }
 
-      await loadLeads();
+      await loadLeads({ silent: true });
+      return true;
     } finally {
       setPendingLeadId(null);
     }
@@ -582,6 +651,65 @@ export function LeadsPanel({
 
   async function handleStatusChange(leadId: string, statusId: string) {
     await patchLead(leadId, { statusId }, "Failed to update lead status.");
+  }
+
+  async function postLeadStatus(label: string, dictionaryId: string, key: string) {
+    const response = await fetch(`${apiBase}/dictionary-items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dictionaryId,
+        type: "lead_status",
+        label,
+        key,
+        color: NEW_STATUS_COLORS[statuses.length % NEW_STATUS_COLORS.length],
+      }),
+    });
+    const body = await response.json().catch(() => null);
+    return { response, body };
+  }
+
+  async function handleCreateStatus(leadId: string, label: string) {
+    if (!canManageStatuses) {
+      throw new Error("You do not have permission to create statuses.");
+    }
+    const dictionaryId = statuses.find((status) => status.dictionaryId)?.dictionaryId;
+    if (!dictionaryId) {
+      throw new Error("Lead statuses are not loaded yet. Reload the page and try again.");
+    }
+
+    const baseKey = slugifyDictionaryKey(label) || "status";
+    const takenKeys = new Set(statuses.map((status) => status.key));
+    const uniqueSuffix = () => `_${Date.now().toString(36).slice(-4)}`;
+    const firstKey = takenKeys.has(baseKey) ? `${baseKey.slice(0, 59)}${uniqueSuffix()}` : baseKey;
+
+    let { response, body } = await postLeadStatus(label, dictionaryId, firstKey);
+    if (response.status === 409 && /key/i.test(body?.error?.message ?? "")) {
+      ({ response, body } = await postLeadStatus(
+        label,
+        dictionaryId,
+        `${baseKey.slice(0, 59)}${uniqueSuffix()}`,
+      ));
+    }
+    if (!response.ok) {
+      throw new Error(body?.error?.message ?? "Could not create the status.");
+    }
+
+    const created = body.data.item as DictionaryItem;
+    setStatuses((current) => [...current, created]);
+    const applied = await patchLead(
+      leadId,
+      { statusId: created.id },
+      "Status created, but the lead could not be updated.",
+    );
+    if (!applied) {
+      throw new Error(`Status “${created.label}” was created but not applied to this lead. Pick it from the list.`);
+    }
+  }
+
+  async function handleAddNote(leadId: string, body: string, followUpIso: string | null) {
+    await createLeadNote({ apiBase, leadId, body, followUpIso, ids: noteActivityIds });
+    await loadLeads({ silent: true });
   }
 
   if (forbidden) {
@@ -989,6 +1117,8 @@ export function LeadsPanel({
             canUpdate={canUpdate}
             canArchive={canArchive}
             canDelete={canDelete}
+            canManageStatuses={canManageStatuses}
+            canAddNotes={canCreateNotes && canCreateLeadNote(noteActivityIds)}
             selectedLeadIds={selectedLeadIds}
             selectAllMatching={selectAllMatching}
             excludedLeadIds={excludedLeadIds}
@@ -999,6 +1129,8 @@ export function LeadsPanel({
             onTogglePage={togglePageSelection}
             onAssign={(leadId, assignedTo) => void handleAssign(leadId, assignedTo)}
             onStatusChange={(leadId, statusId) => void handleStatusChange(leadId, statusId)}
+            onCreateStatus={handleCreateStatus}
+            onAddNote={handleAddNote}
             onArchive={(leadId, leadName) => void handleArchive(leadId, leadName)}
             onRestore={(leadId, leadName) => void handleRestore(leadId, leadName)}
           />

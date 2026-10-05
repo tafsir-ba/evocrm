@@ -11,6 +11,13 @@ import { Input, Label } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { IconNote } from "@/lib/icons";
+import {
+  canCreateLeadNote,
+  createLeadNote,
+  noteTitleFromBody,
+  resolveLeadNoteActivityIds,
+  type LeadNoteActivityIds,
+} from "@/lib/lead-notes-client";
 
 type DictionaryItem = {
   id: string;
@@ -43,11 +50,6 @@ type NotesSectionProps = {
   canArchive: boolean;
 };
 
-function noteTitleFromBody(body: string): string {
-  const firstLine = body.trim().split(/\n/)[0]?.trim() || "Note";
-  return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
-}
-
 function authorLabel(note: NoteItem): string {
   return note.createdByUser?.name || note.createdByUser?.email || note.assignedUser?.name || "Internal";
 }
@@ -67,10 +69,12 @@ export function NotesSection({
 }: NotesSectionProps) {
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [noteTypeId, setNoteTypeId] = useState<string | null>(null);
-  const [taskTypeId, setTaskTypeId] = useState<string | null>(null);
-  const [completedStatusId, setCompletedStatusId] = useState<string | null>(null);
-  const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
+  const [activityIds, setActivityIds] = useState<LeadNoteActivityIds>({
+    noteTypeId: null,
+    taskTypeId: null,
+    completedStatusId: null,
+    pendingStatusId: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState("");
@@ -103,20 +107,12 @@ export function NotesSection({
       const statusesPayload = (await statusesResponse.json()) as {
         data?: { items?: DictionaryItem[] };
       };
-      const types = typesPayload.data?.items ?? [];
-      const statuses = statusesPayload.data?.items ?? [];
-      const nextNoteTypeId = types.find((item) => item.key === "note")?.id ?? null;
-      const nextTaskTypeId = types.find((item) => item.key === "task")?.id ?? null;
-      const nextCompletedStatusId =
-        statuses.find((item) => item.behavior === "completed" || item.key === "completed")?.id ??
-        null;
-      const nextPendingStatusId =
-        statuses.find((item) => item.behavior === "pending" || item.key === "pending")?.id ?? null;
-
-      setNoteTypeId(nextNoteTypeId);
-      setTaskTypeId(nextTaskTypeId);
-      setCompletedStatusId(nextCompletedStatusId);
-      setPendingStatusId(nextPendingStatusId);
+      const nextIds = resolveLeadNoteActivityIds(
+        typesPayload.data?.items ?? [],
+        statusesPayload.data?.items ?? [],
+      );
+      const nextNoteTypeId = nextIds.noteTypeId;
+      setActivityIds(nextIds);
 
       if (!nextNoteTypeId) {
         setNotes([]);
@@ -154,7 +150,7 @@ export function NotesSection({
     void loadNotes();
   }, [loadNotes]);
 
-  const canCompose = canCreate && Boolean(noteTypeId && completedStatusId);
+  const canCompose = canCreate && canCreateLeadNote(activityIds);
 
   const followUpLabel = useMemo(() => {
     if (!followUpAt) return null;
@@ -164,50 +160,20 @@ export function NotesSection({
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
     const trimmed = body.trim();
-    if (!trimmed || !canCompose || !noteTypeId || !completedStatusId) {
+    if (!trimmed || !canCompose) {
       return;
     }
 
     setSaving(true);
     setError(null);
     try {
-      const title = noteTitleFromBody(trimmed);
-      const followUpIso = followUpAt ? new Date(followUpAt).toISOString() : null;
-      const noteResponse = await fetch(`${apiBase}/activities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId,
-          typeId: noteTypeId,
-          statusId: completedStatusId,
-          title,
-          description: trimmed,
-          nextActionDate: followUpIso ?? undefined,
-        }),
+      await createLeadNote({
+        apiBase,
+        leadId,
+        body: trimmed,
+        followUpIso: followUpAt ? new Date(followUpAt).toISOString() : null,
+        ids: activityIds,
       });
-      if (!noteResponse.ok) {
-        const payload = await noteResponse.json().catch(() => null);
-        throw new Error(payload?.error?.message ?? "Could not save the note.");
-      }
-
-      if (followUpIso && taskTypeId && pendingStatusId) {
-        const taskResponse = await fetch(`${apiBase}/activities`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            leadId,
-            typeId: taskTypeId,
-            statusId: pendingStatusId,
-            title: `Follow-up: ${title}`,
-            description: trimmed,
-            dueDate: followUpIso,
-          }),
-        });
-        if (!taskResponse.ok) {
-          const payload = await taskResponse.json().catch(() => null);
-          throw new Error(payload?.error?.message ?? "Note saved, but the follow-up task failed.");
-        }
-      }
 
       setBody("");
       setFollowUpAt("");

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,30 @@ vi.mock("@/lib/use-workspace-project-filter", () => ({
 import { LeadsPanel } from "@/components/leads/leads-panel";
 
 const statuses = [
-  { id: "507f1f77bcf86cd799439021", label: "Nouveau", color: "#3B82F6", key: "new" },
-  { id: "507f1f77bcf86cd799439022", label: "Qualifié", color: "#10B981", key: "qualified" },
+  {
+    id: "507f1f77bcf86cd799439021",
+    label: "Nouveau",
+    color: "#3B82F6",
+    key: "new",
+    dictionaryId: "507f1f77bcf86cd799439020",
+  },
+  {
+    id: "507f1f77bcf86cd799439022",
+    label: "Qualifié",
+    color: "#10B981",
+    key: "qualified",
+    dictionaryId: "507f1f77bcf86cd799439020",
+  },
+];
+
+const activityTypes = [
+  { id: "507f1f77bcf86cd799439071", key: "note", label: "Note" },
+  { id: "507f1f77bcf86cd799439072", key: "task", label: "Task" },
+];
+
+const activityStatuses = [
+  { id: "507f1f77bcf86cd799439081", key: "completed", label: "Completed", behavior: "completed" },
+  { id: "507f1f77bcf86cd799439082", key: "pending", label: "Pending", behavior: "pending" },
 ];
 
 const members = [
@@ -88,6 +110,30 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
     if (url.includes("/dictionary-items?type=lead_source")) {
       return jsonResponse({ data: { items: [sampleLead.source] } });
     }
+    if (url.includes("/dictionary-items?type=activity_type")) {
+      return jsonResponse({ data: { items: activityTypes } });
+    }
+    if (url.includes("/dictionary-items?type=activity_status")) {
+      return jsonResponse({ data: { items: activityStatuses } });
+    }
+    if (url.endsWith("/dictionary-items") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body)) as { label: string; key: string; color: string };
+      return jsonResponse(
+        {
+          data: {
+            item: {
+              id: "507f1f77bcf86cd799439023",
+              dictionaryId: statuses[0].dictionaryId,
+              ...payload,
+            },
+          },
+        },
+        201,
+      );
+    }
+    if (url.endsWith("/activities") && init?.method === "POST") {
+      return jsonResponse({ data: { activity: { id: "act-1" } } }, 201);
+    }
     if (url.includes("/tags?")) {
       return jsonResponse({ data: { tags: sampleLead.tagsResolved } });
     }
@@ -121,7 +167,7 @@ describe("LeadsPanel table", () => {
     mockLeadsFetch();
   });
 
-  it("renders a single-line triage table without permanent contact or duplicate status controls", async () => {
+  it("renders a single-line triage table without permanent contact or assign controls", async () => {
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -134,6 +180,7 @@ describe("LeadsPanel table", () => {
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
     expect(screen.getByRole("columnheader", { name: "Lead" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Phone" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Company" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
@@ -153,9 +200,11 @@ describe("LeadsPanel table", () => {
     expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
 
     expect(screen.queryByText("françois@évohome.ch")).not.toBeInTheDocument();
-    expect(screen.queryByText("+41 79 123 45 67")).not.toBeInTheDocument();
+    const phoneLinks = screen.getAllByRole("link", { name: "+41 79 123 45 67" });
+    expect(phoneLinks.length).toBeGreaterThan(0);
+    expect(phoneLinks[0]).toHaveAttribute("href", "tel:+41791234567");
     expect(screen.queryByText(/Genève-Printemps/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Change status for François Côté" }).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Contact François Côté" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Open François Côté" }).length).toBeGreaterThan(0);
@@ -234,14 +283,13 @@ describe("LeadsPanel table", () => {
 
     await expandDesktopRow(user);
 
-    expect(screen.getAllByLabelText("Change status for François Côté").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Assign François Côté").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Archive" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Genève-Printemps/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /whatsapp|call now|email blast/i })).not.toBeInTheDocument();
   });
 
-  it("patches status and assignment through the existing lead update API after row open", async () => {
+  it("changes status from the inline status dropdown and assignment after row open", async () => {
     const user = userEvent.setup();
     render(
       <LeadsPanel
@@ -253,10 +301,12 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    await expandDesktopRow(user);
-
-    const statusSelect = screen.getAllByLabelText("Change status for François Côté");
-    await user.selectOptions(statusSelect[0]!, statuses[1].id);
+    const statusButtons = await screen.findAllByRole("button", {
+      name: "Change status for François Côté",
+    });
+    await user.click(statusButtons[0]!);
+    const statusDialog = await screen.findByRole("dialog", { name: "Status for François Côté" });
+    await user.click(within(statusDialog).getByRole("option", { name: "Qualifié" }));
 
     await waitFor(() => {
       const patchCall = vi
@@ -272,6 +322,7 @@ describe("LeadsPanel table", () => {
       );
     });
 
+    await expandDesktopRow(user);
     const assignSelect = screen.getAllByLabelText("Assign François Côté");
     await user.selectOptions(assignSelect[0]!, members[1].userId);
 
@@ -291,6 +342,133 @@ describe("LeadsPanel table", () => {
         }),
       );
     });
+  });
+
+  it("creates a reusable workspace status from the dropdown and applies it to the lead", async () => {
+    const user = userEvent.setup();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        canManageStatuses
+      />,
+    );
+
+    const statusButtons = await screen.findAllByRole("button", {
+      name: "Change status for François Côté",
+    });
+    await user.click(statusButtons[0]!);
+    await user.type(screen.getByLabelText("Find or create a status"), "Visite planifiée");
+    await user.click(screen.getByRole("button", { name: "Create status “Visite planifiée”" }));
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls;
+      const createCall = calls.find(
+        ([input, init]) => String(input).endsWith("/dictionary-items") && init?.method === "POST",
+      );
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toEqual(
+        expect.objectContaining({
+          dictionaryId: statuses[0].dictionaryId,
+          type: "lead_status",
+          label: "Visite planifiée",
+          key: "visite_planifi_e",
+        }),
+      );
+      const patchCall = calls.find(([, init]) => init?.method === "PATCH");
+      expect(patchCall?.[1]?.body).toBe(JSON.stringify({ statusId: "507f1f77bcf86cd799439023" }));
+    });
+  });
+
+  it("keeps the status dropdown open with an error when a created status cannot be applied", async () => {
+    const user = userEvent.setup();
+    const baseFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/leads/") && init?.method === "PATCH") {
+        return jsonResponse({ error: { message: "Lead update failed." } }, 500);
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    vi.spyOn(window, "alert").mockImplementation(() => undefined);
+    render(
+      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate canManageStatuses />,
+    );
+
+    const statusButtons = await screen.findAllByRole("button", {
+      name: "Change status for François Côté",
+    });
+    await user.click(statusButtons[0]!);
+    await user.type(screen.getByLabelText("Find or create a status"), "Visite planifiée");
+    await user.click(screen.getByRole("button", { name: "Create status “Visite planifiée”" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Status for François Côté" });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Status “Visite planifiée” was created but not applied to this lead.",
+    );
+  });
+
+  it("only lets status managers create statuses", async () => {
+    const user = userEvent.setup();
+    render(
+      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />,
+    );
+
+    const statusButtons = await screen.findAllByRole("button", {
+      name: "Change status for François Côté",
+    });
+    await user.click(statusButtons[0]!);
+    await user.type(screen.getByLabelText("Find a status"), "Visite");
+    expect(screen.queryByRole("button", { name: /Create status/ })).not.toBeInTheDocument();
+    expect(screen.getByText("No matching status.")).toBeInTheDocument();
+  });
+
+  it("captures a quick note from the Next column as a lead note activity", async () => {
+    const user = userEvent.setup();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        canCreateNotes
+      />,
+    );
+
+    const noteButtons = await screen.findAllByRole("button", {
+      name: "Add quick note for François Côté",
+    });
+    await user.click(noteButtons[0]!);
+    await user.type(screen.getByLabelText("Note"), "Rappelé sur WhatsApp");
+    await user.click(screen.getByRole("button", { name: "Save note" }));
+
+    await waitFor(() => {
+      const noteCall = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) => String(input).endsWith("/activities") && init?.method === "POST",
+        );
+      expect(JSON.parse(String(noteCall?.[1]?.body))).toEqual(
+        expect.objectContaining({
+          leadId: sampleLead.id,
+          typeId: activityTypes[0].id,
+          statusId: activityStatuses[0].id,
+          title: "Rappelé sur WhatsApp",
+          description: "Rappelé sur WhatsApp",
+        }),
+      );
+    });
+    expect(screen.queryByRole("dialog", { name: "Quick note for François Côté" })).not.toBeInTheDocument();
+  });
+
+  it("hides quick notes when the user cannot create activities", async () => {
+    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />);
+
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Add quick note for François Côté" })).not.toBeInTheDocument();
   });
 
   it("hides assign and status controls when the user cannot update leads", async () => {

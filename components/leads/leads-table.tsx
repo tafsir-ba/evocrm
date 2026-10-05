@@ -22,6 +22,8 @@ import {
   visibleLeadTags,
 } from "@/lib/leads-table";
 import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
+import { LeadQuickNote } from "@/components/leads/lead-quick-note";
+import { LeadStatusPicker } from "@/components/leads/lead-status-picker";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -77,6 +79,8 @@ type LeadsTableProps = {
   canUpdate: boolean;
   canArchive: boolean;
   canDelete: boolean;
+  canManageStatuses: boolean;
+  canAddNotes: boolean;
   selectedLeadIds: Set<string>;
   selectAllMatching: boolean;
   excludedLeadIds: Set<string>;
@@ -87,6 +91,8 @@ type LeadsTableProps = {
   onTogglePage: () => void;
   onAssign: (leadId: string, assignedTo: string | null) => void;
   onStatusChange: (leadId: string, statusId: string) => void;
+  onCreateStatus: (leadId: string, label: string) => Promise<void>;
+  onAddNote: (leadId: string, body: string, followUpIso: string | null) => Promise<void>;
   onArchive: (leadId: string, leadName: string) => void;
   onRestore: (leadId: string, leadName: string) => void;
 };
@@ -226,36 +232,44 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
   );
 }
 
-function StatusSelect({
+function StatusCell({
+  workspaceSlug,
   lead,
   statuses,
+  canUpdate,
+  canManageStatuses,
   pending,
   onStatusChange,
+  onCreateStatus,
 }: {
+  workspaceSlug: string;
   lead: LeadTableItem;
   statuses: LeadTableDictionaryItem[];
+  canUpdate: boolean;
+  canManageStatuses: boolean;
   pending: boolean;
   onStatusChange: (statusId: string) => void;
+  onCreateStatus: (label: string) => Promise<void>;
 }) {
-  return (
-    <RowSelect
-      value={lead.status?.id ?? lead.statusId ?? ""}
-      disabled={pending}
-      label={`Change status for ${lead.fullName}`}
-      onChange={(event) => {
-        const nextStatusId = event.target.value;
-        if (nextStatusId && nextStatusId !== (lead.status?.id ?? lead.statusId)) {
-          onStatusChange(nextStatusId);
-        }
-      }}
-    >
-      {lead.status || lead.statusId ? null : <option value="">Set status</option>}
-      {statuses.map((status) => (
-        <option key={status.id} value={status.id}>
-          {status.label}
-        </option>
-      ))}
-    </RowSelect>
+  if (canUpdate && !lead.archivedAt) {
+    return (
+      <LeadStatusPicker
+        workspaceSlug={workspaceSlug}
+        leadName={lead.fullName}
+        status={lead.status}
+        statuses={statuses}
+        disabled={pending}
+        canCreate={canManageStatuses}
+        onSelect={onStatusChange}
+        onCreate={onCreateStatus}
+      />
+    );
+  }
+
+  return lead.status ? (
+    <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
+  ) : (
+    <span className="text-[var(--color-ink-faint)]">—</span>
   );
 }
 
@@ -291,6 +305,23 @@ function AssignSelect({
   );
 }
 
+function PhoneLink({ phone }: { phone: string | null }) {
+  if (!phone) {
+    return <span className="text-[var(--color-ink-faint)]">—</span>;
+  }
+
+  return (
+    <a
+      href={telHref(phone)}
+      title={`Call ${phone}`}
+      onClick={(event) => event.stopPropagation()}
+      className="block truncate tabular text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
+    >
+      {phone}
+    </a>
+  );
+}
+
 function UrgencyBadge({ lead }: { lead: LeadTableItem }) {
   const urgency = leadUrgency(lead);
   if (!urgency.label) {
@@ -304,23 +335,43 @@ function UrgencyBadge({ lead }: { lead: LeadTableItem }) {
   );
 }
 
-function NextStepCell({ lead }: { lead: LeadTableItem }) {
+function NextStepCell({
+  workspaceSlug,
+  lead,
+  canAddNote,
+  onAddNote,
+}: {
+  workspaceSlug: string;
+  lead: LeadTableItem;
+  canAddNote: boolean;
+  onAddNote: (body: string, followUpIso: string | null) => Promise<void>;
+}) {
   const step = formatNextStepCell(lead);
   const urgency = leadUrgency(lead);
   const hot = urgency.level === "overdue" || urgency.level === "today";
 
   return (
-    <p
-      className={cn(
-        "truncate",
-        step.kind === "empty" && "text-[var(--color-ink-faint)]",
-        step.kind === "last" && "text-[var(--color-ink-muted)]",
-        step.kind === "next" && (hot ? "font-medium text-[var(--color-danger-fg)]" : "text-[var(--color-ink-soft)]"),
-      )}
-      title={step.text}
-    >
-      {step.text}
-    </p>
+    <div className="flex min-w-0 items-center gap-1">
+      <p
+        className={cn(
+          "min-w-0 flex-1 truncate",
+          step.kind === "empty" && "text-[var(--color-ink-faint)]",
+          step.kind === "last" && "text-[var(--color-ink-muted)]",
+          step.kind === "next" && (hot ? "font-medium text-[var(--color-danger-fg)]" : "text-[var(--color-ink-soft)]"),
+        )}
+        title={step.text}
+      >
+        {step.text}
+      </p>
+      {canAddNote && !lead.archivedAt ? (
+        <LeadQuickNote
+          workspaceSlug={workspaceSlug}
+          leadId={lead.id}
+          leadName={lead.fullName}
+          onSave={onAddNote}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -359,24 +410,20 @@ function RowActions({
 
 function ExpandedDetails({
   lead,
-  statuses,
   members,
   canUpdate,
   canArchive,
   pending,
   onAssign,
-  onStatusChange,
   onArchive,
   onRestore,
 }: {
   lead: LeadTableItem;
-  statuses: LeadTableDictionaryItem[];
   members: LeadTableMember[];
   canUpdate: boolean;
   canArchive: boolean;
   pending: boolean;
   onAssign: (assignedTo: string | null) => void;
-  onStatusChange: (statusId: string) => void;
   onArchive: () => void;
   onRestore: () => void;
 }) {
@@ -397,13 +444,6 @@ function ExpandedDetails({
             </a>
           </p>
         ) : null}
-        {lead.phone ? (
-          <p>
-            <a className="hover:text-[var(--color-brand-700)]" href={telHref(lead.phone)}>
-              {lead.phone}
-            </a>
-          </p>
-        ) : null}
         {utmTitle ? <p title={utmTitle}>UTM {source.context}</p> : null}
         {last.kind === "last" ? <p>{last.text}</p> : null}
         {lead.industry ? <p>Industry {lead.industry}</p> : null}
@@ -411,14 +451,6 @@ function ExpandedDetails({
         {lead.tagsResolved.length > 0 ? <LeadTags tags={lead.tagsResolved} max={6} /> : null}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {canUpdate && !lead.archivedAt && statuses.length > 0 ? (
-          <StatusSelect
-            lead={lead}
-            statuses={statuses}
-            pending={pending}
-            onStatusChange={onStatusChange}
-          />
-        ) : null}
         {canUpdate && !lead.archivedAt && members.length > 0 ? (
           <AssignSelect lead={lead} members={members} pending={pending} onAssign={onAssign} />
         ) : null}
@@ -456,6 +488,8 @@ export function LeadsTable({
   canUpdate,
   canArchive,
   canDelete,
+  canManageStatuses,
+  canAddNotes,
   selectedLeadIds,
   selectAllMatching,
   excludedLeadIds,
@@ -466,11 +500,13 @@ export function LeadsTable({
   onTogglePage,
   onAssign,
   onStatusChange,
+  onCreateStatus,
+  onAddNote,
   onArchive,
   onRestore,
 }: LeadsTableProps) {
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
-  const columnCount = (canDelete ? 1 : 0) + 11;
+  const columnCount = (canDelete ? 1 : 0) + 12;
 
   function toggleExpanded(leadId: string) {
     setExpandedLeadIds((current) => {
@@ -490,7 +526,7 @@ export function LeadsTable({
         data-testid="leads-table-scroll"
         className="hidden min-h-0 flex-1 overflow-auto overscroll-contain md:block"
       >
-        <table className="min-w-[1120px] w-full text-[12.5px] leading-none">
+        <table className="min-w-[1240px] w-full text-[12.5px] leading-none">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
               {canDelete && (
@@ -510,6 +546,7 @@ export function LeadsTable({
                 </th>
               )}
               <th className="px-1.5 py-1 text-left">Lead</th>
+              <th className="w-[8rem] px-1.5 py-1 text-left">Phone</th>
               <th className="w-[8.5rem] px-1.5 py-1 text-left">Company</th>
               <th className="w-[8.5rem] px-1.5 py-1 text-left">Project</th>
               <th className="w-[7.5rem] px-1.5 py-1 text-left">Source</th>
@@ -576,6 +613,9 @@ export function LeadsTable({
                       ) : null}
                     </td>
                     <td className="px-1.5 py-1">
+                      <PhoneLink phone={lead.phone} />
+                    </td>
+                    <td className="px-1.5 py-1">
                       <p className="truncate text-[var(--color-ink-soft)]" title={lead.company?.name ?? undefined}>
                         {lead.company?.name ?? "—"}
                       </p>
@@ -611,11 +651,16 @@ export function LeadsTable({
                     </td>
                     <td className="px-1.5 py-1">
                       <div className="flex items-center gap-1">
-                        {lead.status ? (
-                          <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
-                        ) : (
-                          <span className="text-[var(--color-ink-faint)]">—</span>
-                        )}
+                        <StatusCell
+                          workspaceSlug={workspaceSlug}
+                          lead={lead}
+                          statuses={statuses}
+                          canUpdate={canUpdate}
+                          canManageStatuses={canManageStatuses}
+                          pending={pending}
+                          onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
+                          onCreateStatus={(label) => onCreateStatus(lead.id, label)}
+                        />
                         {lead.archivedAt ? (
                           <Badge tone="muted" size="sm">
                             Archived
@@ -632,7 +677,12 @@ export function LeadsTable({
                       {formatRelativeAge(lead.createdAt)}
                     </td>
                     <td className="px-1.5 py-1">
-                      <NextStepCell lead={lead} />
+                      <NextStepCell
+                        workspaceSlug={workspaceSlug}
+                        lead={lead}
+                        canAddNote={canAddNotes}
+                        onAddNote={(body, followUpIso) => onAddNote(lead.id, body, followUpIso)}
+                      />
                     </td>
                     <td className="px-1.5 py-1">
                       <UrgencyBadge lead={lead} />
@@ -654,13 +704,11 @@ export function LeadsTable({
                       <td colSpan={columnCount}>
                         <ExpandedDetails
                           lead={lead}
-                          statuses={statuses}
                           members={members}
                           canUpdate={canUpdate}
                           canArchive={canArchive}
                           pending={pending}
                           onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
-                          onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
                           onArchive={() => onArchive(lead.id, lead.fullName)}
                           onRestore={() => onRestore(lead.id, lead.fullName)}
                         />
@@ -722,10 +770,22 @@ export function LeadsTable({
                       {formatRelativeAge(lead.createdAt)}
                     </span>
                   </div>
+                  {lead.phone ? (
+                    <div className="mt-0.5 text-[11.5px]">
+                      <PhoneLink phone={lead.phone} />
+                    </div>
+                  ) : null}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {lead.status ? (
-                      <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
-                    ) : null}
+                    <StatusCell
+                      workspaceSlug={workspaceSlug}
+                      lead={lead}
+                      statuses={statuses}
+                      canUpdate={canUpdate}
+                      canManageStatuses={canManageStatuses}
+                      pending={pending}
+                      onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
+                      onCreateStatus={(label) => onCreateStatus(lead.id, label)}
+                    />
                     <UrgencyBadge lead={lead} />
                     <span className="truncate text-[11.5px] text-[var(--color-ink-soft)]">
                       {formatOwnerName(lead.assignedUser)}
@@ -737,7 +797,12 @@ export function LeadsTable({
                     ) : null}
                   </div>
                   <div className="mt-1">
-                    <NextStepCell lead={lead} />
+                    <NextStepCell
+                      workspaceSlug={workspaceSlug}
+                      lead={lead}
+                      canAddNote={canAddNotes}
+                      onAddNote={(body, followUpIso) => onAddNote(lead.id, body, followUpIso)}
+                    />
                   </div>
                 </div>
                 <RowActions
@@ -763,13 +828,11 @@ export function LeadsTable({
                   </p>
                   <ExpandedDetails
                     lead={lead}
-                    statuses={statuses}
                     members={members}
                     canUpdate={canUpdate}
                     canArchive={canArchive}
                     pending={pending}
                     onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
-                    onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
                     onArchive={() => onArchive(lead.id, lead.fullName)}
                     onRestore={() => onRestore(lead.id, lead.fullName)}
                   />

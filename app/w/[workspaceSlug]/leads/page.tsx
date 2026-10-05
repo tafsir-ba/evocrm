@@ -34,6 +34,8 @@ export default async function LeadsPage({ params }: { params: Params }) {
           canArchive={hasPermission(permissions, "lead:archive")}
           canDelete={hasPermission(permissions, "lead:delete")}
           canUpdate={hasPermission(permissions, "lead:update")}
+          canManageStatuses={hasPermission(permissions, "settings:update")}
+          canCreateNotes={hasPermission(permissions, "activity:create")}
         />
       </ProjectFilterSuspense>
     </PageContainer>
