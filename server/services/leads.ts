@@ -4,7 +4,7 @@ import type { LeadActivityEvent } from "@/lib/lead-activity-summary";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadActivitySummaries } from "@/server/repositories/activities";
-import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
+import { findDictionaryItemById, findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import {
   archiveLead,
   createLead,
@@ -48,6 +48,8 @@ import {
 } from "@/server/services/apply-project-scope";
 import { requireProjectAccess } from "@/server/permissions/require-project-access";
 import { validateActiveProjectId } from "@/server/services/project-scope";
+import { emitLifecycleConversionEvent } from "@/server/services/advertising-attribution";
+import { ADVERTISING_DEFAULTS } from "@/server/advertising/defaults";
 import type {
   BulkDeleteLeadsInput,
   CreateLeadInput,
@@ -884,6 +886,24 @@ export async function updateLeadForWorkspace(
       before: { statusId: existing.statusId },
       after: { statusId: updated.statusId },
     });
+
+    try {
+      const qualified = await findDictionaryItemByTypeAndKey(
+        workspaceId,
+        "lead_status",
+        ADVERTISING_DEFAULTS.qualifiedLeadDefinition.statusKey,
+      );
+      if (qualified && input.statusId === qualified.id && updated.projectId) {
+        await emitLifecycleConversionEvent({
+          workspaceId,
+          projectId: updated.projectId,
+          leadId,
+          milestone: "qualified_lead",
+        });
+      }
+    } catch {
+      // Attribution join must not block lead status updates.
+    }
   }
 
   if (input.assignedTo !== undefined && input.assignedTo !== existing.assignedTo) {

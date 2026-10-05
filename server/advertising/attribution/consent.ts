@@ -6,10 +6,15 @@ import {
   type ConsentCaptureChannel,
   type ConsentPurpose,
 } from "@/lib/advertising-constants";
+import {
+  isAdvertisingMeasurementAllowed,
+  type CookieConsentRecord,
+} from "@/lib/cookie-consent";
 
 /**
  * Consent fields Phase 2 touchpoints must capture (pixel vs form vs server-side).
- * Scaffolding only in Phase 0 — no capture pipeline yet.
+ * Advertising grant comes from cookie-consent OPTIONAL advertising category only —
+ * never from email subscribe or mandatory terms alone.
  */
 export { CONSENT_CAPTURE_CHANNELS, CONSENT_PURPOSES };
 export type { ConsentCaptureChannel, ConsentPurpose };
@@ -37,6 +42,42 @@ export function emptyConsentState(): ConsentState {
     policyVersion: null,
     capturedAt: null,
     market: null,
+  };
+}
+
+/**
+ * Map a visitor cookie-consent record into first-class ConsentState.
+ * Declined or withdrawn advertising → granted false (no Meta measurement processing).
+ */
+export function consentStateFromCookieConsent(
+  cookie: CookieConsentRecord | null | undefined,
+  options: { market?: string | null } = {},
+): ConsentState {
+  if (!cookie) {
+    return emptyConsentState();
+  }
+
+  const decidedAt = cookie.decidedAt ? new Date(cookie.decidedAt) : new Date();
+  const allowed = isAdvertisingMeasurementAllowed(cookie);
+
+  if (!allowed) {
+    return {
+      granted: false,
+      channel: "pixel",
+      purposes: [],
+      policyVersion: cookie.version,
+      capturedAt: decidedAt,
+      market: options.market ?? null,
+    };
+  }
+
+  return {
+    granted: true,
+    channel: "pixel",
+    purposes: ["advertising", "conversion_export", "analytics"],
+    policyVersion: cookie.version,
+    capturedAt: decidedAt,
+    market: options.market ?? null,
   };
 }
 

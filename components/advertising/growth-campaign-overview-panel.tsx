@@ -12,7 +12,13 @@ type Overview = {
     projectName: string;
     marketLabel: string;
   };
-  growthCampaign: { id: string; name: string; attributionPolicyLabel: string } | null;
+  growthCampaign: {
+    id: string;
+    name: string;
+    attributionPolicyLabel: string;
+    projectLockNotice?: string;
+    trustedDestinationCount?: number;
+  } | null;
   accounts: Array<{
     id: string;
     name: string;
@@ -30,6 +36,19 @@ type Overview = {
       ads: Array<{ id: string; name: string; status: string }>;
     }>;
   }>;
+  outcomes?: {
+    attributionLabel: string;
+    formLeads: number;
+    qualifiedLeads: number;
+    opportunities: number;
+    wonCount: number;
+    wonValue: number;
+    pipelineValue: number;
+    costPerFormLead: number | null;
+    costPerQualifiedLead: number | null;
+    roas: number | null;
+    freshnessLabel: string;
+  };
   analytics: {
     metricTierLabel: string;
     spend: number;
@@ -101,6 +120,8 @@ export function GrowthCampaignOverviewPanel({
     );
   }
 
+  const outcomes = overview.outcomes;
+
   return (
     <div className="space-y-5">
       <div>
@@ -112,19 +133,85 @@ export function GrowthCampaignOverviewPanel({
         </p>
       </div>
 
-      <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 grid gap-3 sm:grid-cols-3">
-        <Stat label="Data freshness" value={overview.analytics.freshnessLabel} />
-        <Stat
-          label="Spend (recent snapshots)"
-          value={overview.analytics.spend.toLocaleString(undefined, {
-            maximumFractionDigits: 0,
-          })}
-        />
-        <Stat label="Clicks (recent snapshots)" value={String(overview.analytics.clicks)} />
-      </div>
-      <p className="text-[12px] text-[var(--color-ink-muted)]">
-        {overview.analytics.metricTierLabel}
-      </p>
+      {overview.growthCampaign?.projectLockNotice ? (
+        <p className="text-[12.5px] rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-[var(--color-ink)]">
+          {overview.growthCampaign.projectLockNotice}
+        </p>
+      ) : null}
+
+      <section className="space-y-2">
+        <h3 className="text-[14px] font-semibold">Business results first</h3>
+        <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+          {outcomes?.attributionLabel ??
+            "Last touch — the most recent paid click gets the credit (v1)"}
+          . Freshness: {outcomes?.freshnessLabel ?? overview.analytics.freshnessLabel}.
+        </p>
+        {outcomes &&
+        outcomes.formLeads +
+          outcomes.qualifiedLeads +
+          outcomes.opportunities +
+          outcomes.wonCount ===
+          0 ? (
+          <EmptyState
+            title="No paid outcomes yet"
+            description="When a lead arrives from the Satigny website with tracking, results will show here: form leads → qualified → opportunities → won."
+          />
+        ) : (
+          <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Stat
+              label="Won value (ROAS)"
+              value={
+                outcomes
+                  ? `${outcomes.wonValue.toLocaleString(undefined, {
+                      maximumFractionDigits: 0,
+                    })}${
+                      outcomes.roas != null
+                        ? ` · ROAS ${outcomes.roas.toFixed(2)}`
+                        : ""
+                    }`
+                  : "—"
+              }
+              help="Return on ad spend = won value ÷ spend. Shown when both exist."
+            />
+            <Stat
+              label="Opportunities"
+              value={String(outcomes?.opportunities ?? 0)}
+              help={`Pipeline value: ${(outcomes?.pipelineValue ?? 0).toLocaleString()}`}
+            />
+            <Stat
+              label="Qualified leads"
+              value={String(outcomes?.qualifiedLeads ?? 0)}
+              help={
+                outcomes?.costPerQualifiedLead != null
+                  ? `About ${outcomes.costPerQualifiedLead.toFixed(0)} spend per qualified lead`
+                  : "Status “Qualified” on the lead"
+              }
+            />
+            <Stat
+              label="Form leads"
+              value={String(outcomes?.formLeads ?? 0)}
+              help={
+                outcomes?.costPerFormLead != null
+                  ? `About ${outcomes.costPerFormLead.toFixed(0)} spend per form lead`
+                  : "Diagnostic only"
+              }
+            />
+            <Stat
+              label="Spend (recent snapshots)"
+              value={overview.analytics.spend.toLocaleString(undefined, {
+                maximumFractionDigits: 0,
+              })}
+            />
+            <Stat
+              label="Clicks (media only)"
+              value={String(overview.analytics.clicks)}
+            />
+          </div>
+        )}
+        <p className="text-[12px] text-[var(--color-ink-muted)]">
+          {overview.analytics.metricTierLabel}
+        </p>
+      </section>
 
       {overview.growthCampaign ? (
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
@@ -208,13 +295,24 @@ export function GrowthCampaignOverviewPanel({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  help,
+}: {
+  label: string;
+  value: string;
+  help?: string;
+}) {
   return (
     <div>
       <p className="text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold">
         {label}
       </p>
       <p className="text-[15px] font-semibold text-[var(--color-ink)] mt-1">{value}</p>
+      {help ? (
+        <p className="text-[11.5px] text-[var(--color-ink-muted)] mt-1">{help}</p>
+      ) : null}
     </div>
   );
 }

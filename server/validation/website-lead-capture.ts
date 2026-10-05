@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { objectIdSchema } from "@/server/validation/campaigns";
+import { COOKIE_CONSENT_VERSION } from "@/lib/cookie-consent";
 
 const utmSchema = z
   .object({
@@ -11,6 +12,21 @@ const utmSchema = z
     campaign: z.string().trim().max(120).optional(),
     term: z.string().trim().max(120).optional(),
     content: z.string().trim().max(120).optional(),
+  })
+  .strict();
+
+/** Visitor cookie-consent snapshot from the landing site (not email consent). */
+const cookieConsentSchema = z
+  .object({
+    version: z.string().trim().min(1).max(80).default(COOKIE_CONSENT_VERSION),
+    decidedAt: z.string().trim().min(1).max(40),
+    categories: z
+      .object({
+        necessary: z.literal(true),
+        advertising: z.boolean(),
+      })
+      .strict(),
+    withdrawn: z.boolean(),
   })
   .strict();
 
@@ -36,6 +52,14 @@ export const websiteLeadCaptureInputSchema = z
     stateRegion: z.string().trim().max(120).optional(),
     companyName: z.string().trim().max(200).optional(),
     utm: utmSchema.optional(),
+    /** Eligible Meta click id from landing URL (?fbclid=…). */
+    fbclid: z.string().trim().min(1).max(500).optional(),
+    landingPage: z.string().trim().url().max(2000).optional(),
+    /**
+     * Cookie-consent snapshot for OPTIONAL advertising measurement.
+     * Never treat emailConsentStatus or mandatory terms as this signal.
+     */
+    cookieConsent: cookieConsentSchema.optional(),
   })
   .strict()
   .refine((value) => Boolean(value.email?.trim() || value.phone?.trim()), {

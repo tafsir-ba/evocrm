@@ -36,14 +36,20 @@ import {
   upsertMetricSnapshot,
 } from "@/server/repositories/advertising-hierarchy";
 import {
+  addTrustedDestination,
   createGrowthCampaign,
   findGrowthCampaigns,
   type GrowthCampaignRecord,
 } from "@/server/repositories/growth-campaigns";
+import { findIntegrations } from "@/server/repositories/integrations";
 import {
   findProjectById,
   findProjectByReference,
 } from "@/server/repositories/projects";
+import {
+  lastTouchAttributionLabel,
+  summarizeProjectOutcomeFunnel,
+} from "@/server/services/advertising-attribution";
 
 function publicConnection(record: AdConnectionRecord) {
   return {
@@ -444,19 +450,57 @@ export async function ensurePilotGrowthCampaignForWorkspace(input: {
   const existing = await findGrowthCampaigns(input.workspaceId, {
     projectId: project.id,
   });
-  if (existing[0]) {
-    return existing[0];
+  const growth =
+    existing[0] ??
+    (await createGrowthCampaign({
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      name: `${pilot.projectName} — paid ads`,
+      createdBy: input.actorId,
+      objective: "qualified_leads",
+      marketCountryCode: pilot.countryCode,
+      outcomeTarget: "Qualified leads and visits for Satigny duplex in Geneva",
+      attributionKey: `growth:${pilot.projectReference}`,
+    }));
+
+  return ensureSatignyTrustedDestination(input.workspaceId, growth, project.id);
+}
+
+async function ensureSatignyTrustedDestination(
+  workspaceId: string,
+  growth: GrowthCampaignRecord,
+  pilotProjectId: string,
+): Promise<GrowthCampaignRecord> {
+  const websiteIntegrations = await findIntegrations(workspaceId, {
+    type: "website",
+  });
+  const satignyIntegration =
+    websiteIntegrations.find(
+      (row) =>
+        !row.archivedAt &&
+        row.status === "active" &&
+        (row.defaultProjectId === pilotProjectId ||
+          /satigny/i.test(row.name ?? "")),
+    ) ?? null;
+
+  // Do not create a placeholder destination without a real website integration id —
+  // otherwise capture cannot match the lock and project routing falls through.
+  if (!satignyIntegration) {
+    return growth;
   }
 
-  return createGrowthCampaign({
-    workspaceId: input.workspaceId,
-    projectId: project.id,
-    name: `${pilot.projectName} — paid ads`,
-    createdBy: input.actorId,
-    objective: "qualified_leads",
-    marketCountryCode: pilot.countryCode,
-    outcomeTarget: "Qualified leads and visits for Satigny duplex in Geneva",
-    attributionKey: `growth:${pilot.projectReference}`,
+  const destinationKey = `website:${satignyIntegration.id}`;
+
+  if (
+    growth.trustedDestinations.some((dest) => dest.destinationKey === destinationKey)
+  ) {
+    return growth;
+  }
+
+  return addTrustedDestination(workspaceId, growth.id, {
+    destinationKey,
+    label: "Satigny duplex website — leads always go to this project",
+    websiteIntegrationId: satignyIntegration.id,
   });
 }
 
@@ -534,6 +578,12 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
     0,
   );
 
+  const outcomes = await summarizeProjectOutcomeFunnel(
+    input.workspaceId,
+    input.projectId,
+    spend,
+  );
+
   return {
     pilot: {
       projectName: ADVERTISING_DEFAULTS.pilotSelection.projectName,
@@ -547,7 +597,10 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
           name: growth.name,
           projectId: growth.projectId,
           status: growth.status,
-          attributionPolicyLabel: "Last click gets the credit (v1)",
+          attributionPolicyLabel: lastTouchAttributionLabel(),
+          trustedDestinationCount: growth.trustedDestinations.length,
+          projectLockNotice:
+            "Leads from the Satigny website always go to this project. The browser cannot pick a different one.",
         }
       : null,
     connections: connections.map(publicConnection),
@@ -564,9 +617,15 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
       ),
     })),
     hierarchy,
+    outcomes: {
+      ...outcomes,
+      hierarchyOrder: ADVERTISING_DEFAULTS.successMetricHierarchy,
+      freshnessLabel: freshnessLabel(freshness),
+    },
     analytics: {
       metricTier: 5,
-      metricTierLabel: "Media efficiency only (clicks & spend) — not the main business goal",
+      metricTierLabel:
+        "Media efficiency only (clicks & spend) — not the main business goal",
       spend,
       clicks,
       snapshotCount: snapshots.length,
@@ -576,7 +635,7 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
     },
     readOnly: true,
     nextStepHint: growth
-      ? "Refresh Meta when you want newer numbers. Changing ads still needs a later phase."
+      ? "Review business results first (won, opportunities, qualified leads). Refresh Meta when you want newer spend numbers. Changing ads still needs a later phase."
       : "Create the Satigny paid-ads plan (Growth Campaign), then refresh Meta.",
   };
 }

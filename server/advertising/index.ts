@@ -53,6 +53,7 @@ export {
   CONSENT_PURPOSES,
   canExportConversion,
   canExportCustomerMatch,
+  consentStateFromCookieConsent,
   emptyConsentState,
   type ConsentCaptureChannel,
   type ConsentPurpose,

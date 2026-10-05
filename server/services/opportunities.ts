@@ -32,6 +32,7 @@ import type {
   StageOpportunityInput,
   UpdateOpportunityInput,
 } from "@/server/validation/opportunities";
+import { emitLifecycleConversionEvent } from "@/server/services/advertising-attribution";
 
 export type OpportunityDictionarySummary = {
   id: string;
@@ -639,6 +640,43 @@ export async function createOpportunityForWorkspace(
     after: opportunitySnapshot(opportunity),
   });
 
+  try {
+    await emitLifecycleConversionEvent({
+      workspaceId,
+      projectId,
+      leadId: opportunity.leadId,
+      opportunityId: opportunity.id,
+      milestone: "opportunity_created",
+      value: opportunity.value,
+      currency: opportunity.currency,
+    });
+    if (status.behavior === "terminal_won") {
+      await emitLifecycleConversionEvent({
+        workspaceId,
+        projectId,
+        leadId: opportunity.leadId,
+        opportunityId: opportunity.id,
+        milestone: "won",
+        value: opportunity.value,
+        currency: opportunity.currency,
+        occurredAt: opportunity.wonAt ?? undefined,
+      });
+    } else if (status.behavior === "terminal_lost") {
+      await emitLifecycleConversionEvent({
+        workspaceId,
+        projectId,
+        leadId: opportunity.leadId,
+        opportunityId: opportunity.id,
+        milestone: "lost",
+        value: opportunity.value,
+        currency: opportunity.currency,
+        occurredAt: opportunity.lostAt ?? undefined,
+      });
+    }
+  } catch {
+    // Attribution join must not block opportunity create.
+  }
+
   return detail;
 }
 
@@ -797,6 +835,34 @@ export async function updateOpportunityForWorkspace(
       before: { statusId: existing.statusId },
       after: { statusId: updated.statusId },
     });
+
+    try {
+      if (updated.projectId && targetStatus?.behavior === "terminal_won") {
+        await emitLifecycleConversionEvent({
+          workspaceId,
+          projectId: updated.projectId,
+          leadId: updated.leadId,
+          opportunityId: updated.id,
+          milestone: "won",
+          value: updated.value,
+          currency: updated.currency,
+          occurredAt: updated.wonAt ?? undefined,
+        });
+      } else if (updated.projectId && targetStatus?.behavior === "terminal_lost") {
+        await emitLifecycleConversionEvent({
+          workspaceId,
+          projectId: updated.projectId,
+          leadId: updated.leadId,
+          opportunityId: updated.id,
+          milestone: "lost",
+          value: updated.value,
+          currency: updated.currency,
+          occurredAt: updated.lostAt ?? undefined,
+        });
+      }
+    } catch {
+      // Attribution join must not block opportunity updates.
+    }
   }
 
   if (input.assignedTo !== undefined && input.assignedTo !== existing.assignedTo) {

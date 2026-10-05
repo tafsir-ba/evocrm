@@ -8,6 +8,7 @@ export const PUBLIC_PATHS = [
   "/api/auth",
   "/unsubscribe",
   "/api/unsubscribe",
+  "/privacy-cookies",
   "/api/integrations/website/leads",
   "/api/integrations/website/stats/leads",
   "/api/integrations/hubspot/webhooks",

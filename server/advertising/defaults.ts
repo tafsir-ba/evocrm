@@ -28,9 +28,13 @@ export const ADVERTISING_DEFAULTS = {
   attributionPolicyV1: "last_touch" as const,
   attributionLabelRequired: true,
   keepRawTouchpoints: true,
-  /** Phase 2 — exact status ID documented in pilot ticket when chosen */
+  /**
+   * Phase 2 — Satigny: adopt seeded dictionary key (not a hard-coded ObjectId).
+   * Resolve via findDictionaryItemByTypeAndKey(workspaceId, "lead_status", "qualified").
+   */
   qualifiedLeadDefinition: {
     strategy: "explicit_lifecycle_status_or_tag" as const,
+    statusKey: "qualified" as const,
     statusId: null as string | null,
     tagKey: null as string | null,
   },

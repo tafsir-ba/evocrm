@@ -147,3 +147,43 @@ export async function createGrowthCampaign(input: {
 
   return toRecord(document.toObject());
 }
+
+/**
+ * Idempotent trusted destination upsert by destinationKey.
+ * Destinations always lock leads to the Growth Campaign projectId.
+ */
+export async function addTrustedDestination(
+  workspaceId: string,
+  growthCampaignId: string,
+  destination: {
+    destinationKey: string;
+    label?: string | null;
+    websiteIntegrationId?: string | null;
+  },
+): Promise<GrowthCampaignRecord> {
+  await connectDb();
+  const existing = await GrowthCampaignModel.findOne(
+    withWorkspaceScope(workspaceId, { _id: growthCampaignId, archivedAt: null }),
+  );
+
+  if (!existing) {
+    throw new Error("Growth Campaign not found.");
+  }
+
+  const key = destination.destinationKey.trim();
+  const already = (existing.trustedDestinations ?? []).some(
+    (row) => row.destinationKey === key,
+  );
+
+  if (!already) {
+    existing.trustedDestinations.push({
+      destinationKey: key,
+      label: destination.label ?? null,
+      websiteIntegrationId: destination.websiteIntegrationId ?? null,
+      projectLocked: true,
+    });
+    await existing.save();
+  }
+
+  return toRecord(existing.toObject());
+}

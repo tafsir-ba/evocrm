@@ -237,6 +237,7 @@ describe("sync service write-guard + isolation", () => {
     vi.doMock("@/server/repositories/growth-campaigns", () => ({
       findGrowthCampaigns,
       createGrowthCampaign: vi.fn(),
+      addTrustedDestination: vi.fn(),
     }));
     vi.doMock("@/server/repositories/ad-accounts", () => ({
       findAdAccounts,
@@ -262,6 +263,27 @@ describe("sync service write-guard + isolation", () => {
       findProjectById,
       findProjectByReference: vi.fn(),
     }));
+    vi.doMock("@/server/services/advertising-attribution", () => ({
+      lastTouchAttributionLabel: () =>
+        "Last touch — the most recent paid click gets the credit (v1)",
+      summarizeProjectOutcomeFunnel: vi.fn(async () => ({
+        attributionModel: "last_touch",
+        attributionLabel: "Last touch — the most recent paid click gets the credit (v1)",
+        formLeads: 0,
+        qualifiedLeads: 0,
+        opportunities: 0,
+        wonCount: 0,
+        lostCount: 0,
+        wonValue: 0,
+        pipelineValue: 0,
+        costPerFormLead: null,
+        costPerQualifiedLead: null,
+        roas: null,
+      })),
+    }));
+    vi.doMock("@/server/repositories/integrations", () => ({
+      findIntegrations: vi.fn(async () => []),
+    }));
 
     const { getGrowthCampaignOverviewForWorkspace } = await import(
       "@/server/services/advertising-meta-sync"
@@ -275,6 +297,8 @@ describe("sync service write-guard + isolation", () => {
     expect(overview.readOnly).toBe(true);
     expect(overview.pilot.projectReference).toBe("satigny_duplex");
     expect(overview.hierarchy).toEqual([]);
+    expect(overview.outcomes?.formLeads).toBe(0);
+    expect(overview.growthCampaign === null || overview.growthCampaign.attributionPolicyLabel).toBeTruthy();
     expect(findGrowthCampaigns).toHaveBeenCalledWith("ws-a", { projectId: "proj-1" });
     expect(findAdAccounts).toHaveBeenCalledWith("ws-a");
     expect(findAdConnections).toHaveBeenCalledWith("ws-a");

@@ -32,11 +32,19 @@ import {
   findProjects,
 } from "@/server/repositories/projects";
 import type { WebsiteLeadCaptureInput } from "@/server/validation/website-lead-capture";
+import { findGrowthCampaigns } from "@/server/repositories/growth-campaigns";
+import { resolveTrustedDestinationProjectId } from "@/server/advertising/routing/project-invariant";
+import { recordPaidLeadTouchpointAndFormLead } from "@/server/services/advertising-attribution";
+import {
+  isAdvertisingMeasurementAllowed,
+  type CookieConsentRecord,
+} from "@/lib/cookie-consent";
 
 export type WebsiteLeadCaptureResult = {
   leadId: string;
   duplicate: boolean;
   idempotent: boolean;
+  touchpointId?: string | null;
 };
 
 export async function resolveWebsiteLeadProjectId(input: {
@@ -45,6 +53,17 @@ export async function resolveWebsiteLeadProjectId(input: {
   payload: Pick<WebsiteLeadCaptureInput, "projectId" | "projectReference">;
 }): Promise<string> {
   const { workspaceId, integration, payload } = input;
+
+  // Prefer Growth Campaign trusted-destination lock when this integration is mapped.
+  const growthLocked = await resolveGrowthCampaignLockedProjectId(
+    workspaceId,
+    integration.id,
+    payload.projectId,
+  );
+  if (growthLocked) {
+    return growthLocked;
+  }
+
   const allowOverride = integration.allowProjectOverride === true;
   const hasPayloadProjectId = Boolean(payload.projectId);
   const hasPayloadProjectReference = Boolean(payload.projectReference?.trim());
@@ -115,6 +134,25 @@ export async function resolveWebsiteLeadProjectId(input: {
   return resolveLockedDefaultProjectId(workspaceId, integration);
 }
 
+async function resolveGrowthCampaignLockedProjectId(
+  workspaceId: string,
+  websiteIntegrationId: string,
+  clientProjectId?: string | null,
+): Promise<string | null> {
+  const campaigns = await findGrowthCampaigns(workspaceId);
+  const matched = campaigns.find((campaign) =>
+    campaign.trustedDestinations.some(
+      (dest) => dest.websiteIntegrationId === websiteIntegrationId,
+    ),
+  );
+  if (!matched) return null;
+
+  return resolveTrustedDestinationProjectId({
+    growthCampaignProjectId: matched.projectId,
+    clientProjectId: clientProjectId ?? null,
+  });
+}
+
 async function resolveLockedDefaultProjectId(
   workspaceId: string,
   integration: IntegrationRecord,
@@ -175,6 +213,14 @@ function buildIntegrationAttributes(
 
   if (input.utm) {
     integrationAttributes.utm = input.utm;
+  }
+
+  // Meta click id is advertising measurement data — only when optional ads consent granted.
+  if (
+    input.fbclid?.trim() &&
+    isAdvertisingMeasurementAllowed(normalizeCookieConsentPayload(input.cookieConsent))
+  ) {
+    integrationAttributes.fbclid = input.fbclid.trim();
   }
 
   if (input.propertyReference?.trim()) {
@@ -494,10 +540,57 @@ export async function captureWebsiteLead(
     entityId: result.lead.id,
   });
 
+  let touchpointId: string | null = null;
+  try {
+    const cookieConsent = normalizeCookieConsentPayload(input.cookieConsent);
+    if (isAdvertisingMeasurementAllowed(cookieConsent)) {
+      const campaigns = await findGrowthCampaigns(workspaceId, { projectId });
+      const growth = campaigns[0] ?? null;
+      const attribution = await recordPaidLeadTouchpointAndFormLead({
+        workspaceId,
+        projectId,
+        leadId: result.lead.id,
+        growthCampaignId: growth?.id ?? null,
+        platform: input.fbclid ? "meta" : null,
+        utm: input.utm
+          ? {
+              source: input.utm.source ?? null,
+              medium: input.utm.medium ?? null,
+              campaign: input.utm.campaign ?? null,
+              term: input.utm.term ?? null,
+              content: input.utm.content ?? null,
+            }
+          : null,
+        clickId: input.fbclid?.trim() || null,
+        landingPage: input.landingPage ?? null,
+        cookieConsent,
+      });
+      touchpointId = attribution?.touchpoint.id ?? null;
+    }
+  } catch {
+    // Attribution must not fail lead capture; CRM lead already persisted.
+  }
+
   return {
     leadId: result.lead.id,
     duplicate: false,
     idempotent: false,
+    touchpointId,
+  };
+}
+
+function normalizeCookieConsentPayload(
+  raw: WebsiteLeadCaptureInput["cookieConsent"],
+): CookieConsentRecord | null {
+  if (!raw) return null;
+  return {
+    version: raw.version,
+    decidedAt: raw.decidedAt,
+    categories: {
+      necessary: true,
+      advertising: Boolean(raw.categories.advertising),
+    },
+    withdrawn: Boolean(raw.withdrawn) || !raw.categories.advertising,
   };
 }
 
