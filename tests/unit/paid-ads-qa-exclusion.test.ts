@@ -269,6 +269,7 @@ describe("summarizeProjectOutcomeFunnel QA filtering", () => {
     // Re-call with QA-only filter via fresh mock below would be cleaner; assert advice shape:
     const adviceWithOnlyQaExcluded = buildAdCopilotNextStep({
       freshness: "fresh",
+      freshnessLabel: "Updated recently",
       spend: 78,
       clicks: 12,
       funnel: {
@@ -284,6 +285,7 @@ describe("summarizeProjectOutcomeFunnel QA filtering", () => {
     // Mixed retained form still suggests lead quality review (ordinary lead kept).
     const adviceMixed = buildAdCopilotNextStep({
       freshness: "fresh",
+      freshnessLabel: "Updated recently",
       spend,
       clicks: 12,
       funnel: {
@@ -351,6 +353,7 @@ describe("summarizeProjectOutcomeFunnel QA filtering", () => {
 
     const advice = buildAdCopilotNextStep({
       freshness: "fresh",
+      freshnessLabel: "Updated recently",
       spend: 78,
       clicks: 5,
       funnel: {

@@ -821,7 +821,7 @@ Feature-flagged via `ADVERTISING_ENABLED` (default **off**). **Do not** overload
 
 **Phase 1 pilot:** Satigny duplex (`projectReference: satigny_duplex`), Geneva, Switzerland (CH). Meta read-only (`ads_read`, `business_management`). No campaign writes, customer-list exports, or AI actions.
 
-Project Paid ads (read-only) shows a deterministic **What to do next** suggestion from sync freshness, spend, clicks, and attributed `ConversionEvent` milestones. It never publishes, changes budgets, or collects new consent.
+Project Paid ads (read-only) shows a deterministic **Ad Copilot Action Center** recommendation from sync freshness, spend, clicks, and attributed `ConversionEvent` milestones (QA/test leads excluded at the reporting layer). It never publishes, pauses, changes budgets, or sends CRM/conversion data to Meta.
 
 ### AdConnection
 

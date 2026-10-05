@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdCopilotWhatToDoNext } from "@/components/advertising/ad-copilot-what-to-do-next";
 import { GrowthCampaignOverviewPanel } from "@/components/advertising/growth-campaign-overview-panel";
-import { buildAdCopilotNextStep, emptyAdCopilotFunnel } from "@/lib/ad-copilot-next-step";
+import {
+  buildAdCopilotNextStep,
+  emptyAdCopilotFunnel,
+} from "@/lib/ad-copilot-next-step";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -28,11 +31,12 @@ function jsonResponse(data: unknown, ok = true) {
   } as Response;
 }
 
-describe("AdCopilotWhatToDoNext", () => {
-  it("renders the optimisation area with a Settings next action when data is stale", () => {
+describe("AdCopilotWhatToDoNext Action Center", () => {
+  it("renders structured recommendation with Settings next action when data is stale", () => {
     const funnel = emptyAdCopilotFunnel();
     const step = buildAdCopilotNextStep({
       freshness: "stale",
+      freshnessLabel: "Needs a refresh soon",
       spend: 20,
       clicks: 8,
       funnel,
@@ -47,13 +51,28 @@ describe("AdCopilotWhatToDoNext", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "What to do next" }),
+      screen.getByRole("heading", { name: "Ad Copilot Action Center" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/nothing is changed automatically/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Settings → Paid ads" })).toHaveAttribute(
-      "href",
-      "/w/demo/settings/advertising",
+    expect(screen.getByTestId("ad-copilot-action-center")).toBeInTheDocument();
+    expect(
+      screen.getByText(/nothing changes automatically/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("What the numbers say")).toBeInTheDocument();
+    expect(screen.getByText("Why it matters")).toBeInTheDocument();
+    expect(screen.getByText("What you can do next")).toBeInTheDocument();
+    expect(screen.getByTestId("ad-copilot-evidence-label")).toHaveTextContent(
+      "Needs a refresh soon",
     );
+    expect(screen.getByText("Read-only guardrails")).toBeInTheDocument();
+    expect(
+      screen.getByText(/do not publish, pause, or edit ads/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/do not send customer or conversion data to Meta/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open Settings → Paid ads" }),
+    ).toHaveAttribute("href", "/w/demo/settings/advertising");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
@@ -68,6 +87,7 @@ describe("AdCopilotWhatToDoNext", () => {
       <AdCopilotWhatToDoNext
         step={buildAdCopilotNextStep({
           freshness: "fresh",
+          freshnessLabel: "Updated recently",
           spend: 90,
           clicks: 30,
           funnel,
@@ -79,8 +99,12 @@ describe("AdCopilotWhatToDoNext", () => {
 
     expect(screen.getByText("Ads helped win a sale")).toBeInTheDocument();
     expect(screen.getByText("Won sales: 1")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Open Settings → Paid ads" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/budget|publish|consent|pause/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Open Settings → Paid ads" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /publish|budget|pause|export/i }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -89,10 +113,11 @@ describe("GrowthCampaignOverviewPanel", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows What to do next from the read-only overview payload", async () => {
+  it("shows Action Center from the read-only overview payload", async () => {
     const funnel = emptyAdCopilotFunnel();
     const optimisation = buildAdCopilotNextStep({
       freshness: "fresh",
+      freshnessLabel: "Updated recently",
       spend: 40,
       clicks: 11,
       funnel,
@@ -102,7 +127,10 @@ describe("GrowthCampaignOverviewPanel", () => {
       jsonResponse({
         data: {
           overview: {
-            pilot: { projectName: "Satigny duplex", marketLabel: "Geneva, Switzerland" },
+            pilot: {
+              projectName: "Satigny duplex",
+              marketLabel: "Geneva, Switzerland",
+            },
             growthCampaign: {
               id: "gc-1",
               name: "Satigny duplex — paid ads",
@@ -111,13 +139,15 @@ describe("GrowthCampaignOverviewPanel", () => {
             accounts: [],
             hierarchy: [],
             analytics: {
-              metricTierLabel: "Media efficiency only (clicks & spend) — not the main business goal",
+              metricTierLabel:
+                "Media efficiency only (clicks & spend) — not the main business goal",
               spend: 40,
               clicks: 11,
               freshnessLabel: "Updated recently",
             },
             outcomes: {
-              attributionLabel: "Last touch — the most recent paid click gets the credit (v1)",
+              attributionLabel:
+                "Last touch — the most recent paid click gets the credit (v1)",
               formLeads: 0,
               qualifiedLeads: 0,
               opportunities: 0,
@@ -142,19 +172,32 @@ describe("GrowthCampaignOverviewPanel", () => {
     ) as typeof fetch;
 
     render(
-      <GrowthCampaignOverviewPanel workspaceSlug="demo" projectId="proj-satigny" />,
+      <GrowthCampaignOverviewPanel
+        workspaceSlug="demo"
+        projectId="proj-satigny"
+      />,
     );
 
-    expect(await screen.findByText("What to do next")).toBeInTheDocument();
-    expect(screen.getByText("Check the landing page tracking")).toBeInTheDocument();
-    expect(screen.getByText("Paid ads for Satigny duplex")).toBeInTheDocument();
     expect(
-      screen.getByText("We hid 1 test form fill so it does not change your results."),
+      await screen.findByText("Ad Copilot Action Center"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /publish|budget|pause/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Check the landing page tracking"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Paid ads for Satigny duplex"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We hid 1 test form fill so it does not change your results.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /publish|budget|pause/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("does not invent an optimisation area when the overview API denies access", async () => {
+  it("does not invent an Action Center when the overview API denies access", async () => {
     global.fetch = vi.fn(async () =>
       jsonResponse(
         { error: { message: "You do not have permission to view paid ads." } },
@@ -163,19 +206,29 @@ describe("GrowthCampaignOverviewPanel", () => {
     ) as typeof fetch;
 
     render(
-      <GrowthCampaignOverviewPanel workspaceSlug="demo" projectId="proj-satigny" />,
+      <GrowthCampaignOverviewPanel
+        workspaceSlug="demo"
+        projectId="proj-satigny"
+      />,
     );
 
-    expect(await screen.findByText("Could not load paid ads")).toBeInTheDocument();
-    expect(screen.queryByText("What to do next")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Could not load paid ads"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Ad Copilot Action Center"),
+    ).not.toBeInTheDocument();
   });
 
-  it("omits What to do next when the overview payload lacks optimisation fields", async () => {
+  it("omits Action Center when the overview payload lacks optimisation fields", async () => {
     global.fetch = vi.fn(async () =>
       jsonResponse({
         data: {
           overview: {
-            pilot: { projectName: "Satigny duplex", marketLabel: "Geneva, Switzerland" },
+            pilot: {
+              projectName: "Satigny duplex",
+              marketLabel: "Geneva, Switzerland",
+            },
             growthCampaign: null,
             accounts: [],
             hierarchy: [],
@@ -193,10 +246,17 @@ describe("GrowthCampaignOverviewPanel", () => {
     ) as typeof fetch;
 
     render(
-      <GrowthCampaignOverviewPanel workspaceSlug="demo" projectId="proj-satigny" />,
+      <GrowthCampaignOverviewPanel
+        workspaceSlug="demo"
+        projectId="proj-satigny"
+      />,
     );
 
-    expect(await screen.findByText("Paid ads for Satigny duplex")).toBeInTheDocument();
-    expect(screen.queryByText("What to do next")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Paid ads for Satigny duplex"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Ad Copilot Action Center"),
+    ).not.toBeInTheDocument();
   });
 });

@@ -63,7 +63,7 @@ type Overview = {
     clicks: number;
     freshnessLabel: string;
   };
-  /** Present on current overview responses; omit What to do next if missing. */
+  /** Present on current overview responses; omit Action Center if missing. */
   funnel?: AdCopilotFunnelCounts | null;
   optimisation?: AdCopilotNextStep | null;
   nextStepHint: string;
@@ -79,6 +79,10 @@ function hasWhatToDoNextPayload(
   return Boolean(
     overview.optimisation &&
       typeof overview.optimisation.title === "string" &&
+      typeof overview.optimisation.whatNumbersSay === "string" &&
+      typeof overview.optimisation.whyItMatters === "string" &&
+      typeof overview.optimisation.manualNextStep === "string" &&
+      typeof overview.optimisation.evidenceLabel === "string" &&
       typeof overview.optimisation.nextAction === "string" &&
       overview.funnel &&
       typeof overview.funnel.formLeads === "number",

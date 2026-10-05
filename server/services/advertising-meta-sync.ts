@@ -592,6 +592,7 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
   };
   const optimisation = buildAdCopilotNextStep({
     freshness,
+    freshnessLabel: freshnessLabel(freshness),
     spend,
     clicks,
     funnel,
