@@ -233,6 +233,20 @@ describe("sync service write-guard + isolation", () => {
         reference: "satigny_duplex",
       };
     });
+    const summarizeProjectOutcomeFunnel = vi.fn(async () => ({
+      attributionModel: "last_touch" as const,
+      attributionLabel: "Last touch — the most recent paid click gets the credit (v1)",
+      formLeads: 0,
+      qualifiedLeads: 0,
+      opportunities: 0,
+      wonCount: 0,
+      lostCount: 0,
+      wonValue: 0,
+      pipelineValue: 0,
+      costPerFormLead: null,
+      costPerQualifiedLead: null,
+      roas: null,
+    }));
 
     vi.doMock("@/server/repositories/growth-campaigns", () => ({
       findGrowthCampaigns,
@@ -266,20 +280,7 @@ describe("sync service write-guard + isolation", () => {
     vi.doMock("@/server/services/advertising-attribution", () => ({
       lastTouchAttributionLabel: () =>
         "Last touch — the most recent paid click gets the credit (v1)",
-      summarizeProjectOutcomeFunnel: vi.fn(async () => ({
-        attributionModel: "last_touch",
-        attributionLabel: "Last touch — the most recent paid click gets the credit (v1)",
-        formLeads: 0,
-        qualifiedLeads: 0,
-        opportunities: 0,
-        wonCount: 0,
-        lostCount: 0,
-        wonValue: 0,
-        pipelineValue: 0,
-        costPerFormLead: null,
-        costPerQualifiedLead: null,
-        roas: null,
-      })),
+      summarizeProjectOutcomeFunnel,
     }));
     vi.doMock("@/server/repositories/integrations", () => ({
       findIntegrations: vi.fn(async () => []),
@@ -298,9 +299,21 @@ describe("sync service write-guard + isolation", () => {
     expect(overview.pilot.projectReference).toBe("satigny_duplex");
     expect(overview.hierarchy).toEqual([]);
     expect(overview.outcomes?.formLeads).toBe(0);
-    expect(overview.growthCampaign === null || overview.growthCampaign.attributionPolicyLabel).toBeTruthy();
+    expect(
+      overview.growthCampaign === null ||
+        overview.growthCampaign.attributionPolicyLabel,
+    ).toBeTruthy();
+    expect(overview.optimisation.kind).toBe("refresh_data");
+    expect(overview.optimisation.needsSettingsRefresh).toBe(true);
+    expect(overview.funnel).toEqual({
+      formLeads: 0,
+      qualifiedLeads: 0,
+      opportunities: 0,
+      wins: 0,
+    });
     expect(findGrowthCampaigns).toHaveBeenCalledWith("ws-a", { projectId: "proj-1" });
     expect(findAdAccounts).toHaveBeenCalledWith("ws-a");
     expect(findAdConnections).toHaveBeenCalledWith("ws-a");
+    expect(summarizeProjectOutcomeFunnel).toHaveBeenCalledWith("ws-a", "proj-1", 0);
   });
 });

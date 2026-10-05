@@ -35,6 +35,7 @@ import {
   upsertAdvertisingCampaign,
   upsertMetricSnapshot,
 } from "@/server/repositories/advertising-hierarchy";
+import { buildAdCopilotNextStep } from "@/lib/ad-copilot-next-step";
 import {
   addTrustedDestination,
   createGrowthCampaign,
@@ -583,6 +584,18 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
     input.projectId,
     spend,
   );
+  const funnel = {
+    formLeads: outcomes.formLeads,
+    qualifiedLeads: outcomes.qualifiedLeads,
+    opportunities: outcomes.opportunities,
+    wins: outcomes.wonCount,
+  };
+  const optimisation = buildAdCopilotNextStep({
+    freshness,
+    spend,
+    clicks,
+    funnel,
+  });
 
   return {
     pilot: {
@@ -633,6 +646,8 @@ export async function getGrowthCampaignOverviewForWorkspace(input: {
       freshnessLabel: freshnessLabel(freshness),
       lastSuccessfulSyncAt: latestSync,
     },
+    funnel,
+    optimisation,
     readOnly: true,
     nextStepHint: growth
       ? "Review business results first (won, opportunities, qualified leads). Refresh Meta when you want newer spend numbers. Changing ads still needs a later phase."

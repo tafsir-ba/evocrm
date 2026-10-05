@@ -903,9 +903,9 @@ GET  /api/workspaces/[workspaceSlug]/advertising/overview?projectId=
 | `POST connections` | `advertising:connect` | Body: `{ accessToken?, businessId?, useFixture?, name? }`. Always stores `writeScopesEnabled: false` |
 | `POST sync` | `advertising:connect` | Body: `{ connectionId, growthCampaignId? }`. Fixture path = no live Graph |
 | `POST pilot/ensure` | `advertising:create` | Ensures Growth Campaign for `satigny_duplex` project |
-| `GET overview` | `advertising:read` | Project-scoped hierarchy + media-tier analytics + freshness |
+| `GET overview` | `advertising:read` | Project-scoped hierarchy + attributed business `outcomes` + media-tier analytics + freshness + read-only “What to do next” (`optimisation` / `funnel`) from freshness, spend, clicks, and attributed conversion milestones. No mutate/publish/budget writes from this route. |
 
-UI: Settings → Paid ads; Project → Paid ads tab (both hidden when flag off).
+UI: Settings → Paid ads; Project → Paid ads tab (both hidden when flag off or caller lacks workspace membership + `advertising:read`). Project Paid ads includes a kids-friendly, read-only **What to do next** area (stale data → refresh in Settings; spend/clicks with no attributed funnel outcomes → check landing tracking; form fills with no good leads/pipeline/wins → review quality/targeting; good leads / pipeline / wins → keep that focus).
 
 ---
 

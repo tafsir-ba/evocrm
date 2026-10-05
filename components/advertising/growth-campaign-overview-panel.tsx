@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { AdCopilotWhatToDoNext } from "@/components/advertising/ad-copilot-what-to-do-next";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import type {
+  AdCopilotFunnelCounts,
+  AdCopilotNextStep,
+} from "@/lib/ad-copilot-next-step";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
+import { workspacePath } from "@/lib/workspace-paths";
 
 type Overview = {
   pilot: {
@@ -55,9 +61,27 @@ type Overview = {
     clicks: number;
     freshnessLabel: string;
   };
+  /** Present on current overview responses; omit What to do next if missing. */
+  funnel?: AdCopilotFunnelCounts | null;
+  optimisation?: AdCopilotNextStep | null;
   nextStepHint: string;
   readOnly: boolean;
 };
+
+function hasWhatToDoNextPayload(
+  overview: Overview,
+): overview is Overview & {
+  funnel: AdCopilotFunnelCounts;
+  optimisation: AdCopilotNextStep;
+} {
+  return Boolean(
+    overview.optimisation &&
+      typeof overview.optimisation.title === "string" &&
+      typeof overview.optimisation.nextAction === "string" &&
+      overview.funnel &&
+      typeof overview.funnel.formLeads === "number",
+  );
+}
 
 export function GrowthCampaignOverviewPanel({
   workspaceSlug,
@@ -212,6 +236,14 @@ export function GrowthCampaignOverviewPanel({
           {overview.analytics.metricTierLabel}
         </p>
       </section>
+
+      {hasWhatToDoNextPayload(overview) ? (
+        <AdCopilotWhatToDoNext
+          step={overview.optimisation}
+          funnel={overview.funnel}
+          settingsHref={workspacePath(workspaceSlug, "settings", "advertising")}
+        />
+      ) : null}
 
       {overview.growthCampaign ? (
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">

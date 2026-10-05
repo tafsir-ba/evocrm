@@ -821,6 +821,8 @@ Feature-flagged via `ADVERTISING_ENABLED` (default **off**). **Do not** overload
 
 **Phase 1 pilot:** Satigny duplex (`projectReference: satigny_duplex`), Geneva, Switzerland (CH). Meta read-only (`ads_read`, `business_management`). No campaign writes, customer-list exports, or AI actions.
 
+Project Paid ads (read-only) shows a deterministic **What to do next** suggestion from sync freshness, spend, clicks, and attributed `ConversionEvent` milestones. It never publishes, changes budgets, or collects new consent.
+
 ### AdConnection
 
 Workspace-scoped platform credentials + health. Credentials use the generic vault (`credentialsEncrypted`). Phase 1 forces `writeScopesEnabled: false`.

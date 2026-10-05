@@ -53,7 +53,11 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
         projectId={projectId}
         canUpdate={hasPermission(permissions, "project:update")}
         canArchive={hasPermission(permissions, "project:archive")}
-        showPaidAds={isAdvertisingEnabled()}
+        showPaidAds={
+          isAdvertisingEnabled() &&
+          access.context.accessMode === "member" &&
+          hasPermission(permissions, "advertising:read")
+        }
       />
     </PageContainer>
   );

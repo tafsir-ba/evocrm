@@ -95,5 +95,39 @@ describe("ProjectDetailPanel", () => {
     expect(screen.getByRole("option", { name: /Jean Client/ })).toBeInTheDocument();
     expect(screen.getByText(/Quai du Mont-Blanc/)).toBeInTheDocument();
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Paid ads" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Paid ads tab only when the page opts in (member + advertising:read + flag)", async () => {
+    render(
+      <ProjectDetailPanel
+        workspaceSlug="demo"
+        projectId="507f1f77bcf86cd7994390dd"
+        canUpdate
+        canArchive
+        showPaidAds
+      />,
+    );
+
+    expect(await screen.findByText("Les Terrasses")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Paid ads" })).toHaveAttribute(
+      "href",
+      "/w/demo/projects/507f1f77bcf86cd7994390dd/paid-ads",
+    );
+  });
+
+  it("keeps Paid ads hidden when the page does not opt in (grant-only / no advertising:read)", async () => {
+    render(
+      <ProjectDetailPanel
+        workspaceSlug="demo"
+        projectId="507f1f77bcf86cd7994390dd"
+        canUpdate={false}
+        canArchive={false}
+        showPaidAds={false}
+      />,
+    );
+
+    expect(await screen.findByText("Les Terrasses")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Paid ads" })).not.toBeInTheDocument();
   });
 });
