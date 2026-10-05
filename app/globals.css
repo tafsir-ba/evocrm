@@ -115,6 +115,15 @@ body {
   border: 2px solid transparent;
 }
 
+/* iOS Safari zooms into any focused field under 16px; keep compact sizes on desktop only. */
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Focus ring utility */
 .focus-ring:focus-visible {
   outline: 2px solid var(--color-brand-600);

@@ -112,6 +112,23 @@ export function telHref(phone: string): string {
   return hasPlus ? `tel:+${digits}` : `tel:${digits}`;
 }
 
+/**
+ * wa.me needs a full international number. Local numbers (no "+" or "00" prefix) have an unknown
+ * country code, so no link is returned for them rather than opening the wrong chat.
+ */
+export function whatsappHref(phone: string): string | null {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (trimmed.startsWith("+")) {
+    return digits.length >= 8 ? `https://wa.me/${digits}` : null;
+  }
+  if (digits.startsWith("00")) {
+    const international = digits.slice(2);
+    return international.length >= 8 ? `https://wa.me/${international}` : null;
+  }
+  return null;
+}
+
 export function formatNextActionWhen(
   value: string | Date | null | undefined,
   now: Date = new Date(),

@@ -461,6 +461,9 @@ export function LeadFormPage({
           <Label htmlFor="phone">Phone</Label>
           <Input
             id="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={form.phone}
             onChange={(event) =>
               setForm((current) => ({ ...current, phone: event.target.value }))
@@ -484,7 +487,7 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="jobTitle">Job title</Label>
             <Input
@@ -518,7 +521,7 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="statusId" required>
               Status
@@ -575,7 +578,7 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="language">Language</Label>
             <Input
@@ -613,6 +616,7 @@ export function LeadFormPage({
             <Input
               id="budgetMin"
               type="number"
+              inputMode="numeric"
               min={0}
               value={form.budgetMin}
               onChange={(event) =>
@@ -625,6 +629,7 @@ export function LeadFormPage({
             <Input
               id="budgetMax"
               type="number"
+              inputMode="numeric"
               min={0}
               value={form.budgetMax}
               onChange={(event) =>
@@ -655,7 +660,7 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="transactionIntent">Transaction intent</Label>
             <Select

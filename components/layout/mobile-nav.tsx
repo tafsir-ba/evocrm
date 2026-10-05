@@ -20,11 +20,11 @@ export function MobileNav({
         onClick={onClose}
         aria-label="Close navigation"
       />
-      <div className="relative h-full w-[260px] bg-white animate-[slideIn_.18s_ease-out]">
+      <div className="relative h-full w-[260px] bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] animate-[slideIn_.18s_ease-out]">
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-[var(--color-muted)] focus-ring"
+          className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-3 w-10 h-10 inline-flex items-center justify-center rounded-md hover:bg-[var(--color-muted)] focus-ring"
           aria-label="Close"
         >
           <IconClose size={16} />

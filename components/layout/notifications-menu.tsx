@@ -161,7 +161,7 @@ export function NotificationsMenu() {
           />
           <div
             role="menu"
-            className="absolute right-0 top-[44px] z-50 w-[min(340px,calc(100vw-1rem))] rounded-lg border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
+            className="fixed inset-x-2 top-[calc(64px+env(safe-area-inset-top))] z-50 max-h-[calc(100dvh-80px-env(safe-area-inset-top))] overflow-y-auto rounded-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-[44px] sm:max-h-none sm:w-[340px] sm:overflow-visible border border-[var(--color-line)] bg-white shadow-[var(--shadow-lg)]"
           >
             <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] px-3 py-2.5">
               <p className="text-[13px] font-semibold text-[var(--color-ink)]">Notifications</p>

@@ -39,7 +39,7 @@ export function Topbar({
     .join("") || "U";
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] min-w-0 items-center gap-1.5 border-b border-[var(--color-line)] bg-white px-2.5 sm:gap-3 sm:px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-[calc(60px+env(safe-area-inset-top))] min-w-0 pt-[env(safe-area-inset-top)] items-center gap-1.5 border-b border-[var(--color-line)] bg-white px-2.5 sm:gap-3 sm:px-4 lg:px-6">
       <button
         onClick={onOpenMobileNav}
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-muted)] focus-ring lg:hidden"

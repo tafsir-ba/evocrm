@@ -37,6 +37,7 @@ import {
   type LeadNoteDictionaryItem,
 } from "@/lib/lead-notes-client";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
+import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -175,6 +176,7 @@ export function LeadsPanel({
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
   const [noteActivityIds, setNoteActivityIds] = useState<LeadNoteActivityIds>(NO_NOTE_ACTIVITY_IDS);
   const [enrichLeadId, setEnrichLeadId] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -385,6 +387,24 @@ export function LeadsPanel({
     createdToParam,
     acquisitionParam,
   ]);
+
+  const activeFilterCount = [
+    showArchived,
+    Boolean(projectId && includeAssociated),
+    statusFilter,
+    sourceFilter,
+    assignedFilter,
+    tagFilter,
+    integrationFilter,
+    utmCampaignFilter.trim(),
+    propertyTypeInterestFilter,
+    transactionIntentFilter,
+    usagePurposeFilter,
+    industryFilter.trim(),
+    jobTitleFilter.trim(),
+    stateRegionFilter.trim(),
+    companyFilter,
+  ].filter(Boolean).length;
 
   const selectedCount = useMemo(() => {
     if (selectAllMatching) {
@@ -782,8 +802,9 @@ export function LeadsPanel({
       )}
 
       <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
-        <div className="w-full min-w-0 sm:max-w-md sm:flex-1 sm:min-w-[200px]">
+        <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:flex-1 sm:min-w-[200px]">
           <Input
+            className="min-w-0 flex-1"
             placeholder="Search leads by name, email or phone…"
             aria-label="Search leads by name, email or phone"
             value={search}
@@ -793,7 +814,26 @@ export function LeadsPanel({
             }}
             fieldSize="sm"
           />
+          <button
+            type="button"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-white px-3 text-[14px] font-medium text-[var(--color-ink-soft)] sm:hidden"
+            aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="leads-filters"
+            onClick={() => setMobileFiltersOpen((current) => !current)}
+          >
+            Filters
+            {activeFilterCount > 0 ? (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-600)] px-1 text-[11px] font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </button>
         </div>
+        <div
+          id="leads-filters"
+          className={cn("flex-col gap-2 sm:contents", mobileFiltersOpen ? "flex" : "hidden")}
+        >
         <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
           <input
             type="checkbox"
@@ -914,10 +954,16 @@ export function LeadsPanel({
             ? " · on"
             : ""}
         </button>
+        </div>
       </div>
 
       {showMoreFilters ? (
-      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
+      <div
+        className={cn(
+          "mb-3 flex-wrap items-center gap-1.5 sm:flex",
+          mobileFiltersOpen ? "flex shrink-0" : "hidden",
+        )}
+      >
         <Select
           fieldSize="sm"
           className="w-auto min-w-[140px]"

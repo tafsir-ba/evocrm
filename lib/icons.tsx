@@ -41,6 +41,7 @@ export function IconClose(p: IconProps) { return (<svg {...base(p)}><path d="M6 
 export function IconCheck(p: IconProps) { return (<svg {...base(p)}><path d="m5 12 5 5 9-11"/></svg>); }
 export function IconMail(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3 7 9 6 9-6"/></svg>); }
 export function IconPhone(p: IconProps) { return (<svg {...base(p)}><path d="M5 4h3l2 5-2 1a11 11 0 0 0 6 6l1-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>); }
+export function IconChat(p: IconProps) { return (<svg {...base(p)}><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.2L4 20Z"/></svg>); }
 export function IconCalendar(p: IconProps) { return (<svg {...base(p)}><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>); }
 export function IconClock(p: IconProps) { return (<svg {...base(p)}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>); }
 export function IconMapPin(p: IconProps) { return (<svg {...base(p)}><path d="M12 21s7-7 7-12a7 7 0 0 0-14 0c0 5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>); }

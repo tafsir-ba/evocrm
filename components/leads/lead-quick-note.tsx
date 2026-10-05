@@ -64,7 +64,7 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
             setOpen(true);
           }
         }}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-100)]"
+        className="inline-flex h-8 w-8 md:h-5 md:w-5 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-100)]"
       >
         <IconPlus size={12} />
       </button>
@@ -110,7 +110,7 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
               value={followUpAt}
               onChange={(event) => setFollowUpAt(event.target.value)}
               aria-label="Follow up (optional)"
-              className="h-7 min-w-0 flex-1 rounded-md border border-[var(--color-line)] px-1.5 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+              className="h-10 min-w-0 flex-1 rounded-md md:h-7 border border-[var(--color-line)] px-1.5 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
             />
           </label>
           {error ? (
@@ -122,7 +122,7 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
             <span className="text-[11px] text-[var(--color-ink-faint)]">
               Saved to the lead&apos;s Notes · ⌘↵
             </span>
-            <Button type="submit" size="sm" className="h-7 px-2.5 text-[12px]" disabled={!body.trim() || saving}>
+            <Button type="submit" size="sm" className="h-10 px-3 text-[13px] md:h-7 md:px-2.5 md:text-[12px]" disabled={!body.trim() || saving}>
               {saving ? "Saving…" : "Save note"}
             </Button>
           </div>

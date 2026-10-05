@@ -26,7 +26,7 @@ export function Input({
   inputClassName,
   ...rest
 }: InputProps) {
-  const h = fieldSize === "sm" ? "h-8" : fieldSize === "lg" ? "h-11" : "h-10";
+  const h = fieldSize === "sm" ? "h-10 md:h-8" : fieldSize === "lg" ? "h-11" : "h-10";
   return (
     <div className={cn("relative", className)}>
       {leadingIcon && (

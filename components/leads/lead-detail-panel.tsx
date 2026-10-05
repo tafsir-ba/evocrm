@@ -38,7 +38,9 @@ import {
   IconSparkles,
 } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import { telHref } from "@/lib/leads-table";
 import { createOpportunityHref } from "@/lib/opportunity-link-flow";
+import { LeadContactActions } from "@/components/leads/lead-contact-actions";
 import { EnrichedField } from "@/components/leads/enriched-field";
 import { EnrichmentCandidateList } from "@/components/leads/lead-enrichment-candidates";
 import { LeadEnrichmentModal } from "@/components/leads/lead-enrichment-modal";
@@ -735,6 +737,12 @@ export function LeadDetailPanel({
             </div>
           </div>
 
+          <LeadContactActions
+            phone={lead.phone}
+            email={lead.email}
+            className="mt-4 hidden md:flex"
+          />
+
           <div className="mt-5 space-y-2.5 text-[13px]">
             <Row icon={<IconMail size={14} />} label="Email">
               {lead.email ? (
@@ -749,7 +757,13 @@ export function LeadDetailPanel({
               )}
             </Row>
             <Row icon={<IconPhone size={14} />} label="Phone">
-              {lead.phone ?? "—"}
+              {lead.phone ? (
+                <a className="text-[var(--color-brand-700)] hover:underline" href={telHref(lead.phone)}>
+                  {lead.phone}
+                </a>
+              ) : (
+                "—"
+              )}
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Company">
               <EnrichedField
@@ -1407,6 +1421,12 @@ export function LeadDetailPanel({
           </Card>
         </div>
       </div>
+
+      {!lead.archivedAt && (lead.phone || lead.email) ? (
+        <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-4 border-t border-[var(--color-line)] bg-white/95 px-4 py-2 backdrop-blur md:hidden">
+          <LeadContactActions phone={lead.phone} email={lead.email} />
+        </div>
+      ) : null}
 
       <LeadEnrichmentModal
         open={enrichOpen}

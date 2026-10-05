@@ -410,7 +410,7 @@ export function DashboardPanel({
                     type="button"
                     role="tab"
                     aria-selected={attentionTab === tab.key}
-                    className={`h-7 rounded px-2 text-[12px] font-medium tabular ${
+                    className={`h-9 rounded px-2.5 text-[13px] font-medium tabular md:h-7 md:px-2 md:text-[12px] ${
                       attentionTab === tab.key
                         ? "bg-white text-[var(--color-ink)] shadow-[var(--shadow-xs)]"
                         : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"

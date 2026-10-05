@@ -157,7 +157,7 @@ export function LeadStatusPicker({
           placeholder={canCreate ? "Find or create a status…" : "Find a status…"}
           aria-label={canCreate ? "Find or create a status" : "Find a status"}
           maxLength={120}
-          className="mb-1 h-7 w-full rounded-md border border-[var(--color-line)] px-2 text-[12.5px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
+          className="mb-1 h-10 w-full rounded-md md:h-7 border border-[var(--color-line)] px-2 text-[12.5px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
         />
 
         <div role="listbox" aria-label="Lead statuses" className="max-h-60 overflow-y-auto">
@@ -172,7 +172,7 @@ export function LeadStatusPicker({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => choose(option.id)}
                 className={cn(
-                  "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--color-ink-soft)]",
+                  "flex h-11 w-full items-center gap-2 rounded-md px-2 text-left text-[14px] text-[var(--color-ink-soft)] md:h-8 md:text-[12.5px]",
                   index === activeIndex && "bg-[var(--color-muted)]",
                 )}
               >
@@ -196,7 +196,7 @@ export function LeadStatusPicker({
               onClick={() => void create()}
               disabled={creating}
               className={cn(
-                "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] font-medium text-[var(--color-brand-700)] disabled:opacity-60",
+                "flex h-11 w-full items-center gap-2 rounded-md px-2 text-left text-[14px] font-medium text-[var(--color-brand-700)] disabled:opacity-60 md:h-8 md:text-[12.5px]",
                 activeIndex === filtered.length && "bg-[var(--color-muted)]",
               )}
             >

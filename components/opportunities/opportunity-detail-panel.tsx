@@ -33,6 +33,7 @@ import {
 import { formatDate, formatPrice } from "@/lib/format-price";
 import { IconCheck } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
+import { LeadContactActions } from "@/components/leads/lead-contact-actions";
 
 type DictionaryItem = {
   id: string;
@@ -430,6 +431,10 @@ export function OpportunityDetailPanel({
                   </p>
                 </div>
               </Link>
+              <LeadContactActions
+                phone={opportunity.lead.phone ?? null}
+                email={opportunity.lead.email ?? null}
+              />
               {(opportunity.lead.propertyTypeInterests.length > 0 ||
                 opportunity.lead.transactionIntent ||
                 opportunity.lead.usagePurpose) && (

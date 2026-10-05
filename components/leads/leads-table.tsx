@@ -201,7 +201,7 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
       trigger={
         <button
           type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
           aria-label={`Contact ${lead.fullName}`}
         >
           {lead.email ? <IconMail size={13} /> : <IconPhone size={13} />}
@@ -213,7 +213,7 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
           <a
             role="menuitem"
             href={`mailto:${lead.email}`}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+            className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)] md:py-1.5 md:text-[12.5px]"
           >
             <IconMail size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
             <span className="truncate">{lead.email}</span>
@@ -223,7 +223,7 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
           <a
             role="menuitem"
             href={telHref(lead.phone)}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+            className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)] md:py-1.5 md:text-[12.5px]"
           >
             <IconPhone size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
             <span>{lead.phone}</span>
@@ -395,7 +395,7 @@ function RowActions({
       {onEnrich && !lead.archivedAt ? (
         <button
           type="button"
-          className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
+          className="inline-flex h-9 items-center gap-1 rounded px-2.5 text-[13px] font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)] md:h-6 md:px-1.5 md:text-[12px]"
           aria-label={`Enrich ${lead.fullName}`}
           title="Enrich from public professional sources"
           onClick={(event) => {
@@ -409,7 +409,7 @@ function RowActions({
       ) : null}
       <button
         type="button"
-        className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
         aria-expanded={expanded}
         aria-label={expanded ? `Hide details for ${lead.fullName}` : `Show details for ${lead.fullName}`}
         onClick={onToggleExpanded}
@@ -418,7 +418,7 @@ function RowActions({
       </button>
       <Link
         href={workspacePath(workspaceSlug, "leads", lead.id)}
-        className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+        className="inline-flex h-9 items-center rounded px-2.5 text-[13px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:px-1.5 md:text-[12px]"
         aria-label={`Open ${lead.fullName}`}
       >
         Open
@@ -768,16 +768,16 @@ export function LeadsTable({
             <li
               key={lead.id}
               className={cn(
-                "px-3 py-2",
+                "px-3 py-2.5",
                 selected && "bg-[var(--color-brand-50)]/40",
                 urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
               )}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2.5">
                 {canDelete ? (
                   <input
                     type="checkbox"
-                    className="h-3.5 w-3.5 rounded border-[var(--color-line)]"
+                    className="h-5 w-5 shrink-0 rounded border-[var(--color-line)]"
                     checked={selected}
                     onChange={() => onToggleLead(lead.id)}
                     aria-label={`Select ${lead.fullName}`}
@@ -797,7 +797,7 @@ export function LeadsTable({
                     </span>
                   </div>
                   {lead.phone ? (
-                    <div className="mt-0.5 text-[11.5px]">
+                    <div className="mt-0.5 text-[13px]">
                       <PhoneLink phone={lead.phone} />
                     </div>
                   ) : null}
@@ -830,14 +830,16 @@ export function LeadsTable({
                       onAddNote={(body, followUpIso) => onAddNote(lead.id, body, followUpIso)}
                     />
                   </div>
+                  <div className="-mr-1 mt-1 flex justify-end">
+                    <RowActions
+                      workspaceSlug={workspaceSlug}
+                      lead={lead}
+                      expanded={expanded}
+                      onToggleExpanded={() => toggleExpanded(lead.id)}
+                      onEnrich={enrichHandler(lead.id)}
+                    />
+                  </div>
                 </div>
-                <RowActions
-                  workspaceSlug={workspaceSlug}
-                  lead={lead}
-                  expanded={expanded}
-                  onToggleExpanded={() => toggleExpanded(lead.id)}
-                  onEnrich={enrichHandler(lead.id)}
-                />
               </div>
               {expanded ? (
                 <div className="mt-2 border-t border-[var(--color-line)] pt-2">

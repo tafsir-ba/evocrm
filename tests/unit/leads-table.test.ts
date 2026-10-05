@@ -12,6 +12,7 @@ import {
   leadUrgency,
   telHref,
   visibleLeadTags,
+  whatsappHref,
 } from "@/lib/leads-table";
 
 const now = new Date("2026-08-30T12:00:00.000Z");
@@ -194,5 +195,18 @@ describe("leads table presentation", () => {
         now,
       }).label,
     ).toBeNull();
+  });
+});
+
+describe("whatsappHref", () => {
+  it("links international numbers to wa.me with digits only", () => {
+    expect(whatsappHref("+33 6 12 34 56 78")).toBe("https://wa.me/33612345678");
+    expect(whatsappHref("0033 6 12 34 56 78")).toBe("https://wa.me/33612345678");
+  });
+
+  it("returns null for local or too-short numbers", () => {
+    expect(whatsappHref("06 12 34 56 78")).toBeNull();
+    expect(whatsappHref("+33 12")).toBeNull();
+    expect(whatsappHref("")).toBeNull();
   });
 });

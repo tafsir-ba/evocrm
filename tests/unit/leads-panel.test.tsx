@@ -289,6 +289,24 @@ describe("LeadsPanel table", () => {
     expect(screen.queryByRole("button", { name: /whatsapp|call now|email blast/i })).not.toBeInTheDocument();
   });
 
+  it("folds filters behind a mobile Filters toggle that counts active filters", async () => {
+    const user = userEvent.setup();
+    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />);
+
+    await screen.findByPlaceholderText("Search leads by name, email or phone…");
+    const toggle = screen.getByRole("button", { name: "Filters" });
+    const filters = document.getElementById("leads-filters");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(filters).toHaveClass("hidden", "sm:contents");
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(filters).not.toHaveClass("hidden");
+
+    await user.click(screen.getByLabelText("Show archived"));
+    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+  });
+
   it("changes status from the inline status dropdown and assignment after row open", async () => {
     const user = userEvent.setup();
     render(

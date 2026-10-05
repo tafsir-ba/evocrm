@@ -267,9 +267,9 @@ export function PipelinePanel({
     return (
       <div className="space-y-3">
         <Skeleton className="h-8 w-full max-w-xl" />
-        <div className="grid grid-flow-col auto-cols-[240px] gap-2">
+        <div className="grid grid-flow-col auto-cols-[82vw] gap-2 overflow-hidden sm:auto-cols-[240px]">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-[220px] w-[240px]" />
+            <Skeleton key={index} className="h-[220px] w-full" />
           ))}
         </div>
       </div>
@@ -325,7 +325,7 @@ export function PipelinePanel({
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <div className="min-w-[200px] max-w-md flex-1">
+        <div className="w-full min-w-0 max-w-md flex-1 sm:min-w-[200px]">
           <SearchInput
             placeholder="Search opportunities…"
             aria-label="Search opportunities"
@@ -335,7 +335,7 @@ export function PipelinePanel({
         </div>
         <Select
           fieldSize="sm"
-          className="w-auto min-w-[160px]"
+          className="w-full sm:w-auto sm:min-w-[160px]"
           value={assignedFilter}
           onChange={(event) => setAssignedFilter(event.target.value)}
         >
@@ -366,8 +366,8 @@ export function PipelinePanel({
           }
         />
       ) : (
-        <div className="-mx-4 md:-mx-6 lg:-mx-8 min-w-0 max-w-full overflow-x-auto px-4 pb-4 md:px-6 lg:px-8">
-          <div className="grid w-max grid-flow-col auto-cols-[minmax(220px,250px)] gap-2">
+        <div className="-mx-4 md:-mx-6 lg:-mx-8 min-w-0 max-w-full snap-x snap-mandatory scroll-px-4 overflow-x-auto overscroll-x-contain px-4 pb-4 md:snap-none md:px-6 lg:px-8">
+          <div className="grid w-max grid-flow-col auto-cols-[82vw] gap-2 sm:auto-cols-[minmax(220px,250px)] [&>*]:snap-start">
             {columns.map((column) => (
               <KanbanColumn
                 key={column.status.id}
@@ -443,7 +443,7 @@ export function PipelinePanel({
                               )
                             }
                             disabled={stageMovePending === opportunity.id}
-                            className="h-7 text-[12px]"
+                            className="h-10 text-[13px] md:h-7 md:text-[12px]"
                           >
                             {allStages.map((stage) => (
                               <option key={stage.id} value={stage.id}>

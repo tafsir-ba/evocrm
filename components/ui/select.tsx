@@ -16,7 +16,7 @@ export function Select({
   children,
   ...rest
 }: SelectProps) {
-  const h = fieldSize === "sm" ? "h-8" : "h-10";
+  const h = fieldSize === "sm" ? "h-10 md:h-8" : "h-10";
   return (
     <select
       {...rest}

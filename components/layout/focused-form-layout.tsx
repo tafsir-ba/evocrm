@@ -50,7 +50,7 @@ export function FocusedFormLayout({
           </Link>
         ) : null}
       </div>
-      <div className="rounded-xl border border-[var(--color-line)] bg-white p-6">
+      <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 sm:p-6">
         {children}
         {footer}
       </div>

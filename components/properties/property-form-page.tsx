@@ -406,7 +406,7 @@ export function PropertyFormPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="typeId">Type</Label>
             <Select
@@ -440,7 +440,7 @@ export function PropertyFormPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="price">Price</Label>
             <Input
@@ -536,7 +536,7 @@ export function PropertyFormPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="col-span-2">
             <Label htmlFor="surface">Surface</Label>
             <Input

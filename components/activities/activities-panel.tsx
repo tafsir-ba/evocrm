@@ -282,7 +282,7 @@ export function ActivitiesPanel({
         {list.map((activity) => (
           <div
             key={activity.id}
-            className={`flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--color-canvas)] ${
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 hover:bg-[var(--color-canvas)] md:flex-nowrap md:py-1.5 ${
               activity.isOverdue ? "bg-[color-mix(in_srgb,var(--color-danger-fg)_4%,white)]" : ""
             }`}
           >
@@ -296,9 +296,9 @@ export function ActivitiesPanel({
             >
               {activityTypeIcon(activity.type?.key, 14)}
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 grow basis-[calc(100%-2.25rem)] md:basis-0">
               <div className="flex min-w-0 items-baseline gap-1.5">
-                <p className="truncate text-[12.5px] font-semibold text-[var(--color-ink)]">
+                <p className="truncate text-[13.5px] font-semibold text-[var(--color-ink)] md:text-[12.5px]">
                   {activity.title}
                 </p>
                 {activity.isOverdue ? (
@@ -318,20 +318,20 @@ export function ActivitiesPanel({
                 {activity.outcome ? ` · ${activity.outcome}` : ""}
               </p>
             </div>
-            {activity.status ? (
-              <StatusBadge
-                label={activity.status.label}
-                color={activity.status.color}
-                behavior={activity.status.behavior}
-                size="sm"
-              />
-            ) : null}
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="ml-9 flex min-w-0 flex-wrap items-center gap-1 md:ml-0 md:shrink-0 md:flex-nowrap md:gap-0.5">
+              {activity.status ? (
+                <StatusBadge
+                  label={activity.status.label}
+                  color={activity.status.color}
+                  behavior={activity.status.behavior}
+                  size="sm"
+                />
+              ) : null}
               {canUpdate && activity.status?.behavior === "pending" ? (
                 <>
                   <button
                     type="button"
-                    className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                    className="inline-flex h-8 items-center rounded px-2 text-[13px] font-medium text-[var(--color-ink-soft)] md:h-6 md:px-1.5 md:text-[12px] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
                     disabled={actionPending === activity.id}
                     onClick={() => void handleComplete(activity.id)}
                   >
@@ -340,7 +340,7 @@ export function ActivitiesPanel({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                    className="inline-flex h-8 items-center rounded px-2 text-[13px] font-medium text-[var(--color-ink-soft)] md:h-6 md:px-1.5 md:text-[12px] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
                     disabled={actionPending === activity.id}
                     onClick={() => void handleCancel(activity.id)}
                   >
@@ -351,7 +351,7 @@ export function ActivitiesPanel({
               {canUpdate ? (
                 <button
                   type="button"
-                  className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                  className="inline-flex h-8 items-center rounded px-2 text-[13px] font-medium text-[var(--color-ink-soft)] md:h-6 md:px-1.5 md:text-[12px] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
                   onClick={() =>
                     router.push(workspacePath(workspaceSlug, "activities", activity.id, "edit"))
                   }
@@ -362,7 +362,7 @@ export function ActivitiesPanel({
               {canArchive ? (
                 <button
                   type="button"
-                  className="inline-flex h-6 items-center rounded px-1.5 text-[12px] font-medium text-[var(--color-danger-fg)] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                  className="inline-flex h-8 items-center rounded px-2 text-[13px] font-medium text-[var(--color-danger-fg)] md:h-6 md:px-1.5 md:text-[12px] hover:bg-[var(--color-muted)] disabled:opacity-50"
                   disabled={actionPending === activity.id}
                   onClick={() => void handleArchive(activity.id, activity.title)}
                 >
@@ -446,7 +446,7 @@ export function ActivitiesPanel({
                 setView(tab.key);
                 setPage(1);
               }}
-              className={`h-7 whitespace-nowrap rounded px-2.5 text-[12.5px] font-medium ${
+              className={`h-9 whitespace-nowrap rounded px-3 text-[13.5px] font-medium md:h-7 md:px-2.5 md:text-[12.5px] ${
                 view === tab.key
                   ? "bg-white text-[var(--color-ink)] shadow-[var(--shadow-xs)]"
                   : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
