@@ -7,7 +7,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input, Label } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { META_READ_ONLY_SCOPES } from "@/lib/advertising-constants";
+import {
+  META_CONNECT_DEFAULT_PATH,
+  META_CONNECT_NEVER_SHARE,
+  META_CONNECT_PATH_LABELS,
+  META_CONNECT_PATHS,
+  META_CONNECT_PREPARE_STEPS,
+  type MetaConnectPath,
+} from "@/lib/advertising-meta-connect-help";
 import { formatApiErrorMessage } from "@/lib/format-api-error";
+import { cn } from "@/lib/utils";
 
 type Connection = {
   id: string;
@@ -38,6 +48,9 @@ export function AdvertisingSettingsPanel({
   const [confirmConnect, setConfirmConnect] = useState(false);
   const [confirmPractice, setConfirmPractice] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [connectPath, setConnectPath] = useState<MetaConnectPath>(
+    META_CONNECT_DEFAULT_PATH,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +79,15 @@ export function AdvertisingSettingsPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  function selectConnectPath(path: MetaConnectPath) {
+    setConnectPath(path);
+    setConfirmConnect(false);
+    setConfirmPractice(false);
+    if (path === META_CONNECT_PATHS.prepare) {
+      setAccessToken("");
+    }
+  }
 
   async function connect(useFixture: boolean) {
     if (!canConnect) return;
@@ -182,6 +204,9 @@ export function AdvertisingSettingsPanel({
     );
   }
 
+  const showHaveToken = connectPath === META_CONNECT_PATHS.haveToken;
+  const showPrepare = connectPath === META_CONNECT_PATHS.prepare;
+
   return (
     <div className="space-y-6">
       <div>
@@ -219,52 +244,141 @@ export function AdvertisingSettingsPanel({
       <section className="rounded-xl border border-[var(--color-line)] bg-white p-5 space-y-4">
         <h3 className="text-[14px] font-semibold">2. Connect Meta</h3>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-          Use a read-only Meta token, or the practice connection to explore with sample data
-          (no live Meta calls).
+          Connect with a view-only Meta access key (Meta calls this a token), or use
+          practice data to explore with sample ads (no live Meta calls).
         </p>
 
         {canConnect ? (
           <>
-            <div className="space-y-1.5">
-              <Label htmlFor="meta-token">Meta access token</Label>
-              <Input
-                id="meta-token"
-                type="password"
-                autoComplete="off"
-                value={accessToken}
-                onChange={(event) => setAccessToken(event.target.value)}
-                placeholder="Paste token — never share it in chat"
-              />
-              <p className="text-[12px] text-[var(--color-ink-muted)]">
-                Tip: this pilot only needs permission to read ads. Write permissions stay off.
-              </p>
-            </div>
-
-            {!confirmConnect && !confirmPractice ? (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  disabled={busy || !accessToken.trim()}
-                  onClick={() => {
-                    setConfirmPractice(false);
-                    setConfirmConnect(true);
-                  }}
-                >
-                  Connect Meta
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
+            <fieldset className="space-y-2">
+              <legend className="text-[13px] font-medium text-[var(--color-ink)]">
+                How do you want to continue?
+              </legend>
+              <div
+                role="radiogroup"
+                aria-label="Connect Meta path"
+                className="flex flex-col gap-2 sm:flex-row"
+              >
+                <PathChoice
+                  checked={showHaveToken}
+                  label={META_CONNECT_PATH_LABELS.haveToken}
+                  onSelect={() => selectConnectPath(META_CONNECT_PATHS.haveToken)}
                   disabled={busy}
-                  onClick={() => {
-                    setConfirmConnect(false);
-                    setConfirmPractice(true);
-                  }}
-                >
-                  Use practice data
-                </Button>
+                />
+                <PathChoice
+                  checked={showPrepare}
+                  label={META_CONNECT_PATH_LABELS.prepare}
+                  onSelect={() => selectConnectPath(META_CONNECT_PATHS.prepare)}
+                  disabled={busy}
+                />
               </div>
-            ) : confirmPractice ? (
+            </fieldset>
+
+            {showPrepare ? (
+              <div
+                className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-4 space-y-3"
+                data-testid="meta-connect-prepare-help"
+              >
+                <p className="text-[13px] text-[var(--color-ink)]">
+                  Follow these steps in Meta Business before pasting anything here.
+                  EvoCRM does not create Meta apps or developer accounts for you.
+                </p>
+                <ol className="list-decimal pl-5 space-y-3 text-[12.5px] text-[var(--color-ink-muted)]">
+                  {META_CONNECT_PREPARE_STEPS.map((step) => (
+                    <li key={step.title} className="pl-1">
+                      <span className="font-medium text-[var(--color-ink)]">
+                        {step.title}
+                      </span>
+                      <p className="mt-1">{step.body}</p>
+                    </li>
+                  ))}
+                </ol>
+                <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                  Allowed permissions for this pilot:{" "}
+                  <code className="text-[12px] text-[var(--color-ink)]">
+                    {META_READ_ONLY_SCOPES[0]}
+                  </code>{" "}
+                  and{" "}
+                  <code className="text-[12px] text-[var(--color-ink)]">
+                    {META_READ_ONLY_SCOPES[1]}
+                  </code>
+                  . No write scopes.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => selectConnectPath(META_CONNECT_PATHS.haveToken)}
+                  >
+                    I have a token ready
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmConnect(false);
+                      setConfirmPractice(true);
+                    }}
+                  >
+                    Use practice data
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {showHaveToken ? (
+              <div className="space-y-4" data-testid="meta-connect-have-token">
+                <div className="space-y-1.5">
+                  <Label htmlFor="meta-token">Meta access token (view only)</Label>
+                  <Input
+                    id="meta-token"
+                    type="password"
+                    autoComplete="off"
+                    value={accessToken}
+                    onChange={(event) => setAccessToken(event.target.value)}
+                    placeholder="Paste token only in this field"
+                  />
+                  <p className="text-[12px] text-[var(--color-ink-muted)]">
+                    {META_CONNECT_NEVER_SHARE}
+                  </p>
+                  <p className="text-[12px] text-[var(--color-ink-muted)]">
+                    This pilot allows only{" "}
+                    <code className="text-[11.5px]">{META_READ_ONLY_SCOPES[0]}</code> and{" "}
+                    <code className="text-[11.5px]">{META_READ_ONLY_SCOPES[1]}</code>
+                    . Write permissions stay off.
+                  </p>
+                </div>
+
+                {!confirmConnect && !confirmPractice ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      disabled={busy || !accessToken.trim()}
+                      onClick={() => {
+                        setConfirmPractice(false);
+                        setConfirmConnect(true);
+                      }}
+                    >
+                      Connect Meta
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setConfirmConnect(false);
+                        setConfirmPractice(true);
+                      }}
+                    >
+                      Use practice data
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {confirmPractice ? (
               <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 space-y-2">
                 <p className="text-[13px]">
                   Load <strong>practice</strong> Meta data (sample accounts only — no live Meta
@@ -288,7 +402,9 @@ export function AdvertisingSettingsPanel({
                   </Button>
                 </div>
               </div>
-            ) : (
+            ) : null}
+
+            {confirmConnect && showHaveToken ? (
               <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 space-y-2">
                 <p className="text-[13px]">
                   Connect Meta for <strong>reading only</strong>? We will not publish ads or
@@ -312,7 +428,7 @@ export function AdvertisingSettingsPanel({
                   </Button>
                 </div>
               </div>
-            )}
+            ) : null}
           </>
         ) : (
           <p className="text-[13px] text-[var(--color-ink-muted)]">
@@ -359,5 +475,35 @@ export function AdvertisingSettingsPanel({
         )}
       </section>
     </div>
+  );
+}
+
+function PathChoice({
+  checked,
+  label,
+  onSelect,
+  disabled,
+}: {
+  checked: boolean;
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "flex-1 rounded-lg border px-3 py-2.5 text-left text-[13px] transition-colors focus-ring",
+        checked
+          ? "border-[var(--color-brand-300)] bg-[var(--color-brand-50)] text-[var(--color-ink)]"
+          : "border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:border-[var(--color-line-strong)] hover:text-[var(--color-ink)]",
+      )}
+    >
+      <span className="font-medium text-[var(--color-ink)]">{label}</span>
+    </button>
   );
 }

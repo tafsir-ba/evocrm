@@ -3,6 +3,13 @@
 export const AD_PLATFORMS = ["meta", "google", "tiktok"] as const;
 export type AdPlatform = (typeof AD_PLATFORMS)[number];
 
+/**
+ * Phase 1 Meta Marketing API scopes — read-only only.
+ * Never request ads_management, publish, or other write / spend scopes.
+ */
+export const META_READ_ONLY_SCOPES = ["ads_read", "business_management"] as const;
+export type MetaReadOnlyScope = (typeof META_READ_ONLY_SCOPES)[number];
+
 export const CONSENT_CAPTURE_CHANNELS = ["pixel", "form", "server_side"] as const;
 export type ConsentCaptureChannel = (typeof CONSENT_CAPTURE_CHANNELS)[number];
 

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { META_READ_ONLY_SCOPES } from "@/lib/advertising-constants";
+
 /**
  * Recommended defaults adopted for Growth Copilot (brief §13).
  * Silent product-owner = proceed on these unless overridden before the named phase.
@@ -21,7 +23,7 @@ export const ADVERTISING_DEFAULTS = {
   /** Phase 1 */
   readPilotPlatforms: ["meta"] as const,
   /** Meta Marketing API read-only scopes for Phase 1 — never request write scopes. */
-  metaReadOnlyScopes: ["ads_read", "business_management"] as const,
+  metaReadOnlyScopes: META_READ_ONLY_SCOPES,
   /** Phase 2 */
   attributionPolicyV1: "last_touch" as const,
   attributionLabelRequired: true,
