@@ -42,4 +42,37 @@ describe("buildCampaignEmailHtml", () => {
     expect(html).toContain('src="https://cdn.example.com/unsubscribe-icon.png"');
     expect(html).toContain('<a href="' + url + '">Unsubscribe</a> from future campaign emails.');
   });
+
+  it("does not wrap a complete HTML document so the tracking pixel can sit before </body>", () => {
+    const html = buildCampaignEmailHtml("unused", url, {
+      previewText: "Hidden preview",
+      htmlBody: `<!doctype html>
+<html lang="fr">
+<head><title>Duplex</title></head>
+<body>
+  <p>Hello</p>
+  <p><a href="${url}">Se désinscrire</a></p>
+</body>
+</html>`,
+    });
+
+    expect(html.trim().toLowerCase().startsWith("<!doctype html")).toBe(true);
+    expect(html).toMatch(/<\/body>\s*<\/html>\s*$/i);
+    expect(html).not.toMatch(/<div[^>]*>\s*<!doctype html/i);
+    expect(html).toContain("Hidden preview");
+    expect(html.indexOf("Hidden preview")).toBeGreaterThan(html.toLowerCase().indexOf("<body"));
+    expect(html.toLowerCase().indexOf("</html>")).toBeGreaterThan(html.toLowerCase().indexOf("</body>"));
+  });
+
+  it("injects the unsubscribe footer before </body> on complete documents", () => {
+    const html = buildCampaignEmailHtml("unused", url, {
+      htmlBody: `<!DOCTYPE html><html><body><p>News</p></body></html>`,
+    });
+
+    expect(html).toContain('<a href="' + url + '">Unsubscribe</a> from future campaign emails.');
+    expect(html.toLowerCase().indexOf("unsubscribe")).toBeLessThan(
+      html.toLowerCase().lastIndexOf("</body>"),
+    );
+    expect(html).not.toMatch(/<\/html>\s*<\/div>/i);
+  });
 });
