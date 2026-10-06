@@ -201,6 +201,69 @@ export function buildCampaignEmailPlainText(
   return `${cleaned}\n\n${footer}`;
 }
 
+/**
+ * True when the body is already a complete HTML email document.
+ * Wrapping those in an extra <div> leaves </html> before the end of the
+ * payload; Resend's open-tracking pixel is appended after that and email
+ * clients never load it.
+ */
+export function isCompleteHtmlEmailDocument(html: string): boolean {
+  const trimmed = html.trim();
+  return /^<!doctype\s+html\b/i.test(trimmed) || /^<html[\s>]/i.test(trimmed);
+}
+
+function injectAfterOpeningBody(html: string, injection: string): string {
+  if (!injection) {
+    return html;
+  }
+
+  const match = html.match(/<body\b[^>]*>/i);
+  if (!match || match.index == null) {
+    return injection + html;
+  }
+
+  const at = match.index + match[0].length;
+  return html.slice(0, at) + injection + html.slice(at);
+}
+
+function injectBeforeLastClosingTag(
+  html: string,
+  tag: string,
+  injection: string,
+): string {
+  if (!injection) {
+    return html;
+  }
+
+  const re = new RegExp(`</${tag}\\s*>`, "gi");
+  let last: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null = re.exec(html);
+  while (match) {
+    last = match;
+    match = re.exec(html);
+  }
+
+  if (!last) {
+    return html + injection;
+  }
+
+  return html.slice(0, last.index) + injection + html.slice(last.index);
+}
+
+function assembleCompleteHtmlEmail(
+  html: string,
+  preview: string,
+  footer: string,
+): string {
+  let result = injectAfterOpeningBody(html, preview);
+  if (footer) {
+    result = /<\/body>/i.test(result)
+      ? injectBeforeLastClosingTag(result, "body", footer)
+      : injectBeforeLastClosingTag(result, "html", footer);
+  }
+  return result.trim();
+}
+
 export function buildCampaignEmailHtml(
   body: string,
   unsubscribeUrl: string,
@@ -227,6 +290,10 @@ export function buildCampaignEmailHtml(
       <p style="font-size: 12px; color: #666;">
         <a href="${unsubscribeUrl}">Unsubscribe</a> from future campaign emails.
       </p>`;
+
+  if (isCompleteHtmlEmailDocument(content)) {
+    return assembleCompleteHtmlEmail(content, preview, footer);
+  }
 
   return `
     <div style="font-family: sans-serif; line-height: 1.5; color: #111;">

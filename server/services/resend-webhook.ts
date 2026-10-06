@@ -87,6 +87,12 @@ function isCampaignTaggedEmail(tags: Record<string, string>): boolean {
   return Boolean(tags.campaign_id);
 }
 
+/** Newsletter test sends tag campaign_id but never create a CampaignSend row. */
+function isNewsletterTestEmail(tags: Record<string, string>): boolean {
+  const flag = tags.newsletter_test?.toLowerCase();
+  return flag === "true" || flag === "1";
+}
+
 function extractProviderError(
   eventType: CampaignSendProviderEventType,
   payload: ResendWebhookPayload,
@@ -173,6 +179,12 @@ export async function processResendWebhookPayload(
   const tags = normalizeWebhookTags(payload.data.tags);
 
   if (!send) {
+    // Test sends are tagged with campaign_id but never persist CampaignSend.
+    // Returning 503 would retry until Svix gives up and still never attach.
+    if (isNewsletterTestEmail(tags)) {
+      return { ignored: true, reason: "newsletter_test_email" };
+    }
+
     // Campaign emails can race ahead of CampaignSend insert. Ask the provider to
     // retry. Non-campaign Resend traffic (invites, feedback, etc.) is ignored.
     if (isCampaignTaggedEmail(tags)) {

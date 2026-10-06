@@ -178,6 +178,33 @@ describe("resend webhook processing", () => {
     expect(createEmailEventIdempotent).not.toHaveBeenCalled();
   });
 
+  it("does not retry newsletter test emails that have no CampaignSend row", async () => {
+    vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue(null);
+
+    const result = await processResendWebhookPayload(
+      {
+        type: "email.opened",
+        data: {
+          email_id: "re_test_open",
+          created_at: "2026-10-06T08:10:00.000Z",
+          tags: {
+            campaign_id: "camp-1",
+            workspace_id: "ws-1",
+            newsletter_test: "true",
+          },
+        },
+      },
+      "svix_test_open",
+    );
+
+    expect(result).toEqual({
+      ignored: true,
+      reason: "newsletter_test_email",
+    });
+    expect(createEmailEventIdempotent).not.toHaveBeenCalled();
+    expect(applyCampaignSendProviderEvent).not.toHaveBeenCalled();
+  });
+
   it("requests retry when campaign tags arrive as a name/value array", async () => {
     vi.mocked(findCampaignSendByProviderMessageId).mockResolvedValue(null);
 
