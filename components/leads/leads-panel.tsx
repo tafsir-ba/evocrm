@@ -615,7 +615,8 @@ export function LeadsPanel({
     if (patch.companyId !== undefined) {
       setCompanyFilter(patch.companyId);
     }
-    if (patch.projectId !== undefined) {
+    if (patch.projectId !== undefined && !scopedProjectId) {
+      // Project-scoped leads routes must not rewrite to /leads via the column filter.
       setTableProjectFilter("");
       const next = setProjectIdInSearchParams(
         new URLSearchParams(searchParams.toString()),

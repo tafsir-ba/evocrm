@@ -690,18 +690,24 @@ export function LeadsTable({
                   filterOptions.projects.find((item) => item.id === effectiveProjectFilter)?.name
                 }
               >
-                <ColumnFilterSelect
-                  label="Project"
-                  value={effectiveProjectFilter}
-                  onChange={(value) => onColumnFilterChange({ projectId: value })}
-                >
-                  <option value="">All projects</option>
-                  {filterOptions.projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </ColumnFilterSelect>
+                {filterOptions.workspaceProjectId ? (
+                  <p className="text-[12px] leading-snug text-[var(--color-ink-muted)]">
+                    Locked to the current project view.
+                  </p>
+                ) : (
+                  <ColumnFilterSelect
+                    label="Project"
+                    value={effectiveProjectFilter}
+                    onChange={(value) => onColumnFilterChange({ projectId: value })}
+                  >
+                    <option value="">All projects</option>
+                    {filterOptions.projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </ColumnFilterSelect>
+                )}
               </LeadColumnHeader>
               <LeadColumnHeader
                 label="Source"

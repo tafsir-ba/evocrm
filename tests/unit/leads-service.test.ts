@@ -33,6 +33,18 @@ vi.mock("@/server/repositories/leads", () => ({
   findLeadIds: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/lead-deletion", () => ({
+  purgeLeadsByIds: vi.fn(),
+}));
+
+vi.mock("@/server/services/apply-project-scope", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/services/apply-project-scope")>();
+  return {
+    ...actual,
+    applyUserProjectScope: vi.fn(actual.applyUserProjectScope),
+  };
+});
+
 vi.mock("@/server/repositories/lead-project-memberships", () => ({
   findLeadIdsForProjectMembership: vi.fn(),
 }));
@@ -93,15 +105,18 @@ import {
   findActiveLeadByEmailNormalized,
   findLeadById,
   findLeadByPhoneNormalized,
+  findLeadIds,
   findLeads,
   restoreLead,
   updateLead,
 } from "@/server/repositories/leads";
+import { purgeLeadsByIds } from "@/server/repositories/lead-deletion";
 import { findLeadActivitySummaries } from "@/server/repositories/activities";
 import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findTagById } from "@/server/repositories/tags";
 import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
 import { scheduleLeadAutoEnrichmentForLead } from "@/server/services/lead-auto-enrichment";
+import { applyUserProjectScope } from "@/server/services/apply-project-scope";
 import {
   ensurePrimaryMembershipForLead,
   loadMembershipsByLeadIds,
@@ -112,6 +127,7 @@ import {
   listLeadsForWorkspace,
   normalizeLeadEmail,
   normalizeLeadPhone,
+  purgeLeadsForWorkspace,
   restoreLeadForWorkspace,
   updateLeadForWorkspace,
 } from "@/server/services/leads";
@@ -687,5 +703,64 @@ describe("lead service", () => {
       code: "CONFLICT",
     });
     expect(restoreLead).not.toHaveBeenCalled();
+  });
+
+  it("applies project scope when resolving select-all bulk delete ids", async () => {
+    vi.mocked(applyUserProjectScope).mockResolvedValueOnce({
+      projectIds: ["project-allowed"],
+      includeArchived: true,
+    });
+    vi.mocked(findLeadIds).mockResolvedValueOnce(["lead-scoped"]);
+    vi.mocked(purgeLeadsByIds).mockResolvedValueOnce(1);
+
+    const result = await purgeLeadsForWorkspace("ws-1", "user-1", {
+      selectAll: true,
+      filters: { includeArchived: true },
+    });
+
+    expect(applyUserProjectScope).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({ includeArchived: true }),
+    );
+    expect(findLeadIds).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({ projectIds: ["project-allowed"] }),
+    );
+    expect(purgeLeadsByIds).toHaveBeenCalledWith("ws-1", ["lead-scoped"]);
+    expect(result).toEqual({ deletedCount: 1, requestedCount: 1 });
+  });
+
+  it("applies project scope when resolving explicit bulk delete ids", async () => {
+    vi.mocked(applyUserProjectScope).mockResolvedValueOnce({
+      leadIds: ["lead-a", "lead-b"],
+      projectIds: ["project-allowed"],
+      includeArchived: true,
+    });
+    vi.mocked(findLeadIds).mockResolvedValueOnce(["lead-a"]);
+    vi.mocked(purgeLeadsByIds).mockResolvedValueOnce(1);
+
+    const result = await purgeLeadsForWorkspace("ws-1", "user-1", {
+      selectAll: false,
+      leadIds: ["lead-a", "lead-b"],
+    });
+
+    expect(applyUserProjectScope).toHaveBeenCalledWith(
+      "ws-1",
+      "user-1",
+      expect.objectContaining({
+        leadIds: ["lead-a", "lead-b"],
+        includeArchived: true,
+      }),
+    );
+    expect(findLeadIds).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        leadIds: ["lead-a", "lead-b"],
+        projectIds: ["project-allowed"],
+      }),
+    );
+    expect(purgeLeadsByIds).toHaveBeenCalledWith("ws-1", ["lead-a"]);
+    expect(result).toEqual({ deletedCount: 1, requestedCount: 2 });
   });
 });

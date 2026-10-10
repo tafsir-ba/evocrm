@@ -1155,9 +1155,11 @@ function buildBulkDeleteLeadFilter(
 
 async function resolveBulkDeleteLeadIds(
   workspaceId: string,
+  userId: string,
   filter: LeadListFilter,
 ): Promise<string[]> {
-  const listFilter = await resolveListFilter(workspaceId, filter);
+  const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
+  const listFilter = await resolveListFilter(workspaceId, scopedFilter);
   if (!listFilter.nextFilter && !listFilter.urgencyFilter) {
     return findLeadIds(workspaceId, listFilter);
   }
@@ -1182,8 +1184,12 @@ export async function purgeLeadsForWorkspace(
   input: BulkDeleteLeadsInput,
 ): Promise<{ deletedCount: number; requestedCount: number }> {
   const leadIds = input.selectAll
-    ? await resolveBulkDeleteLeadIds(workspaceId, buildBulkDeleteLeadFilter(input))
-    : await findLeadIds(workspaceId, {
+    ? await resolveBulkDeleteLeadIds(
+        workspaceId,
+        actorId,
+        buildBulkDeleteLeadFilter(input),
+      )
+    : await resolveBulkDeleteLeadIds(workspaceId, actorId, {
         leadIds: input.leadIds ?? [],
         includeArchived: true,
       });

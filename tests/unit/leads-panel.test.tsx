@@ -2,8 +2,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const routerReplace = vi.hoisted(() => vi.fn());
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: routerReplace }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/w/demo/leads",
 }));
@@ -169,6 +171,7 @@ async function expandDesktopRow(user: ReturnType<typeof userEvent.setup>) {
 describe("LeadsPanel table", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    routerReplace.mockReset();
     projectFilterState.current = null;
     mockLeadsFetch();
   });
@@ -674,6 +677,29 @@ describe("LeadsPanel table", () => {
       expect(listCall).toBeTruthy();
       expect(String(listCall?.[0])).toContain("projectId=507f1f77bcf86cd799439051");
     });
+  });
+
+  it("locks the project column filter and skips /leads navigation when scoped to a project", async () => {
+    const user = userEvent.setup();
+    mockLeadsFetch();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        scopedProjectId="507f1f77bcf86cd799439051"
+      />,
+    );
+
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    expect(screen.queryByLabelText("Filter by project")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Filter Project/i }));
+    expect(screen.getByText("Locked to the current project view.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 
   it("still supports archived restore from the opened row", async () => {

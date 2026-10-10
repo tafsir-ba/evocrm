@@ -76,12 +76,12 @@ export function LeadsPageShell({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {projectId && project ? (
+      {projectId ? (
         <ProjectSectionNav
           workspaceSlug={workspaceSlug}
           projectId={projectId}
-          projectName={project.name}
-          projectReference={project.reference}
+          projectName={project?.name ?? "Project"}
+          projectReference={project?.reference ?? null}
           activeTab="leads"
           showPaidAds={showPaidAds}
         />
