@@ -246,6 +246,68 @@ describe("ProjectFormPage", () => {
     expect(push).toHaveBeenCalledWith(`/w/demo/projects/${projectId}`);
   });
 
+  it("exposes auto-enrich in project settings and saves it", async () => {
+    const user = userEvent.setup();
+    const projectId = "507f1f77bcf86cd7994390dd";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.includes("/companies") && method === "GET") {
+        return jsonResponse({ companies: [{ id: "c1", name: "Promotor SA" }] });
+      }
+      if (url.includes("/members")) {
+        return jsonResponse({ members: [] });
+      }
+      if (url.includes("/dictionary-items")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url.endsWith(`/projects/${projectId}`) && method === "GET") {
+        return jsonResponse({
+          project: {
+            id: projectId,
+            name: "Satigny duplex",
+            reference: "satigny_duplex",
+            projectType: null,
+            commercialStage: null,
+            propertyTypeId: null,
+            website: null,
+            autoEnrichLeads: false,
+            address: null,
+            city: null,
+            country: null,
+            location: null,
+            companies: [{ companyId: "c1", role: "developer", isPrimary: true }],
+            description: null,
+            ownerId: null,
+            assignedTo: null,
+          },
+        });
+      }
+      if (url.endsWith(`/projects/${projectId}`) && method === "PATCH") {
+        return jsonResponse({ project: { id: projectId } });
+      }
+      return jsonResponse({});
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    render(<ProjectFormPage workspaceSlug="demo" mode="edit" projectId={projectId} />);
+
+    expect(await screen.findByRole("heading", { name: "Lead enrichment" })).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox", { name: /Auto-enrich new leads/i });
+    expect(checkbox).not.toBeChecked();
+    await user.click(checkbox);
+    await user.click(screen.getByRole("button", { name: "Save project" }));
+
+    await waitFor(() => {
+      const patchCall = fetchMock.mock.calls.find(([url, init]) => {
+        return String(url).endsWith(`/projects/${projectId}`) && init?.method === "PATCH";
+      });
+      expect(patchCall).toBeTruthy();
+      const body = JSON.parse(String(patchCall?.[1]?.body));
+      expect(body.autoEnrichLeads).toBe(true);
+    });
+  });
+
   it("does not create without a primary company", async () => {
     const user = userEvent.setup();
     render(<ProjectFormPage workspaceSlug="demo" mode="create" />);

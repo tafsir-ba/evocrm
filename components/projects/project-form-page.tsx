@@ -512,6 +512,43 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
             />
           </section>
 
+          <section className="space-y-3" aria-labelledby="project-auto-enrich-heading">
+            <div>
+              <h2
+                id="project-auto-enrich-heading"
+                className="text-[15px] font-semibold text-[var(--color-ink)]"
+              >
+                Lead enrichment
+              </h2>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Control automatic enrichment for leads that land on this project.
+              </p>
+            </div>
+            <label className="flex items-start gap-2.5 rounded-lg border border-[var(--color-line)] bg-white px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-[var(--color-line)]"
+                checked={form.autoEnrichLeads}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    autoEnrichLeads: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-[var(--color-ink)]">
+                  Auto-enrich new leads
+                </span>
+                <span className="mt-0.5 block text-[12px] text-[var(--color-ink-muted)]">
+                  When enabled, every new lead for this project — manual create, CRM API, or
+                  website capture — is enriched in the background if workspace enrichment is on
+                  and the lead has a name and email.
+                </span>
+              </span>
+            </label>
+          </section>
+
           <section className="space-y-4" aria-labelledby="project-advanced-heading">
             <button
               type="button"
@@ -526,7 +563,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                   More details
                 </span>
                 <span className="block text-[12px] text-[var(--color-ink-muted)]">
-                  Description, website, auto-enrich, additional companies, assignment
+                  Description, website, additional companies, assignment
                 </span>
               </span>
               <span className="text-[12.5px] font-medium text-[var(--color-ink-soft)]">
@@ -558,29 +595,6 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                     }
                   />
                 </div>
-                <label className="flex items-start gap-2.5 rounded-lg border border-[var(--color-line)] bg-white px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 rounded border-[var(--color-line)]"
-                    checked={form.autoEnrichLeads}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        autoEnrichLeads: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>
-                    <span className="block text-[13px] font-medium text-[var(--color-ink)]">
-                      Auto-enrich new leads
-                    </span>
-                    <span className="mt-0.5 block text-[12px] text-[var(--color-ink-muted)]">
-                      When enabled, new leads created for this project (manual, API, or website
-                      capture) are enriched automatically if workspace enrichment is on and the
-                      lead has a name and email.
-                    </span>
-                  </span>
-                </label>
                 <div className="space-y-3">
                   <div>
                     <p className="text-[13px] font-medium text-[var(--color-ink-soft)]">
