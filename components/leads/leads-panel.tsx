@@ -133,6 +133,8 @@ type LeadsPanelProps = {
   canCreateNotes?: boolean;
   canEnrich?: boolean;
   canRequestMarketEstimate?: boolean;
+  /** When set (project leads route), lock the list to this project and hide the project picker. */
+  scopedProjectId?: string | null;
 };
 
 export function LeadsPanel({
@@ -146,6 +148,7 @@ export function LeadsPanel({
   canCreateNotes = false,
   canEnrich = false,
   canRequestMarketEstimate = false,
+  scopedProjectId = null,
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,7 +158,8 @@ export function LeadsPanel({
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
   const acquisitionParam = searchParams.get("acquisition");
-  const projectId = useWorkspaceProjectFilter();
+  const workspaceProjectId = useWorkspaceProjectFilter();
+  const projectId = scopedProjectId ?? workspaceProjectId;
   const [includeAssociated, setIncludeAssociated] = useState(false);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -1002,29 +1006,31 @@ export function LeadsPanel({
             Include associated projects
           </label>
         ) : null}
-        <Select
-          fieldSize="sm"
-          className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
-          aria-label="Filter by project"
-          value={projectId ?? ""}
-          onChange={(event) => {
-            setPage(1);
-            setTableProjectFilter("");
-            const next = setProjectIdInSearchParams(
-              new URLSearchParams(searchParams.toString()),
-              event.target.value || null,
-            );
-            const qs = next.toString();
-            router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
-          }}
-        >
-          <option value="">All projects</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </Select>
+        {!scopedProjectId ? (
+          <Select
+            fieldSize="sm"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
+            aria-label="Filter by project"
+            value={projectId ?? ""}
+            onChange={(event) => {
+              setPage(1);
+              setTableProjectFilter("");
+              const next = setProjectIdInSearchParams(
+                new URLSearchParams(searchParams.toString()),
+                event.target.value || null,
+              );
+              const qs = next.toString();
+              router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+            }}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Select
           fieldSize="sm"
           className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
