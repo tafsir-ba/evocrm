@@ -116,6 +116,24 @@ describe("ProjectDetailPanel", () => {
     );
   });
 
+  it("keeps Leads inside the project section so the project menu stays available", async () => {
+    render(
+      <ProjectDetailPanel
+        workspaceSlug="demo"
+        projectId="507f1f77bcf86cd7994390dd"
+        canUpdate
+        canArchive
+      />,
+    );
+
+    expect(await screen.findByText("Les Terrasses")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Project sections" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Leads" })).toHaveAttribute(
+      "href",
+      "/w/demo/projects/507f1f77bcf86cd7994390dd/leads",
+    );
+  });
+
   it("keeps Paid ads hidden when the page does not opt in (grant-only / no advertising:read)", async () => {
     render(
       <ProjectDetailPanel

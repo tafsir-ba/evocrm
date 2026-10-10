@@ -70,6 +70,7 @@ const projectSchema = new Schema(
       ref: "Campaign",
       default: null,
     },
+    autoEnrichLeads: { type: Boolean, default: false },
     statusId: { type: Schema.Types.ObjectId, ref: "DictionaryItem", default: null },
     address: { type: String, trim: true, default: null },
     city: { type: String, trim: true, default: null },

@@ -135,8 +135,10 @@ export type LeadListFilter = {
   includeAssociated?: boolean;
   associatedLeadIds?: string[];
   search?: string;
+  phone?: string;
   statusId?: string;
   sourceId?: string;
+  /** User id, or `"unassigned"` for leads with no assignee. */
   assignedTo?: string;
   ownerId?: string;
   tagId?: string;
@@ -157,6 +159,14 @@ export type LeadListFilter = {
   leadIds?: string[];
   page?: number;
   pageSize?: number;
+  /** When true, return every matching lead (ignore page/pageSize). */
+  unpaginated?: boolean;
+  sort?: string;
+  sortDir?: "asc" | "desc";
+  /** Applied after activity enrichment (not in Mongo query). */
+  nextFilter?: "has_next" | "no_next" | "overdue";
+  /** Applied after activity enrichment (not in Mongo query). */
+  urgencyFilter?: "overdue" | "today" | "soon" | "stale" | "unassigned" | "none";
 };
 
 function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
@@ -180,7 +190,9 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   if (filter.sourceId) {
     query.sourceId = filter.sourceId;
   }
-  if (filter.assignedTo) {
+  if (filter.assignedTo === "unassigned") {
+    query.assignedTo = null;
+  } else if (filter.assignedTo) {
     query.assignedTo = filter.assignedTo;
   }
   if (filter.ownerId) {
@@ -309,22 +321,53 @@ function buildSearchOr(search: string | undefined): Array<Record<string, unknown
   ];
 }
 
+function buildPhoneClause(phone: string | undefined): Record<string, unknown> | null {
+  if (!phone?.trim()) {
+    return null;
+  }
+  const escaped = phone.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(escaped, "i");
+  return {
+    $or: [{ phone: regex }, { phoneNormalized: regex }],
+  };
+}
+
+function buildLeadSort(filter: LeadListFilter): Record<string, 1 | -1> {
+  const direction = filter.sortDir === "asc" ? 1 : -1;
+  if (filter.sort === "fullName") {
+    return { fullName: direction, _id: 1 };
+  }
+  if (filter.sort === "phone") {
+    return { phone: direction, fullName: 1, _id: 1 };
+  }
+  if (filter.sort === "age") {
+    return { createdAt: direction, _id: 1 };
+  }
+  return { createdAt: -1, _id: 1 };
+}
+
 export async function findLeads(
   workspaceId: string,
   filter: LeadListFilter = {},
 ): Promise<{ leads: LeadRecord[]; total: number }> {
   await connectDb();
-  const query = withWorkspaceScope(workspaceId, buildListQuery(filter));
+  const query = buildScopedListQuery(workspaceId, filter);
+  const sort = buildLeadSort(filter);
+
+  if (filter.unpaginated) {
+    const documents = await LeadModel.find(query).sort(sort).lean<LeadDocument[]>();
+    return {
+      leads: documents.map(toLeadRecord),
+      total: documents.length,
+    };
+  }
+
   const page = filter.page ?? 1;
   const pageSize = filter.pageSize ?? 25;
   const skip = (page - 1) * pageSize;
 
   const [documents, total] = await Promise.all([
-    LeadModel.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .lean<LeadDocument[]>(),
+    LeadModel.find(query).sort(sort).skip(skip).limit(pageSize).lean<LeadDocument[]>(),
     LeadModel.countDocuments(query),
   ]);
 
@@ -334,12 +377,24 @@ export async function findLeads(
   };
 }
 
+function buildScopedListQuery(
+  workspaceId: string,
+  filter: LeadListFilter,
+): Record<string, unknown> {
+  const baseQuery = buildListQuery(filter);
+  const phoneClause = buildPhoneClause(filter.phone);
+  return withWorkspaceScope(
+    workspaceId,
+    phoneClause ? { $and: [baseQuery, phoneClause] } : baseQuery,
+  );
+}
+
 export async function findLeadIds(
   workspaceId: string,
   filter: LeadListFilter = {},
 ): Promise<string[]> {
   await connectDb();
-  const query = withWorkspaceScope(workspaceId, buildListQuery(filter));
+  const query = buildScopedListQuery(workspaceId, filter);
   const documents = await LeadModel.find(query).select({ _id: 1 }).lean<Array<{ _id: mongoose.Types.ObjectId }>>();
 
   return documents.map((document) => document._id.toString());

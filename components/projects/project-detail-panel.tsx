@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
@@ -15,6 +14,7 @@ import {
   type ProjectLocation,
 } from "@/lib/project-location";
 import { ProjectCompanyPeople } from "@/components/projects/project-company-people";
+import { ProjectSectionNav } from "@/components/projects/project-section-nav";
 import {
   primaryCompanyLink,
   PROJECT_COMMERCIAL_STAGE_LABELS,
@@ -24,8 +24,7 @@ import {
   type ProjectCompanyRole,
   type ProjectType,
 } from "@/lib/project-operating-record";
-import { withProjectIdQuery } from "@/lib/project-scope";
-import { workspaceNavPath, workspacePath } from "@/lib/workspace-paths";
+import { workspacePath } from "@/lib/workspace-paths";
 
 type ProjectCompanyLink = {
   companyId: string;
@@ -63,17 +62,6 @@ type ProjectDetail = {
     email: string | null;
   }>;
 };
-
-const BASE_TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "leads", label: "Leads", href: "leads" },
-  { key: "properties", label: "Properties", href: "properties" },
-  { key: "pipeline", label: "Pipeline", href: "pipeline" },
-  { key: "activities", label: "Activities", href: "activities" },
-  { key: "dripping", label: "Dripping", href: "dripping" },
-  { key: "settings", label: "Settings", href: "edit" },
-  { key: "share", label: "Share", href: "sharing" },
-] as const;
 
 type ProjectDetailPanelProps = {
   workspaceSlug: string;
@@ -173,9 +161,13 @@ export function ProjectDetailPanel({
 
   return (
     <>
-      <PageHeader
-        title={project.name}
-        description={project.reference ? `Reference ${project.reference}` : undefined}
+      <ProjectSectionNav
+        workspaceSlug={workspaceSlug}
+        projectId={projectId}
+        projectName={project.name}
+        projectReference={project.reference}
+        activeTab="overview"
+        showPaidAds={showPaidAds}
         actions={
           <div className="flex items-center gap-2">
             {canUpdate && !project.archivedAt && (
@@ -194,42 +186,6 @@ export function ProjectDetailPanel({
           </div>
         }
       />
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        {[
-          ...BASE_TABS.slice(0, 6),
-          ...(showPaidAds
-            ? [{ key: "paid-ads", label: "Paid ads", href: "paid-ads" } as const]
-            : []),
-          ...BASE_TABS.slice(6),
-        ].map((tab) => {
-          if (tab.key === "overview") {
-            return (
-              <span
-                key={tab.key}
-                className="px-3 py-1.5 rounded-md bg-[var(--color-brand-50)] text-[var(--color-brand-700)] text-[13px] font-medium"
-              >
-                {tab.label}
-              </span>
-            );
-          }
-
-          const baseHref =
-            tab.href === "edit" || tab.href === "sharing" || tab.href === "paid-ads"
-              ? workspacePath(workspaceSlug, "projects", projectId, tab.href)
-              : withProjectIdQuery(workspaceNavPath(workspaceSlug, tab.href!), projectId);
-
-          return (
-            <Link
-              key={tab.key}
-              href={baseHref}
-              className="px-3 py-1.5 rounded-md border border-[var(--color-line)] bg-white text-[13px] text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
 
       <div className="rounded-lg border border-[var(--color-line)] bg-white p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">

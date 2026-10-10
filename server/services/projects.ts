@@ -66,6 +66,7 @@ function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
     propertyTypeId: project.propertyTypeId,
     website: project.website,
     defaultDripCampaignId: project.defaultDripCampaignId,
+    autoEnrichLeads: project.autoEnrichLeads,
     statusId: project.statusId,
     address: project.address,
     city: project.city,
@@ -405,6 +406,7 @@ export async function createProjectForWorkspace(
       propertyTypeId: input.propertyTypeId ?? null,
       website: input.website ?? null,
       defaultDripCampaignId: input.defaultDripCampaignId ?? null,
+      autoEnrichLeads: input.autoEnrichLeads ?? false,
       statusId: input.statusId ?? null,
       address: input.address ?? legacy.address,
       city: input.city ?? legacy.city,
@@ -485,6 +487,9 @@ export async function updateProjectForWorkspace(
   }
   if (input.defaultDripCampaignId !== undefined) {
     updatePayload.defaultDripCampaignId = input.defaultDripCampaignId;
+  }
+  if (input.autoEnrichLeads !== undefined) {
+    updatePayload.autoEnrichLeads = input.autoEnrichLeads;
   }
   if (input.statusId !== undefined) {
     updatePayload.statusId = input.statusId;

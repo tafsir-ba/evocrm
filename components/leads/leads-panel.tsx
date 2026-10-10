@@ -9,7 +9,11 @@ import {
   LeadEnrichmentModal,
   type EnrichmentAppliedRun,
 } from "@/components/leads/lead-enrichment-modal";
-import { LeadsTable, type LeadTableMember } from "@/components/leads/leads-table";
+import {
+  LeadsTable,
+  type LeadTableMember,
+  type LeadsTableColumnFilters,
+} from "@/components/leads/leads-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,6 +21,20 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input, Select } from "@/components/ui/input";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  agePresetToCreatedRange,
+  isLeadAgePreset,
+  isLeadNextFilter,
+  isLeadUrgencyFilter,
+  nextLeadBrowserSort,
+  readLeadBrowserSort,
+  readLeadBrowserSortDir,
+  type LeadAgePreset,
+  type LeadBrowserSort,
+  type LeadBrowserSortDir,
+  type LeadNextFilter,
+  type LeadUrgencyFilter,
+} from "@/lib/lead-browser";
 import {
   PROPERTY_TYPE_INTERESTS,
   PROPERTY_TYPE_INTEREST_LABELS,
@@ -36,6 +54,7 @@ import {
   type LeadNoteActivityIds,
   type LeadNoteDictionaryItem,
 } from "@/lib/lead-notes-client";
+import { setProjectIdInSearchParams } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -114,6 +133,8 @@ type LeadsPanelProps = {
   canCreateNotes?: boolean;
   canEnrich?: boolean;
   canRequestMarketEstimate?: boolean;
+  /** When set (project leads route), lock the list to this project and hide the project picker. */
+  scopedProjectId?: string | null;
 };
 
 export function LeadsPanel({
@@ -127,15 +148,18 @@ export function LeadsPanel({
   canCreateNotes = false,
   canEnrich = false,
   canRequestMarketEstimate = false,
+  scopedProjectId = null,
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = workspacePath(workspaceSlug, "leads");
   const sourceIdParam = searchParams.get("sourceId") ?? "";
   const assignedToParam = searchParams.get("assignedTo") ?? "";
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
   const acquisitionParam = searchParams.get("acquisition");
-  const projectId = useWorkspaceProjectFilter();
+  const workspaceProjectId = useWorkspaceProjectFilter();
+  const projectId = scopedProjectId ?? workspaceProjectId;
   const [includeAssociated, setIncludeAssociated] = useState(false);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -145,6 +169,7 @@ export function LeadsPanel({
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState("");
+  const [phoneFilter, setPhoneFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState(() => searchParams.get("sourceId") ?? "");
   const [assignedFilter, setAssignedFilter] = useState(() => searchParams.get("assignedTo") ?? "");
@@ -159,7 +184,18 @@ export function LeadsPanel({
   const [jobTitleFilter, setJobTitleFilter] = useState("");
   const [stateRegionFilter, setStateRegionFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [tableProjectFilter, setTableProjectFilter] = useState("");
+  const [agePreset, setAgePreset] = useState<LeadAgePreset | "">("");
+  const [nextFilter, setNextFilter] = useState<LeadNextFilter | "">("");
+  const [urgencyFilter, setUrgencyFilter] = useState<LeadUrgencyFilter | "">("");
+  const [sort, setSort] = useState<LeadBrowserSort>(() =>
+    readLeadBrowserSort(searchParams.get("sort")),
+  );
+  const [sortDir, setSortDir] = useState<LeadBrowserSortDir>(() =>
+    readLeadBrowserSortDir(searchParams.get("dir") ?? searchParams.get("sortDir")),
+  );
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
@@ -185,15 +221,23 @@ export function LeadsPanel({
     setWebsiteOptionsWarning(null);
 
     try {
-      const [statusRes, sourceRes, tagsRes, integrationsRes, membersRes, companiesRes] =
-        await Promise.all([
-          fetch(`${apiBase}/dictionary-items?type=lead_status`),
-          fetch(`${apiBase}/dictionary-items?type=lead_source`),
-          fetch(`${apiBase}/tags?entityType=lead`),
-          fetch(`${apiBase}/integrations?type=website`),
-          fetch(`${apiBase}/members`),
-          fetch(`${apiBase}/companies`),
-        ]);
+      const [
+        statusRes,
+        sourceRes,
+        tagsRes,
+        integrationsRes,
+        membersRes,
+        companiesRes,
+        projectsRes,
+      ] = await Promise.all([
+        fetch(`${apiBase}/dictionary-items?type=lead_status`),
+        fetch(`${apiBase}/dictionary-items?type=lead_source`),
+        fetch(`${apiBase}/tags?entityType=lead`),
+        fetch(`${apiBase}/integrations?type=website`),
+        fetch(`${apiBase}/members`),
+        fetch(`${apiBase}/companies`),
+        fetch(`${apiBase}/projects?pageSize=100&sort=name&sortDir=asc`),
+      ]);
 
       const [
         statusPayload,
@@ -202,6 +246,7 @@ export function LeadsPanel({
         integrationsPayload,
         membersPayload,
         companiesPayload,
+        projectsPayload,
       ] = await Promise.all([
         statusRes.json(),
         sourceRes.json(),
@@ -209,6 +254,7 @@ export function LeadsPanel({
         integrationsRes.json(),
         membersRes.json(),
         companiesRes.json(),
+        projectsRes.json(),
       ]);
 
       if (statusRes.ok) {
@@ -249,6 +295,15 @@ export function LeadsPanel({
         );
       } else {
         setCompanies([]);
+      }
+      if (projectsRes.ok) {
+        const projectItems =
+          (projectsPayload?.data as Array<{ id: string; name: string }> | undefined) ??
+          (projectsPayload?.data?.projects as Array<{ id: string; name: string }> | undefined) ??
+          [];
+        setProjects(projectItems.map((project) => ({ id: project.id, name: project.name })));
+      } else {
+        setProjects([]);
       }
     } catch {
       setWebsiteOptionsWarning("Could not load some lead filter options.");
@@ -323,6 +378,7 @@ export function LeadsPanel({
     pageSize,
     propertyTypeInterestFilter,
     search,
+    phoneFilter,
     sourceFilter,
     assignedFilter,
     statusFilter,
@@ -335,6 +391,12 @@ export function LeadsPanel({
     jobTitleFilter,
     stateRegionFilter,
     companyFilter,
+    tableProjectFilter,
+    agePreset,
+    nextFilter,
+    urgencyFilter,
+    sort,
+    sortDir,
     projectId,
     includeAssociated,
     showArchived,
@@ -370,6 +432,7 @@ export function LeadsPanel({
     includeAssociated,
     propertyTypeInterestFilter,
     search,
+    phoneFilter,
     sourceFilter,
     assignedFilter,
     statusFilter,
@@ -382,6 +445,12 @@ export function LeadsPanel({
     jobTitleFilter,
     stateRegionFilter,
     companyFilter,
+    tableProjectFilter,
+    agePreset,
+    nextFilter,
+    urgencyFilter,
+    sort,
+    sortDir,
     showArchived,
     createdFromParam,
     createdToParam,
@@ -404,6 +473,11 @@ export function LeadsPanel({
     jobTitleFilter.trim(),
     stateRegionFilter.trim(),
     companyFilter,
+    phoneFilter.trim(),
+    tableProjectFilter,
+    agePreset,
+    nextFilter,
+    urgencyFilter,
   ].filter(Boolean).length;
 
   const selectedCount = useMemo(() => {
@@ -439,6 +513,9 @@ export function LeadsPanel({
     if (search.trim()) {
       filters.search = search.trim();
     }
+    if (phoneFilter.trim()) {
+      filters.phone = phoneFilter.trim();
+    }
     if (statusFilter) {
       filters.statusId = statusFilter;
     }
@@ -448,14 +525,24 @@ export function LeadsPanel({
     if (assignedFilter) {
       filters.assignedTo = assignedFilter;
     }
-    if (createdFromParam) {
-      filters.createdFrom = createdFromParam;
-    }
-    if (createdToParam) {
-      filters.createdTo = createdToParam;
-    }
-    if (acquisitionParam === "genuine_inbound" || acquisitionParam === "legacy_import") {
-      filters.acquisition = acquisitionParam;
+    if (agePreset) {
+      const ageRange = agePresetToCreatedRange(agePreset);
+      if (ageRange.createdFrom) {
+        filters.createdFrom = ageRange.createdFrom.toISOString();
+      }
+      if (ageRange.createdTo) {
+        filters.createdTo = ageRange.createdTo.toISOString();
+      }
+    } else {
+      if (createdFromParam) {
+        filters.createdFrom = createdFromParam;
+      }
+      if (createdToParam) {
+        filters.createdTo = createdToParam;
+      }
+      if (acquisitionParam === "genuine_inbound" || acquisitionParam === "legacy_import") {
+        filters.acquisition = acquisitionParam;
+      }
     }
     if (tagFilter) {
       filters.tagId = tagFilter;
@@ -487,8 +574,9 @@ export function LeadsPanel({
     if (companyFilter) {
       filters.companyId = companyFilter;
     }
-    if (projectId) {
-      filters.projectId = projectId;
+    const effectiveProjectId = projectId ?? (tableProjectFilter || undefined);
+    if (effectiveProjectId) {
+      filters.projectId = effectiveProjectId;
     }
     if (projectId && includeAssociated) {
       filters.includeAssociated = "true";
@@ -496,7 +584,68 @@ export function LeadsPanel({
     if (showArchived) {
       filters.includeArchived = "true";
     }
+    if (nextFilter) {
+      filters.nextFilter = nextFilter;
+    }
+    if (urgencyFilter) {
+      filters.urgencyFilter = urgencyFilter;
+    }
+    if (sort !== "age" || sortDir !== "desc") {
+      filters.sort = sort;
+      filters.sortDir = sortDir;
+    }
     return filters;
+  }
+
+  function changeSort(nextSort: LeadBrowserSort) {
+    const next = nextLeadBrowserSort(sort, sortDir, nextSort);
+    setPage(1);
+    setSort(next.sort);
+    setSortDir(next.sortDir);
+  }
+
+  function handleColumnFilterChange(patch: Partial<LeadsTableColumnFilters>) {
+    setPage(1);
+    if (patch.search !== undefined) {
+      setSearch(patch.search);
+    }
+    if (patch.phone !== undefined) {
+      setPhoneFilter(patch.phone);
+    }
+    if (patch.companyId !== undefined) {
+      setCompanyFilter(patch.companyId);
+    }
+    if (patch.projectId !== undefined && !scopedProjectId) {
+      // Project-scoped leads routes must not rewrite to /leads via the column filter.
+      setTableProjectFilter("");
+      const next = setProjectIdInSearchParams(
+        new URLSearchParams(searchParams.toString()),
+        patch.projectId || null,
+      );
+      const qs = next.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+    }
+    if (patch.sourceId !== undefined) {
+      setSourceFilter(patch.sourceId);
+    }
+    if (patch.statusId !== undefined) {
+      setStatusFilter(patch.statusId);
+    }
+    if (patch.assignedTo !== undefined) {
+      setAssignedFilter(patch.assignedTo);
+    }
+    if (patch.agePreset !== undefined) {
+      setAgePreset(isLeadAgePreset(patch.agePreset) ? patch.agePreset : "");
+    }
+    if (patch.nextFilter !== undefined) {
+      setNextFilter(isLeadNextFilter(patch.nextFilter) ? patch.nextFilter : "");
+    }
+    if (patch.urgencyFilter !== undefined) {
+      setUrgencyFilter(isLeadUrgencyFilter(patch.urgencyFilter) ? patch.urgencyFilter : "");
+    }
+    if (patch.tagId !== undefined) {
+      setTagFilter(patch.tagId);
+    }
   }
 
   function toggleLeadSelection(leadId: string) {
@@ -858,6 +1007,31 @@ export function LeadsPanel({
             Include associated projects
           </label>
         ) : null}
+        {!scopedProjectId ? (
+          <Select
+            fieldSize="sm"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
+            aria-label="Filter by project"
+            value={projectId ?? ""}
+            onChange={(event) => {
+              setPage(1);
+              setTableProjectFilter("");
+              const next = setProjectIdInSearchParams(
+                new URLSearchParams(searchParams.toString()),
+                event.target.value || null,
+              );
+              const qs = next.toString();
+              router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+            }}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Select
           fieldSize="sm"
           className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
@@ -903,6 +1077,7 @@ export function LeadsPanel({
           }}
         >
           <option value="">All assigned</option>
+          <option value="unassigned">Unassigned</option>
           {members.map((member) => (
             <option key={member.userId} value={member.userId}>
               {member.name ?? member.email}
@@ -1124,10 +1299,19 @@ export function LeadsPanel({
         <ErrorState title="Could not load leads" description={error} primaryAction={{ label: "Retry", onClick: () => void loadLeads() }} />
       ) : leads.length === 0 ? (
         <EmptyState
-          title="No leads yet"
-          description="Create your first lead to start capturing demand in this workspace."
+          title={
+            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+              ? "No matching leads"
+              : "No leads yet"
+          }
+          description={
+            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+              ? "Try clearing filters or broadening your search."
+              : "Create your first lead to start capturing demand in this workspace."
+          }
           primaryAction={
-            canCreate
+            canCreate &&
+            !(activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId))
               ? {
                   label: "New lead",
                   onClick: () => router.push(workspacePath(workspaceSlug, "leads", "new")),
@@ -1195,6 +1379,32 @@ export function LeadsPanel({
             allPageSelected={allPageSelected}
             somePageSelected={somePageSelected}
             pendingLeadId={pendingLeadId}
+            sort={sort}
+            sortDir={sortDir}
+            onSort={changeSort}
+            columnFilters={{
+              search,
+              phone: phoneFilter,
+              companyId: companyFilter,
+              projectId: tableProjectFilter,
+              sourceId: sourceFilter,
+              statusId: statusFilter,
+              assignedTo: assignedFilter,
+              agePreset,
+              nextFilter,
+              urgencyFilter,
+              tagId: tagFilter,
+            }}
+            filterOptions={{
+              statuses,
+              sources,
+              members,
+              companies,
+              projects,
+              tags,
+              workspaceProjectId: projectId,
+            }}
+            onColumnFilterChange={handleColumnFilterChange}
             onToggleLead={toggleLeadSelection}
             onTogglePage={togglePageSelection}
             onAssign={(leadId, assignedTo) => void handleAssign(leadId, assignedTo)}

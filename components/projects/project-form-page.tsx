@@ -55,6 +55,7 @@ type ProjectFormState = {
   additionalCompanies: AdditionalCompany[];
   description: string;
   website: string;
+  autoEnrichLeads: boolean;
 };
 
 function defaultCreateLocation(): ProjectLocation {
@@ -78,6 +79,7 @@ function emptyCreateForm(): ProjectFormState {
     additionalCompanies: [],
     description: "",
     website: "",
+    autoEnrichLeads: false,
   };
 }
 
@@ -88,6 +90,7 @@ type LoadedProject = {
   commercialStage: string | null;
   propertyTypeId: string | null;
   website: string | null;
+  autoEnrichLeads?: boolean;
   address: string | null;
   city: string | null;
   country: string | null;
@@ -136,6 +139,7 @@ function formFromProject(project: LoadedProject): ProjectFormState {
     additionalCompanies,
     description: project.description ?? "",
     website: project.website ?? "",
+    autoEnrichLeads: Boolean(project.autoEnrichLeads),
   };
 }
 
@@ -298,6 +302,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       ...(form.commercialStage ? { commercialStage: form.commercialStage } : {}),
       ...(form.propertyTypeId ? { propertyTypeId: form.propertyTypeId } : {}),
       ...(form.website.trim() ? { website: form.website.trim() } : {}),
+      autoEnrichLeads: form.autoEnrichLeads,
       ...(location ? { location } : {}),
       companies,
       ...(form.description.trim() ? { description: form.description.trim() } : {}),
@@ -312,6 +317,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       commercialStage: form.commercialStage || null,
       propertyTypeId: form.propertyTypeId || null,
       website: form.website.trim() || null,
+      autoEnrichLeads: form.autoEnrichLeads,
       location,
       address: location?.normalizedAddress ?? null,
       city: location?.municipality ?? null,
@@ -504,6 +510,43 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
               value={form.location}
               onChange={(location) => setForm((current) => ({ ...current, location }))}
             />
+          </section>
+
+          <section className="space-y-3" aria-labelledby="project-auto-enrich-heading">
+            <div>
+              <h2
+                id="project-auto-enrich-heading"
+                className="text-[15px] font-semibold text-[var(--color-ink)]"
+              >
+                Lead enrichment
+              </h2>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Control automatic enrichment for leads that land on this project.
+              </p>
+            </div>
+            <label className="flex items-start gap-2.5 rounded-lg border border-[var(--color-line)] bg-white px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-[var(--color-line)]"
+                checked={form.autoEnrichLeads}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    autoEnrichLeads: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-[var(--color-ink)]">
+                  Auto-enrich new leads
+                </span>
+                <span className="mt-0.5 block text-[12px] text-[var(--color-ink-muted)]">
+                  When enabled, every new lead for this project — manual create, CRM API, or
+                  website capture — is enriched in the background if workspace enrichment is on
+                  and the lead has a name and email.
+                </span>
+              </span>
+            </label>
           </section>
 
           <section className="space-y-4" aria-labelledby="project-advanced-heading">

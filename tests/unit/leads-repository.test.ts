@@ -34,6 +34,34 @@ describe("leads repository", () => {
       workspaceId: "ws-1",
       archivedAt: null,
     });
+    expect(sort).toHaveBeenCalledWith({ createdAt: -1, _id: 1 });
+  });
+
+  it("sorts by fullName and filters unassigned owners", async () => {
+    const lean = vi.fn().mockResolvedValue([]);
+    const limit = vi.fn().mockReturnValue({ lean });
+    const skip = vi.fn().mockReturnValue({ limit });
+    const sort = vi.fn().mockReturnValue({ skip });
+    vi.mocked(LeadModel.find).mockReturnValue({ sort } as never);
+    vi.mocked(LeadModel.countDocuments).mockResolvedValue(0);
+
+    await findLeads("ws-1", {
+      sort: "fullName",
+      sortDir: "asc",
+      assignedTo: "unassigned",
+      phone: "079",
+    });
+
+    expect(LeadModel.find).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      $and: [
+        { archivedAt: null, assignedTo: null },
+        {
+          $or: [{ phone: expect.any(RegExp) }, { phoneNormalized: expect.any(RegExp) }],
+        },
+      ],
+    });
+    expect(sort).toHaveBeenCalledWith({ fullName: 1, _id: 1 });
   });
 
   it("includes archived leads when includeArchived is true", async () => {

@@ -1,6 +1,6 @@
 # Manual Lead Enrichment & Financial Situation
 
-Feature-flagged, never automatic. Production stays disabled until `OPENAI_API_KEY` is set **and** the workspace toggle is on. Campaign enrollment, HubSpot GV/WD runners, consent, project membership, and lead status are out of scope.
+Feature-flagged. Production stays disabled until `OPENAI_API_KEY` is set **and** the workspace toggle is on. Operators can still start enrichment manually from a lead (`lead:enrich`). Projects may also enable **Auto-enrich new leads** in project settings; when that flag is on, new leads created for the project (manual, API, or website capture — not HubSpot/`triggerAutomation: false` paths) schedule enrichment in the background if the lead has a name and email. Campaign enrollment, HubSpot GV/WD runners, consent, project membership, and lead status remain out of scope for enrichment writes.
 
 ## Product flow
 
