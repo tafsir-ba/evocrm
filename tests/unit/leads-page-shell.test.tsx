@@ -46,7 +46,8 @@ describe("LeadsPageShell", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Project" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Leads" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Project sections" })).toBeInTheDocument();
+    expect(screen.getByText("Leads")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("leads-panel")).toBeInTheDocument();
 
     resolveFetch?.(
@@ -72,11 +73,13 @@ describe("LeadsPageShell", () => {
 
   it("keeps project section nav when project fetch fails", async () => {
     projectFilterState.current = "507f1f77bcf86cd799439051";
-    global.fetch = vi.fn(async () => ({
-      ok: false,
-      status: 404,
-      json: async () => ({ error: { message: "Not found" } }),
-    })) as typeof fetch;
+    global.fetch = vi.fn(async () =>
+      ({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: { message: "Not found" } }),
+      }) as Response,
+    ) as typeof fetch;
 
     render(
       <LeadsPageShell
@@ -92,6 +95,6 @@ describe("LeadsPageShell", () => {
       expect(screen.getByRole("heading", { name: "Project" })).toBeInTheDocument();
     });
     expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Leads" })).toBeInTheDocument();
+    expect(screen.getByText("Leads")).toHaveAttribute("aria-current", "page");
   });
 });

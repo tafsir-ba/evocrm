@@ -706,10 +706,10 @@ describe("lead service", () => {
   });
 
   it("applies project scope when resolving select-all bulk delete ids", async () => {
-    vi.mocked(applyUserProjectScope).mockResolvedValueOnce({
+    vi.mocked(applyUserProjectScope).mockImplementationOnce(async (_ws, _user, filter) => ({
+      ...filter,
       projectIds: ["project-allowed"],
-      includeArchived: true,
-    });
+    }));
     vi.mocked(findLeadIds).mockResolvedValueOnce(["lead-scoped"]);
     vi.mocked(purgeLeadsByIds).mockResolvedValueOnce(1);
 
@@ -732,16 +732,14 @@ describe("lead service", () => {
   });
 
   it("applies project scope when resolving explicit bulk delete ids", async () => {
-    vi.mocked(applyUserProjectScope).mockResolvedValueOnce({
-      leadIds: ["lead-a", "lead-b"],
+    vi.mocked(applyUserProjectScope).mockImplementationOnce(async (_ws, _user, filter) => ({
+      ...filter,
       projectIds: ["project-allowed"],
-      includeArchived: true,
-    });
+    }));
     vi.mocked(findLeadIds).mockResolvedValueOnce(["lead-a"]);
     vi.mocked(purgeLeadsByIds).mockResolvedValueOnce(1);
 
     const result = await purgeLeadsForWorkspace("ws-1", "user-1", {
-      selectAll: false,
       leadIds: ["lead-a", "lead-b"],
     });
 
