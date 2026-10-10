@@ -243,6 +243,23 @@ describe("LeadsPanel table", () => {
     expect(scroller.contains(nextPage)).toBe(false);
   });
 
+  it("always shows a project menu in the leads filter bar", async () => {
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
+
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+    expect(screen.getByRole("combobox", { name: "Filter by project" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "All projects" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Les Terrasses" })).toBeInTheDocument();
+  });
+
   it("sorts and filters from column headers", async () => {
     const user = userEvent.setup();
     render(

@@ -58,6 +58,7 @@ function projectDocument() {
     propertyTypeId: null,
     website: null,
     defaultDripCampaignId: null,
+    autoEnrichLeads: false,
     statusId: null,
     address: null,
     city: "Geneva",

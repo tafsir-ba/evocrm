@@ -12,6 +12,7 @@ export const projectRecordExtras: Pick<
   ProjectRecord,
   | "projectType"
   | "defaultDripCampaignId"
+  | "autoEnrichLeads"
   | "commercialStage"
   | "propertyTypeId"
   | "website"
@@ -20,6 +21,7 @@ export const projectRecordExtras: Pick<
 > = {
   projectType: null,
   defaultDripCampaignId: null,
+  autoEnrichLeads: false,
   commercialStage: null,
   propertyTypeId: null,
   website: null,

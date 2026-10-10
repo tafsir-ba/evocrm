@@ -43,6 +43,7 @@ export type ProjectRecord = {
   propertyTypeId: string | null;
   website: string | null;
   defaultDripCampaignId: string | null;
+  autoEnrichLeads: boolean;
   statusId: string | null;
   address: string | null;
   city: string | null;
@@ -83,6 +84,7 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
     propertyTypeId: document.propertyTypeId?.toString() ?? null,
     website: document.website ?? null,
     defaultDripCampaignId: document.defaultDripCampaignId?.toString() ?? null,
+    autoEnrichLeads: Boolean(document.autoEnrichLeads),
     statusId: document.statusId?.toString() ?? null,
     address: document.address ?? null,
     city: document.city ?? null,
@@ -498,6 +500,7 @@ export async function createProject(input: {
   propertyTypeId?: string | null;
   website?: string | null;
   defaultDripCampaignId?: string | null;
+  autoEnrichLeads?: boolean;
   statusId?: string | null;
   address?: string | null;
   city?: string | null;
@@ -519,6 +522,7 @@ export async function createProject(input: {
     propertyTypeId: input.propertyTypeId ?? null,
     website: input.website?.trim() || null,
     defaultDripCampaignId: input.defaultDripCampaignId ?? null,
+    autoEnrichLeads: input.autoEnrichLeads ?? false,
     statusId: input.statusId ?? null,
     address: input.address?.trim() || null,
     city: input.city?.trim() || null,
@@ -545,6 +549,7 @@ export async function updateProject(
     propertyTypeId: string | null;
     website: string | null;
     defaultDripCampaignId: string | null;
+    autoEnrichLeads: boolean;
     statusId: string | null;
     address: string | null;
     city: string | null;

@@ -52,6 +52,7 @@ import {
   evaluateCampaignAutoEnrollmentForLead,
   logAutoEnrollmentFailure,
 } from "@/server/services/campaign-auto-enrollment";
+import { scheduleLeadAutoEnrichmentForLead } from "@/server/services/lead-auto-enrichment";
 import {
   applyUserProjectScope,
   assertRecordProjectAccess,
@@ -736,6 +737,12 @@ export async function createLeadForWorkspace(
         error,
       );
     }
+
+    scheduleLeadAutoEnrichmentForLead({
+      workspaceId,
+      leadId: lead.id,
+      actorId,
+    });
   }
 
   return {

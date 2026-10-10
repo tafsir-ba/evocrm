@@ -579,7 +579,6 @@ export function LeadsTable({
     canEnrich && onEnrich ? () => onEnrich(leadId) : undefined;
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
   const columnCount = (canDelete ? 1 : 0) + 12;
-  const projectFilterLocked = Boolean(filterOptions.workspaceProjectId);
   const effectiveProjectFilter =
     filterOptions.workspaceProjectId ?? columnFilters.projectId;
 
@@ -691,24 +690,18 @@ export function LeadsTable({
                   filterOptions.projects.find((item) => item.id === effectiveProjectFilter)?.name
                 }
               >
-                {projectFilterLocked ? (
-                  <p className="text-[11px] text-[var(--color-ink-muted)]">
-                    Controlled by the workspace project filter.
-                  </p>
-                ) : (
-                  <ColumnFilterSelect
-                    label="Project"
-                    value={columnFilters.projectId}
-                    onChange={(value) => onColumnFilterChange({ projectId: value })}
-                  >
-                    <option value="">All projects</option>
-                    {filterOptions.projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </ColumnFilterSelect>
-                )}
+                <ColumnFilterSelect
+                  label="Project"
+                  value={effectiveProjectFilter}
+                  onChange={(value) => onColumnFilterChange({ projectId: value })}
+                >
+                  <option value="">All projects</option>
+                  {filterOptions.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
               </LeadColumnHeader>
               <LeadColumnHeader
                 label="Source"

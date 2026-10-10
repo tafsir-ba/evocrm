@@ -54,6 +54,7 @@ import {
   type LeadNoteActivityIds,
   type LeadNoteDictionaryItem,
 } from "@/lib/lead-notes-client";
+import { setProjectIdInSearchParams } from "@/lib/project-scope";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -148,6 +149,7 @@ export function LeadsPanel({
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = workspacePath(workspaceSlug, "leads");
   const sourceIdParam = searchParams.get("sourceId") ?? "";
   const assignedToParam = searchParams.get("assignedTo") ?? "";
   const createdFromParam = searchParams.get("createdFrom");
@@ -610,7 +612,13 @@ export function LeadsPanel({
       setCompanyFilter(patch.companyId);
     }
     if (patch.projectId !== undefined) {
-      setTableProjectFilter(patch.projectId);
+      setTableProjectFilter("");
+      const next = setProjectIdInSearchParams(
+        new URLSearchParams(searchParams.toString()),
+        patch.projectId || null,
+      );
+      const qs = next.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
     }
     if (patch.sourceId !== undefined) {
       setSourceFilter(patch.sourceId);
@@ -994,6 +1002,29 @@ export function LeadsPanel({
             Include associated projects
           </label>
         ) : null}
+        <Select
+          fieldSize="sm"
+          className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
+          aria-label="Filter by project"
+          value={projectId ?? ""}
+          onChange={(event) => {
+            setPage(1);
+            setTableProjectFilter("");
+            const next = setProjectIdInSearchParams(
+              new URLSearchParams(searchParams.toString()),
+              event.target.value || null,
+            );
+            const qs = next.toString();
+            router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+          }}
+        >
+          <option value="">All projects</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
         <Select
           fieldSize="sm"
           className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"

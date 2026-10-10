@@ -75,6 +75,10 @@ vi.mock("@/server/services/campaign-auto-enrollment", () => ({
   logAutoEnrollmentFailure: vi.fn(),
 }));
 
+vi.mock("@/server/services/lead-auto-enrichment", () => ({
+  scheduleLeadAutoEnrichmentForLead: vi.fn(),
+}));
+
 vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
@@ -97,6 +101,7 @@ import { findLeadActivitySummaries } from "@/server/repositories/activities";
 import { findLeadIdsForProjectMembership } from "@/server/repositories/lead-project-memberships";
 import { findTagById } from "@/server/repositories/tags";
 import { evaluateCampaignAutoEnrollmentForLead } from "@/server/services/campaign-auto-enrollment";
+import { scheduleLeadAutoEnrichmentForLead } from "@/server/services/lead-auto-enrichment";
 import {
   ensurePrimaryMembershipForLead,
   loadMembershipsByLeadIds,
@@ -296,6 +301,24 @@ describe("lead service", () => {
         associatedLeadIds: [],
       }),
     );
+  });
+
+  it("schedules auto-enrichment when lead automation is enabled", async () => {
+    vi.mocked(createLead).mockResolvedValue(baseLead);
+
+    await createLeadForWorkspace("ws-1", "user-1", {
+      projectId: "project-1",
+      statusId: "status-1",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+    });
+
+    expect(scheduleLeadAutoEnrichmentForLead).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      leadId: "lead-1",
+      actorId: "user-1",
+    });
   });
 
   it("creates a primary membership on lead create without replacing campaign enrollment", async () => {
