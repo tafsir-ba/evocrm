@@ -38,6 +38,20 @@ const propertyTypeInterestsSchema = z
 const transactionIntentSchema = z.enum(TRANSACTION_INTENTS);
 const usagePurposeSchema = z.enum(USAGE_PURPOSES);
 
+const leadBrowserSortSchema = z.enum([
+  "fullName",
+  "phone",
+  "company",
+  "project",
+  "source",
+  "status",
+  "owner",
+  "age",
+  "next",
+  "urgency",
+  "tags",
+]);
+
 export const leadListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -46,6 +60,7 @@ export const leadListQuerySchema = z.object({
     .optional()
     .transform((value) => value === "true"),
   search: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(40).optional(),
   projectId: objectIdSchema.optional(),
   companyId: objectIdSchema.optional(),
   includeAssociated: z
@@ -54,7 +69,7 @@ export const leadListQuerySchema = z.object({
     .transform((value) => value === "true"),
   statusId: objectIdSchema.optional(),
   sourceId: objectIdSchema.optional(),
-  assignedTo: objectIdSchema.optional(),
+  assignedTo: z.union([objectIdSchema, z.literal("unassigned")]).optional(),
   ownerId: objectIdSchema.optional(),
   tagId: objectIdSchema.optional(),
   propertyTypeInterest: z.enum(PROPERTY_TYPE_INTERESTS).optional(),
@@ -68,6 +83,12 @@ export const leadListQuerySchema = z.object({
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
   acquisition: z.enum(["genuine_inbound", "legacy_import"]).optional(),
+  sort: leadBrowserSortSchema.optional(),
+  sortDir: z.enum(["asc", "desc"]).optional(),
+  nextFilter: z.enum(["has_next", "no_next", "overdue"]).optional(),
+  urgencyFilter: z
+    .enum(["overdue", "today", "soon", "stale", "unassigned", "none"])
+    .optional(),
 });
 
 const createLeadBudgetRefinement = {
@@ -169,7 +190,7 @@ export type UpdateLeadInput = z.infer<typeof updateLeadInputSchema>;
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
 
 const bulkDeleteLeadFiltersSchema = leadListQuerySchema
-  .omit({ page: true, pageSize: true })
+  .omit({ page: true, pageSize: true, sort: true, sortDir: true })
   .partial();
 
 export const bulkDeleteLeadsInputSchema = z

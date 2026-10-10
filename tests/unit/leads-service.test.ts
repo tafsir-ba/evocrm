@@ -211,6 +211,22 @@ describe("lead service", () => {
     expect(findLeadActivitySummaries).toHaveBeenCalledWith("ws-1", ["lead-1"]);
   });
 
+  it("loads unpaginated leads when sorting by a derived column", async () => {
+    vi.mocked(findLeads).mockResolvedValue({
+      leads: [baseLead],
+      total: 1,
+    });
+
+    await listLeadsForWorkspace("ws-1", { sort: "urgency", sortDir: "asc" });
+
+    expect(findLeads).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        unpaginated: true,
+      }),
+    );
+  });
+
   it("attaches last activity and next action from the workspace activity timeline", async () => {
     const lastActivity = {
       id: "act-last",

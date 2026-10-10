@@ -4,11 +4,26 @@ import Link from "next/link";
 import { Fragment, useState, type ChangeEvent, type ReactNode } from "react";
 
 import { StatusBadge } from "@/components/domain/status-badge";
+import {
+  ColumnFilterInput,
+  ColumnFilterSelect,
+  LeadColumnHeader,
+} from "@/components/leads/lead-column-header";
+import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
+import { LeadQuickNote } from "@/components/leads/lead-quick-note";
+import { LeadStatusPicker } from "@/components/leads/lead-status-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
 import { IconChevronDown, IconChevronRight, IconMail, IconPhone, IconSparkles } from "@/lib/icons";
+import type {
+  LeadAgePreset,
+  LeadBrowserSort,
+  LeadBrowserSortDir,
+  LeadNextFilter,
+  LeadUrgencyFilter,
+} from "@/lib/lead-browser";
 import {
   formatLeadRoleLine,
   formatNextStepCell,
@@ -21,9 +36,6 @@ import {
   telHref,
   visibleLeadTags,
 } from "@/lib/leads-table";
-import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
-import { LeadQuickNote } from "@/components/leads/lead-quick-note";
-import { LeadStatusPicker } from "@/components/leads/lead-status-picker";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
 
@@ -71,6 +83,31 @@ export type LeadTableItem = {
   nextAction?: { id: string; title: string; at: string | Date } | null;
 };
 
+export type LeadsTableColumnFilters = {
+  search: string;
+  phone: string;
+  companyId: string;
+  projectId: string;
+  sourceId: string;
+  statusId: string;
+  assignedTo: string;
+  agePreset: LeadAgePreset | "";
+  nextFilter: LeadNextFilter | "";
+  urgencyFilter: LeadUrgencyFilter | "";
+  tagId: string;
+};
+
+export type LeadsTableFilterOptions = {
+  statuses: LeadTableDictionaryItem[];
+  sources: LeadTableDictionaryItem[];
+  members: LeadTableMember[];
+  companies: Array<{ id: string; name: string }>;
+  projects: Array<{ id: string; name: string }>;
+  tags: Array<{ id: string; name: string }>;
+  /** When set by the workspace project switcher, project column filter is locked. */
+  workspaceProjectId: string | null;
+};
+
 type LeadsTableProps = {
   workspaceSlug: string;
   leads: LeadTableItem[];
@@ -88,6 +125,12 @@ type LeadsTableProps = {
   allPageSelected: boolean;
   somePageSelected: boolean;
   pendingLeadId: string | null;
+  sort: LeadBrowserSort;
+  sortDir: LeadBrowserSortDir;
+  onSort: (column: LeadBrowserSort) => void;
+  columnFilters: LeadsTableColumnFilters;
+  filterOptions: LeadsTableFilterOptions;
+  onColumnFilterChange: (patch: Partial<LeadsTableColumnFilters>) => void;
   onToggleLead: (leadId: string) => void;
   onTogglePage: () => void;
   onAssign: (leadId: string, assignedTo: string | null) => void;
@@ -516,6 +559,12 @@ export function LeadsTable({
   allPageSelected,
   somePageSelected,
   pendingLeadId,
+  sort,
+  sortDir,
+  onSort,
+  columnFilters,
+  filterOptions,
+  onColumnFilterChange,
   onToggleLead,
   onTogglePage,
   onAssign,
@@ -530,6 +579,9 @@ export function LeadsTable({
     canEnrich && onEnrich ? () => onEnrich(leadId) : undefined;
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
   const columnCount = (canDelete ? 1 : 0) + 12;
+  const projectFilterLocked = Boolean(filterOptions.workspaceProjectId);
+  const effectiveProjectFilter =
+    filterOptions.workspaceProjectId ?? columnFilters.projectId;
 
   function toggleExpanded(leadId: string) {
     setExpandedLeadIds((current) => {
@@ -568,17 +620,300 @@ export function LeadsTable({
                   />
                 </th>
               )}
-              <th className="px-1.5 py-1 text-left">Lead</th>
-              <th className="w-[8rem] px-1.5 py-1 text-left">Phone</th>
-              <th className="w-[8.5rem] px-1.5 py-1 text-left">Company</th>
-              <th className="w-[8.5rem] px-1.5 py-1 text-left">Project</th>
-              <th className="w-[7.5rem] px-1.5 py-1 text-left">Source</th>
-              <th className="w-[7.5rem] px-1.5 py-1 text-left">Status</th>
-              <th className="w-[7.5rem] px-1.5 py-1 text-left">Owner</th>
-              <th className="w-[3.25rem] px-1.5 py-1 text-left">Age</th>
-              <th className="w-[12rem] px-1.5 py-1 text-left">Next</th>
-              <th className="w-[5.5rem] px-1.5 py-1 text-left">Urgency</th>
-              <th className="w-[6.5rem] px-1.5 py-1 text-left">Tags</th>
+              <LeadColumnHeader
+                label="Lead"
+                column="fullName"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                filterActive={Boolean(columnFilters.search.trim())}
+                filterLabel={columnFilters.search.trim() || undefined}
+              >
+                <ColumnFilterInput
+                  label="Search name or email"
+                  value={columnFilters.search}
+                  placeholder="Name or email…"
+                  onChange={(value) => onColumnFilterChange({ search: value })}
+                />
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Phone"
+                column="phone"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[8rem]"
+                filterActive={Boolean(columnFilters.phone.trim())}
+                filterLabel={columnFilters.phone.trim() || undefined}
+              >
+                <ColumnFilterInput
+                  label="Phone contains"
+                  value={columnFilters.phone}
+                  placeholder="Phone…"
+                  onChange={(value) => onColumnFilterChange({ phone: value })}
+                />
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Company"
+                column="company"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[8.5rem]"
+                filterActive={Boolean(columnFilters.companyId)}
+                filterLabel={
+                  filterOptions.companies.find((item) => item.id === columnFilters.companyId)
+                    ?.name
+                }
+              >
+                <ColumnFilterSelect
+                  label="Company"
+                  value={columnFilters.companyId}
+                  onChange={(value) => onColumnFilterChange({ companyId: value })}
+                >
+                  <option value="">All companies</option>
+                  {filterOptions.companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Project"
+                column="project"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[8.5rem]"
+                filterActive={Boolean(effectiveProjectFilter)}
+                filterLabel={
+                  filterOptions.projects.find((item) => item.id === effectiveProjectFilter)?.name
+                }
+              >
+                {projectFilterLocked ? (
+                  <p className="text-[11px] text-[var(--color-ink-muted)]">
+                    Controlled by the workspace project filter.
+                  </p>
+                ) : (
+                  <ColumnFilterSelect
+                    label="Project"
+                    value={columnFilters.projectId}
+                    onChange={(value) => onColumnFilterChange({ projectId: value })}
+                  >
+                    <option value="">All projects</option>
+                    {filterOptions.projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </ColumnFilterSelect>
+                )}
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Source"
+                column="source"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[7.5rem]"
+                filterActive={Boolean(columnFilters.sourceId)}
+                filterLabel={
+                  filterOptions.sources.find((item) => item.id === columnFilters.sourceId)?.label
+                }
+              >
+                <ColumnFilterSelect
+                  label="Source"
+                  value={columnFilters.sourceId}
+                  onChange={(value) => onColumnFilterChange({ sourceId: value })}
+                >
+                  <option value="">All sources</option>
+                  {filterOptions.sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.label}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Status"
+                column="status"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[7.5rem]"
+                filterActive={Boolean(columnFilters.statusId)}
+                filterLabel={
+                  filterOptions.statuses.find((item) => item.id === columnFilters.statusId)?.label
+                }
+              >
+                <ColumnFilterSelect
+                  label="Status"
+                  value={columnFilters.statusId}
+                  onChange={(value) => onColumnFilterChange({ statusId: value })}
+                >
+                  <option value="">All statuses</option>
+                  {filterOptions.statuses.map((status) => (
+                    <option key={status.id} value={status.id}>
+                      {status.label}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Owner"
+                column="owner"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[7.5rem]"
+                filterActive={Boolean(columnFilters.assignedTo)}
+                filterLabel={
+                  columnFilters.assignedTo === "unassigned"
+                    ? "Unassigned"
+                    : filterOptions.members.find(
+                        (item) => item.userId === columnFilters.assignedTo,
+                      )?.name ??
+                      filterOptions.members.find(
+                        (item) => item.userId === columnFilters.assignedTo,
+                      )?.email
+                }
+              >
+                <ColumnFilterSelect
+                  label="Owner"
+                  value={columnFilters.assignedTo}
+                  onChange={(value) => onColumnFilterChange({ assignedTo: value })}
+                >
+                  <option value="">All owners</option>
+                  <option value="unassigned">Unassigned</option>
+                  {filterOptions.members.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.name ?? member.email}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Age"
+                column="age"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[3.25rem]"
+                filterActive={Boolean(columnFilters.agePreset)}
+                filterLabel={
+                  columnFilters.agePreset === "24h"
+                    ? "Last 24h"
+                    : columnFilters.agePreset === "7d"
+                      ? "Last 7d"
+                      : columnFilters.agePreset === "30d"
+                        ? "Last 30d"
+                        : columnFilters.agePreset === "older_30d"
+                          ? "Older than 30d"
+                          : undefined
+                }
+              >
+                <ColumnFilterSelect
+                  label="Created"
+                  value={columnFilters.agePreset}
+                  onChange={(value) =>
+                    onColumnFilterChange({ agePreset: value as LeadAgePreset | "" })
+                  }
+                >
+                  <option value="">Any age</option>
+                  <option value="24h">Last 24 hours</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="older_30d">Older than 30 days</option>
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Next"
+                column="next"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[12rem]"
+                filterActive={Boolean(columnFilters.nextFilter)}
+                filterLabel={
+                  columnFilters.nextFilter === "has_next"
+                    ? "Has next"
+                    : columnFilters.nextFilter === "no_next"
+                      ? "No next"
+                      : columnFilters.nextFilter === "overdue"
+                        ? "Overdue"
+                        : undefined
+                }
+              >
+                <ColumnFilterSelect
+                  label="Next action"
+                  value={columnFilters.nextFilter}
+                  onChange={(value) =>
+                    onColumnFilterChange({ nextFilter: value as LeadNextFilter | "" })
+                  }
+                >
+                  <option value="">Any</option>
+                  <option value="has_next">Has next action</option>
+                  <option value="no_next">No next action</option>
+                  <option value="overdue">Overdue</option>
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Urgency"
+                column="urgency"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[5.5rem]"
+                filterActive={Boolean(columnFilters.urgencyFilter)}
+                filterLabel={
+                  columnFilters.urgencyFilter
+                    ? columnFilters.urgencyFilter.charAt(0).toUpperCase() +
+                      columnFilters.urgencyFilter.slice(1)
+                    : undefined
+                }
+              >
+                <ColumnFilterSelect
+                  label="Urgency"
+                  value={columnFilters.urgencyFilter}
+                  onChange={(value) =>
+                    onColumnFilterChange({ urgencyFilter: value as LeadUrgencyFilter | "" })
+                  }
+                >
+                  <option value="">Any urgency</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="today">Today</option>
+                  <option value="soon">Soon</option>
+                  <option value="stale">Stale</option>
+                  <option value="unassigned">Unassigned</option>
+                  <option value="none">None</option>
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
+              <LeadColumnHeader
+                label="Tags"
+                column="tags"
+                sort={sort}
+                sortDir={sortDir}
+                onSort={onSort}
+                className="w-[6.5rem]"
+                filterActive={Boolean(columnFilters.tagId)}
+                filterLabel={
+                  filterOptions.tags.find((item) => item.id === columnFilters.tagId)?.name
+                }
+              >
+                <ColumnFilterSelect
+                  label="Tag"
+                  value={columnFilters.tagId}
+                  onChange={(value) => onColumnFilterChange({ tagId: value })}
+                >
+                  <option value="">All tags</option>
+                  {filterOptions.tags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </ColumnFilterSelect>
+              </LeadColumnHeader>
               <th className={cn("px-1.5 py-1 text-right", canEnrich ? "w-[9rem]" : "w-[5.5rem]")}>
                 Actions
               </th>

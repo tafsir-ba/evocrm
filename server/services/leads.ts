@@ -1,6 +1,16 @@
 import "server-only";
 
 import type { LeadActivityEvent } from "@/lib/lead-activity-summary";
+import {
+  isLeadBrowserSort,
+  needsLeadBrowserMemoryPath,
+  paginateLeadBrowser,
+  readLeadBrowserSort,
+  readLeadBrowserSortDir,
+  type LeadBrowserSort,
+  type LeadNextFilter,
+  type LeadUrgencyFilter,
+} from "@/lib/lead-browser";
 import { createAuditLog } from "@/server/audit/create-audit-log";
 import { AppError } from "@/server/errors";
 import { findLeadActivitySummaries } from "@/server/repositories/activities";
@@ -484,6 +494,54 @@ async function resolveListFilter(
   };
 }
 
+async function attachLeadActivitySummaries(
+  workspaceId: string,
+  leads: LeadListItem[],
+): Promise<LeadListItem[]> {
+  if (leads.length === 0) {
+    return leads;
+  }
+
+  const activitySummaries = await findLeadActivitySummaries(
+    workspaceId,
+    leads.map((lead) => lead.id),
+  );
+
+  return leads.map((lead) => {
+    const timeline = activitySummaries.get(lead.id);
+    return {
+      ...lead,
+      lastActivity: timeline?.lastActivity ?? null,
+      nextAction: timeline?.nextAction ?? null,
+    };
+  });
+}
+
+async function enrichLeadPage(
+  workspaceId: string,
+  leads: LeadRecord[],
+): Promise<LeadListItem[]> {
+  const membershipsByLead = await loadMembershipsByLeadIds(
+    workspaceId,
+    leads.map((lead) => lead.id),
+  );
+
+  const enriched = await Promise.all(
+    leads.map((lead) => enrichLeadListItem(lead, membershipsByLead.get(lead.id) ?? [])),
+  );
+
+  return attachLeadActivitySummaries(workspaceId, enriched);
+}
+
+function resolveLeadBrowserSort(filter: LeadListFilter): {
+  sort: LeadBrowserSort;
+  sortDir: "asc" | "desc";
+} {
+  const sort = isLeadBrowserSort(filter.sort) ? filter.sort : readLeadBrowserSort(filter.sort);
+  const sortDir = readLeadBrowserSortDir(filter.sortDir);
+  return { sort, sortDir };
+}
+
 export async function listLeadsForWorkspace(
   workspaceId: string,
   filter: LeadListFilter = {},
@@ -491,34 +549,44 @@ export async function listLeadsForWorkspace(
 ): Promise<{ leads: LeadListItem[]; total: number }> {
   const scopedFilter = await applyUserProjectScope(workspaceId, userId, filter);
   const listFilter = await resolveListFilter(workspaceId, scopedFilter);
-  const { leads, total } = await findLeads(workspaceId, listFilter);
-  const membershipsByLead = await loadMembershipsByLeadIds(
-    workspaceId,
-    leads.map((lead) => lead.id),
-  );
+  const { sort, sortDir } = resolveLeadBrowserSort(listFilter);
+  const useMemoryPath = needsLeadBrowserMemoryPath({
+    sort,
+    nextFilter: listFilter.nextFilter,
+    urgencyFilter: listFilter.urgencyFilter,
+  });
 
-  const [enriched, activitySummaries] = await Promise.all([
-    Promise.all(
-      leads.map((lead) =>
-        enrichLeadListItem(lead, membershipsByLead.get(lead.id) ?? []),
-      ),
-    ),
-    findLeadActivitySummaries(
-      workspaceId,
-      leads.map((lead) => lead.id),
-    ),
-  ]);
+  if (!useMemoryPath) {
+    const { leads, total } = await findLeads(workspaceId, {
+      ...listFilter,
+      sort,
+      sortDir,
+    });
+    return {
+      leads: await enrichLeadPage(workspaceId, leads),
+      total,
+    };
+  }
+
+  const { leads } = await findLeads(workspaceId, {
+    ...listFilter,
+    unpaginated: true,
+    sort: undefined,
+    sortDir: undefined,
+  });
+  const enriched = await enrichLeadPage(workspaceId, leads);
+  const page = paginateLeadBrowser(enriched, {
+    sort,
+    sortDir,
+    nextFilter: listFilter.nextFilter as LeadNextFilter | undefined,
+    urgencyFilter: listFilter.urgencyFilter as LeadUrgencyFilter | undefined,
+    page: listFilter.page,
+    pageSize: listFilter.pageSize,
+  });
 
   return {
-    leads: enriched.map((lead) => {
-      const timeline = activitySummaries.get(lead.id);
-      return {
-        ...lead,
-        lastActivity: timeline?.lastActivity ?? null,
-        nextAction: timeline?.nextAction ?? null,
-      };
-    }),
-    total,
+    leads: page.leads,
+    total: page.total,
   };
 }
 
@@ -1052,7 +1120,9 @@ function buildBulkDeleteLeadFilter(
   return {
     includeArchived: filters.includeArchived,
     search: filters.search,
+    phone: filters.phone,
     projectId: filters.projectId,
+    companyId: filters.companyId,
     includeAssociated: filters.includeAssociated,
     statusId: filters.statusId,
     sourceId: filters.sourceId,
@@ -1062,13 +1132,41 @@ function buildBulkDeleteLeadFilter(
     propertyTypeInterest: filters.propertyTypeInterest,
     transactionIntent: filters.transactionIntent,
     usagePurpose: filters.usagePurpose,
+    industry: filters.industry,
+    jobTitle: filters.jobTitle,
+    stateRegion: filters.stateRegion,
     integrationId: filters.integrationId,
     utmCampaign: filters.utmCampaign,
     createdFrom: filters.createdFrom,
     createdTo: filters.createdTo,
     acquisition: filters.acquisition,
+    nextFilter: filters.nextFilter,
+    urgencyFilter: filters.urgencyFilter,
     excludeIds: input.excludeLeadIds,
   };
+}
+
+async function resolveBulkDeleteLeadIds(
+  workspaceId: string,
+  filter: LeadListFilter,
+): Promise<string[]> {
+  const listFilter = await resolveListFilter(workspaceId, filter);
+  if (!listFilter.nextFilter && !listFilter.urgencyFilter) {
+    return findLeadIds(workspaceId, listFilter);
+  }
+
+  const { leads } = await findLeads(workspaceId, {
+    ...listFilter,
+    unpaginated: true,
+  });
+  const enriched = await enrichLeadPage(workspaceId, leads);
+  const page = paginateLeadBrowser(enriched, {
+    nextFilter: listFilter.nextFilter as LeadNextFilter | undefined,
+    urgencyFilter: listFilter.urgencyFilter as LeadUrgencyFilter | undefined,
+    page: 1,
+    pageSize: Math.max(enriched.length, 1),
+  });
+  return page.leads.map((lead) => lead.id);
 }
 
 export async function purgeLeadsForWorkspace(
@@ -1077,10 +1175,7 @@ export async function purgeLeadsForWorkspace(
   input: BulkDeleteLeadsInput,
 ): Promise<{ deletedCount: number; requestedCount: number }> {
   const leadIds = input.selectAll
-    ? await findLeadIds(
-        workspaceId,
-        await resolveListFilter(workspaceId, buildBulkDeleteLeadFilter(input)),
-      )
+    ? await resolveBulkDeleteLeadIds(workspaceId, buildBulkDeleteLeadFilter(input))
     : await findLeadIds(workspaceId, {
         leadIds: input.leadIds ?? [],
         includeArchived: true,

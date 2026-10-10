@@ -45,6 +45,7 @@ export async function GET(request: Request, context: RouteContext) {
         pageSize: query.pageSize,
         includeArchived: query.includeArchived,
         search: query.search,
+        phone: query.phone,
         projectId: query.projectId,
         companyId: query.companyId,
         includeAssociated: query.includeAssociated,
@@ -64,6 +65,10 @@ export async function GET(request: Request, context: RouteContext) {
         createdFrom: query.createdFrom,
         createdTo: query.createdTo,
         acquisition: query.acquisition,
+        sort: query.sort,
+        sortDir: query.sortDir,
+        nextFilter: query.nextFilter,
+        urgencyFilter: query.urgencyFilter,
       },
       userId,
     );

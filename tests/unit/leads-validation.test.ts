@@ -75,6 +75,27 @@ describe("lead validation", () => {
     }
   });
 
+  it("accepts column sort and derived filters on the list query", () => {
+    const result = leadListQuerySchema.safeParse({
+      sort: "urgency",
+      sortDir: "asc",
+      phone: "079",
+      assignedTo: "unassigned",
+      nextFilter: "overdue",
+      urgencyFilter: "stale",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sort).toBe("urgency");
+      expect(result.data.sortDir).toBe("asc");
+      expect(result.data.phone).toBe("079");
+      expect(result.data.assignedTo).toBe("unassigned");
+      expect(result.data.nextFilter).toBe("overdue");
+      expect(result.data.urgencyFilter).toBe("stale");
+    }
+  });
+
   it("requires at least one field on update", () => {
     const result = updateLeadInputSchema.safeParse({});
     expect(result.success).toBe(false);

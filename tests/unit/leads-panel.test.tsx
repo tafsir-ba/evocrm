@@ -146,6 +146,12 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
     if (url.includes("/companies")) {
       return jsonResponse({ data: { companies: [] } });
     }
+    if (url.includes("/projects")) {
+      return jsonResponse({
+        data: [{ id: sampleLead.project.id, name: sampleLead.project.name }],
+        pagination: { total: 1 },
+      });
+    }
     if (url.includes("/leads/") && init?.method === "PATCH") {
       return jsonResponse({ data: { lead: sampleLead } });
     }
@@ -179,16 +185,21 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.getByRole("columnheader", { name: "Lead" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Phone" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Company" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Project" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Owner" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Age" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Next" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Urgency" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Lead" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter Lead" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Phone" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Company" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter Company" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Project" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Source" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Owner" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Age" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Next" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Urgency" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by Tags" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter Tags" })).toBeInTheDocument();
 
     expect(screen.getAllByText("EvoHome SA").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Les Terrasses").length).toBeGreaterThan(0);
@@ -230,6 +241,36 @@ describe("LeadsPanel table", () => {
     expect(scroller).toHaveClass("min-h-0");
     expect(scroller).toHaveClass("flex-1");
     expect(scroller.contains(nextPage)).toBe(false);
+  });
+
+  it("sorts and filters from column headers", async () => {
+    const user = userEvent.setup();
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
+
+    expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Sort by Company" }));
+    await waitFor(() => {
+      const calls = vi.mocked(global.fetch).mock.calls.map(([input]) => String(input));
+      expect(calls.some((url) => url.includes("sort=company") && url.includes("sortDir=asc"))).toBe(
+        true,
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "Filter Urgency" }));
+    await user.selectOptions(screen.getByLabelText("Urgency"), "stale");
+    await waitFor(() => {
+      const calls = vi.mocked(global.fetch).mock.calls.map(([input]) => String(input));
+      expect(calls.some((url) => url.includes("urgencyFilter=stale"))).toBe(true);
+    });
   });
 
   it("reveals contact channels from the compact icon popover", async () => {
