@@ -1292,10 +1292,19 @@ export function LeadsPanel({
         <ErrorState title="Could not load leads" description={error} primaryAction={{ label: "Retry", onClick: () => void loadLeads() }} />
       ) : leads.length === 0 ? (
         <EmptyState
-          title="No leads yet"
-          description="Create your first lead to start capturing demand in this workspace."
+          title={
+            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+              ? "No matching leads"
+              : "No leads yet"
+          }
+          description={
+            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+              ? "Try clearing filters or broadening your search."
+              : "Create your first lead to start capturing demand in this workspace."
+          }
           primaryAction={
-            canCreate
+            canCreate &&
+            !(activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId))
               ? {
                   label: "New lead",
                   onClick: () => router.push(workspacePath(workspaceSlug, "leads", "new")),
