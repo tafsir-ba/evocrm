@@ -289,7 +289,7 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
       trigger={
         <button
           type="button"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
           aria-label={`Contact ${lead.fullName}`}
         >
           {lead.email ? <IconMail size={13} /> : <IconPhone size={13} />}
@@ -528,7 +528,7 @@ function RowActions({
       ) : null}
       <button
         type="button"
-        className="inline-flex h-9 w-9 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
+        className="inline-flex h-11 w-11 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
         aria-expanded={expanded}
         aria-label={
           expanded
@@ -1417,7 +1417,7 @@ export function LeadsTable({
                         rel="noopener noreferrer"
                         title="Opens a WhatsApp draft. Nothing is sent until you press send."
                         aria-label={`WhatsApp ${lead.fullName}`}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
                       >
                         <IconChat size={15} />
                       </a>
@@ -1426,7 +1426,7 @@ export function LeadsTable({
                     {enrich ? (
                       <button
                         type="button"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
                         aria-label={`Enrich ${lead.fullName}`}
                         title="Enrich from public professional sources"
                         onClick={(event) => {
@@ -1439,7 +1439,7 @@ export function LeadsTable({
                     ) : null}
                     <button
                       type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
                       aria-expanded={expanded}
                       aria-label={
                         expanded
@@ -1457,7 +1457,7 @@ export function LeadsTable({
                     <Link
                       href={hrefFor(lead.id)}
                       onClick={() => onOpenLead?.(lead.id)}
-                      className="inline-flex h-9 items-center rounded-md px-2 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                      className="inline-flex h-11 items-center rounded-md px-2.5 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
                       aria-label={`Open ${lead.fullName}`}
                     >
                       Open

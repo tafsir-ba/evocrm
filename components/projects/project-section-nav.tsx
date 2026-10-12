@@ -170,7 +170,8 @@ export function ProjectSectionNav({
           <button
             type="button"
             className="absolute inset-0 bg-[#0f172a]/40"
-            aria-label="Close project sections"
+            aria-hidden="true"
+            tabIndex={-1}
             onClick={() => setSectionsOpen(false)}
           />
           <div

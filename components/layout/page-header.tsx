@@ -40,7 +40,7 @@ export function PageHeader({
           mode={back.mode}
           className={cn(
             "focus-ring inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink-soft)]",
-            compact ? "mb-1" : "mb-3",
+            bar ? "mb-1" : compact ? "mb-1.5" : "mb-3",
             hideBackOnMobile && "max-md:hidden",
           )}
         >
@@ -56,7 +56,12 @@ export function PageHeader({
         )}
       >
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2.5">
+          <div
+            className={cn(
+              "flex min-w-0 flex-wrap items-center",
+              bar ? "gap-1.5 md:gap-2.5" : "gap-2.5",
+            )}
+          >
             <h1
               className={cn(
                 "min-w-0 leading-tight font-bold tracking-tight text-[var(--color-ink)]",
@@ -83,7 +88,12 @@ export function PageHeader({
           )}
         </div>
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5 md:gap-2">
+          <div
+            className={cn(
+              "flex flex-wrap items-center",
+              bar ? "shrink-0 gap-1.5 md:gap-2" : "gap-2",
+            )}
+          >
             {actions}
           </div>
         )}

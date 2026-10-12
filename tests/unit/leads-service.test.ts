@@ -124,6 +124,7 @@ import {
 import {
   archiveLeadForWorkspace,
   createLeadForWorkspace,
+  getLeadForWorkspace,
   listLeadsForWorkspace,
   normalizeLeadEmail,
   normalizeLeadPhone,
@@ -229,6 +230,23 @@ describe("lead service", () => {
     expect(result.leads[0]?.project).toBeNull();
     expect(result.leads[0]?.lastActivity).toBeNull();
     expect(result.leads[0]?.nextAction).toBeNull();
+    expect(findLeadActivitySummaries).toHaveBeenCalledWith("ws-1", ["lead-1"]);
+  });
+
+  it("includes the next action on lead detail", async () => {
+    const nextAction = {
+      id: "act-1",
+      title: "Call back",
+      at: new Date("2026-09-01T09:00:00.000Z"),
+    };
+    vi.mocked(findLeadById).mockResolvedValue(baseLead);
+    vi.mocked(findLeadActivitySummaries).mockResolvedValue(
+      new Map([["lead-1", { lastActivity: null, nextAction }]]),
+    );
+
+    const lead = await getLeadForWorkspace("ws-1", "lead-1");
+
+    expect(lead.nextAction).toEqual(nextAction);
     expect(findLeadActivitySummaries).toHaveBeenCalledWith("ws-1", ["lead-1"]);
   });
 

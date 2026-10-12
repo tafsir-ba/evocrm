@@ -92,6 +92,17 @@ export function defaultSortDirForLeadColumn(sort: LeadBrowserSort): LeadBrowserS
   return "desc";
 }
 
+export function leadBrowserSortDirLabel(
+  sort: LeadBrowserSort,
+  sortDir: LeadBrowserSortDir,
+): string {
+  const asc = sortDir === "asc";
+  if (sort === "age") return asc ? "Oldest first" : "Newest first";
+  if (sort === "next") return asc ? "Soonest first" : "Latest first";
+  if (sort === "urgency") return asc ? "Most urgent first" : "Least urgent first";
+  return asc ? "A–Z" : "Z–A";
+}
+
 export function nextLeadBrowserSort(
   currentSort: LeadBrowserSort,
   currentDir: LeadBrowserSortDir,

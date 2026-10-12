@@ -429,10 +429,9 @@ async function enrichLeadListItem(
 
 async function enrichLeadRecord(lead: LeadRecord): Promise<LeadDetail> {
   const membershipsByLead = await loadMembershipsByLeadIds(lead.workspaceId, [lead.id]);
-  const listItem = await enrichLeadListItem(
-    lead,
-    membershipsByLead.get(lead.id) ?? [],
-  );
+  const [listItem] = await attachLeadActivitySummaries(lead.workspaceId, [
+    await enrichLeadListItem(lead, membershipsByLead.get(lead.id) ?? []),
+  ]);
   const ownerUser = await resolveUserSummary(lead.ownerId);
   return { ...listItem, ownerUser };
 }

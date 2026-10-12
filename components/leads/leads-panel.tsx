@@ -28,6 +28,7 @@ import {
   isLeadUrgencyFilter,
   LEAD_BROWSER_SORT_LABELS,
   LEAD_BROWSER_SORTS,
+  leadBrowserSortDirLabel,
   nextLeadBrowserSort,
   type LeadAgePreset,
   type LeadBrowserSort,
@@ -248,7 +249,7 @@ function LeadMobileActions({
               }}
             >
               {LEAD_BROWSER_SORT_LABELS[column]}
-              {active ? (sortDir === "asc" ? " · A–Z" : " · Z–A") : ""}
+              {active ? ` · ${leadBrowserSortDirLabel(column, sortDir)}` : ""}
             </button>
           );
         })}
@@ -287,7 +288,7 @@ function LeadListPagination({
       <div className="inline-flex shrink-0 items-center gap-1">
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
           disabled={page <= 1}
           aria-label="Previous page"
           onClick={() => onPage(Math.max(1, page - 1))}
@@ -302,7 +303,7 @@ function LeadListPagination({
         </span>
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
           disabled={page >= totalPages}
           aria-label="Next page"
           onClick={() => onPage(Math.min(totalPages, page + 1))}

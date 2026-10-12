@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   agePresetToCreatedRange,
   compareLeadsForBrowser,
+  leadBrowserSortDirLabel,
   matchesLeadNextFilter,
   matchesLeadUrgencyFilter,
   nextLeadBrowserSort,
@@ -84,6 +85,15 @@ describe("lead browser", () => {
     expect(needsLeadBrowserMemoryPath({ sort: "age" })).toBe(false);
     expect(needsLeadBrowserMemoryPath({ sort: "company" })).toBe(true);
     expect(needsLeadBrowserMemoryPath({ sort: "age", urgencyFilter: "stale" })).toBe(true);
+  });
+
+  it("labels sort direction in terms of the column", () => {
+    expect(leadBrowserSortDirLabel("age", "desc")).toBe("Newest first");
+    expect(leadBrowserSortDirLabel("age", "asc")).toBe("Oldest first");
+    expect(leadBrowserSortDirLabel("next", "asc")).toBe("Soonest first");
+    expect(leadBrowserSortDirLabel("urgency", "asc")).toBe("Most urgent first");
+    expect(leadBrowserSortDirLabel("fullName", "asc")).toBe("A–Z");
+    expect(leadBrowserSortDirLabel("owner", "desc")).toBe("Z–A");
   });
 
   it("maps age presets to created ranges", () => {

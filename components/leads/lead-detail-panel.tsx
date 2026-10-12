@@ -47,7 +47,12 @@ import {
   loadLeadWhatsAppDraft,
   type LeadWhatsAppDraft,
 } from "@/lib/lead-whatsapp-welcome";
-import { telHref, whatsappHref } from "@/lib/leads-table";
+import { cn } from "@/lib/utils";
+import {
+  formatNextStepCell,
+  telHref,
+  whatsappHref,
+} from "@/lib/leads-table";
 import {
   appendReturnTo,
   clearRememberedFocusedLead,
@@ -136,6 +141,8 @@ type LeadDetail = {
   >;
   attributes?: Record<string, unknown> | null;
   emailConsentStatus?: "unknown" | "subscribed" | "unsubscribed" | null;
+  lastActivity?: { id: string; title: string; at: string } | null;
+  nextAction?: { id: string; title: string; at: string } | null;
 };
 
 type LeadDetailPanelProps = {
@@ -831,6 +838,10 @@ export function LeadDetailPanel({
     );
   }
 
+  const nextStep = formatNextStepCell(lead);
+  const nextStepOverdue =
+    nextStep.kind === "next" && nextStep.text.startsWith("Overdue");
+
   const initials = lead.fullName
     .split(" ")
     .map((part) => part[0])
@@ -1084,6 +1095,23 @@ export function LeadDetailPanel({
             handoffNote={handoffNote}
             handoffNoteClassName="max-md:hidden"
           />
+          {nextStep.kind !== "empty" ? (
+            <p
+              data-testid="lead-next-step"
+              className={cn(
+                "mt-2 truncate text-[13px] md:mt-3",
+                nextStepOverdue
+                  ? "font-medium text-[var(--color-danger-fg)]"
+                  : "text-[var(--color-ink)]",
+              )}
+              title={nextStep.text}
+            >
+              {nextStep.kind === "next" ? (
+                <span className="text-[var(--color-ink-muted)]">Next </span>
+              ) : null}
+              {nextStep.text}
+            </p>
+          ) : null}
           <p className="mt-2 text-[13px] text-[var(--color-ink)] md:hidden">
             <span className="text-[var(--color-ink-muted)]">Owner </span>
             {lead.assignedUser?.name ??
