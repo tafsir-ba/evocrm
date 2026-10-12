@@ -3,9 +3,10 @@ import { workspacePath } from "@/lib/workspace-paths";
 /**
  * One-step memory for the CRM funnel.
  *
- * Each forward move stores only its immediate parent. In-app Back uses
- * history when that parent is still the top of the stack, so it matches
- * browser Back. A refresh or a pasted link falls back to the parent URL.
+ * Each forward move stores only its immediate parent and arms that parent as
+ * the only history.back() target. In-app Back uses history only while that
+ * armed parent is still the top of the stack. A later screen, a pasted link,
+ * or a stack entry left from another project falls back to the labeled URL.
  * The parent URL can itself carry a returnTo, so Project → Leads → Lead →
  * Edit unwinds one screen at a time.
  */
@@ -13,6 +14,9 @@ import { workspacePath } from "@/lib/workspace-paths";
 export const WORKFLOW_STACK_KEY = "evocrm:workflow-stack";
 export const LEAD_FOCUS_PARAM = "focus";
 const FOCUS_STORAGE_PREFIX = "evocrm:lead-list-focus:";
+const PENDING_KEY = "evocrm:workflow-pending";
+const PENDING_OWNER_KEY = "evocrm:workflow-pending-owner";
+const PENDING_ARMED_KEY = "evocrm:workflow-pending-armed";
 const STACK_LIMIT = 30;
 
 const BASE = "http://workflow.invalid";
@@ -260,6 +264,63 @@ function writeStack(storage: WorkflowStorage, stack: string[]): void {
   );
 }
 
+function sameWorkflowPath(left: string, right: string): boolean {
+  const a = parseWorkflowUrl(left)?.pathname;
+  const b = parseWorkflowUrl(right)?.pathname;
+  return Boolean(a && b && a === b);
+}
+
+function armForward(storage: WorkflowStorage, parentHref: string): void {
+  storage.setItem(PENDING_KEY, parentHref);
+  storage.removeItem(PENDING_OWNER_KEY);
+  storage.setItem(PENDING_ARMED_KEY, "1");
+}
+
+function retainPending(
+  storage: WorkflowStorage,
+  parentHref: string,
+  ownerHref: string,
+): void {
+  storage.setItem(PENDING_KEY, parentHref);
+  storage.setItem(PENDING_OWNER_KEY, ownerHref);
+  storage.removeItem(PENDING_ARMED_KEY);
+}
+
+function clearPending(storage: WorkflowStorage): void {
+  storage.removeItem(PENDING_KEY);
+  storage.removeItem(PENDING_OWNER_KEY);
+  storage.removeItem(PENDING_ARMED_KEY);
+}
+
+/**
+ * history.back() is valid only when the stored parent is still the stack top
+ * and it is the parent this forward move armed. Otherwise the caller must
+ * open the labeled href.
+ */
+function takeHistoryBack(
+  expectedParent: string,
+  storage: WorkflowStorage,
+): boolean {
+  const pending = storage.getItem(PENDING_KEY);
+  if (!pending || !sameWorkflowPlace(pending, expectedParent)) {
+    return false;
+  }
+  const stack = readStack(storage);
+  const top = stack[stack.length - 1];
+  if (!top || !sameWorkflowPlace(top, expectedParent)) {
+    return false;
+  }
+  stack.pop();
+  writeStack(storage, stack);
+  const nextParent = stack[stack.length - 1];
+  if (nextParent) {
+    retainPending(storage, nextParent, expectedParent);
+  } else {
+    clearPending(storage);
+  }
+  return true;
+}
+
 export function rememberWorkflowStep(
   parentHref: string,
   storage: WorkflowStorage | null = browserStorage(),
@@ -278,10 +339,12 @@ export function rememberWorkflowStep(
       stack[stack.length - 1] = normalized;
       writeStack(storage, stack);
     }
+    armForward(storage, normalized);
     return;
   }
   stack.push(normalized);
   writeStack(storage, stack);
+  armForward(storage, normalized);
 }
 
 export function noteWorkflowArrival(
@@ -300,7 +363,24 @@ export function noteWorkflowArrival(
   if (top && sameWorkflowPlace(top, current)) {
     stack.pop();
     writeStack(storage, stack);
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      retainPending(storage, parent, current);
+    } else {
+      clearPending(storage);
+    }
+    return;
   }
+  if (storage.getItem(PENDING_ARMED_KEY) === "1") {
+    storage.removeItem(PENDING_ARMED_KEY);
+    storage.setItem(PENDING_OWNER_KEY, current);
+    return;
+  }
+  const owner = storage.getItem(PENDING_OWNER_KEY);
+  if (owner && sameWorkflowPath(owner, current)) {
+    return;
+  }
+  clearPending(storage);
 }
 
 export function peekWorkflowStep(
@@ -322,33 +402,22 @@ export function planWorkflowParentBack(
       expectedParent,
       expectedParentWorkspace(expectedParent),
     ) ?? expectedParent;
-  if (!storage) {
-    return { action: "push", href: fallback };
-  }
-  const stack = readStack(storage);
-  const top = stack[stack.length - 1];
-  if (top && sameWorkflowPlace(top, expectedParent)) {
-    stack.pop();
-    writeStack(storage, stack);
+  if (storage && takeHistoryBack(fallback, storage)) {
     return { action: "history", href: fallback };
   }
   return { action: "push", href: fallback };
 }
 
-/** Project-section Back: history when a previous section was stored, otherwise the given fallback. */
+/**
+ * Section Back. History only when the labeled fallback is the armed parent.
+ * Any other stored screen is left in place and the fallback URL is opened.
+ */
 export function planWorkflowStackBack(
   fallbackHref: string,
   storage: WorkflowStorage | null = browserStorage(),
 ): WorkflowStepPlan {
-  if (!storage) {
-    return { action: "push", href: fallbackHref };
-  }
-  const stack = readStack(storage);
-  const top = stack[stack.length - 1];
-  if (top) {
-    stack.pop();
-    writeStack(storage, stack);
-    return { action: "history", href: top };
+  if (storage && takeHistoryBack(fallbackHref, storage)) {
+    return { action: "history", href: fallbackHref };
   }
   return { action: "push", href: fallbackHref };
 }

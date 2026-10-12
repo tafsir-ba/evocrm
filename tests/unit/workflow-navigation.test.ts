@@ -131,6 +131,58 @@ describe("workflow navigation", () => {
     ]);
   });
 
+  it("does not history-back to a project when another screen is the armed parent", () => {
+    const storage = memoryStorage();
+    const project = projectOverviewHref("demo", "vista");
+    const properties = `${project}/properties`;
+    const leads = projectLeadsHref("demo", "vista");
+
+    rememberWorkflowStep(project, storage);
+    rememberWorkflowStep(properties, storage);
+    noteWorkflowArrival(leads, storage);
+
+    expect(planWorkflowStackBack(project, storage)).toEqual({
+      action: "push",
+      href: project,
+    });
+    expect(JSON.parse(storage.getItem(WORKFLOW_STACK_KEY) ?? "[]")).toEqual([
+      project,
+      properties,
+    ]);
+  });
+
+  it("drops history back after the user leaves the funnel screen", () => {
+    const storage = memoryStorage();
+    const list = "/w/demo/projects/vista/leads?page=4";
+    const lead = leadDetailHref("demo", "lead-9", list);
+
+    rememberWorkflowStep(list, storage);
+    noteWorkflowArrival(lead, storage);
+    noteWorkflowArrival("/w/demo/settings", storage);
+
+    expect(planWorkflowParentBack(list, storage)).toEqual({
+      action: "push",
+      href: list,
+    });
+  });
+
+  it("re-arms the project after browser Back returns to its lead list", () => {
+    const storage = memoryStorage();
+    const project = projectOverviewHref("demo", "vista");
+    const list = `${projectLeadsHref("demo", "vista")}?page=4`;
+    const lead = leadDetailHref("demo", "lead-9", list);
+
+    rememberWorkflowStep(project, storage);
+    rememberWorkflowStep(list, storage);
+    noteWorkflowArrival(lead, storage);
+    noteWorkflowArrival(list, storage);
+
+    expect(planWorkflowStackBack(project, storage)).toEqual({
+      action: "history",
+      href: project,
+    });
+  });
+
   it("rejects external and cross-workspace return targets", () => {
     expect(
       readSafeWorkflowHref("https://evil.example/w/demo/leads", "demo"),
