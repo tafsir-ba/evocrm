@@ -297,6 +297,11 @@ describe("LeadsPanel table", () => {
       name: "+41 79 123 45 67",
     });
     expect(phoneLinks.length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("link", {
+        name: "Call François Côté at +41 79 123 45 67",
+      }),
+    ).toHaveAttribute("href", "tel:+41791234567");
     expect(phoneLinks[0]).toHaveAttribute("href", "tel:+41791234567");
     expect(screen.queryByText(/Genève-Printemps/)).not.toBeInTheDocument();
     expect(

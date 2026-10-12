@@ -1346,7 +1346,7 @@ export function LeadsTable({
                         <a
                           href={telHref(lead.phone)}
                           title={`Call ${lead.phone}`}
-                          aria-label={`Call ${lead.fullName}`}
+                          aria-label={`Call ${lead.fullName} at ${lead.phone}`}
                           className="tabular shrink-0 text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
                         >
                           {lead.phone}

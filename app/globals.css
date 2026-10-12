@@ -252,6 +252,14 @@ body {
     display: none;
   }
 
+  /* Chrome hides closed <details> via ::details-content { content-visibility: hidden }.
+     display on the children does not paint them, and the summary is hidden here,
+     so desktop must force the content box itself visible. */
+  .mobile-disclosure::details-content {
+    content-visibility: visible !important;
+    display: block !important;
+  }
+
   .mobile-disclosure:not([open]) > :not(summary) {
     display: block !important;
   }

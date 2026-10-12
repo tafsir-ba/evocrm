@@ -74,7 +74,7 @@ export function PageHeader({
           {description && (
             <p
               className={cn(
-                "max-w-2xl text-[var(--color-ink-muted)] max-md:truncate",
+                "max-w-2xl text-[var(--color-ink-muted)]",
                 compact ? "mt-0.5 text-[12.5px]" : "mt-1 text-[13.5px]",
               )}
             >
