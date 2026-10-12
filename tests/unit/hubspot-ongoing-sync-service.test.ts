@@ -108,6 +108,10 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/services/integration-logs", () => ({
+  writeIntegrationLog: vi.fn(),
+}));
+
 import { findIntegrations } from "@/server/repositories/integrations";
 import { listActiveLeadsByNormalizedEmail, findLeadByHubSpotContactId } from "@/server/repositories/leads";
 import {

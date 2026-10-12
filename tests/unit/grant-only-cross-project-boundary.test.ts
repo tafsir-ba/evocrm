@@ -9,6 +9,12 @@ vi.mock("@/server/permissions/require-project-access", () => ({
   requireProjectAccess: vi.fn(),
 }));
 
+vi.mock("@/server/db/mongoose", () => ({
+  connectDb: vi.fn(async () => {
+    throw new Error("Database unavailable in unit tests.");
+  }),
+}));
+
 vi.mock("@/server/repositories/documents", () => ({
   findDocuments: vi.fn(),
   findDocumentById: vi.fn(),

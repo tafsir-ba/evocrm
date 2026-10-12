@@ -59,6 +59,14 @@ vi.mock("@/server/audit/create-audit-log", () => ({
   createAuditLog: vi.fn(),
 }));
 
+vi.mock("@/server/repositories/growth-campaigns", () => ({
+  findGrowthCampaigns: vi.fn(async () => []),
+}));
+
+vi.mock("@/server/services/advertising-attribution", () => ({
+  recordPaidLeadTouchpointAndFormLead: vi.fn(async () => null),
+}));
+
 import { findDictionaryItemByTypeAndKey } from "@/server/repositories/dictionary-items";
 import {
   findProjectById,
