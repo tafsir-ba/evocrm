@@ -51,20 +51,24 @@ describe("default dictionaries", () => {
     const result = await ensureDefaultDictionaries("ws-1", "user-1");
 
     expect(result.dictionariesCreated).toBe(DEFAULT_DICTIONARY_SEEDS.length);
-    expect(createDictionary).toHaveBeenCalledTimes(DEFAULT_DICTIONARY_SEEDS.length);
+    expect(createDictionary).toHaveBeenCalledTimes(
+      DEFAULT_DICTIONARY_SEEDS.length,
+    );
     expect(createDictionaryItem).toHaveBeenCalled();
   });
 
   it("does not duplicate existing items", async () => {
-    vi.mocked(findDictionaryByType).mockImplementation(async (_workspaceId, type) => ({
-      id: `dict-${type}`,
-      workspaceId: "ws-1",
-      type,
-      name: type,
-      isSystem: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
+    vi.mocked(findDictionaryByType).mockImplementation(
+      async (_workspaceId, type) => ({
+        id: `dict-${type}`,
+        workspaceId: "ws-1",
+        type,
+        name: type,
+        isSystem: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
     vi.mocked(findDictionaryItemByTypeAndKey).mockResolvedValue({
       id: "existing",
       workspaceId: "ws-1",
@@ -109,14 +113,86 @@ describe("default dictionaries", () => {
       (seed) => seed.type === "activity_status",
     );
 
-    expect(activity?.items.find((item) => item.key === "pending")?.behavior).toBe(
-      "pending",
+    expect(
+      activity?.items.find((item) => item.key === "pending")?.behavior,
+    ).toBe("pending");
+    expect(
+      activity?.items.find((item) => item.key === "completed")?.behavior,
+    ).toBe("completed");
+    expect(
+      activity?.items.find((item) => item.key === "cancelled")?.behavior,
+    ).toBe("cancelled");
+  });
+
+  it("adds the callback status and leaves existing lead statuses unchanged", async () => {
+    const lead = DEFAULT_DICTIONARY_SEEDS.find(
+      (seed) => seed.type === "lead_status",
     );
-    expect(activity?.items.find((item) => item.key === "completed")?.behavior).toBe(
-      "completed",
+    expect(lead?.items.map((item) => item.key)).toEqual([
+      "new",
+      "contacted",
+      "called_no_answer",
+      "qualified",
+      "lost",
+    ]);
+    expect(lead?.items.find((item) => item.key === "new")?.label).toBe("New");
+    expect(lead?.items.find((item) => item.key === "contacted")?.order).toBe(1);
+    expect(lead?.items.find((item) => item.key === "qualified")?.label).toBe(
+      "Qualified",
     );
-    expect(activity?.items.find((item) => item.key === "cancelled")?.behavior).toBe(
-      "cancelled",
+    expect(lead?.items.find((item) => item.key === "qualified")?.order).toBe(2);
+    expect(lead?.items.find((item) => item.key === "lost")?.order).toBe(3);
+    expect(
+      lead?.items.find((item) => item.key === "called_no_answer"),
+    ).toMatchObject({
+      label: "Called — no answer / Call back required",
+      color: "#EA580C",
+      order: 2,
+    });
+
+    vi.mocked(findDictionaryByType).mockResolvedValue({
+      id: "dict-lead_status",
+      workspaceId: "ws-1",
+      type: "lead_status",
+      name: "Lead status",
+      isSystem: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(findDictionaryItemByTypeAndKey).mockImplementation(
+      async (_workspaceId, _type, key) => {
+        if (key === "called_no_answer") {
+          return null;
+        }
+        return {
+          id: `existing-${key}`,
+          workspaceId: "ws-1",
+          dictionaryId: "dict-lead_status",
+          type: "lead_status",
+          label: key,
+          key,
+          color: "#000000",
+          order: 0,
+          isDefault: false,
+          isActive: true,
+          isSystem: true,
+          behavior: undefined,
+          defaultProbability: undefined,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      },
+    );
+
+    const result = await ensureDefaultDictionaries("ws-1", "user-1");
+
+    expect(result.itemsCreated).toBe(1);
+    expect(createDictionaryItem).toHaveBeenCalledTimes(1);
+    expect(createDictionaryItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "called_no_answer",
+        label: "Called — no answer / Call back required",
+      }),
     );
   });
 });

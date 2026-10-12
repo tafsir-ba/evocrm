@@ -8,12 +8,18 @@ import {
   type CompanySelectorCompany,
 } from "@/components/domain/company-selector";
 import { EnumChipSelector } from "@/components/domain/enum-chip-selector";
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import {
+  MemberSelector,
+  type MemberSelectorMember,
+} from "@/components/domain/member-selector";
 import {
   ProjectSelector,
   type ProjectSelectorProject,
 } from "@/components/domain/project-selector";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
+import {
+  TagSelector,
+  type TagSelectorTag,
+} from "@/components/domain/tag-selector";
 import {
   FocusedFormActions,
   FocusedFormLayout,
@@ -31,7 +37,13 @@ import {
   type UsagePurpose,
 } from "@/lib/lead-preferences";
 import { useWorkspaceProjectFilter } from "@/lib/use-workspace-project-filter";
+import { leadDetailHref } from "@/lib/lead-list-context";
 import { resolveOpportunityReturnTo } from "@/lib/opportunity-link-flow";
+import {
+  performWorkflowStepBack,
+  projectLeadsHref,
+  readSafeWorkflowHref,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -74,7 +86,7 @@ type LeadFormPageProps = {
   leadId?: string;
   initialValues?: Partial<LeadFormInitialValues>;
   /** When set (create mode), redirect back into the opportunity flow after save. */
-  returnTo?: string;
+  returnTo?: string | null;
   cancelHref: string;
   back?: { href: string; label?: string };
 };
@@ -148,7 +160,9 @@ export function LeadFormPage({
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     try {
-      const loadJson = async <T,>(url: string): Promise<{ ok: boolean; data: T | null }> => {
+      const loadJson = async <T,>(
+        url: string,
+      ): Promise<{ ok: boolean; data: T | null }> => {
         try {
           const response = await fetch(url);
           if (!response.ok) {
@@ -171,14 +185,25 @@ export function LeadFormPage({
         }
       });
 
-      const [statusResult, sourceResult, tagsResult, membersResult, companiesResult] =
-        await Promise.all([
-          loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_status`),
-          loadJson<{ items: DictionaryItem[] }>(`${apiBase}/dictionary-items?type=lead_source`),
-          loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
-          loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
-          loadJson<{ companies: CompanySelectorCompany[] }>(`${apiBase}/companies`),
-        ]);
+      const [
+        statusResult,
+        sourceResult,
+        tagsResult,
+        membersResult,
+        companiesResult,
+      ] = await Promise.all([
+        loadJson<{ items: DictionaryItem[] }>(
+          `${apiBase}/dictionary-items?type=lead_status`,
+        ),
+        loadJson<{ items: DictionaryItem[] }>(
+          `${apiBase}/dictionary-items?type=lead_source`,
+        ),
+        loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
+        loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
+        loadJson<{ companies: CompanySelectorCompany[] }>(
+          `${apiBase}/companies`,
+        ),
+      ]);
 
       await projectsPromise;
 
@@ -199,12 +224,16 @@ export function LeadFormPage({
         const selectedId = initialValues?.companyId;
         const selectedName = initialValues?.companyName;
         setCompanies(
-          selectedId && selectedName && !loaded.some((company) => company.id === selectedId)
+          selectedId &&
+            selectedName &&
+            !loaded.some((company) => company.id === selectedId)
             ? [...loaded, { id: selectedId, name: selectedName }]
             : loaded,
         );
       } else if (initialValues?.companyId && initialValues.companyName) {
-        setCompanies([{ id: initialValues.companyId, name: initialValues.companyName }]);
+        setCompanies([
+          { id: initialValues.companyId, name: initialValues.companyName },
+        ]);
       }
     } finally {
       setLoadingOptions(false);
@@ -233,7 +262,8 @@ export function LeadFormPage({
     }
 
     const preferredProjectId =
-      scopedProjectId && projects.some((project) => project.id === scopedProjectId)
+      scopedProjectId &&
+      projects.some((project) => project.id === scopedProjectId)
         ? scopedProjectId
         : projects.length === 1
           ? projects[0].id
@@ -244,7 +274,9 @@ export function LeadFormPage({
     }
   }, [form.projectId, isEdit, projects, scopedProjectId]);
 
-  async function createCompany(name: string): Promise<CompanySelectorCompany | null> {
+  async function createCompany(
+    name: string,
+  ): Promise<CompanySelectorCompany | null> {
     setCreatingCompany(true);
     setFormError(null);
     try {
@@ -262,11 +294,17 @@ export function LeadFormPage({
         if (current.some((item) => item.id === company.id)) {
           return current;
         }
-        return [...current, company].sort((left, right) => left.name.localeCompare(right.name));
+        return [...current, company].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        );
       });
       return company;
     } catch (createError) {
-      setFormError(createError instanceof Error ? createError.message : "Failed to create company.");
+      setFormError(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create company.",
+      );
       return null;
     } finally {
       setCreatingCompany(false);
@@ -298,7 +336,10 @@ export function LeadFormPage({
     setFormWarning(null);
 
     const preferredAreas = form.preferredAreas
-      ? form.preferredAreas.split(",").map((area) => area.trim()).filter(Boolean)
+      ? form.preferredAreas
+          .split(",")
+          .map((area) => area.trim())
+          .filter(Boolean)
       : isEdit
         ? []
         : undefined;
@@ -312,16 +353,31 @@ export function LeadFormPage({
       phone: form.phone.trim() || (isEdit ? null : undefined),
       sourceId: form.sourceId || (isEdit ? null : undefined),
       language: form.language.trim() || (isEdit ? null : undefined),
-      preferredContactMethod: form.preferredContactMethod || (isEdit ? null : undefined),
-      budgetMin: form.budgetMin ? Number(form.budgetMin) : isEdit ? null : undefined,
-      budgetMax: form.budgetMax ? Number(form.budgetMax) : isEdit ? null : undefined,
-      preferredAreas: isEdit ? preferredAreas : preferredAreas?.length ? preferredAreas : undefined,
+      preferredContactMethod:
+        form.preferredContactMethod || (isEdit ? null : undefined),
+      budgetMin: form.budgetMin
+        ? Number(form.budgetMin)
+        : isEdit
+          ? null
+          : undefined,
+      budgetMax: form.budgetMax
+        ? Number(form.budgetMax)
+        : isEdit
+          ? null
+          : undefined,
+      preferredAreas: isEdit
+        ? preferredAreas
+        : preferredAreas?.length
+          ? preferredAreas
+          : undefined,
       propertyTypeInterests:
-        form.propertyTypeInterests.length > 0 ? form.propertyTypeInterests : isEdit ? [] : undefined,
-      transactionIntent: (form.transactionIntent || (isEdit ? null : undefined)) as
-        | TransactionIntent
-        | null
-        | undefined,
+        form.propertyTypeInterests.length > 0
+          ? form.propertyTypeInterests
+          : isEdit
+            ? []
+            : undefined,
+      transactionIntent: (form.transactionIntent ||
+        (isEdit ? null : undefined)) as TransactionIntent | null | undefined,
       usagePurpose: (form.usagePurpose || (isEdit ? null : undefined)) as
         | UsagePurpose
         | null
@@ -347,11 +403,16 @@ export function LeadFormPage({
       const body = await response.json();
 
       if (!response.ok) {
-        throw new Error(body.error?.message ?? `Failed to ${isEdit ? "update" : "create"} lead.`);
+        throw new Error(
+          body.error?.message ??
+            `Failed to ${isEdit ? "update" : "create"} lead.`,
+        );
       }
 
       if (body.data.warnings?.includes("duplicate_phone")) {
-        setFormWarning("A lead with this phone number already exists in this workspace.");
+        setFormWarning(
+          "A lead with this phone number already exists in this workspace.",
+        );
         return;
       }
 
@@ -362,18 +423,42 @@ export function LeadFormPage({
               leadId: savedLeadId,
             })
           : null;
+      const workflowReturn = readSafeWorkflowHref(returnTo, workspaceSlug);
       if (opportunityReturnTo) {
         router.push(opportunityReturnTo);
         router.refresh();
+      } else if (isEdit && workflowReturn) {
+        performWorkflowStepBack(router, workflowReturn, {
+          fallback: "replace",
+        });
+        router.refresh();
+      } else if (savedLeadId && workflowReturn) {
+        router.replace(
+          leadDetailHref(workspaceSlug, savedLeadId, workflowReturn),
+        );
+        router.refresh();
       } else if (savedLeadId) {
-        router.push(workspacePath(workspaceSlug, "leads", savedLeadId));
+        const projectParent = form.projectId
+          ? projectLeadsHref(workspaceSlug, form.projectId)
+          : null;
+        router.push(
+          projectParent
+            ? leadDetailHref(workspaceSlug, savedLeadId, projectParent)
+            : workspacePath(workspaceSlug, "leads", savedLeadId),
+        );
         router.refresh();
       } else {
-        router.push(workspacePath(workspaceSlug, "leads"));
+        router.push(
+          form.projectId
+            ? projectLeadsHref(workspaceSlug, form.projectId)
+            : workspacePath(workspaceSlug, "leads"),
+        );
         router.refresh();
       }
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : "Failed to save.");
+      setFormError(
+        submitError instanceof Error ? submitError.message : "Failed to save.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -389,7 +474,11 @@ export function LeadFormPage({
       }
       back={back}
     >
-      <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        id={formId}
+        className="space-y-4"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         {!isEdit && projects.length === 0 ? (
           <p className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
             Create an active project before adding leads.
@@ -405,7 +494,10 @@ export function LeadFormPage({
               projects={projects}
               selectedProjectId={form.projectId || null}
               onChange={(projectId) =>
-                setForm((current) => ({ ...current, projectId: projectId ?? "" }))
+                setForm((current) => ({
+                  ...current,
+                  projectId: projectId ?? "",
+                }))
               }
               disabled={loadingOptions || projects.length === 0}
               loading={loadingOptions}
@@ -423,7 +515,10 @@ export function LeadFormPage({
               id="firstName"
               value={form.firstName}
               onChange={(event) =>
-                setForm((current) => ({ ...current, firstName: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  firstName: event.target.value,
+                }))
               }
               required
               disabled={loadingOptions}
@@ -437,7 +532,10 @@ export function LeadFormPage({
               id="lastName"
               value={form.lastName}
               onChange={(event) =>
-                setForm((current) => ({ ...current, lastName: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  lastName: event.target.value,
+                }))
               }
               required
               disabled={loadingOptions}
@@ -487,14 +585,17 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="jobTitle">Job title</Label>
             <Input
               id="jobTitle"
               value={form.jobTitle}
               onChange={(event) =>
-                setForm((current) => ({ ...current, jobTitle: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  jobTitle: event.target.value,
+                }))
               }
             />
           </div>
@@ -504,7 +605,10 @@ export function LeadFormPage({
               id="industry"
               value={form.industry}
               onChange={(event) =>
-                setForm((current) => ({ ...current, industry: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  industry: event.target.value,
+                }))
               }
             />
           </div>
@@ -516,12 +620,15 @@ export function LeadFormPage({
             id="stateRegion"
             value={form.stateRegion}
             onChange={(event) =>
-              setForm((current) => ({ ...current, stateRegion: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                stateRegion: event.target.value,
+              }))
             }
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="statusId" required>
               Status
@@ -530,7 +637,10 @@ export function LeadFormPage({
               id="statusId"
               value={form.statusId}
               onChange={(event) =>
-                setForm((current) => ({ ...current, statusId: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  statusId: event.target.value,
+                }))
               }
               required
               disabled={loadingOptions}
@@ -549,7 +659,10 @@ export function LeadFormPage({
               id="sourceId"
               value={form.sourceId}
               onChange={(event) =>
-                setForm((current) => ({ ...current, sourceId: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  sourceId: event.target.value,
+                }))
               }
               disabled={loadingOptions}
             >
@@ -578,14 +691,17 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="language">Language</Label>
             <Input
               id="language"
               value={form.language}
               onChange={(event) =>
-                setForm((current) => ({ ...current, language: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  language: event.target.value,
+                }))
               }
             />
           </div>
@@ -620,7 +736,10 @@ export function LeadFormPage({
               min={0}
               value={form.budgetMin}
               onChange={(event) =>
-                setForm((current) => ({ ...current, budgetMin: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  budgetMin: event.target.value,
+                }))
               }
             />
           </div>
@@ -633,7 +752,10 @@ export function LeadFormPage({
               min={0}
               value={form.budgetMax}
               onChange={(event) =>
-                setForm((current) => ({ ...current, budgetMax: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  budgetMax: event.target.value,
+                }))
               }
             />
           </div>
@@ -646,7 +768,10 @@ export function LeadFormPage({
             placeholder="Geneva, Nyon"
             value={form.preferredAreas}
             onChange={(event) =>
-              setForm((current) => ({ ...current, preferredAreas: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                preferredAreas: event.target.value,
+              }))
             }
           />
         </div>
@@ -660,7 +785,7 @@ export function LeadFormPage({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="transactionIntent">Transaction intent</Label>
             <Select
@@ -726,10 +851,14 @@ export function LeadFormPage({
         </div>
 
         {formError && (
-          <p className="text-[13px] text-[var(--color-danger-fg)]">{formError}</p>
+          <p className="text-[13px] text-[var(--color-danger-fg)]">
+            {formError}
+          </p>
         )}
         {formWarning && (
-          <p className="text-[13px] text-[var(--color-warning-fg,#b45309)]">{formWarning}</p>
+          <p className="text-[13px] text-[var(--color-warning-fg,#b45309)]">
+            {formWarning}
+          </p>
         )}
 
         <FocusedFormActions

@@ -1,23 +1,33 @@
 import { ActivityFormPage } from "@/components/activities/activity-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import {
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getActivityForWorkspace } from "@/server/services/activities";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
-import {
-  toDatetimeLocalInWorkspaceTimezone,
-} from "@/lib/workspace-datetime";
+import { toDatetimeLocalInWorkspaceTimezone } from "@/lib/workspace-datetime";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string; activityId: string }>;
+type SearchParams = Promise<{ returnTo?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
   return { title: `Edit activity — ${workspaceSlug}` };
 }
 
-export default async function EditActivityPage({ params }: { params: Params }) {
+export default async function EditActivityPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug, activityId } = await params;
+  const { returnTo: rawReturnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -45,15 +55,25 @@ export default async function EditActivityPage({ params }: { params: Params }) {
   }
 
   const timezone = access.context.workspace.timezone;
-  const activity = await getActivityForWorkspace(access.context.workspace.id, activityId);
+  const activity = await getActivityForWorkspace(
+    access.context.workspace.id,
+    activityId,
+  );
 
-  const cancelHref = activity.lead
-    ? workspacePath(workspaceSlug, "leads", activity.lead.id)
-    : activity.property
-      ? workspacePath(workspaceSlug, "properties", activity.property.id)
-      : activity.opportunity
-        ? workspacePath(workspaceSlug, "opportunities", activity.opportunity.id)
-        : workspacePath(workspaceSlug, "activities");
+  const workflowReturn = readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const cancelHref =
+    workflowReturn ??
+    (activity.lead
+      ? workspacePath(workspaceSlug, "leads", activity.lead.id)
+      : activity.property
+        ? workspacePath(workspaceSlug, "properties", activity.property.id)
+        : activity.opportunity
+          ? workspacePath(
+              workspaceSlug,
+              "opportunities",
+              activity.opportunity.id,
+            )
+          : workspacePath(workspaceSlug, "activities"));
 
   return (
     <PageContainer>
@@ -67,7 +87,10 @@ export default async function EditActivityPage({ params }: { params: Params }) {
           statusId: activity.statusId,
           title: activity.title,
           description: activity.description ?? "",
-          dueDate: toDatetimeLocalInWorkspaceTimezone(activity.dueDate, timezone),
+          dueDate: toDatetimeLocalInWorkspaceTimezone(
+            activity.dueDate,
+            timezone,
+          ),
           nextActionDate: toDatetimeLocalInWorkspaceTimezone(
             activity.nextActionDate,
             timezone,
@@ -75,8 +98,14 @@ export default async function EditActivityPage({ params }: { params: Params }) {
           assignedTo: activity.assignedTo ?? "",
           outcome: activity.outcome ?? "",
         }}
+        returnTo={workflowReturn}
         cancelHref={cancelHref}
-        back={{ href: cancelHref, label: "Back" }}
+        back={{
+          href: cancelHref,
+          label: workflowReturn
+            ? workflowBackLabel(cancelHref, workspaceSlug)
+            : "Back",
+        }}
       />
     </PageContainer>
   );

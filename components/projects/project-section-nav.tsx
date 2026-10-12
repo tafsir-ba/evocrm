@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { withProjectIdQuery } from "@/lib/project-scope";
 import { cn } from "@/lib/utils";
+import { rememberWorkflowStep } from "@/lib/workflow-navigation";
 import { workspaceNavPath, workspacePath } from "@/lib/workspace-paths";
 
 export const PROJECT_SECTION_TABS = [
@@ -19,7 +20,9 @@ export const PROJECT_SECTION_TABS = [
   { key: "share", label: "Share", href: "sharing" },
 ] as const;
 
-export type ProjectSectionTabKey = (typeof PROJECT_SECTION_TABS)[number]["key"] | "paid-ads";
+export type ProjectSectionTabKey =
+  | (typeof PROJECT_SECTION_TABS)[number]["key"]
+  | "paid-ads";
 
 type ProjectSectionNavProps = {
   workspaceSlug: string;
@@ -44,10 +47,17 @@ export function projectSectionTabHref(
   if (tab.key === "leads") {
     return workspacePath(workspaceSlug, "projects", projectId, "leads");
   }
-  if (tab.href === "edit" || tab.href === "sharing" || tab.href === "paid-ads") {
+  if (
+    tab.href === "edit" ||
+    tab.href === "sharing" ||
+    tab.href === "paid-ads"
+  ) {
     return workspacePath(workspaceSlug, "projects", projectId, tab.href);
   }
-  return withProjectIdQuery(workspaceNavPath(workspaceSlug, tab.href!), projectId);
+  return withProjectIdQuery(
+    workspaceNavPath(workspaceSlug, tab.href!),
+    projectId,
+  );
 }
 
 export function ProjectSectionNav({
@@ -73,14 +83,13 @@ export function ProjectSectionNav({
       {showHeader ? (
         <PageHeader
           title={projectName}
-          description={projectReference ? `Reference ${projectReference}` : undefined}
+          description={
+            projectReference ? `Reference ${projectReference}` : undefined
+          }
           actions={actions}
         />
       ) : null}
-      <nav
-        className="mb-5 flex flex-wrap gap-2"
-        aria-label="Project sections"
-      >
+      <nav className="mb-5 flex flex-wrap gap-2" aria-label="Project sections">
         {tabs.map((tab) => {
           const active = tab.key === activeTab;
           if (active) {
@@ -99,6 +108,11 @@ export function ProjectSectionNav({
             <Link
               key={tab.key}
               href={projectSectionTabHref(workspaceSlug, projectId, tab)}
+              onClick={() => {
+                rememberWorkflowStep(
+                  `${window.location.pathname}${window.location.search}`,
+                );
+              }}
               className={cn(
                 "rounded-md border border-[var(--color-line)] bg-white px-3 py-1.5 text-[13px] text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
               )}

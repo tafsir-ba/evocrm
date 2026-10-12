@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
@@ -27,8 +27,6 @@ import {
   isLeadNextFilter,
   isLeadUrgencyFilter,
   nextLeadBrowserSort,
-  readLeadBrowserSort,
-  readLeadBrowserSortDir,
   type LeadAgePreset,
   type LeadBrowserSort,
   type LeadBrowserSortDir,
@@ -44,6 +42,27 @@ import {
   USAGE_PURPOSE_LABELS,
 } from "@/lib/lead-preferences";
 import { slugifyDictionaryKey } from "@/lib/dictionary-form-helpers";
+import {
+  LEAD_LIST_PAGE_SIZE,
+  applyLeadListQueryState,
+  leadDetailHref,
+  leadListHref,
+  leadListQueryStatesEqual,
+  nearestLeadListPage,
+  readLeadListQueryState,
+  sameSearchParams,
+  type LeadListQueryState,
+} from "@/lib/lead-list-context";
+import {
+  clearRememberedFocusedLead,
+  noteWorkflowArrival,
+  projectOverviewHref,
+  readFocusedLead,
+  readRememberedFocusedLead,
+  rememberFocusedLead,
+  rememberWorkflowStep,
+  withFocusedLead,
+} from "@/lib/workflow-navigation";
 import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
 import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
 import { requestMarketEstimateAfterEnrichment } from "@/lib/lead-enrichment-followup-client";
@@ -99,7 +118,11 @@ type LeadListItem = {
   statusId?: string;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
-  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  secondaryProjects?: Array<{
+    id: string;
+    name: string;
+    reference: string | null;
+  }>;
   projectMemberships?: Array<{
     id: string;
     projectId: string;
@@ -152,70 +175,233 @@ export function LeadsPanel({
 }: LeadsPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = workspacePath(workspaceSlug, "leads");
-  const sourceIdParam = searchParams.get("sourceId") ?? "";
-  const assignedToParam = searchParams.get("assignedTo") ?? "";
+  const pathname = usePathname() || workspacePath(workspaceSlug, "leads");
+  const initialListState = readLeadListQueryState(searchParams);
   const createdFromParam = searchParams.get("createdFrom");
   const createdToParam = searchParams.get("createdTo");
   const acquisitionParam = searchParams.get("acquisition");
   const workspaceProjectId = useWorkspaceProjectFilter();
   const projectId = scopedProjectId ?? workspaceProjectId;
-  const [includeAssociated, setIncludeAssociated] = useState(false);
+  const [includeAssociated, setIncludeAssociated] = useState(
+    initialListState.includeAssociated,
+  );
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
+  const [page, setPage] = useState(initialListState.page);
+  const [pageSize] = useState(LEAD_LIST_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [search, setSearch] = useState("");
-  const [phoneFilter, setPhoneFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState(() => searchParams.get("sourceId") ?? "");
-  const [assignedFilter, setAssignedFilter] = useState(() => searchParams.get("assignedTo") ?? "");
+  const [search, setSearch] = useState(initialListState.search);
+  const [phoneFilter, setPhoneFilter] = useState(initialListState.phone);
+  const [statusFilter, setStatusFilter] = useState(initialListState.statusId);
+  const [sourceFilter, setSourceFilter] = useState(initialListState.sourceId);
+  const [assignedFilter, setAssignedFilter] = useState(
+    initialListState.assignedTo,
+  );
   const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const [tagFilter, setTagFilter] = useState("");
-  const [integrationFilter, setIntegrationFilter] = useState("");
-  const [utmCampaignFilter, setUtmCampaignFilter] = useState("");
-  const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState("");
-  const [transactionIntentFilter, setTransactionIntentFilter] = useState("");
-  const [usagePurposeFilter, setUsagePurposeFilter] = useState("");
-  const [industryFilter, setIndustryFilter] = useState("");
-  const [jobTitleFilter, setJobTitleFilter] = useState("");
-  const [stateRegionFilter, setStateRegionFilter] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState(initialListState.tagId);
+  const [integrationFilter, setIntegrationFilter] = useState(
+    initialListState.integrationId,
+  );
+  const [utmCampaignFilter, setUtmCampaignFilter] = useState(
+    initialListState.utmCampaign,
+  );
+  const [propertyTypeInterestFilter, setPropertyTypeInterestFilter] = useState(
+    initialListState.propertyTypeInterest,
+  );
+  const [transactionIntentFilter, setTransactionIntentFilter] = useState(
+    initialListState.transactionIntent,
+  );
+  const [usagePurposeFilter, setUsagePurposeFilter] = useState(
+    initialListState.usagePurpose,
+  );
+  const [industryFilter, setIndustryFilter] = useState(
+    initialListState.industry,
+  );
+  const [jobTitleFilter, setJobTitleFilter] = useState(
+    initialListState.jobTitle,
+  );
+  const [stateRegionFilter, setStateRegionFilter] = useState(
+    initialListState.stateRegion,
+  );
+  const [companyFilter, setCompanyFilter] = useState(
+    initialListState.companyId,
+  );
   const [tableProjectFilter, setTableProjectFilter] = useState("");
-  const [agePreset, setAgePreset] = useState<LeadAgePreset | "">("");
-  const [nextFilter, setNextFilter] = useState<LeadNextFilter | "">("");
-  const [urgencyFilter, setUrgencyFilter] = useState<LeadUrgencyFilter | "">("");
-  const [sort, setSort] = useState<LeadBrowserSort>(() =>
-    readLeadBrowserSort(searchParams.get("sort")),
+  const [agePreset, setAgePreset] = useState<LeadAgePreset | "">(
+    initialListState.agePreset,
   );
-  const [sortDir, setSortDir] = useState<LeadBrowserSortDir>(() =>
-    readLeadBrowserSortDir(searchParams.get("dir") ?? searchParams.get("sortDir")),
+  const [nextFilter, setNextFilter] = useState<LeadNextFilter | "">(
+    initialListState.nextFilter,
   );
-  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
-  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [urgencyFilter, setUrgencyFilter] = useState<LeadUrgencyFilter | "">(
+    initialListState.urgencyFilter,
+  );
+  const [sort, setSort] = useState<LeadBrowserSort>(initialListState.sort);
+  const [sortDir, setSortDir] = useState<LeadBrowserSortDir>(
+    initialListState.sortDir,
+  );
+  const [companies, setCompanies] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>(
+    [],
+  );
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
-  const [websiteIntegrations, setWebsiteIntegrations] = useState<WebsiteIntegrationOption[]>(
-    [],
+  const [websiteIntegrations, setWebsiteIntegrations] = useState<
+    WebsiteIntegrationOption[]
+  >([]);
+  const [websiteOptionsWarning, setWebsiteOptionsWarning] = useState<
+    string | null
+  >(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(
+    () => new Set(),
   );
-  const [websiteOptionsWarning, setWebsiteOptionsWarning] = useState<string | null>(null);
-  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(() => new Set());
   const [selectAllMatching, setSelectAllMatching] = useState(false);
-  const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(() => new Set());
+  const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const [showArchived, setShowArchived] = useState(
+    initialListState.includeArchived,
+  );
   const [members, setMembers] = useState<LeadTableMember[]>([]);
   const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
-  const [noteActivityIds, setNoteActivityIds] = useState<LeadNoteActivityIds>(NO_NOTE_ACTIVITY_IDS);
+  const [noteActivityIds, setNoteActivityIds] =
+    useState<LeadNoteActivityIds>(NO_NOTE_ACTIVITY_IDS);
   const [enrichLeadId, setEnrichLeadId] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [focusedLeadId, setFocusedLeadId] = useState<string | null>(() =>
+    searchParams.get("focus"),
+  );
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const listQuery = useMemo<LeadListQueryState>(
+    () => ({
+      page,
+      search,
+      phone: phoneFilter,
+      statusId: statusFilter,
+      sourceId: sourceFilter,
+      assignedTo: assignedFilter,
+      tagId: tagFilter,
+      integrationId: integrationFilter,
+      utmCampaign: utmCampaignFilter,
+      propertyTypeInterest: propertyTypeInterestFilter,
+      transactionIntent: transactionIntentFilter,
+      usagePurpose: usagePurposeFilter,
+      industry: industryFilter,
+      jobTitle: jobTitleFilter,
+      stateRegion: stateRegionFilter,
+      companyId: companyFilter,
+      agePreset,
+      nextFilter,
+      urgencyFilter,
+      sort,
+      sortDir,
+      includeAssociated,
+      includeArchived: showArchived,
+    }),
+    [
+      agePreset,
+      assignedFilter,
+      companyFilter,
+      includeAssociated,
+      industryFilter,
+      integrationFilter,
+      jobTitleFilter,
+      nextFilter,
+      page,
+      phoneFilter,
+      propertyTypeInterestFilter,
+      search,
+      showArchived,
+      sort,
+      sortDir,
+      sourceFilter,
+      stateRegionFilter,
+      statusFilter,
+      tagFilter,
+      transactionIntentFilter,
+      urgencyFilter,
+      usagePurposeFilter,
+      utmCampaignFilter,
+    ],
+  );
+  const listQueryRef = useRef(listQuery);
+  listQueryRef.current = listQuery;
+  const expectedSearch = useRef<string | null>(null);
+  const seenSearch = useRef(searchParams.toString());
+  const listHrefValue = useMemo(
+    () =>
+      leadListHref(
+        pathname,
+        applyLeadListQueryState(
+          new URLSearchParams(searchParams.toString()),
+          listQuery,
+        ),
+      ),
+    [listQuery, pathname, searchParams],
+  );
+
+  useEffect(() => {
+    noteWorkflowArrival(listHrefValue);
+    const fromUrl = readFocusedLead(listHrefValue) ?? searchParams.get("focus");
+    if (fromUrl) {
+      setFocusedLeadId(fromUrl);
+      rememberFocusedLead(listHrefValue, fromUrl);
+      return;
+    }
+    setFocusedLeadId(readRememberedFocusedLead(listHrefValue));
+  }, [listHrefValue, searchParams]);
+
+  const openLeadHref = useCallback(
+    (leadId: string) =>
+      leadDetailHref(
+        workspaceSlug,
+        leadId,
+        withFocusedLead(listHrefValue, leadId),
+      ),
+    [listHrefValue, workspaceSlug],
+  );
+
+  const rememberLeadOpen = useCallback(
+    (leadId: string) => {
+      const parent = withFocusedLead(listHrefValue, leadId);
+      rememberWorkflowStep(parent);
+      rememberFocusedLead(listHrefValue, leadId);
+      setFocusedLeadId(leadId);
+    },
+    [listHrefValue],
+  );
+
+  const openNewLead = useCallback(() => {
+    rememberWorkflowStep(listHrefValue);
+    clearRememberedFocusedLead(listHrefValue);
+    const params = new URLSearchParams();
+    if (projectId) {
+      params.set("projectId", projectId);
+    }
+    params.set("returnTo", listHrefValue);
+    const path = workspacePath(workspaceSlug, "leads", "new");
+    router.push(`${path}?${params.toString()}`);
+  }, [listHrefValue, projectId, router, workspaceSlug]);
+
+  const commitListSearch = useCallback(
+    (next: URLSearchParams) => {
+      const query = next.toString();
+      expectedSearch.current = query;
+      seenSearch.current = query;
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [pathname, router],
+  );
 
   const loadOptions = useCallback(async () => {
     setWebsiteOptionsWarning(null);
@@ -268,9 +454,12 @@ export function LeadsPanel({
       }
       if (integrationsRes.ok) {
         setWebsiteIntegrations(
-          (integrationsPayload.data.integrations as WebsiteIntegrationOption[]).map(
-            (integration) => ({ id: integration.id, name: integration.name }),
-          ),
+          (
+            integrationsPayload.data.integrations as WebsiteIntegrationOption[]
+          ).map((integration) => ({
+            id: integration.id,
+            name: integration.name,
+          })),
         );
       } else if (integrationsRes.status === 403) {
         setWebsiteIntegrations([]);
@@ -280,28 +469,42 @@ export function LeadsPanel({
       } else {
         setWebsiteIntegrations([]);
         setWebsiteOptionsWarning(
-          integrationsPayload.error?.message ?? "Could not load website integrations for filtering.",
+          integrationsPayload.error?.message ??
+            "Could not load website integrations for filtering.",
         );
       }
       if (membersRes.ok) {
-        setMembers((membersPayload?.data?.members as LeadTableMember[] | undefined) ?? []);
+        setMembers(
+          (membersPayload?.data?.members as LeadTableMember[] | undefined) ??
+            [],
+        );
       } else {
         setMembers([]);
       }
       if (companiesRes.ok) {
         setCompanies(
-          ((companiesPayload?.data?.companies as Array<{ id: string; name: string }> | undefined) ??
-            []) as Array<{ id: string; name: string }>,
+          ((companiesPayload?.data?.companies as
+            | Array<{ id: string; name: string }>
+            | undefined) ?? []) as Array<{ id: string; name: string }>,
         );
       } else {
         setCompanies([]);
       }
       if (projectsRes.ok) {
         const projectItems =
-          (projectsPayload?.data as Array<{ id: string; name: string }> | undefined) ??
-          (projectsPayload?.data?.projects as Array<{ id: string; name: string }> | undefined) ??
+          (projectsPayload?.data as
+            | Array<{ id: string; name: string }>
+            | undefined) ??
+          (projectsPayload?.data?.projects as
+            | Array<{ id: string; name: string }>
+            | undefined) ??
           [];
-        setProjects(projectItems.map((project) => ({ id: project.id, name: project.name })));
+        setProjects(
+          projectItems.map((project) => ({
+            id: project.id,
+            name: project.name,
+          })),
+        );
       } else {
         setProjects([]);
       }
@@ -331,8 +534,11 @@ export function LeadsPanel({
       ]);
       setNoteActivityIds(
         resolveLeadNoteActivityIds(
-          (typesPayload?.data?.items as LeadNoteDictionaryItem[] | undefined) ?? [],
-          (statusesPayload?.data?.items as LeadNoteDictionaryItem[] | undefined) ?? [],
+          (typesPayload?.data?.items as LeadNoteDictionaryItem[] | undefined) ??
+            [],
+          (statusesPayload?.data?.items as
+            | LeadNoteDictionaryItem[]
+            | undefined) ?? [],
         ),
       );
     } catch {
@@ -340,75 +546,159 @@ export function LeadsPanel({
     }
   }, [apiBase, canCreateNotes]);
 
-  const loadLeads = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
-      setLoading(true);
-    }
-    setError(null);
-    setForbidden(false);
-
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(pageSize),
-        ...buildLeadListFilters(),
-      });
-
-      const response = await fetch(`${apiBase}/leads?${params.toString()}`);
-      const payload = await response.json();
-
-      if (response.status === 403) {
-        setForbidden(true);
-        return;
+  const loadLeads = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoading(true);
       }
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Failed to load leads.");
-      }
+      setError(null);
+      setForbidden(false);
 
-      setLeads(payload.data as LeadListItem[]);
-      setTotal(payload.pagination?.total ?? 0);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load.");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    apiBase,
-    page,
-    pageSize,
-    propertyTypeInterestFilter,
-    search,
-    phoneFilter,
-    sourceFilter,
-    assignedFilter,
-    statusFilter,
-    tagFilter,
-    integrationFilter,
-    utmCampaignFilter,
-    transactionIntentFilter,
-    usagePurposeFilter,
-    industryFilter,
-    jobTitleFilter,
-    stateRegionFilter,
-    companyFilter,
-    tableProjectFilter,
-    agePreset,
-    nextFilter,
-    urgencyFilter,
-    sort,
-    sortDir,
-    projectId,
-    includeAssociated,
-    showArchived,
-    createdFromParam,
-    createdToParam,
-    acquisitionParam,
-  ]);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          pageSize: String(pageSize),
+          ...buildLeadListFilters(),
+        });
+
+        const response = await fetch(`${apiBase}/leads?${params.toString()}`);
+        const payload = await response.json();
+
+        if (response.status === 403) {
+          setForbidden(true);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(payload.error?.message ?? "Failed to load leads.");
+        }
+
+        setLeads(payload.data as LeadListItem[]);
+        setTotal(payload.pagination?.total ?? 0);
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error ? loadError.message : "Failed to load.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      apiBase,
+      page,
+      pageSize,
+      propertyTypeInterestFilter,
+      search,
+      phoneFilter,
+      sourceFilter,
+      assignedFilter,
+      statusFilter,
+      tagFilter,
+      integrationFilter,
+      utmCampaignFilter,
+      transactionIntentFilter,
+      usagePurposeFilter,
+      industryFilter,
+      jobTitleFilter,
+      stateRegionFilter,
+      companyFilter,
+      tableProjectFilter,
+      agePreset,
+      nextFilter,
+      urgencyFilter,
+      sort,
+      sortDir,
+      projectId,
+      includeAssociated,
+      showArchived,
+      createdFromParam,
+      createdToParam,
+      acquisitionParam,
+    ],
+  );
 
   useEffect(() => {
-    setSourceFilter(sourceIdParam);
-    setAssignedFilter(assignedToParam);
-  }, [assignedToParam, sourceIdParam]);
+    const onPopState = () => {
+      expectedSearch.current = null;
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (current === seenSearch.current) {
+      return;
+    }
+    if (
+      expectedSearch.current !== null &&
+      !sameSearchParams(current, expectedSearch.current)
+    ) {
+      return;
+    }
+    seenSearch.current = current;
+    if (
+      expectedSearch.current !== null &&
+      sameSearchParams(current, expectedSearch.current)
+    ) {
+      expectedSearch.current = null;
+      return;
+    }
+
+    const fromUrl = readLeadListQueryState(searchParams);
+    if (leadListQueryStatesEqual(fromUrl, listQueryRef.current)) {
+      return;
+    }
+    setPage(fromUrl.page);
+    setSearch(fromUrl.search);
+    setPhoneFilter(fromUrl.phone);
+    setStatusFilter(fromUrl.statusId);
+    setSourceFilter(fromUrl.sourceId);
+    setAssignedFilter(fromUrl.assignedTo);
+    setTagFilter(fromUrl.tagId);
+    setIntegrationFilter(fromUrl.integrationId);
+    setUtmCampaignFilter(fromUrl.utmCampaign);
+    setPropertyTypeInterestFilter(fromUrl.propertyTypeInterest);
+    setTransactionIntentFilter(fromUrl.transactionIntent);
+    setUsagePurposeFilter(fromUrl.usagePurpose);
+    setIndustryFilter(fromUrl.industry);
+    setJobTitleFilter(fromUrl.jobTitle);
+    setStateRegionFilter(fromUrl.stateRegion);
+    setCompanyFilter(fromUrl.companyId);
+    setAgePreset(fromUrl.agePreset);
+    setNextFilter(fromUrl.nextFilter);
+    setUrgencyFilter(fromUrl.urgencyFilter);
+    setSort(fromUrl.sort);
+    setSortDir(fromUrl.sortDir);
+    setIncludeAssociated(fromUrl.includeAssociated);
+    setShowArchived(fromUrl.includeArchived);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const next = applyLeadListQueryState(
+      new URLSearchParams(searchParams.toString()),
+      listQuery,
+    );
+    if (sameSearchParams(next, searchParams)) {
+      return;
+    }
+    if (
+      expectedSearch.current !== null &&
+      !sameSearchParams(searchParams.toString(), expectedSearch.current)
+    ) {
+      return;
+    }
+    commitListSearch(next);
+  }, [commitListSearch, listQuery, searchParams]);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    const nearest = nearestLeadListPage(page, total, pageSize);
+    if (nearest !== page) {
+      setPage(nearest);
+    }
+  }, [loading, page, pageSize, total]);
 
   useEffect(() => {
     void loadOptions();
@@ -540,7 +830,10 @@ export function LeadsPanel({
       if (createdToParam) {
         filters.createdTo = createdToParam;
       }
-      if (acquisitionParam === "genuine_inbound" || acquisitionParam === "legacy_import") {
+      if (
+        acquisitionParam === "genuine_inbound" ||
+        acquisitionParam === "legacy_import"
+      ) {
         filters.acquisition = acquisitionParam;
       }
     }
@@ -616,14 +909,15 @@ export function LeadsPanel({
       setCompanyFilter(patch.companyId);
     }
     if (patch.projectId !== undefined && !scopedProjectId) {
-      // Project-scoped leads routes must not rewrite to /leads via the column filter.
       setTableProjectFilter("");
       const next = setProjectIdInSearchParams(
-        new URLSearchParams(searchParams.toString()),
+        applyLeadListQueryState(new URLSearchParams(searchParams.toString()), {
+          ...listQueryRef.current,
+          page: 1,
+        }),
         patch.projectId || null,
       );
-      const qs = next.toString();
-      router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+      commitListSearch(next);
     }
     if (patch.sourceId !== undefined) {
       setSourceFilter(patch.sourceId);
@@ -641,7 +935,9 @@ export function LeadsPanel({
       setNextFilter(isLeadNextFilter(patch.nextFilter) ? patch.nextFilter : "");
     }
     if (patch.urgencyFilter !== undefined) {
-      setUrgencyFilter(isLeadUrgencyFilter(patch.urgencyFilter) ? patch.urgencyFilter : "");
+      setUrgencyFilter(
+        isLeadUrgencyFilter(patch.urgencyFilter) ? patch.urgencyFilter : "",
+      );
     }
     if (patch.tagId !== undefined) {
       setTagFilter(patch.tagId);
@@ -766,7 +1062,9 @@ export function LeadsPanel({
       return;
     }
 
-    const response = await fetch(`${apiBase}/leads/${leadId}`, { method: "DELETE" });
+    const response = await fetch(`${apiBase}/leads/${leadId}`, {
+      method: "DELETE",
+    });
     if (!response.ok) {
       const body = await response.json();
       window.alert(body.error?.message ?? "Failed to archive lead.");
@@ -833,7 +1131,11 @@ export function LeadsPanel({
     await patchLead(leadId, { statusId }, "Failed to update lead status.");
   }
 
-  async function postLeadStatus(label: string, dictionaryId: string, key: string) {
+  async function postLeadStatus(
+    label: string,
+    dictionaryId: string,
+    key: string,
+  ) {
     const response = await fetch(`${apiBase}/dictionary-items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -853,17 +1155,27 @@ export function LeadsPanel({
     if (!canManageStatuses) {
       throw new Error("You do not have permission to create statuses.");
     }
-    const dictionaryId = statuses.find((status) => status.dictionaryId)?.dictionaryId;
+    const dictionaryId = statuses.find(
+      (status) => status.dictionaryId,
+    )?.dictionaryId;
     if (!dictionaryId) {
-      throw new Error("Lead statuses are not loaded yet. Reload the page and try again.");
+      throw new Error(
+        "Lead statuses are not loaded yet. Reload the page and try again.",
+      );
     }
 
     const baseKey = slugifyDictionaryKey(label) || "status";
     const takenKeys = new Set(statuses.map((status) => status.key));
     const uniqueSuffix = () => `_${Date.now().toString(36).slice(-4)}`;
-    const firstKey = takenKeys.has(baseKey) ? `${baseKey.slice(0, 59)}${uniqueSuffix()}` : baseKey;
+    const firstKey = takenKeys.has(baseKey)
+      ? `${baseKey.slice(0, 59)}${uniqueSuffix()}`
+      : baseKey;
 
-    let { response, body } = await postLeadStatus(label, dictionaryId, firstKey);
+    let { response, body } = await postLeadStatus(
+      label,
+      dictionaryId,
+      firstKey,
+    );
     if (response.status === 409 && /key/i.test(body?.error?.message ?? "")) {
       ({ response, body } = await postLeadStatus(
         label,
@@ -883,7 +1195,9 @@ export function LeadsPanel({
       "Status created, but the lead could not be updated.",
     );
     if (!applied) {
-      throw new Error(`Status “${created.label}” was created but not applied to this lead. Pick it from the list.`);
+      throw new Error(
+        `Status “${created.label}” was created but not applied to this lead. Pick it from the list.`,
+      );
     }
   }
 
@@ -899,8 +1213,18 @@ export function LeadsPanel({
     }
   }
 
-  async function handleAddNote(leadId: string, body: string, followUpIso: string | null) {
-    await createLeadNote({ apiBase, leadId, body, followUpIso, ids: noteActivityIds });
+  async function handleAddNote(
+    leadId: string,
+    body: string,
+    followUpIso: string | null,
+  ) {
+    await createLeadNote({
+      apiBase,
+      leadId,
+      body,
+      followUpIso,
+      ids: noteActivityIds,
+    });
     await loadLeads({ silent: true });
   }
 
@@ -918,6 +1242,15 @@ export function LeadsPanel({
       <PageHeader
         density="compact"
         className="shrink-0"
+        back={
+          projectId
+            ? {
+                href: projectOverviewHref(workspaceSlug, projectId),
+                label: "Back to project",
+                mode: "stack",
+              }
+            : undefined
+        }
         title="Leads"
         meta={
           !loading ? (
@@ -937,7 +1270,7 @@ export function LeadsPanel({
               />
               <Button
                 leadingIcon={<IconPlus size={14} />}
-                onClick={() => router.push(workspacePath(workspaceSlug, "leads", "new"))}
+                onClick={openNewLead}
               >
                 New lead
               </Button>
@@ -947,11 +1280,13 @@ export function LeadsPanel({
       />
 
       {websiteOptionsWarning && (
-        <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">{websiteOptionsWarning}</p>
+        <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">
+          {websiteOptionsWarning}
+        </p>
       )}
 
       <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
-        <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:flex-1 sm:min-w-[200px]">
+        <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
             className="min-w-0 flex-1"
             placeholder="Search leads by name, email or phone…"
@@ -966,7 +1301,11 @@ export function LeadsPanel({
           <button
             type="button"
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-white px-3 text-[14px] font-medium text-[var(--color-ink-soft)] sm:hidden"
-            aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
+            aria-label={
+              activeFilterCount > 0
+                ? `Filters, ${activeFilterCount} active`
+                : "Filters"
+            }
             aria-expanded={mobileFiltersOpen}
             aria-controls="leads-filters"
             onClick={() => setMobileFiltersOpen((current) => !current)}
@@ -981,311 +1320,319 @@ export function LeadsPanel({
         </div>
         <div
           id="leads-filters"
-          className={cn("flex-col gap-2 sm:contents", mobileFiltersOpen ? "flex" : "hidden")}
+          className={cn(
+            "flex-col gap-2 sm:contents",
+            mobileFiltersOpen ? "flex" : "hidden",
+          )}
         >
-        <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => {
-              setPage(1);
-              setShowArchived(event.target.checked);
-            }}
-          />
-          Show archived
-        </label>
-        {projectId ? (
           <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
             <input
               type="checkbox"
-              checked={includeAssociated}
+              checked={showArchived}
               onChange={(event) => {
                 setPage(1);
-                setIncludeAssociated(event.target.checked);
+                setShowArchived(event.target.checked);
               }}
             />
-            Include associated projects
+            Show archived
           </label>
-        ) : null}
-        {!scopedProjectId ? (
+          {projectId ? (
+            <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
+              <input
+                type="checkbox"
+                checked={includeAssociated}
+                onChange={(event) => {
+                  setPage(1);
+                  setIncludeAssociated(event.target.checked);
+                }}
+              />
+              Include associated projects
+            </label>
+          ) : null}
+          {!scopedProjectId ? (
+            <Select
+              fieldSize="sm"
+              className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
+              aria-label="Filter by project"
+              value={projectId ?? ""}
+              onChange={(event) => {
+                setPage(1);
+                setTableProjectFilter("");
+                const next = setProjectIdInSearchParams(
+                  applyLeadListQueryState(
+                    new URLSearchParams(searchParams.toString()),
+                    {
+                      ...listQueryRef.current,
+                      page: 1,
+                    },
+                  ),
+                  event.target.value || null,
+                );
+                commitListSearch(next);
+              }}
+            >
+              <option value="">All projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
           <Select
             fieldSize="sm"
-            className="w-full min-w-0 sm:w-auto sm:min-w-[160px]"
-            aria-label="Filter by project"
-            value={projectId ?? ""}
+            className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
+            aria-label="Filter by status"
+            value={statusFilter}
             onChange={(event) => {
               setPage(1);
-              setTableProjectFilter("");
-              const next = setProjectIdInSearchParams(
-                new URLSearchParams(searchParams.toString()),
-                event.target.value || null,
-              );
-              const qs = next.toString();
-              router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+              setStatusFilter(event.target.value);
             }}
           >
-            <option value="">All projects</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
+            <option value="">All statuses</option>
+            {statuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.label}
               </option>
             ))}
           </Select>
-        ) : null}
-        <Select
-          fieldSize="sm"
-          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
-          aria-label="Filter by status"
-          value={statusFilter}
-          onChange={(event) => {
-            setPage(1);
-            setStatusFilter(event.target.value);
-          }}
-        >
-          <option value="">All statuses</option>
-          {statuses.map((status) => (
-            <option key={status.id} value={status.id}>
-              {status.label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
-          aria-label="Filter by source"
-          value={sourceFilter}
-          onChange={(event) => {
-            setPage(1);
-            setSourceFilter(event.target.value);
-          }}
-        >
-          <option value="">All sources</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
-          aria-label="Filter by assignee"
-          value={assignedFilter}
-          onChange={(event) => {
-            setPage(1);
-            setAssignedFilter(event.target.value);
-          }}
-        >
-          <option value="">All assigned</option>
-          <option value="unassigned">Unassigned</option>
-          {members.map((member) => (
-            <option key={member.userId} value={member.userId}>
-              {member.name ?? member.email}
-            </option>
-          ))}
-        </Select>
-        {createdFromParam || createdToParam ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)]">
-            {acquisitionParam === "legacy_import"
-              ? "Imported in linked period"
-              : acquisitionParam === "genuine_inbound"
-                ? "Genuine inbound in linked period"
-                : "Created in linked period"}
-            <button
-              type="button"
-              className="font-medium text-[var(--color-brand-700)] hover:underline"
-              onClick={() => {
-                const next = new URLSearchParams(searchParams.toString());
-                next.delete("createdFrom");
-                next.delete("createdTo");
-                next.delete("acquisition");
-                const qs = next.toString();
-                router.replace(
-                  `${workspacePath(workspaceSlug, "leads")}${qs ? `?${qs}` : ""}`,
-                );
-              }}
-            >
-              Clear
-            </button>
-          </span>
-        ) : null}
-        <button
-          type="button"
-          className="inline-flex h-8 items-center rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
-          aria-expanded={showMoreFilters}
-          onClick={() => setShowMoreFilters((current) => !current)}
-        >
-          More filters
-          {tagFilter ||
-          integrationFilter ||
-          utmCampaignFilter ||
-          propertyTypeInterestFilter ||
-          transactionIntentFilter ||
-          usagePurposeFilter ||
-          industryFilter ||
-          jobTitleFilter ||
-          stateRegionFilter ||
-          companyFilter
-            ? " · on"
-            : ""}
-        </button>
+          <Select
+            fieldSize="sm"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
+            aria-label="Filter by source"
+            value={sourceFilter}
+            onChange={(event) => {
+              setPage(1);
+              setSourceFilter(event.target.value);
+            }}
+          >
+            <option value="">All sources</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
+            aria-label="Filter by assignee"
+            value={assignedFilter}
+            onChange={(event) => {
+              setPage(1);
+              setAssignedFilter(event.target.value);
+            }}
+          >
+            <option value="">All assigned</option>
+            <option value="unassigned">Unassigned</option>
+            {members.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.name ?? member.email}
+              </option>
+            ))}
+          </Select>
+          {createdFromParam || createdToParam ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1 text-[12px] text-[var(--color-ink-soft)]">
+              {acquisitionParam === "legacy_import"
+                ? "Imported in linked period"
+                : acquisitionParam === "genuine_inbound"
+                  ? "Genuine inbound in linked period"
+                  : "Created in linked period"}
+              <button
+                type="button"
+                className="font-medium text-[var(--color-brand-700)] hover:underline"
+                onClick={() => {
+                  const next = applyLeadListQueryState(
+                    new URLSearchParams(searchParams.toString()),
+                    listQueryRef.current,
+                  );
+                  next.delete("createdFrom");
+                  next.delete("createdTo");
+                  next.delete("acquisition");
+                  commitListSearch(next);
+                }}
+              >
+                Clear
+              </button>
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="inline-flex h-8 items-center rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
+            aria-expanded={showMoreFilters}
+            onClick={() => setShowMoreFilters((current) => !current)}
+          >
+            More filters
+            {tagFilter ||
+            integrationFilter ||
+            utmCampaignFilter ||
+            propertyTypeInterestFilter ||
+            transactionIntentFilter ||
+            usagePurposeFilter ||
+            industryFilter ||
+            jobTitleFilter ||
+            stateRegionFilter ||
+            companyFilter
+              ? " · on"
+              : ""}
+          </button>
         </div>
       </div>
 
       {showMoreFilters ? (
-      <div
-        className={cn(
-          "mb-3 flex-wrap items-center gap-1.5 sm:flex",
-          mobileFiltersOpen ? "flex shrink-0" : "hidden",
-        )}
-      >
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[140px]"
-          aria-label="Filter by tag"
-          value={tagFilter}
-          onChange={(event) => {
-            setPage(1);
-            setTagFilter(event.target.value);
-          }}
+        <div
+          className={cn(
+            "mb-3 flex-wrap items-center gap-1.5 sm:flex",
+            mobileFiltersOpen ? "flex shrink-0" : "hidden",
+          )}
         >
-          <option value="">All tags</option>
-          {tags.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[160px]"
-          aria-label="Filter by website"
-          value={integrationFilter}
-          onChange={(event) => {
-            setPage(1);
-            setIntegrationFilter(event.target.value);
-          }}
-        >
-          <option value="">All websites</option>
-          {websiteIntegrations.map((integration) => (
-            <option key={integration.id} value={integration.id}>
-              {integration.name}
-            </option>
-          ))}
-        </Select>
-        <Input
-          fieldSize="sm"
-          className="w-auto min-w-[150px] max-w-[180px]"
-          placeholder="UTM campaign"
-          aria-label="Filter by UTM campaign"
-          value={utmCampaignFilter}
-          onChange={(event) => {
-            setPage(1);
-            setUtmCampaignFilter(event.target.value);
-          }}
-        />
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[160px]"
-          aria-label="Filter by property type"
-          value={propertyTypeInterestFilter}
-          onChange={(event) => {
-            setPage(1);
-            setPropertyTypeInterestFilter(event.target.value);
-          }}
-        >
-          <option value="">All property types</option>
-          {PROPERTY_TYPE_INTERESTS.map((value) => (
-            <option key={value} value={value}>
-              {PROPERTY_TYPE_INTEREST_LABELS[value]}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[140px]"
-          aria-label="Filter by intent"
-          value={transactionIntentFilter}
-          onChange={(event) => {
-            setPage(1);
-            setTransactionIntentFilter(event.target.value);
-          }}
-        >
-          <option value="">All intents</option>
-          {TRANSACTION_INTENTS.map((value) => (
-            <option key={value} value={value}>
-              {TRANSACTION_INTENT_LABELS[value]}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[150px]"
-          aria-label="Filter by usage purpose"
-          value={usagePurposeFilter}
-          onChange={(event) => {
-            setPage(1);
-            setUsagePurposeFilter(event.target.value);
-          }}
-        >
-          <option value="">All usage purposes</option>
-          {USAGE_PURPOSES.map((value) => (
-            <option key={value} value={value}>
-              {USAGE_PURPOSE_LABELS[value]}
-            </option>
-          ))}
-        </Select>
-        <Select
-          fieldSize="sm"
-          className="w-auto min-w-[160px]"
-          aria-label="Filter by company"
-          value={companyFilter}
-          onChange={(event) => {
-            setPage(1);
-            setCompanyFilter(event.target.value);
-          }}
-        >
-          <option value="">All companies</option>
-          {companies.map((company) => (
-            <option key={company.id} value={company.id}>
-              {company.name}
-            </option>
-          ))}
-        </Select>
-        <Input
-          fieldSize="sm"
-          className="w-auto min-w-[140px] max-w-[180px]"
-          placeholder="Industry"
-          aria-label="Filter by industry"
-          value={industryFilter}
-          onChange={(event) => {
-            setPage(1);
-            setIndustryFilter(event.target.value);
-          }}
-        />
-        <Input
-          fieldSize="sm"
-          className="w-auto min-w-[140px] max-w-[180px]"
-          placeholder="Job title"
-          aria-label="Filter by job title"
-          value={jobTitleFilter}
-          onChange={(event) => {
-            setPage(1);
-            setJobTitleFilter(event.target.value);
-          }}
-        />
-        <Input
-          fieldSize="sm"
-          className="w-auto min-w-[140px] max-w-[180px]"
-          placeholder="State / region"
-          aria-label="Filter by state or region"
-          value={stateRegionFilter}
-          onChange={(event) => {
-            setPage(1);
-            setStateRegionFilter(event.target.value);
-          }}
-        />
-      </div>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[140px]"
+            aria-label="Filter by tag"
+            value={tagFilter}
+            onChange={(event) => {
+              setPage(1);
+              setTagFilter(event.target.value);
+            }}
+          >
+            <option value="">All tags</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[160px]"
+            aria-label="Filter by website"
+            value={integrationFilter}
+            onChange={(event) => {
+              setPage(1);
+              setIntegrationFilter(event.target.value);
+            }}
+          >
+            <option value="">All websites</option>
+            {websiteIntegrations.map((integration) => (
+              <option key={integration.id} value={integration.id}>
+                {integration.name}
+              </option>
+            ))}
+          </Select>
+          <Input
+            fieldSize="sm"
+            className="w-auto max-w-[180px] min-w-[150px]"
+            placeholder="UTM campaign"
+            aria-label="Filter by UTM campaign"
+            value={utmCampaignFilter}
+            onChange={(event) => {
+              setPage(1);
+              setUtmCampaignFilter(event.target.value);
+            }}
+          />
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[160px]"
+            aria-label="Filter by property type"
+            value={propertyTypeInterestFilter}
+            onChange={(event) => {
+              setPage(1);
+              setPropertyTypeInterestFilter(event.target.value);
+            }}
+          >
+            <option value="">All property types</option>
+            {PROPERTY_TYPE_INTERESTS.map((value) => (
+              <option key={value} value={value}>
+                {PROPERTY_TYPE_INTEREST_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[140px]"
+            aria-label="Filter by intent"
+            value={transactionIntentFilter}
+            onChange={(event) => {
+              setPage(1);
+              setTransactionIntentFilter(event.target.value);
+            }}
+          >
+            <option value="">All intents</option>
+            {TRANSACTION_INTENTS.map((value) => (
+              <option key={value} value={value}>
+                {TRANSACTION_INTENT_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[150px]"
+            aria-label="Filter by usage purpose"
+            value={usagePurposeFilter}
+            onChange={(event) => {
+              setPage(1);
+              setUsagePurposeFilter(event.target.value);
+            }}
+          >
+            <option value="">All usage purposes</option>
+            {USAGE_PURPOSES.map((value) => (
+              <option key={value} value={value}>
+                {USAGE_PURPOSE_LABELS[value]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            fieldSize="sm"
+            className="w-auto min-w-[160px]"
+            aria-label="Filter by company"
+            value={companyFilter}
+            onChange={(event) => {
+              setPage(1);
+              setCompanyFilter(event.target.value);
+            }}
+          >
+            <option value="">All companies</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </Select>
+          <Input
+            fieldSize="sm"
+            className="w-auto max-w-[180px] min-w-[140px]"
+            placeholder="Industry"
+            aria-label="Filter by industry"
+            value={industryFilter}
+            onChange={(event) => {
+              setPage(1);
+              setIndustryFilter(event.target.value);
+            }}
+          />
+          <Input
+            fieldSize="sm"
+            className="w-auto max-w-[180px] min-w-[140px]"
+            placeholder="Job title"
+            aria-label="Filter by job title"
+            value={jobTitleFilter}
+            onChange={(event) => {
+              setPage(1);
+              setJobTitleFilter(event.target.value);
+            }}
+          />
+          <Input
+            fieldSize="sm"
+            className="w-auto max-w-[180px] min-w-[140px]"
+            placeholder="State / region"
+            aria-label="Filter by state or region"
+            value={stateRegionFilter}
+            onChange={(event) => {
+              setPage(1);
+              setStateRegionFilter(event.target.value);
+            }}
+          />
+        </div>
       ) : null}
 
       {loading ? (
@@ -1296,25 +1643,40 @@ export function LeadsPanel({
           <Skeleton className="h-9 w-full" />
         </div>
       ) : error ? (
-        <ErrorState title="Could not load leads" description={error} primaryAction={{ label: "Retry", onClick: () => void loadLeads() }} />
+        <ErrorState
+          title="Could not load leads"
+          description={error}
+          primaryAction={{ label: "Retry", onClick: () => void loadLeads() }}
+        />
       ) : leads.length === 0 ? (
         <EmptyState
           title={
-            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+            activeFilterCount > 0 ||
+            search.trim() ||
+            phoneFilter.trim() ||
+            Boolean(projectId)
               ? "No matching leads"
               : "No leads yet"
           }
           description={
-            activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId)
+            activeFilterCount > 0 ||
+            search.trim() ||
+            phoneFilter.trim() ||
+            Boolean(projectId)
               ? "Try clearing filters or broadening your search."
               : "Create your first lead to start capturing demand in this workspace."
           }
           primaryAction={
             canCreate &&
-            !(activeFilterCount > 0 || search.trim() || phoneFilter.trim() || Boolean(projectId))
+            !(
+              activeFilterCount > 0 ||
+              search.trim() ||
+              phoneFilter.trim() ||
+              Boolean(projectId)
+            )
               ? {
                   label: "New lead",
-                  onClick: () => router.push(workspacePath(workspaceSlug, "leads", "new")),
+                  onClick: openNewLead,
                 }
               : undefined
           }
@@ -1330,7 +1692,12 @@ export function LeadsPanel({
                 selected
               </p>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkDeleting}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={bulkDeleting}
+                >
                   Clear
                 </Button>
                 <Button
@@ -1345,22 +1712,25 @@ export function LeadsPanel({
             </div>
           )}
 
-          {canDelete && allPageSelected && total > leads.length && !selectAllMatching && (
-            <div className="shrink-0 border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
-              All {leads.length} leads on this page are selected.{" "}
-              <button
-                type="button"
-                className="font-medium text-[var(--color-brand-700)] hover:underline"
-                onClick={() => {
-                  setSelectAllMatching(true);
-                  setSelectedLeadIds(new Set());
-                  setExcludedLeadIds(new Set());
-                }}
-              >
-                Select all {total.toLocaleString()} leads
-              </button>
-            </div>
-          )}
+          {canDelete &&
+            allPageSelected &&
+            total > leads.length &&
+            !selectAllMatching && (
+              <div className="shrink-0 border-b border-[var(--color-line)] bg-[#eff6ff] px-3 py-2 text-[12.5px] text-[var(--color-ink-soft)]">
+                All {leads.length} leads on this page are selected.{" "}
+                <button
+                  type="button"
+                  className="font-medium text-[var(--color-brand-700)] hover:underline"
+                  onClick={() => {
+                    setSelectAllMatching(true);
+                    setSelectedLeadIds(new Set());
+                    setExcludedLeadIds(new Set());
+                  }}
+                >
+                  Select all {total.toLocaleString()} leads
+                </button>
+              </div>
+            )}
 
           <LeadsTable
             workspaceSlug={workspaceSlug}
@@ -1381,6 +1751,10 @@ export function LeadsPanel({
             pendingLeadId={pendingLeadId}
             sort={sort}
             sortDir={sortDir}
+            listHref={listHrefValue}
+            leadHref={openLeadHref}
+            focusedLeadId={focusedLeadId}
+            onOpenLead={rememberLeadOpen}
             onSort={changeSort}
             columnFilters={{
               search,
@@ -1407,43 +1781,60 @@ export function LeadsPanel({
             onColumnFilterChange={handleColumnFilterChange}
             onToggleLead={toggleLeadSelection}
             onTogglePage={togglePageSelection}
-            onAssign={(leadId, assignedTo) => void handleAssign(leadId, assignedTo)}
-            onStatusChange={(leadId, statusId) => void handleStatusChange(leadId, statusId)}
+            onAssign={(leadId, assignedTo) =>
+              void handleAssign(leadId, assignedTo)
+            }
+            onStatusChange={(leadId, statusId) =>
+              void handleStatusChange(leadId, statusId)
+            }
             onCreateStatus={handleCreateStatus}
             onAddNote={handleAddNote}
             onEnrich={setEnrichLeadId}
-            onArchive={(leadId, leadName) => void handleArchive(leadId, leadName)}
-            onRestore={(leadId, leadName) => void handleRestore(leadId, leadName)}
+            onArchive={(leadId, leadName) =>
+              void handleArchive(leadId, leadName)
+            }
+            onRestore={(leadId, leadName) =>
+              void handleRestore(leadId, leadName)
+            }
           />
 
           <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
             <p className="text-[12.5px] text-[var(--color-ink-muted)]">
               Showing{" "}
-              <span className="text-[var(--color-ink)] font-medium">
+              <span className="font-medium text-[var(--color-ink)]">
                 {total === 0 ? 0 : (page - 1) * pageSize + 1}–
                 {Math.min(page * pageSize, total)}
               </span>{" "}
-              of <span className="text-[var(--color-ink)] font-medium">{total}</span> leads
+              of{" "}
+              <span className="font-medium text-[var(--color-ink)]">
+                {total}
+              </span>{" "}
+              leads
             </p>
             <div className="inline-flex items-center gap-1">
               <button
                 type="button"
-                className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page <= 1}
                 aria-label="Previous page"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
                 <IconChevronLeft size={14} />
               </button>
-              <span className="px-2 text-[12.5px] text-[var(--color-ink-soft)] tabular" aria-live="polite">
+              <span
+                className="tabular px-2 text-[12.5px] text-[var(--color-ink-soft)]"
+                aria-live="polite"
+              >
                 {page} / {totalPages}
               </span>
               <button
                 type="button"
-                className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
                 disabled={page >= totalPages}
                 aria-label="Next page"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
               >
                 <IconChevronRight size={14} />
               </button>

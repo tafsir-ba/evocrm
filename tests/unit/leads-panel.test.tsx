@@ -3,14 +3,25 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routerReplace = vi.hoisted(() => vi.fn());
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: routerReplace }),
-  useSearchParams: () => new URLSearchParams(),
-  usePathname: () => "/w/demo/leads",
+const navigationState = vi.hoisted(() => ({
+  pathname: "/w/demo/leads",
+  search: "",
 }));
 
-const projectFilterState = vi.hoisted(() => ({ current: null as string | null }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    refresh: vi.fn(),
+    replace: routerReplace,
+    back: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(navigationState.search),
+  usePathname: () => navigationState.pathname,
+}));
+
+const projectFilterState = vi.hoisted(() => ({
+  current: null as string | null,
+}));
 
 vi.mock("@/lib/use-workspace-project-filter", () => ({
   useWorkspaceProjectFilter: () => projectFilterState.current,
@@ -41,13 +52,31 @@ const activityTypes = [
 ];
 
 const activityStatuses = [
-  { id: "507f1f77bcf86cd799439081", key: "completed", label: "Completed", behavior: "completed" },
-  { id: "507f1f77bcf86cd799439082", key: "pending", label: "Pending", behavior: "pending" },
+  {
+    id: "507f1f77bcf86cd799439081",
+    key: "completed",
+    label: "Completed",
+    behavior: "completed",
+  },
+  {
+    id: "507f1f77bcf86cd799439082",
+    key: "pending",
+    label: "Pending",
+    behavior: "pending",
+  },
 ];
 
 const members = [
-  { userId: "507f1f77bcf86cd799439031", name: "Camille Müller", email: "camille@evo-home.ch" },
-  { userId: "507f1f77bcf86cd799439032", name: "Léa Dupont", email: "lea@evo-home.ch" },
+  {
+    userId: "507f1f77bcf86cd799439031",
+    name: "Camille Müller",
+    email: "camille@evo-home.ch",
+  },
+  {
+    userId: "507f1f77bcf86cd799439032",
+    name: "Léa Dupont",
+    email: "lea@evo-home.ch",
+  },
 ];
 
 const sampleLead = {
@@ -64,8 +93,17 @@ const sampleLead = {
     },
   },
   status: statuses[0],
-  source: { id: "507f1f77bcf86cd799439041", label: "Site web", color: "#6366F1", key: "website" },
-  project: { id: "507f1f77bcf86cd799439051", name: "Les Terrasses", reference: "LT-01" },
+  source: {
+    id: "507f1f77bcf86cd799439041",
+    label: "Site web",
+    color: "#6366F1",
+    key: "website",
+  },
+  project: {
+    id: "507f1f77bcf86cd799439051",
+    name: "Les Terrasses",
+    reference: "LT-01",
+  },
   tagsResolved: [
     { id: "t1", name: "VIP", color: "#B45309" },
     { id: "t2", name: "Genève", color: "#1D4ED8" },
@@ -100,11 +138,11 @@ function jsonResponse(data: unknown, status = 200) {
   } as Response;
 }
 
-function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
+function mockLeadsFetch(leads: unknown[] = [sampleLead], total = leads.length) {
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/leads?") && (!init?.method || init.method === "GET")) {
-      return jsonResponse({ data: leads, pagination: { total: leads.length } });
+      return jsonResponse({ data: leads, pagination: { total } });
     }
     if (url.includes("/dictionary-items?type=lead_status")) {
       return jsonResponse({ data: { items: statuses } });
@@ -119,7 +157,11 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
       return jsonResponse({ data: { items: activityStatuses } });
     }
     if (url.endsWith("/dictionary-items") && init?.method === "POST") {
-      const payload = JSON.parse(String(init.body)) as { label: string; key: string; color: string };
+      const payload = JSON.parse(String(init.body)) as {
+        label: string;
+        key: string;
+        color: string;
+      };
       return jsonResponse(
         {
           data: {
@@ -140,7 +182,9 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead]) {
       return jsonResponse({ data: { tags: sampleLead.tagsResolved } });
     }
     if (url.includes("/integrations")) {
-      return jsonResponse({ data: { integrations: [{ id: "int-1", name: "evo-home.ch" }] } });
+      return jsonResponse({
+        data: { integrations: [{ id: "int-1", name: "evo-home.ch" }] },
+      });
     }
     if (url.includes("/members")) {
       return jsonResponse({ data: { members } });
@@ -173,6 +217,9 @@ describe("LeadsPanel table", () => {
     vi.restoreAllMocks();
     routerReplace.mockReset();
     projectFilterState.current = null;
+    navigationState.pathname = "/w/demo/leads";
+    navigationState.search = "";
+    sessionStorage.clear();
     mockLeadsFetch();
   });
 
@@ -188,21 +235,51 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Sort by Lead" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter Lead" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Phone" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Company" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter Company" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Project" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Source" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Status" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Owner" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Age" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Next" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Urgency" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sort by Tags" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter Tags" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Lead" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter Lead" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Phone" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter Phone" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Company" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter Company" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Project" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Source" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Status" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Owner" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Age" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Next" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Urgency" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sort by Tags" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter Tags" }),
+    ).toBeInTheDocument();
 
     expect(screen.getAllByText("EvoHome SA").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Les Terrasses").length).toBeGreaterThan(0);
@@ -214,14 +291,25 @@ describe("LeadsPanel table", () => {
     expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
 
     expect(screen.queryByText("françois@évohome.ch")).not.toBeInTheDocument();
-    const phoneLinks = screen.getAllByRole("link", { name: "+41 79 123 45 67" });
+    const phoneLinks = screen.getAllByRole("link", {
+      name: "+41 79 123 45 67",
+    });
     expect(phoneLinks.length).toBeGreaterThan(0);
     expect(phoneLinks[0]).toHaveAttribute("href", "tel:+41791234567");
     expect(screen.queryByText(/Genève-Printemps/)).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Change status for François Côté" }).length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Contact François Côté" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: "Open François Côté" }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: "Change status for François Côté" })
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("Assign François Côté"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Contact François Côté" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("link", { name: "Open François Côté" }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("scrolls lead rows inside the table so pagination stays pinned", async () => {
@@ -258,9 +346,15 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.getByRole("combobox", { name: "Filter by project" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "All projects" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Les Terrasses" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Filter by project" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "All projects" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Les Terrasses" }),
+    ).toBeInTheDocument();
   });
 
   it("sorts and filters from column headers", async () => {
@@ -279,17 +373,25 @@ describe("LeadsPanel table", () => {
 
     await user.click(screen.getByRole("button", { name: "Sort by Company" }));
     await waitFor(() => {
-      const calls = vi.mocked(global.fetch).mock.calls.map(([input]) => String(input));
-      expect(calls.some((url) => url.includes("sort=company") && url.includes("sortDir=asc"))).toBe(
-        true,
-      );
+      const calls = vi
+        .mocked(global.fetch)
+        .mock.calls.map(([input]) => String(input));
+      expect(
+        calls.some(
+          (url) => url.includes("sort=company") && url.includes("sortDir=asc"),
+        ),
+      ).toBe(true);
     });
 
     await user.click(screen.getByRole("button", { name: "Filter Urgency" }));
     await user.selectOptions(screen.getByLabelText("Urgency"), "stale");
     await waitFor(() => {
-      const calls = vi.mocked(global.fetch).mock.calls.map(([input]) => String(input));
-      expect(calls.some((url) => url.includes("urgencyFilter=stale"))).toBe(true);
+      const calls = vi
+        .mocked(global.fetch)
+        .mock.calls.map(([input]) => String(input));
+      expect(calls.some((url) => url.includes("urgencyFilter=stale"))).toBe(
+        true,
+      );
     });
   });
 
@@ -310,7 +412,9 @@ describe("LeadsPanel table", () => {
     });
     await user.click(contactButtons[0]!);
 
-    const mail = await screen.findByRole("menuitem", { name: /françois@évohome.ch/i });
+    const mail = await screen.findByRole("menuitem", {
+      name: /françois@évohome.ch/i,
+    });
     expect(mail).toHaveAttribute("href", "mailto:françois@évohome.ch");
     const phone = screen.getByRole("menuitem", { name: /\+41 79 123 45 67/ });
     expect(phone).toHaveAttribute("href", "tel:+41791234567");
@@ -328,7 +432,11 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    expect(await screen.findByPlaceholderText("Search leads by name, email or phone…")).toBeInTheDocument();
+    expect(
+      await screen.findByPlaceholderText(
+        "Search leads by name, email or phone…",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Show archived")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All statuses")).toBeInTheDocument();
     expect(screen.getByDisplayValue("All sources")).toBeInTheDocument();
@@ -344,15 +452,29 @@ describe("LeadsPanel table", () => {
 
     await expandDesktopRow(user);
 
-    expect(screen.getAllByLabelText("Assign François Côté").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Archive" }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("Assign François Côté").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: "Archive" }).length,
+    ).toBeGreaterThan(0);
     expect(screen.getAllByText(/Genève-Printemps/).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /whatsapp|call now|email blast/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /whatsapp|call now|email blast/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("folds filters behind a mobile Filters toggle that counts active filters", async () => {
     const user = userEvent.setup();
-    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />);
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
 
     await screen.findByPlaceholderText("Search leads by name, email or phone…");
     const toggle = screen.getByRole("button", { name: "Filters" });
@@ -365,7 +487,9 @@ describe("LeadsPanel table", () => {
     expect(filters).not.toHaveClass("hidden");
 
     await user.click(screen.getByLabelText("Show archived"));
-    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filters, 1 active" }),
+    ).toBeInTheDocument();
   });
 
   it("changes status from the inline status dropdown and assignment after row open", async () => {
@@ -384,15 +508,24 @@ describe("LeadsPanel table", () => {
       name: "Change status for François Côté",
     });
     await user.click(statusButtons[0]!);
-    const statusDialog = await screen.findByRole("dialog", { name: "Status for François Côté" });
-    await user.click(within(statusDialog).getByRole("option", { name: "Qualifié" }));
+    const statusDialog = await screen.findByRole("dialog", {
+      name: "Status for François Côté",
+    });
+    await user.click(
+      within(statusDialog).getByRole("option", { name: "Qualifié" }),
+    );
 
     await waitFor(() => {
       const patchCall = vi
         .mocked(fetch)
-        .mock.calls.find(([, init]) => init && typeof init === "object" && init.method === "PATCH");
+        .mock.calls.find(
+          ([, init]) =>
+            init && typeof init === "object" && init.method === "PATCH",
+        );
       expect(patchCall).toBeTruthy();
-      expect(String(patchCall?.[0])).toContain("/api/workspaces/demo/leads/507f1f77bcf86cd799439011");
+      expect(String(patchCall?.[0])).toContain(
+        "/api/workspaces/demo/leads/507f1f77bcf86cd799439011",
+      );
       expect(patchCall?.[1]).toEqual(
         expect.objectContaining({
           method: "PATCH",
@@ -440,13 +573,20 @@ describe("LeadsPanel table", () => {
       name: "Change status for François Côté",
     });
     await user.click(statusButtons[0]!);
-    await user.type(screen.getByLabelText("Find or create a status"), "Visite planifiée");
-    await user.click(screen.getByRole("button", { name: "Create status “Visite planifiée”" }));
+    await user.type(
+      screen.getByLabelText("Find or create a status"),
+      "Visite planifiée",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Create status “Visite planifiée”" }),
+    );
 
     await waitFor(() => {
       const calls = vi.mocked(fetch).mock.calls;
       const createCall = calls.find(
-        ([input, init]) => String(input).endsWith("/dictionary-items") && init?.method === "POST",
+        ([input, init]) =>
+          String(input).endsWith("/dictionary-items") &&
+          init?.method === "POST",
       );
       expect(createCall).toBeTruthy();
       expect(JSON.parse(String(createCall?.[1]?.body))).toEqual(
@@ -458,32 +598,53 @@ describe("LeadsPanel table", () => {
         }),
       );
       const patchCall = calls.find(([, init]) => init?.method === "PATCH");
-      expect(patchCall?.[1]?.body).toBe(JSON.stringify({ statusId: "507f1f77bcf86cd799439023" }));
+      expect(patchCall?.[1]?.body).toBe(
+        JSON.stringify({ statusId: "507f1f77bcf86cd799439023" }),
+      );
     });
   });
 
   it("keeps the status dropdown open with an error when a created status cannot be applied", async () => {
     const user = userEvent.setup();
     const baseFetch = global.fetch;
-    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes("/leads/") && init?.method === "PATCH") {
-        return jsonResponse({ error: { message: "Lead update failed." } }, 500);
-      }
-      return baseFetch(input, init);
-    }) as typeof fetch;
+    global.fetch = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes("/leads/") && init?.method === "PATCH") {
+          return jsonResponse(
+            { error: { message: "Lead update failed." } },
+            500,
+          );
+        }
+        return baseFetch(input, init);
+      },
+    ) as typeof fetch;
     vi.spyOn(window, "alert").mockImplementation(() => undefined);
     render(
-      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate canManageStatuses />,
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        canManageStatuses
+      />,
     );
 
     const statusButtons = await screen.findAllByRole("button", {
       name: "Change status for François Côté",
     });
     await user.click(statusButtons[0]!);
-    await user.type(screen.getByLabelText("Find or create a status"), "Visite planifiée");
-    await user.click(screen.getByRole("button", { name: "Create status “Visite planifiée”" }));
+    await user.type(
+      screen.getByLabelText("Find or create a status"),
+      "Visite planifiée",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Create status “Visite planifiée”" }),
+    );
 
-    const dialog = await screen.findByRole("dialog", { name: "Status for François Côté" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Status for François Côté",
+    });
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       "Status “Visite planifiée” was created but not applied to this lead.",
     );
@@ -492,7 +653,13 @@ describe("LeadsPanel table", () => {
   it("only lets status managers create statuses", async () => {
     const user = userEvent.setup();
     render(
-      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />,
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
     );
 
     const statusButtons = await screen.findAllByRole("button", {
@@ -500,7 +667,9 @@ describe("LeadsPanel table", () => {
     });
     await user.click(statusButtons[0]!);
     await user.type(screen.getByLabelText("Find a status"), "Visite");
-    expect(screen.queryByRole("button", { name: /Create status/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Create status/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("No matching status.")).toBeInTheDocument();
   });
 
@@ -528,7 +697,8 @@ describe("LeadsPanel table", () => {
       const noteCall = vi
         .mocked(fetch)
         .mock.calls.find(
-          ([input, init]) => String(input).endsWith("/activities") && init?.method === "POST",
+          ([input, init]) =>
+            String(input).endsWith("/activities") && init?.method === "POST",
         );
       expect(JSON.parse(String(noteCall?.[1]?.body))).toEqual(
         expect.objectContaining({
@@ -540,49 +710,79 @@ describe("LeadsPanel table", () => {
         }),
       );
     });
-    expect(screen.queryByRole("dialog", { name: "Quick note for François Côté" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Quick note for François Côté" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides quick notes when the user cannot create activities", async () => {
-    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />);
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
+    );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: "Add quick note for François Côté" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Add quick note for François Côté",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("enriches a lead from its row and requests the market estimate after a unique match", async () => {
     const user = userEvent.setup();
     const baseFetch = global.fetch;
-    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith(`/leads/${sampleLead.id}/enrichment`) && init?.method === "POST") {
-        return jsonResponse({
-          data: {
-            run: {
-              id: "run-1",
-              status: "accepted",
-              identityMatch: "unique",
-              identityRationale: null,
-              failureMessage: null,
-              demoMode: false,
-              candidates: [],
-              selectedCandidateId: null,
+    global.fetch = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (
+          url.endsWith(`/leads/${sampleLead.id}/enrichment`) &&
+          init?.method === "POST"
+        ) {
+          return jsonResponse({
+            data: {
+              run: {
+                id: "run-1",
+                status: "accepted",
+                identityMatch: "unique",
+                identityRationale: null,
+                failureMessage: null,
+                demoMode: false,
+                candidates: [],
+                selectedCandidateId: null,
+              },
             },
-          },
-        });
-      }
-      if (url.endsWith(`/leads/${sampleLead.id}`) && (!init?.method || init.method === "GET")) {
-        return jsonResponse({
-          data: {
-            lead: { ...sampleLead, city: "Genève", country: "Switzerland", jobTitle: "Buyer" },
-          },
-        });
-      }
-      if (url.endsWith("/financial-situation/market-estimate") && init?.method === "POST") {
-        return jsonResponse({ data: { estimate: {} } });
-      }
-      return baseFetch(input, init);
-    }) as typeof fetch;
+          });
+        }
+        if (
+          url.endsWith(`/leads/${sampleLead.id}`) &&
+          (!init?.method || init.method === "GET")
+        ) {
+          return jsonResponse({
+            data: {
+              lead: {
+                ...sampleLead,
+                city: "Genève",
+                country: "Switzerland",
+                jobTitle: "Buyer",
+              },
+            },
+          });
+        }
+        if (
+          url.endsWith("/financial-situation/market-estimate") &&
+          init?.method === "POST"
+        ) {
+          return jsonResponse({ data: { estimate: {} } });
+        }
+        return baseFetch(input, init);
+      },
+    ) as typeof fetch;
 
     render(
       <LeadsPanel
@@ -596,7 +796,9 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    const enrichButtons = await screen.findAllByRole("button", { name: "Enrich François Côté" });
+    const enrichButtons = await screen.findAllByRole("button", {
+      name: "Enrich François Côté",
+    });
     await user.click(enrichButtons[0]!);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
 
@@ -605,7 +807,8 @@ describe("LeadsPanel table", () => {
       expect(
         calls.some(
           ([input, init]) =>
-            String(input) === `/api/workspaces/demo/leads/${sampleLead.id}/enrichment` &&
+            String(input) ===
+              `/api/workspaces/demo/leads/${sampleLead.id}/enrichment` &&
             init?.method === "POST",
         ),
       ).toBe(true);
@@ -621,16 +824,35 @@ describe("LeadsPanel table", () => {
 
   it("hides the enrich action without enrichment access or on archived leads", async () => {
     const { unmount } = render(
-      <LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate />,
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+      />,
     );
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: "Enrich François Côté" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Enrich François Côté" }),
+    ).not.toBeInTheDocument();
     unmount();
 
     mockLeadsFetch([{ ...sampleLead, archivedAt: "2026-08-29T12:00:00.000Z" }]);
-    render(<LeadsPanel workspaceSlug="demo" canCreate canArchive canDelete canUpdate canEnrich />);
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        canEnrich
+      />,
+    );
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: "Enrich François Côté" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Enrich François Côté" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides assign and status controls when the user cannot update leads", async () => {
@@ -647,9 +869,15 @@ describe("LeadsPanel table", () => {
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
     await expandDesktopRow(user);
-    expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Assign François Côté")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Change status for François Côté"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Assign François Côté"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Archive" }),
+    ).not.toBeInTheDocument();
     expect(screen.getAllByText("Camille Müller").length).toBeGreaterThan(0);
   });
 
@@ -667,15 +895,23 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    const checkbox = await screen.findByLabelText("Include associated projects");
+    const checkbox = await screen.findByLabelText(
+      "Include associated projects",
+    );
     await user.click(checkbox);
 
     await waitFor(() => {
       const listCall = vi
         .mocked(fetch)
-        .mock.calls.find(([input]) => String(input).includes("/leads?") && String(input).includes("includeAssociated=true"));
+        .mock.calls.find(
+          ([input]) =>
+            String(input).includes("/leads?") &&
+            String(input).includes("includeAssociated=true"),
+        );
       expect(listCall).toBeTruthy();
-      expect(String(listCall?.[0])).toContain("projectId=507f1f77bcf86cd799439051");
+      expect(String(listCall?.[0])).toContain(
+        "projectId=507f1f77bcf86cd799439051",
+      );
     });
   });
 
@@ -694,10 +930,14 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
-    expect(screen.queryByLabelText("Filter by project")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Filter by project"),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Filter Project/i }));
-    expect(screen.getByText("Locked to the current project view.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Locked to the current project view."),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });
@@ -716,9 +956,51 @@ describe("LeadsPanel table", () => {
     );
 
     expect(await screen.findAllByText("Archived")).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Restore" }),
+    ).not.toBeInTheDocument();
     await expandDesktopRow(user);
-    expect(screen.getAllByRole("button", { name: "Restore" }).length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("Change status for François Côté")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Restore" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("Change status for François Côté"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a filtered project page as the parent when opening a lead", async () => {
+    navigationState.pathname =
+      "/w/demo/projects/507f1f77bcf86cd799439051/leads";
+    navigationState.search =
+      "page=4&statusId=507f1f77bcf86cd799439021&sort=fullName&dir=asc";
+    mockLeadsFetch([sampleLead], 100);
+    render(
+      <LeadsPanel
+        workspaceSlug="demo"
+        canCreate
+        canArchive
+        canDelete
+        canUpdate
+        scopedProjectId="507f1f77bcf86cd799439051"
+      />,
+    );
+
+    const openLinks = await screen.findAllByRole("link", {
+      name: "Open François Côté",
+    });
+    const href = openLinks[0]?.getAttribute("href") ?? "";
+    const returnTo =
+      new URL(href, "http://local.invalid").searchParams.get("returnTo") ?? "";
+    expect(returnTo).toContain(
+      "/w/demo/projects/507f1f77bcf86cd799439051/leads",
+    );
+    expect(returnTo).toContain("page=4");
+    expect(returnTo).toContain("statusId=507f1f77bcf86cd799439021");
+    expect(returnTo).toContain("sort=fullName");
+    expect(returnTo).toContain("focus=507f1f77bcf86cd799439011");
+    expect(returnTo.startsWith("/w/demo/leads")).toBe(false);
+    expect(
+      screen.getByRole("link", { name: "Back to project" }),
+    ).toHaveAttribute("href", "/w/demo/projects/507f1f77bcf86cd799439051");
   });
 });

@@ -5,6 +5,11 @@ import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isSafeOpportunityReturnTo } from "@/lib/opportunity-link-flow";
+import {
+  projectLeadsHref,
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -49,11 +54,19 @@ export default async function NewLeadPage({
     );
   }
 
-  const returnTo =
+  const opportunityReturn =
     rawReturnTo && isSafeOpportunityReturnTo(rawReturnTo, workspaceSlug)
       ? rawReturnTo
       : undefined;
-  const cancelHref = returnTo ?? workspacePath(workspaceSlug, "leads");
+  const workflowReturn = opportunityReturn
+    ? undefined
+    : readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const returnTo = opportunityReturn ?? workflowReturn;
+  const cancelHref =
+    returnTo ??
+    (projectId
+      ? projectLeadsHref(workspaceSlug, projectId)
+      : workspacePath(workspaceSlug, "leads"));
 
   return (
     <PageContainer>
@@ -69,11 +82,13 @@ export default async function NewLeadPage({
           workspaceSlug={workspaceSlug}
           mode="create"
           initialValues={projectId ? { projectId } : undefined}
-          returnTo={returnTo}
+          returnTo={returnTo ?? undefined}
           cancelHref={cancelHref}
           back={{
             href: cancelHref,
-            label: returnTo ? "Back to opportunity" : "Back to leads",
+            label: opportunityReturn
+              ? "Back to opportunity"
+              : workflowBackLabel(cancelHref, workspaceSlug),
           }}
         />
       </Suspense>

@@ -9,9 +9,15 @@ import {
   type EntityComboboxOption,
   type EntityComboboxSearchResult,
 } from "@/components/domain/entity-combobox";
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import {
+  MemberSelector,
+  type MemberSelectorMember,
+} from "@/components/domain/member-selector";
 import { CurrencySelect } from "@/components/domain/locale-selectors";
-import { TagSelector, type TagSelectorTag } from "@/components/domain/tag-selector";
+import {
+  TagSelector,
+  type TagSelectorTag,
+} from "@/components/domain/tag-selector";
 import {
   FocusedFormActions,
   FocusedFormLayout,
@@ -28,6 +34,11 @@ import {
   validateOpportunitySameProject,
   type OpportunityLinkEntity,
 } from "@/lib/opportunity-link-flow";
+import {
+  appendReturnTo,
+  performWorkflowStepBack,
+  readSafeWorkflowHref,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -63,6 +74,7 @@ type OpportunityFormPageProps = {
   lockProperty?: boolean;
   cancelHref: string;
   back?: { href: string; label?: string };
+  returnTo?: string | null;
 };
 
 const emptyForm = (defaultCurrency: string): OpportunityFormValues => ({
@@ -89,6 +101,7 @@ export function OpportunityFormPage({
   lockProperty = false,
   cancelHref,
   back,
+  returnTo = null,
 }: OpportunityFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<OpportunityFormValues>({
@@ -100,10 +113,10 @@ export function OpportunityFormPage({
   const [lostReasons, setLostReasons] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
-  const [selectedLead, setSelectedLead] = useState<OpportunityLinkEntity | null>(null);
-  const [selectedProperty, setSelectedProperty] = useState<OpportunityLinkEntity | null>(
-    null,
-  );
+  const [selectedLead, setSelectedLead] =
+    useState<OpportunityLinkEntity | null>(null);
+  const [selectedProperty, setSelectedProperty] =
+    useState<OpportunityLinkEntity | null>(null);
   const [peerTotal, setPeerTotal] = useState<number | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [hydratingLinks, setHydratingLinks] = useState(false);
@@ -112,7 +125,8 @@ export function OpportunityFormPage({
   const hydratedInitialValues = useRef(Boolean(initialValues));
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
-  const formId = mode === "create" ? "create-opportunity-form" : "edit-opportunity-form";
+  const formId =
+    mode === "create" ? "create-opportunity-form" : "edit-opportunity-form";
   const isEdit = mode === "edit";
 
   const activeProjectId =
@@ -134,7 +148,9 @@ export function OpportunityFormPage({
         fetch(`${apiBase}/members`),
         fetch(`${apiBase}/dictionary-items?type=lost_reason`),
       ]);
-      const payloads = await Promise.all(responses.map((response) => response.json()));
+      const payloads = await Promise.all(
+        responses.map((response) => response.json()),
+      );
 
       if (responses[0].ok) {
         setStatuses(payloads[0].data.items as DictionaryItem[]);
@@ -175,7 +191,8 @@ export function OpportunityFormPage({
       return;
     }
 
-    const defaultStatus = statuses.find((status) => status.isDefault) ?? statuses[0];
+    const defaultStatus =
+      statuses.find((status) => status.isDefault) ?? statuses[0];
     if (defaultStatus) {
       setForm((current) => ({ ...current, statusId: defaultStatus.id }));
     }
@@ -270,7 +287,9 @@ export function OpportunityFormPage({
         params.set("projectId", selectedLead.projectId);
       }
 
-      const response = await fetch(`${apiBase}/properties?${params.toString()}`);
+      const response = await fetch(
+        `${apiBase}/properties?${params.toString()}`,
+      );
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.error?.message ?? "Failed to search properties.");
@@ -340,7 +359,9 @@ export function OpportunityFormPage({
     }
 
     const currency =
-      typeof option.data?.currency === "string" ? option.data.currency : undefined;
+      typeof option.data?.currency === "string"
+        ? option.data.currency
+        : undefined;
     const entity = mapPropertyApiRecord({
       id: option.id,
       title: option.label,
@@ -420,27 +441,41 @@ export function OpportunityFormPage({
         String(formData.get("expectedCloseDate") ?? "").trim() || null;
 
       if (isEdit) {
-        const response = await fetch(`${apiBase}/opportunities/${opportunityId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            leadId: form.leadId,
-            propertyId: form.propertyId,
-            value: form.value ? Number(form.value) : null,
-            currency: form.currency,
-            expectedCloseDate,
-            notes: form.notes || null,
-            assignedTo: form.assignedTo || null,
-            tags: form.tagIds,
-          }),
-        });
+        const response = await fetch(
+          `${apiBase}/opportunities/${opportunityId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              leadId: form.leadId,
+              propertyId: form.propertyId,
+              value: form.value ? Number(form.value) : null,
+              currency: form.currency,
+              expectedCloseDate,
+              notes: form.notes || null,
+              assignedTo: form.assignedTo || null,
+              tags: form.tagIds,
+            }),
+          },
+        );
 
         if (!response.ok) {
-          const body = (await response.json()) as { error?: { message?: string } };
-          throw new Error(body.error?.message ?? "Failed to update opportunity.");
+          const body = (await response.json()) as {
+            error?: { message?: string };
+          };
+          throw new Error(
+            body.error?.message ?? "Failed to update opportunity.",
+          );
         }
 
-        router.push(workspacePath(workspaceSlug, "opportunities", opportunityId!));
+        const parent = readSafeWorkflowHref(returnTo, workspaceSlug);
+        if (parent) {
+          performWorkflowStepBack(router, parent, { fallback: "replace" });
+        } else {
+          router.push(
+            workspacePath(workspaceSlug, "opportunities", opportunityId!),
+          );
+        }
       } else {
         const payload: Record<string, unknown> = {
           leadId: form.leadId,
@@ -471,21 +506,35 @@ export function OpportunityFormPage({
         };
 
         if (!response.ok) {
-          throw new Error(body.error?.message ?? "Failed to create opportunity.");
+          throw new Error(
+            body.error?.message ?? "Failed to create opportunity.",
+          );
         }
 
         const newId = body.data?.opportunity?.id;
-        router.push(
-          newId
-            ? workspacePath(workspaceSlug, "opportunities", newId)
-            : workspacePath(workspaceSlug, "pipeline"),
-        );
+        const parent = readSafeWorkflowHref(returnTo, workspaceSlug);
+        if (newId && parent) {
+          router.replace(
+            appendReturnTo(
+              workspacePath(workspaceSlug, "opportunities", newId),
+              parent,
+            ),
+          );
+        } else {
+          router.push(
+            newId
+              ? workspacePath(workspaceSlug, "opportunities", newId)
+              : workspacePath(workspaceSlug, "pipeline"),
+          );
+        }
       }
 
       router.refresh();
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "Failed to save opportunity.",
+        submitError instanceof Error
+          ? submitError.message
+          : "Failed to save opportunity.",
       );
     } finally {
       setSubmitting(false);
@@ -506,7 +555,11 @@ export function OpportunityFormPage({
       back={back}
       maxWidth="3xl"
     >
-      <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        id={formId}
+        className="space-y-4"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         <div>
           <Label htmlFor="opp-lead" required>
             Lead
@@ -515,7 +568,9 @@ export function OpportunityFormPage({
             id="opp-lead"
             aria-label="Lead"
             value={form.leadId}
-            selectedOption={selectedLead ? toComboboxOption(selectedLead) : null}
+            selectedOption={
+              selectedLead ? toComboboxOption(selectedLead) : null
+            }
             onChange={handleLeadChange}
             onSearch={searchLeads}
             disabled={leadDisabled}
@@ -534,7 +589,9 @@ export function OpportunityFormPage({
                           side: "lead",
                           projectId: activeProjectId,
                           lockedPropertyId:
-                            form.propertyId || selectedProperty?.id || undefined,
+                            form.propertyId ||
+                            selectedProperty?.id ||
+                            undefined,
                         })}
                         className="font-medium text-[var(--color-brand-700)] hover:underline"
                       >
@@ -578,7 +635,8 @@ export function OpportunityFormPage({
                           workspaceSlug,
                           side: "property",
                           projectId: activeProjectId,
-                          lockedLeadId: form.leadId || selectedLead?.id || undefined,
+                          lockedLeadId:
+                            form.leadId || selectedLead?.id || undefined,
                         })}
                         className="font-medium text-[var(--color-brand-700)] hover:underline"
                       >
@@ -604,7 +662,10 @@ export function OpportunityFormPage({
                 id="opp-status"
                 value={form.statusId}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, statusId: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    statusId: event.target.value,
+                  }))
                 }
                 required
                 disabled={loadingOptions}
@@ -644,7 +705,9 @@ export function OpportunityFormPage({
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="opp-lost-reason-text">Lost reason details</Label>
+                  <Label htmlFor="opp-lost-reason-text">
+                    Lost reason details
+                  </Label>
                   <Textarea
                     id="opp-lost-reason-text"
                     value={form.lostReasonText}
@@ -662,7 +725,7 @@ export function OpportunityFormPage({
           </>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="opp-value">Value</Label>
             <Input
@@ -671,7 +734,10 @@ export function OpportunityFormPage({
               min={0}
               value={form.value}
               onChange={(event) =>
-                setForm((current) => ({ ...current, value: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  value: event.target.value,
+                }))
               }
             />
           </div>
@@ -680,7 +746,9 @@ export function OpportunityFormPage({
             <CurrencySelect
               id="opp-currency"
               value={form.currency}
-              onChange={(currency) => setForm((current) => ({ ...current, currency }))}
+              onChange={(currency) =>
+                setForm((current) => ({ ...current, currency }))
+              }
             />
           </div>
         </div>
@@ -740,7 +808,9 @@ export function OpportunityFormPage({
           />
         </div>
 
-        {error && <p className="text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>}
+        {error && (
+          <p className="text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>
+        )}
 
         <FocusedFormActions
           cancelHref={cancelHref}

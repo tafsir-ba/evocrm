@@ -39,7 +39,9 @@ export function formatLeadRoleLine(input: {
   jobTitle?: string | null;
   company?: { name: string } | null;
 }): string | null {
-  const parts = [input.jobTitle?.trim(), input.company?.name?.trim()].filter(Boolean);
+  const parts = [input.jobTitle?.trim(), input.company?.name?.trim()].filter(
+    Boolean,
+  );
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
@@ -48,14 +50,17 @@ export function formatProjectMembershipCell(input: {
   secondaryCount?: number;
 }): { text: string; overflow: number } {
   const primary = input.primaryName?.trim() || "—";
-  const overflow = input.secondaryCount && input.secondaryCount > 0 ? input.secondaryCount : 0;
+  const overflow =
+    input.secondaryCount && input.secondaryCount > 0 ? input.secondaryCount : 0;
   return {
     text: overflow > 0 ? `${primary} +${overflow}` : primary,
     overflow,
   };
 }
 
-export function formatOwnerName(user: LeadTableUser | null | undefined): string {
+export function formatOwnerName(
+  user: LeadTableUser | null | undefined,
+): string {
   const name = user?.name?.trim();
   if (name) {
     return name;
@@ -65,7 +70,9 @@ export function formatOwnerName(user: LeadTableUser | null | undefined): string 
   return email || "—";
 }
 
-export function formatCompactUtm(utm: LeadIntegrationUtm | undefined): string | null {
+export function formatCompactUtm(
+  utm: LeadIntegrationUtm | undefined,
+): string | null {
   if (!utm) {
     return null;
   }
@@ -116,17 +123,27 @@ export function telHref(phone: string): string {
  * wa.me needs a full international number. Local numbers (no "+" or "00" prefix) have an unknown
  * country code, so no link is returned for them rather than opening the wrong chat.
  */
-export function whatsappHref(phone: string): string | null {
+export function whatsappHref(
+  phone: string,
+  message?: string | null,
+): string | null {
   const trimmed = phone.trim();
   const digits = trimmed.replace(/\D/g, "");
+  let href: string | null = null;
   if (trimmed.startsWith("+")) {
-    return digits.length >= 8 ? `https://wa.me/${digits}` : null;
-  }
-  if (digits.startsWith("00")) {
+    href = digits.length >= 8 ? `https://wa.me/${digits}` : null;
+  } else if (digits.startsWith("00")) {
     const international = digits.slice(2);
-    return international.length >= 8 ? `https://wa.me/${international}` : null;
+    href = international.length >= 8 ? `https://wa.me/${international}` : null;
   }
-  return null;
+  if (!href) {
+    return null;
+  }
+  const text = message?.trim();
+  if (!text) {
+    return href;
+  }
+  return `${href}?text=${encodeURIComponent(text)}`;
 }
 
 export function formatNextActionWhen(
@@ -139,7 +156,8 @@ export function formatNextActionWhen(
   }
 
   const dayDelta = Math.round(
-    (startOfLocalDay(date).getTime() - startOfLocalDay(now).getTime()) / LIST_DAY_MS,
+    (startOfLocalDay(date).getTime() - startOfLocalDay(now).getTime()) /
+      LIST_DAY_MS,
   );
 
   if (dayDelta === 0) {
@@ -243,10 +261,16 @@ export function leadUrgency(input: {
   const nextAt = parseListDate(input.nextAction?.at);
   if (nextAt) {
     const dayDelta = Math.round(
-      (startOfLocalDay(nextAt).getTime() - startOfLocalDay(now).getTime()) / LIST_DAY_MS,
+      (startOfLocalDay(nextAt).getTime() - startOfLocalDay(now).getTime()) /
+        LIST_DAY_MS,
     );
     if (dayDelta < 0) {
-      return { level: "overdue", label: "Overdue", tone: "danger", sortRank: 0 };
+      return {
+        level: "overdue",
+        label: "Overdue",
+        tone: "danger",
+        sortRank: 0,
+      };
     }
     if (dayDelta === 0) {
       return { level: "today", label: "Today", tone: "warn", sortRank: 1 };
@@ -267,7 +291,12 @@ export function leadUrgency(input: {
   }
 
   if (!input.assignedUser) {
-    return { level: "unassigned", label: "Unassigned", tone: "muted", sortRank: 4 };
+    return {
+      level: "unassigned",
+      label: "Unassigned",
+      tone: "muted",
+      sortRank: 4,
+    };
   }
 
   return { level: "none", label: null, tone: "muted", sortRank: 5 };

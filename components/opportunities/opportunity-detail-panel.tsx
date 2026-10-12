@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -32,6 +33,13 @@ import {
 } from "@/lib/lead-preferences";
 import { formatDate, formatPrice } from "@/lib/format-price";
 import { IconCheck } from "@/lib/icons";
+import {
+  appendReturnTo,
+  noteWorkflowArrival,
+  performWorkflowStepBack,
+  rememberWorkflowStep,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
 import { LeadContactActions } from "@/components/leads/lead-contact-actions";
 
@@ -106,6 +114,7 @@ type OpportunityDetailPanelProps = {
   canReadDocuments: boolean;
   canCreateDocument: boolean;
   canArchiveDocument: boolean;
+  returnTo?: string | null;
 };
 
 export function OpportunityDetailPanel({
@@ -121,10 +130,15 @@ export function OpportunityDetailPanel({
   canReadDocuments,
   canCreateDocument,
   canArchiveDocument,
+  returnTo = null,
 }: OpportunityDetailPanelProps) {
-  const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
+  const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(
+    null,
+  );
   const [stages, setStages] = useState<DictionaryItem[]>([]);
-  const [lostReasons, setLostReasons] = useState<Array<{ id: string; label: string }>>([]);
+  const [lostReasons, setLostReasons] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -132,6 +146,18 @@ export function OpportunityDetailPanel({
   const [stagePending, setStagePending] = useState(false);
   const [archivePending, setArchivePending] = useState(false);
   const [lostModal, setLostModal] = useState<string | null>(null);
+  const router = useRouter();
+  const resolvedBackHref = returnTo ?? workspacePath(workspaceSlug, "pipeline");
+  const currentHref = returnTo
+    ? appendReturnTo(
+        workspacePath(workspaceSlug, "opportunities", opportunityId),
+        returnTo,
+      )
+    : workspacePath(workspaceSlug, "opportunities", opportunityId);
+
+  useEffect(() => {
+    noteWorkflowArrival(currentHref);
+  }, [currentHref]);
 
   const loadOpportunity = useCallback(async () => {
     setLoading(true);
@@ -156,11 +182,15 @@ export function OpportunityDetailPanel({
         throw new Error("Failed to load opportunity.");
       }
 
-      const body = (await response.json()) as { data: { opportunity: OpportunityDetail } };
+      const body = (await response.json()) as {
+        data: { opportunity: OpportunityDetail };
+      };
       setOpportunity(body.data.opportunity);
     } catch (loadError) {
       setError(
-        loadError instanceof Error ? loadError.message : "Failed to load opportunity.",
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load opportunity.",
       );
     } finally {
       setLoading(false);
@@ -174,12 +204,18 @@ export function OpportunityDetailPanel({
   useEffect(() => {
     void (async () => {
       const [stagesResponse, lostReasonsResponse] = await Promise.all([
-        fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=opportunity_status`),
-        fetch(`/api/workspaces/${workspaceSlug}/dictionary-items?type=lost_reason`),
+        fetch(
+          `/api/workspaces/${workspaceSlug}/dictionary-items?type=opportunity_status`,
+        ),
+        fetch(
+          `/api/workspaces/${workspaceSlug}/dictionary-items?type=lost_reason`,
+        ),
       ]);
 
       if (stagesResponse.ok) {
-        const payload = (await stagesResponse.json()) as { data: { items: DictionaryItem[] } };
+        const payload = (await stagesResponse.json()) as {
+          data: { items: DictionaryItem[] };
+        };
         setStages(payload.data.items);
       }
       if (lostReasonsResponse.ok) {
@@ -214,13 +250,19 @@ export function OpportunityDetailPanel({
       );
 
       if (!response.ok) {
-        const body = (await response.json()) as { error?: { message?: string } };
+        const body = (await response.json()) as {
+          error?: { message?: string };
+        };
         throw new Error(body.error?.message ?? "Failed to update stage.");
       }
 
       await loadOpportunity();
     } catch (stageError) {
-      setError(stageError instanceof Error ? stageError.message : "Failed to update stage.");
+      setError(
+        stageError instanceof Error
+          ? stageError.message
+          : "Failed to update stage.",
+      );
     } finally {
       setStagePending(false);
       setLostModal(null);
@@ -260,8 +302,12 @@ export function OpportunityDetailPanel({
       );
 
       if (!response.ok) {
-        const body = (await response.json()) as { error?: { message?: string } };
-        throw new Error(body.error?.message ?? "Failed to archive opportunity.");
+        const body = (await response.json()) as {
+          error?: { message?: string };
+        };
+        throw new Error(
+          body.error?.message ?? "Failed to archive opportunity.",
+        );
       }
 
       window.location.href = workspacePath(workspaceSlug, "pipeline");
@@ -288,7 +334,7 @@ export function OpportunityDetailPanel({
     return (
       <div className="space-y-4">
         <Skeleton className="h-12 w-full max-w-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
@@ -304,9 +350,9 @@ export function OpportunityDetailPanel({
         title="Opportunity not found"
         description="This opportunity does not exist in the current workspace."
         primaryAction={{
-          label: "Back to pipeline",
+          label: workflowBackLabel(resolvedBackHref, workspaceSlug),
           onClick: () => {
-            window.location.href = workspacePath(workspaceSlug, "pipeline");
+            performWorkflowStepBack(router, resolvedBackHref);
           },
         }}
       />
@@ -318,7 +364,10 @@ export function OpportunityDetailPanel({
       <ErrorState
         title="Could not load opportunity"
         description={error}
-        primaryAction={{ label: "Retry", onClick: () => void loadOpportunity() }}
+        primaryAction={{
+          label: "Retry",
+          onClick: () => void loadOpportunity(),
+        }}
       />
     );
   }
@@ -327,19 +376,26 @@ export function OpportunityDetailPanel({
     return null;
   }
 
-  const isTerminal = isTerminalOpportunityBehavior(opportunity.status?.behavior);
-  const currentStageIndex = stages.findIndex((stage) => stage.id === opportunity.statusId);
+  const isTerminal = isTerminalOpportunityBehavior(
+    opportunity.status?.behavior,
+  );
+  const currentStageIndex = stages.findIndex(
+    (stage) => stage.id === opportunity.statusId,
+  );
 
   return (
     <>
       <PageHeader
         back={{
-          href: workspacePath(workspaceSlug, "pipeline"),
-          label: "Back to pipeline",
+          href: resolvedBackHref,
+          label: returnTo
+            ? workflowBackLabel(resolvedBackHref, workspaceSlug)
+            : "Back to pipeline",
         }}
         title={
-          <span className="flex items-center gap-2 flex-wrap">
-            {opportunity.lead?.fullName ?? "Lead"} — {opportunity.property?.title ?? "Property"}
+          <span className="flex flex-wrap items-center gap-2">
+            {opportunity.lead?.fullName ?? "Lead"} —{" "}
+            {opportunity.property?.title ?? "Property"}
             {opportunity.status && (
               <StatusBadge
                 label={opportunity.status.label}
@@ -351,19 +407,34 @@ export function OpportunityDetailPanel({
         }
         description={`Expected close ${formatDate(opportunity.expectedCloseDate)}`}
         meta={
-          <span className="text-[18px] font-bold tabular text-[var(--color-brand-700)] ml-3">
+          <span className="tabular ml-3 text-[18px] font-bold text-[var(--color-brand-700)]">
             {formatPrice(opportunity.value, opportunity.currency)}
           </span>
         }
         actions={
           <>
             {canUpdate && (
-              <Link href={workspacePath(workspaceSlug, "opportunities", opportunityId, "edit")}>
+              <Link
+                href={appendReturnTo(
+                  workspacePath(
+                    workspaceSlug,
+                    "opportunities",
+                    opportunityId,
+                    "edit",
+                  ),
+                  currentHref,
+                )}
+                onClick={() => rememberWorkflowStep(currentHref)}
+              >
                 <Button variant="secondary">Edit</Button>
               </Link>
             )}
             {canArchive && (
-              <Button variant="secondary" onClick={() => void handleArchive()} disabled={archivePending}>
+              <Button
+                variant="secondary"
+                onClick={() => void handleArchive()}
+                disabled={archivePending}
+              >
                 Archive
               </Button>
             )}
@@ -386,14 +457,20 @@ export function OpportunityDetailPanel({
       />
 
       {error && (
-        <p className="mb-3 text-[12.5px] text-[var(--color-danger-fg)]">{error}</p>
+        <p className="mb-3 text-[12.5px] text-[var(--color-danger-fg)]">
+          {error}
+        </p>
       )}
 
       {opportunity.project ? (
         <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">
           Project:{" "}
           <Link
-            href={workspacePath(workspaceSlug, "projects", opportunity.project.id)}
+            href={workspacePath(
+              workspaceSlug,
+              "projects",
+              opportunity.project.id,
+            )}
             className="text-[var(--color-brand-700)] hover:underline"
           >
             {opportunity.project.reference
@@ -403,30 +480,37 @@ export function OpportunityDetailPanel({
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
-          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
+          <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
             Lead
           </p>
           {opportunity.lead ? (
             <div className="space-y-2">
               <Link
-                href={workspacePath(workspaceSlug, "leads", opportunity.lead.id)}
+                href={workspacePath(
+                  workspaceSlug,
+                  "leads",
+                  opportunity.lead.id,
+                )}
                 className="flex items-center gap-3 hover:opacity-90"
               >
                 <Avatar
                   user={{
                     id: opportunity.lead.id,
                     name: opportunity.lead.fullName,
-                    initials: userInitials(opportunity.lead.fullName, opportunity.lead.email ?? ""),
+                    initials: userInitials(
+                      opportunity.lead.fullName,
+                      opportunity.lead.email ?? "",
+                    ),
                   }}
                   size={36}
                 />
                 <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-[var(--color-ink)] truncate">
+                  <p className="truncate text-[14px] font-semibold text-[var(--color-ink)]">
                     {opportunity.lead.fullName}
                   </p>
-                  <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
+                  <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
                     {opportunity.lead.email ?? opportunity.lead.phone ?? "—"}
                   </p>
                 </div>
@@ -441,7 +525,9 @@ export function OpportunityDetailPanel({
                 <div className="space-y-1 border-t border-[var(--color-line)] pt-2 text-[12px] text-[var(--color-ink-muted)]">
                   {opportunity.lead.propertyTypeInterests.length > 0 ? (
                     <p>
-                      <span className="font-medium text-[var(--color-ink)]">Interests:</span>{" "}
+                      <span className="font-medium text-[var(--color-ink)]">
+                        Interests:
+                      </span>{" "}
                       {opportunity.lead.propertyTypeInterests
                         .map((interest) => labelPropertyTypeInterest(interest))
                         .join(", ")}
@@ -449,13 +535,19 @@ export function OpportunityDetailPanel({
                   ) : null}
                   {opportunity.lead.transactionIntent ? (
                     <p>
-                      <span className="font-medium text-[var(--color-ink)]">Intent:</span>{" "}
-                      {labelTransactionIntent(opportunity.lead.transactionIntent)}
+                      <span className="font-medium text-[var(--color-ink)]">
+                        Intent:
+                      </span>{" "}
+                      {labelTransactionIntent(
+                        opportunity.lead.transactionIntent,
+                      )}
                     </p>
                   ) : null}
                   {opportunity.lead.usagePurpose ? (
                     <p>
-                      <span className="font-medium text-[var(--color-ink)]">Purpose:</span>{" "}
+                      <span className="font-medium text-[var(--color-ink)]">
+                        Purpose:
+                      </span>{" "}
                       {labelUsagePurpose(opportunity.lead.usagePurpose)}
                     </p>
                   ) : null}
@@ -468,20 +560,27 @@ export function OpportunityDetailPanel({
         </Card>
 
         <Card>
-          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
+          <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
             Property
           </p>
           {opportunity.property ? (
             <Link
-              href={workspacePath(workspaceSlug, "properties", opportunity.property.id)}
+              href={workspacePath(
+                workspaceSlug,
+                "properties",
+                opportunity.property.id,
+              )}
               className="block hover:opacity-90"
             >
-              <p className="text-[14px] font-semibold text-[var(--color-ink)] truncate">
+              <p className="truncate text-[14px] font-semibold text-[var(--color-ink)]">
                 {opportunity.property.title}
               </p>
-              <p className="text-[12px] text-[var(--color-ink-muted)] tabular truncate">
+              <p className="tabular truncate text-[12px] text-[var(--color-ink-muted)]">
                 {opportunity.property.reference ?? "No reference"} ·{" "}
-                {formatPrice(opportunity.property.price, opportunity.property.currency)}
+                {formatPrice(
+                  opportunity.property.price,
+                  opportunity.property.currency,
+                )}
               </p>
             </Link>
           ) : (
@@ -490,14 +589,16 @@ export function OpportunityDetailPanel({
         </Card>
 
         <Card>
-          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
+          <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
             Assigned
           </p>
           {opportunity.assignedUser ? (
             <AvatarWithName
               user={{
                 id: opportunity.assignedUser.id,
-                name: opportunity.assignedUser.name ?? opportunity.assignedUser.email,
+                name:
+                  opportunity.assignedUser.name ??
+                  opportunity.assignedUser.email,
                 initials: userInitials(
                   opportunity.assignedUser.name,
                   opportunity.assignedUser.email,
@@ -506,9 +607,11 @@ export function OpportunityDetailPanel({
               size={30}
             />
           ) : (
-            <p className="text-[13px] text-[var(--color-ink-muted)]">Unassigned</p>
+            <p className="text-[13px] text-[var(--color-ink-muted)]">
+              Unassigned
+            </p>
           )}
-          <div className="mt-3 text-[12.5px] text-[var(--color-ink-soft)] tabular">
+          <div className="tabular mt-3 text-[12.5px] text-[var(--color-ink-soft)]">
             {opportunity.probability !== null
               ? `${opportunity.probability}% probability`
               : "—"}
@@ -516,8 +619,8 @@ export function OpportunityDetailPanel({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-1 self-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card className="self-start xl:col-span-1">
           <CardHeader title="Pipeline stage" subtitle="Current progression" />
           {canUpdate && (
             <div className="px-4 pb-3">
@@ -536,24 +639,25 @@ export function OpportunityDetailPanel({
               </Select>
             </div>
           )}
-          <ol className="relative pl-5 px-4 pb-4">
-            <span className="absolute left-[22px] top-2 bottom-4 w-px bg-[var(--color-line)]" />
+          <ol className="relative px-4 pb-4 pl-5">
+            <span className="absolute top-2 bottom-4 left-[22px] w-px bg-[var(--color-line)]" />
             {stages.map((stage, index) => {
               const isCurrent = index === currentStageIndex;
-              const isPast = currentStageIndex >= 0 && index < currentStageIndex;
+              const isPast =
+                currentStageIndex >= 0 && index < currentStageIndex;
               return (
                 <li
                   key={stage.id}
                   className={`relative mb-3 last:mb-0 ${
                     isCurrent
-                      ? "px-3 py-2 -mx-1 rounded-lg bg-[var(--color-brand-50)] border border-[var(--color-brand-100)]"
+                      ? "-mx-1 rounded-lg border border-[var(--color-brand-100)] bg-[var(--color-brand-50)] px-3 py-2"
                       : ""
                   }`}
                 >
                   <span
                     className={`absolute ${
-                      isCurrent ? "-left-[12px] top-3" : "-left-[15px] top-1"
-                    } w-3 h-3 rounded-full border-2 border-white`}
+                      isCurrent ? "top-3 -left-[12px]" : "top-1 -left-[15px]"
+                    } h-3 w-3 rounded-full border-2 border-white`}
                     style={{
                       background: isPast
                         ? "var(--color-success-fg)"
@@ -587,8 +691,14 @@ export function OpportunityDetailPanel({
                 key: "overview",
                 label: "Overview",
                 content: (
-                  <div className="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <Info label="Value" value={formatPrice(opportunity.value, opportunity.currency)} />
+                  <div className="grid grid-cols-1 gap-5 px-5 pb-5 md:grid-cols-2">
+                    <Info
+                      label="Value"
+                      value={formatPrice(
+                        opportunity.value,
+                        opportunity.currency,
+                      )}
+                    />
                     <Info
                       label="Probability"
                       value={
@@ -601,11 +711,20 @@ export function OpportunityDetailPanel({
                       label="Expected close"
                       value={formatDate(opportunity.expectedCloseDate)}
                     />
-                    <Info label="Created" value={formatDate(opportunity.createdAt)} />
-                    <Info label="Closed" value={formatDate(opportunity.closedAt)} />
+                    <Info
+                      label="Created"
+                      value={formatDate(opportunity.createdAt)}
+                    />
+                    <Info
+                      label="Closed"
+                      value={formatDate(opportunity.closedAt)}
+                    />
                     <Info label="Won" value={formatDate(opportunity.wonAt)} />
                     <Info label="Lost" value={formatDate(opportunity.lostAt)} />
-                    <Info label="Lost reason" value={opportunity.lostReason?.label ?? "—"} />
+                    <Info
+                      label="Lost reason"
+                      value={opportunity.lostReason?.label ?? "—"}
+                    />
                     <Info
                       label="Lost reason details"
                       value={opportunity.lostReasonText ?? "—"}
@@ -615,7 +734,9 @@ export function OpportunityDetailPanel({
                       label="Tags"
                       value={
                         opportunity.tagsResolved.length > 0
-                          ? opportunity.tagsResolved.map((tag) => tag.name).join(", ")
+                          ? opportunity.tagsResolved
+                              .map((tag) => tag.name)
+                              .join(", ")
                           : "—"
                       }
                     />
@@ -630,6 +751,7 @@ export function OpportunityDetailPanel({
                     workspaceSlug={workspaceSlug}
                     workspaceTimezone={workspaceTimezone}
                     opportunityId={opportunityId}
+                    returnTo={currentHref}
                     canRead={canReadActivities}
                     canCreate={canCreateActivity}
                     canUpdate={canUpdateActivity}
@@ -685,7 +807,6 @@ export function OpportunityDetailPanel({
         </Card>
       </div>
 
-
       <LostReasonModal
         open={lostModal !== null}
         onClose={() => setLostModal(null)}
@@ -703,7 +824,7 @@ export function OpportunityDetailPanel({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
+      <p className="mb-1 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
         {label}
       </p>
       <p className="text-[13.5px] text-[var(--color-ink)]">{value}</p>

@@ -1,17 +1,26 @@
 import { LeadDetailPanel } from "@/components/leads/lead-detail-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { readSafeWorkflowHref } from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
 type Params = Promise<{ workspaceSlug: string; leadId: string }>;
+type SearchParams = Promise<{ returnTo?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { workspaceSlug, leadId } = await params;
   return { title: `Lead ${leadId} — ${workspaceSlug}` };
 }
 
-export default async function LeadDetailPage({ params }: { params: Params }) {
+export default async function LeadDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug, leadId } = await params;
+  const { returnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -49,6 +58,8 @@ export default async function LeadDetailPage({ params }: { params: Params }) {
         canFinancialRead={hasPermission(permissions, "lead:financial_read")}
         canFinancialUpdate={hasPermission(permissions, "lead:financial_update")}
         canFinancialDelete={hasPermission(permissions, "lead:financial_delete")}
+        canDelete={hasPermission(permissions, "lead:delete")}
+        listReturnTo={readSafeWorkflowHref(returnTo, workspaceSlug)}
       />
     </PageContainer>
   );

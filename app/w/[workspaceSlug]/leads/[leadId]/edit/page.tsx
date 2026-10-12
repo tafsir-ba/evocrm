@@ -1,22 +1,37 @@
-import { LeadFormPage, type LeadFormInitialValues } from "@/components/leads/lead-form-page";
+import {
+  LeadFormPage,
+  type LeadFormInitialValues,
+} from "@/components/leads/lead-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { ProjectFilterSuspense } from "@/components/layout/project-filter-suspense";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getLeadForWorkspace } from "@/server/services/leads";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string; leadId: string }>;
+type SearchParams = Promise<{ returnTo?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
   return { title: `Edit lead — ${workspaceSlug}` };
 }
 
-export default async function EditLeadPage({ params }: { params: Params }) {
+export default async function EditLeadPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug, leadId } = await params;
+  const { returnTo: rawReturnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -70,6 +85,9 @@ export default async function EditLeadPage({ params }: { params: Params }) {
     stateRegion: lead.stateRegion ?? "",
   };
 
+  const returnTo = readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const cancelHref = returnTo ?? workspacePath(workspaceSlug, "leads", leadId);
+
   return (
     <PageContainer>
       <ProjectFilterSuspense
@@ -85,10 +103,11 @@ export default async function EditLeadPage({ params }: { params: Params }) {
           mode="edit"
           leadId={leadId}
           initialValues={initialValues}
-          cancelHref={workspacePath(workspaceSlug, "leads", leadId)}
+          returnTo={returnTo}
+          cancelHref={cancelHref}
           back={{
-            href: workspacePath(workspaceSlug, "leads", leadId),
-            label: "Back to lead",
+            href: cancelHref,
+            label: workflowBackLabel(cancelHref, workspaceSlug),
           }}
         />
       </ProjectFilterSuspense>

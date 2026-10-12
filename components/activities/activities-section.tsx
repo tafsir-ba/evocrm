@@ -17,6 +17,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IconCheck, IconPlus } from "@/lib/icons";
+import {
+  appendReturnTo,
+  rememberWorkflowStep,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type ActivityListItem = {
@@ -27,8 +31,20 @@ type ActivityListItem = {
   completedAt: string | null;
   cancelledAt: string | null;
   outcome: string | null;
-  type: { id: string; label: string; color: string; key: string; behavior?: string } | null;
-  status: { id: string; label: string; color: string; key: string; behavior?: string } | null;
+  type: {
+    id: string;
+    label: string;
+    color: string;
+    key: string;
+    behavior?: string;
+  } | null;
+  status: {
+    id: string;
+    label: string;
+    color: string;
+    key: string;
+    behavior?: string;
+  } | null;
   lead: { id: string; fullName: string } | null;
   property: { id: string; title: string; reference: string | null } | null;
   opportunity: { id: string } | null;
@@ -47,21 +63,31 @@ type ActivitiesSectionProps = {
   canUpdate: boolean;
   canArchive: boolean;
   compact?: boolean;
+  /** Immediate parent to restore when the activity form is closed or saved. */
+  returnTo?: string | null;
 };
 
 function activityFormPath(
   workspaceSlug: string,
-  options: { leadId?: string; propertyId?: string; opportunityId?: string; activityId?: string },
+  options: {
+    leadId?: string;
+    propertyId?: string;
+    opportunityId?: string;
+    activityId?: string;
+    returnTo?: string | null;
+  },
 ): string {
-  const { leadId, propertyId, opportunityId, activityId } = options;
+  const { leadId, propertyId, opportunityId, activityId, returnTo } = options;
   if (activityId) {
-    return workspacePath(workspaceSlug, "activities", activityId, "edit");
+    const path = workspacePath(workspaceSlug, "activities", activityId, "edit");
+    return returnTo ? appendReturnTo(path, returnTo) : path;
   }
 
   const params = new URLSearchParams();
   if (leadId) params.set("leadId", leadId);
   if (propertyId) params.set("propertyId", propertyId);
   if (opportunityId) params.set("opportunityId", opportunityId);
+  if (returnTo) params.set("returnTo", returnTo);
   const query = params.toString();
   return query
     ? `${workspacePath(workspaceSlug, "activities", "new")}?${query}`
@@ -79,6 +105,7 @@ export function ActivitiesSection({
   canUpdate,
   canArchive,
   compact = false,
+  returnTo = null,
 }: ActivitiesSectionProps) {
   const router = useRouter();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
@@ -86,7 +113,19 @@ export function ActivitiesSection({
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
 
-  const createHref = activityFormPath(workspaceSlug, { leadId, propertyId, opportunityId });
+  const createHref = activityFormPath(workspaceSlug, {
+    leadId,
+    propertyId,
+    opportunityId,
+    returnTo,
+  });
+
+  function openActivity(href: string) {
+    if (returnTo) {
+      rememberWorkflowStep(returnTo);
+    }
+    router.push(href);
+  }
 
   const loadActivities = useCallback(async () => {
     if (!canRead) {
@@ -120,7 +159,9 @@ export function ActivitiesSection({
       setActivities(body.data);
     } catch (loadError) {
       setError(
-        loadError instanceof Error ? loadError.message : "Failed to load activities.",
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load activities.",
       );
     } finally {
       setLoading(false);
@@ -204,7 +245,7 @@ export function ActivitiesSection({
 
   if (loading) {
     return (
-      <div className="px-5 pb-5 space-y-3">
+      <div className="space-y-3 px-5 pb-5">
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-16 w-full" />
       </div>
@@ -217,7 +258,10 @@ export function ActivitiesSection({
         <ErrorState
           title="Could not load activities"
           description={error}
-          primaryAction={{ label: "Retry", onClick: () => void loadActivities() }}
+          primaryAction={{
+            label: "Retry",
+            onClick: () => void loadActivities(),
+          }}
         />
       </div>
     );
@@ -230,7 +274,7 @@ export function ActivitiesSection({
           <Button
             size="sm"
             leadingIcon={<IconPlus size={13} />}
-            onClick={() => router.push(createHref)}
+            onClick={() => openActivity(createHref)}
           >
             New activity
           </Button>
@@ -245,7 +289,7 @@ export function ActivitiesSection({
             canCreate
               ? {
                   label: "Create activity",
-                  onClick: () => router.push(createHref),
+                  onClick: () => openActivity(createHref),
                 }
               : undefined
           }
@@ -253,14 +297,14 @@ export function ActivitiesSection({
       ) : (
         <div className="space-y-4">
           {!compact && (
-            <div className="bg-white border border-[var(--color-line)] rounded-xl divide-y divide-[var(--color-line)] overflow-hidden">
+            <div className="divide-y divide-[var(--color-line)] overflow-hidden rounded-xl border border-[var(--color-line)] bg-white">
               {activities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--color-canvas)] transition-colors"
+                  className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-[var(--color-canvas)]"
                 >
                   <span
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                     style={{
                       background: `color-mix(in srgb, ${activity.type?.color ?? "var(--color-brand-600)"} 10%, white)`,
                       color: activity.type?.color ?? "var(--color-brand-600)",
@@ -268,9 +312,9 @@ export function ActivitiesSection({
                   >
                     {activityTypeIcon(activity.type?.key)}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[13.5px] font-semibold text-[var(--color-ink)] truncate">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-[13.5px] font-semibold text-[var(--color-ink)]">
                         {activity.title}
                       </p>
                       {activity.isOverdue && (
@@ -279,10 +323,13 @@ export function ActivitiesSection({
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-[var(--color-ink-muted)] mt-0.5 truncate">
+                    <p className="mt-0.5 truncate text-[12px] text-[var(--color-ink-muted)]">
                       {formatRelatedSummary(activity)} ·{" "}
                       {activity.dueDate
-                        ? formatActivityDateTime(activity.dueDate, workspaceTimezone)
+                        ? formatActivityDateTime(
+                            activity.dueDate,
+                            workspaceTimezone,
+                          )
                         : "No due date"}
                     </p>
                   </div>
@@ -321,8 +368,11 @@ export function ActivitiesSection({
                         size="sm"
                         variant="ghost"
                         onClick={() =>
-                          router.push(
-                            activityFormPath(workspaceSlug, { activityId: activity.id }),
+                          openActivity(
+                            activityFormPath(workspaceSlug, {
+                              activityId: activity.id,
+                              returnTo,
+                            }),
                           )
                         }
                       >
@@ -334,7 +384,9 @@ export function ActivitiesSection({
                         size="sm"
                         variant="ghost"
                         disabled={actionPending === activity.id}
-                        onClick={() => void handleArchive(activity.id, activity.title)}
+                        onClick={() =>
+                          void handleArchive(activity.id, activity.title)
+                        }
                       >
                         Archive
                       </Button>
@@ -366,7 +418,7 @@ export function ActivitiesSection({
                   .filter(Boolean)
                   .join(" · "),
                 trailing: (
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex shrink-0 items-center gap-1">
                     {activity.status && (
                       <StatusBadge
                         label={activity.status.label}
@@ -375,34 +427,39 @@ export function ActivitiesSection({
                         size="sm"
                       />
                     )}
-                    {compact && canUpdate && activity.status?.behavior === "pending" && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          leadingIcon={<IconCheck size={12} />}
-                          disabled={actionPending === activity.id}
-                          onClick={() => void handleComplete(activity.id)}
-                        >
-                          Complete
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={actionPending === activity.id}
-                          onClick={() => void handleCancel(activity.id)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
+                    {compact &&
+                      canUpdate &&
+                      activity.status?.behavior === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            leadingIcon={<IconCheck size={12} />}
+                            disabled={actionPending === activity.id}
+                            onClick={() => void handleComplete(activity.id)}
+                          >
+                            Complete
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={actionPending === activity.id}
+                            onClick={() => void handleCancel(activity.id)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      )}
                     {compact && canUpdate && (
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() =>
-                          router.push(
-                            activityFormPath(workspaceSlug, { activityId: activity.id }),
+                          openActivity(
+                            activityFormPath(workspaceSlug, {
+                              activityId: activity.id,
+                              returnTo,
+                            }),
                           )
                         }
                       >
@@ -414,7 +471,9 @@ export function ActivitiesSection({
                         size="sm"
                         variant="ghost"
                         disabled={actionPending === activity.id}
-                        onClick={() => void handleArchive(activity.id, activity.title)}
+                        onClick={() =>
+                          void handleArchive(activity.id, activity.title)
+                        }
                       >
                         Archive
                       </Button>
@@ -426,7 +485,6 @@ export function ActivitiesSection({
           />
         </div>
       )}
-
     </div>
   );
 }

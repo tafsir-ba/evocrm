@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { MemberSelector, type MemberSelectorMember } from "@/components/domain/member-selector";
+import {
+  MemberSelector,
+  type MemberSelectorMember,
+} from "@/components/domain/member-selector";
 import {
   ProjectSelector,
   type ProjectSelectorProject,
@@ -17,6 +20,10 @@ import {
   fromDatetimeLocalInWorkspaceTimezone,
   toDatetimeLocalInWorkspaceTimezone,
 } from "@/lib/workspace-datetime";
+import {
+  performWorkflowStepBack,
+  readSafeWorkflowHref,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type DictionaryItem = {
@@ -55,6 +62,7 @@ type ActivityFormPageProps = {
   initialValues?: ActivityFormInitialValues;
   cancelHref: string;
   back?: { href: string; label?: string };
+  returnTo?: string | null;
 };
 
 const emptyForm: ActivityFormInitialValues = {
@@ -78,19 +86,23 @@ export function ActivityFormPage({
   initialValues,
   cancelHref,
   back,
+  returnTo = null,
 }: ActivityFormPageProps) {
   const router = useRouter();
   const [types, setTypes] = useState<DictionaryItem[]>([]);
   const [statuses, setStatuses] = useState<DictionaryItem[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
-  const [form, setForm] = useState<ActivityFormInitialValues>(initialValues ?? emptyForm);
+  const [form, setForm] = useState<ActivityFormInitialValues>(
+    initialValues ?? emptyForm,
+  );
   const [loading, setLoading] = useState(mode === "edit" && !initialValues);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
-  const formId = mode === "create" ? "create-activity-form" : "edit-activity-form";
+  const formId =
+    mode === "create" ? "create-activity-form" : "edit-activity-form";
   const isEdit = mode === "edit";
   const hasLinkContext = Boolean(
     context?.leadId || context?.propertyId || context?.opportunityId,
@@ -103,7 +115,8 @@ export function ActivityFormPage({
 
   const defaultStatusId = useMemo(
     () =>
-      statuses.find((item) => item.behavior === "pending" && item.isDefault)?.id ??
+      statuses.find((item) => item.behavior === "pending" && item.isDefault)
+        ?.id ??
       statuses.find((item) => item.behavior === "pending")?.id ??
       statuses[0]?.id ??
       "",
@@ -115,20 +128,21 @@ export function ActivityFormPage({
       setError(null);
 
       try {
-        const [typesRes, statusesRes, membersRes, projectsRes] = await Promise.all([
-          fetch(`${apiBase}/dictionary-items?type=activity_type`),
-          fetch(`${apiBase}/dictionary-items?type=activity_status`),
-          fetch(`${apiBase}/members`),
-          fetch(`${apiBase}/projects`),
-        ]);
+        const [typesRes, statusesRes, membersRes, projectsRes] =
+          await Promise.all([
+            fetch(`${apiBase}/dictionary-items?type=activity_type`),
+            fetch(`${apiBase}/dictionary-items?type=activity_status`),
+            fetch(`${apiBase}/members`),
+            fetch(`${apiBase}/projects`),
+          ]);
 
         const [typesPayload, statusesPayload, membersPayload, projectsPayload] =
           await Promise.all([
-          typesRes.json(),
-          statusesRes.json(),
-          membersRes.json(),
-          projectsRes.json(),
-        ]);
+            typesRes.json(),
+            statusesRes.json(),
+            membersRes.json(),
+            projectsRes.json(),
+          ]);
 
         if (typesRes.ok) {
           setTypes(typesPayload.data.items as DictionaryItem[]);
@@ -140,7 +154,9 @@ export function ActivityFormPage({
           setMembers(membersPayload.data.members as MemberSelectorMember[]);
         }
         if (projectsRes.ok) {
-          setProjects(projectsPayload.data.projects as ProjectSelectorProject[]);
+          setProjects(
+            projectsPayload.data.projects as ProjectSelectorProject[],
+          );
         }
       } catch {
         setError("Failed to load form options.");
@@ -218,7 +234,10 @@ export function ActivityFormPage({
           statusId: activity.statusId,
           title: activity.title,
           description: activity.description ?? "",
-          dueDate: toDatetimeLocalInWorkspaceTimezone(activity.dueDate, workspaceTimezone),
+          dueDate: toDatetimeLocalInWorkspaceTimezone(
+            activity.dueDate,
+            workspaceTimezone,
+          ),
           nextActionDate: toDatetimeLocalInWorkspaceTimezone(
             activity.nextActionDate,
             workspaceTimezone,
@@ -227,7 +246,11 @@ export function ActivityFormPage({
           outcome: activity.outcome ?? "",
         });
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Failed to load activity.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load activity.",
+        );
       } finally {
         setLoading(false);
       }
@@ -246,7 +269,9 @@ export function ActivityFormPage({
       // before React state catches up (especially with footer submit).
       const formData = new FormData(event.currentTarget);
       const dueDateLocal = String(formData.get("dueDate") ?? "").trim();
-      const nextActionDateLocal = String(formData.get("nextActionDate") ?? "").trim();
+      const nextActionDateLocal = String(
+        formData.get("nextActionDate") ?? "",
+      ).trim();
 
       const dueDateIso = fromDatetimeLocalInWorkspaceTimezone(
         dueDateLocal,
@@ -291,7 +316,9 @@ export function ActivityFormPage({
       }
 
       const response = await fetch(
-        isEdit ? `${apiBase}/activities/${activityId}` : `${apiBase}/activities`,
+        isEdit
+          ? `${apiBase}/activities/${activityId}`
+          : `${apiBase}/activities`,
         {
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -305,12 +332,19 @@ export function ActivityFormPage({
       }
 
       const savedActivityId = isEdit ? activityId : body.data?.activity?.id;
-      if (context?.leadId) {
+      const parent = readSafeWorkflowHref(returnTo, workspaceSlug);
+      if (parent) {
+        performWorkflowStepBack(router, parent, { fallback: "replace" });
+      } else if (context?.leadId) {
         router.push(workspacePath(workspaceSlug, "leads", context.leadId));
       } else if (context?.propertyId) {
-        router.push(workspacePath(workspaceSlug, "properties", context.propertyId));
+        router.push(
+          workspacePath(workspaceSlug, "properties", context.propertyId),
+        );
       } else if (context?.opportunityId) {
-        router.push(workspacePath(workspaceSlug, "opportunities", context.opportunityId));
+        router.push(
+          workspacePath(workspaceSlug, "opportunities", context.opportunityId),
+        );
       } else if (savedActivityId) {
         router.push(workspacePath(workspaceSlug, "activities"));
       } else {
@@ -318,7 +352,9 @@ export function ActivityFormPage({
       }
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to save.");
+      setError(
+        submitError instanceof Error ? submitError.message : "Failed to save.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -326,7 +362,10 @@ export function ActivityFormPage({
 
   if (loading) {
     return (
-      <FocusedFormLayout title={isEdit ? "Edit activity" : "New activity"} back={back}>
+      <FocusedFormLayout
+        title={isEdit ? "Edit activity" : "New activity"}
+        back={back}
+      >
         <p className="text-[13px] text-[var(--color-ink-muted)]">Loading…</p>
       </FocusedFormLayout>
     );
@@ -342,12 +381,17 @@ export function ActivityFormPage({
       }
       back={back}
     >
-      <form id={formId} className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+      <form
+        id={formId}
+        className="space-y-4"
+        onSubmit={(event) => void handleSubmit(event)}
+      >
         {!isEdit && !hasLinkContext && (
           <>
             {projects.length === 0 ? (
-              <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
-                Create an active project before scheduling a standalone activity.
+              <p className="rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-[12px] text-[var(--color-ink-muted)]">
+                Create an active project before scheduling a standalone
+                activity.
               </p>
             ) : (
               <div>
@@ -358,7 +402,10 @@ export function ActivityFormPage({
                   projects={projects}
                   selectedProjectId={form.projectId || null}
                   onChange={(projectId) =>
-                    setForm((current) => ({ ...current, projectId: projectId ?? "" }))
+                    setForm((current) => ({
+                      ...current,
+                      projectId: projectId ?? "",
+                    }))
                   }
                   emptyLabel="No active projects available"
                 />
@@ -368,14 +415,14 @@ export function ActivityFormPage({
         )}
 
         {!isEdit && hasLinkContext && (
-          <p className="text-[12px] text-[var(--color-ink-muted)] rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2">
+          <p className="rounded-lg border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-[12px] text-[var(--color-ink-muted)]">
             This activity will inherit project scope from the linked record.
           </p>
         )}
 
         <p className="text-[12px] text-[var(--color-ink-muted)]">
-          Due dates use workspace timezone ({workspaceTimezone}). Date/time inputs are
-          interpreted in that timezone before saving.
+          Due dates use workspace timezone ({workspaceTimezone}). Date/time
+          inputs are interpreted in that timezone before saving.
         </p>
 
         <div>
@@ -385,7 +432,9 @@ export function ActivityFormPage({
           <Select
             id="activity-type"
             value={form.typeId}
-            onChange={(event) => setForm((current) => ({ ...current, typeId: event.target.value }))}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, typeId: event.target.value }))
+            }
             required
           >
             <option value="">Select type</option>
@@ -405,7 +454,10 @@ export function ActivityFormPage({
             id="activity-status"
             value={form.statusId}
             onChange={(event) =>
-              setForm((current) => ({ ...current, statusId: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                statusId: event.target.value,
+              }))
             }
             required
           >
@@ -425,7 +477,9 @@ export function ActivityFormPage({
           <Input
             id="activity-title"
             value={form.title}
-            onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, title: event.target.value }))
+            }
             required
           />
         </div>
@@ -436,7 +490,10 @@ export function ActivityFormPage({
             id="activity-description"
             value={form.description}
             onChange={(event) =>
-              setForm((current) => ({ ...current, description: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                description: event.target.value,
+              }))
             }
             rows={3}
           />
@@ -483,14 +540,19 @@ export function ActivityFormPage({
               id="activity-outcome"
               value={form.outcome}
               onChange={(event) =>
-                setForm((current) => ({ ...current, outcome: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  outcome: event.target.value,
+                }))
               }
               rows={2}
             />
           </div>
         )}
 
-        {error && <p className="text-[12px] text-[var(--color-danger-fg)]">{error}</p>}
+        {error && (
+          <p className="text-[12px] text-[var(--color-danger-fg)]">{error}</p>
+        )}
 
         <FocusedFormActions
           cancelHref={cancelHref}

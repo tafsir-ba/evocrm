@@ -9,13 +9,22 @@ import { IconPlus } from "@/lib/icons";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type LeadQuickNoteProps = {
-  workspaceSlug: string;
+  workspaceSlug?: string;
   leadId: string;
   leadName: string;
+  href?: string;
+  onOpen?: () => void;
   onSave: (body: string, followUpIso: string | null) => Promise<void>;
 };
 
-export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQuickNoteProps) {
+export function LeadQuickNote({
+  workspaceSlug,
+  leadId,
+  leadName,
+  href,
+  onOpen,
+  onSave,
+}: LeadQuickNoteProps) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -36,12 +45,19 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
     setSaving(true);
     setError(null);
     try {
-      await onSave(trimmed, followUpAt ? new Date(followUpAt).toISOString() : null);
+      await onSave(
+        trimmed,
+        followUpAt ? new Date(followUpAt).toISOString() : null,
+      );
       setBody("");
       setFollowUpAt("");
       setOpen(false);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save the note.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Could not save the note.",
+      );
     } finally {
       setSaving(false);
     }
@@ -64,7 +80,7 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
             setOpen(true);
           }
         }}
-        className="inline-flex h-8 w-8 md:h-5 md:w-5 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-100)]"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-100)] md:h-5 md:w-5"
       >
         <IconPlus size={12} />
       </button>
@@ -78,11 +94,22 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
         align="right"
         className="p-2.5"
       >
-        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-2">
+        <form
+          onSubmit={(event) => void handleSubmit(event)}
+          className="space-y-2"
+        >
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[12.5px] font-semibold text-[var(--color-ink)]">Quick note</p>
+            <p className="text-[12.5px] font-semibold text-[var(--color-ink)]">
+              Quick note
+            </p>
             <Link
-              href={workspacePath(workspaceSlug, "leads", leadId)}
+              href={
+                href ??
+                (workspaceSlug
+                  ? workspacePath(workspaceSlug, "leads", leadId)
+                  : "#")
+              }
+              onClick={onOpen}
               className="text-[11px] font-medium text-[var(--color-brand-700)] hover:underline"
             >
               Open lead
@@ -101,7 +128,7 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
             rows={3}
             placeholder="e.g. Followed up on WhatsApp, waiting for financing…"
             aria-label="Note"
-            className="w-full resize-y rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[12.5px] leading-snug text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-100)]"
+            className="w-full resize-y rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[12.5px] leading-snug text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:outline-none"
           />
           <label className="flex items-center gap-2 text-[11.5px] text-[var(--color-ink-muted)]">
             <span className="shrink-0">Follow up</span>
@@ -110,11 +137,14 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
               value={followUpAt}
               onChange={(event) => setFollowUpAt(event.target.value)}
               aria-label="Follow up (optional)"
-              className="h-10 min-w-0 flex-1 rounded-md md:h-7 border border-[var(--color-line)] px-1.5 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+              className="h-10 min-w-0 flex-1 rounded-md border border-[var(--color-line)] px-1.5 text-[12px] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none md:h-7"
             />
           </label>
           {error ? (
-            <p role="alert" className="text-[12px] text-[var(--color-danger-fg)]">
+            <p
+              role="alert"
+              className="text-[12px] text-[var(--color-danger-fg)]"
+            >
               {error}
             </p>
           ) : null}
@@ -122,7 +152,12 @@ export function LeadQuickNote({ workspaceSlug, leadId, leadName, onSave }: LeadQ
             <span className="text-[11px] text-[var(--color-ink-faint)]">
               Saved to the lead&apos;s Notes · ⌘↵
             </span>
-            <Button type="submit" size="sm" className="h-10 px-3 text-[13px] md:h-7 md:px-2.5 md:text-[12px]" disabled={!body.trim() || saving}>
+            <Button
+              type="submit"
+              size="sm"
+              className="h-10 px-3 text-[13px] md:h-7 md:px-2.5 md:text-[12px]"
+              disabled={!body.trim() || saving}
+            >
               {saving ? "Saving…" : "Save note"}
             </Button>
           </div>

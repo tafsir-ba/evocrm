@@ -1,7 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { WorkflowBackLink } from "@/components/layout/workflow-back-link";
 import { Button } from "@/components/ui/button";
 import { IconClose } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -18,14 +18,15 @@ export function FocusedFormLayout({
 }: {
   title: ReactNode;
   description?: ReactNode;
-  back?: { href: string; label?: string };
+  back?: { href: string; label?: string; mode?: "parent" | "stack" };
   closeHref?: string;
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
   maxWidth?: "lg" | "2xl" | "3xl" | "full";
 }) {
-  const resolvedBack = back ?? (closeHref ? { href: closeHref, label: "Back" } : undefined);
+  const resolvedBack =
+    back ?? (closeHref ? { href: closeHref, label: "Back" } : undefined);
   const resolvedCloseHref = closeHref ?? back?.href;
   const maxWidthClass =
     maxWidth === "lg"
@@ -34,20 +35,25 @@ export function FocusedFormLayout({
         ? "max-w-3xl"
         : maxWidth === "full"
           ? "max-w-none w-full"
-        : "max-w-2xl";
+          : "max-w-2xl";
 
   return (
     <div className={cn(maxWidthClass, "mx-auto", className)}>
       <div className="relative mb-6">
-        <PageHeader title={title} description={description} back={resolvedBack} />
+        <PageHeader
+          title={title}
+          description={description}
+          back={resolvedBack}
+        />
         {resolvedCloseHref ? (
-          <Link
+          <WorkflowBackLink
             href={resolvedCloseHref}
-            className="absolute right-0 top-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas)] focus-ring"
-            aria-label="Close"
+            mode={back?.mode}
+            className="focus-ring absolute top-0 right-0 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-canvas)] hover:text-[var(--color-ink)]"
+            ariaLabel="Close"
           >
             <IconClose size={18} />
-          </Link>
+          </WorkflowBackLink>
         ) : null}
       </div>
       <div className="rounded-xl border border-[var(--color-line)] bg-white p-4 sm:p-6">
@@ -76,18 +82,22 @@ export function FocusedFormActions({
   return (
     <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--color-line)] pt-4">
       {cancelHref ? (
-        <Link
+        <WorkflowBackLink
           href={cancelHref}
           className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white px-3.5 text-[13.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-canvas)]"
         >
           Cancel
-        </Link>
+        </WorkflowBackLink>
       ) : (
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
       )}
-      <Button type="submit" form={formId} disabled={submitting || submitDisabled}>
+      <Button
+        type="submit"
+        form={formId}
+        disabled={submitting || submitDisabled}
+      >
         {submitting ? `${submitLabel}…` : submitLabel}
       </Button>
     </div>

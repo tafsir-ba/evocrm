@@ -10,6 +10,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createOpportunityHref } from "@/lib/opportunity-link-flow";
+import {
+  appendReturnTo,
+  rememberWorkflowStep,
+} from "@/lib/workflow-navigation";
 import { IconPlus } from "@/lib/icons";
 import { formatDate, formatPrice } from "@/lib/format-price";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -20,7 +24,12 @@ type OpportunityListItem = {
   currency: string;
   probability: number | null;
   expectedCloseDate: string | null;
-  status: { id: string; label: string; color: string; behavior?: string } | null;
+  status: {
+    id: string;
+    label: string;
+    color: string;
+    behavior?: string;
+  } | null;
   lead: { id: string; fullName: string } | null;
   property: { id: string; title: string; reference: string | null } | null;
 };
@@ -32,6 +41,8 @@ type OpportunitiesSectionProps = {
   propertyId?: string;
   canRead: boolean;
   canCreate: boolean;
+  /** Immediate parent restored from the new opportunity and from its detail screen. */
+  returnTo?: string | null;
 };
 
 export function OpportunitiesSection({
@@ -41,18 +52,33 @@ export function OpportunitiesSection({
   propertyId,
   canRead,
   canCreate,
+  returnTo = null,
 }: OpportunitiesSectionProps) {
   const router = useRouter();
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const createHref = createOpportunityHref(workspaceSlug, {
+  const createPath = createOpportunityHref(workspaceSlug, {
     leadId,
     propertyId,
     lockLead: Boolean(leadId),
     lockProperty: Boolean(propertyId),
   });
+  const createHref = returnTo
+    ? appendReturnTo(createPath, returnTo)
+    : createPath;
+  const linkedOpportunityHref = (opportunityId: string) => {
+    const path = workspacePath(workspaceSlug, "opportunities", opportunityId);
+    return returnTo ? appendReturnTo(path, returnTo) : path;
+  };
+
+  function openFromHere(href: string) {
+    if (returnTo) {
+      rememberWorkflowStep(returnTo);
+    }
+    router.push(href);
+  }
   const createLabel = leadId
     ? "Link to property"
     : propertyId
@@ -90,7 +116,9 @@ export function OpportunitiesSection({
       setOpportunities(body.data);
     } catch (loadError) {
       setError(
-        loadError instanceof Error ? loadError.message : "Failed to load opportunities.",
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load opportunities.",
       );
     } finally {
       setLoading(false);
@@ -114,7 +142,7 @@ export function OpportunitiesSection({
 
   if (loading) {
     return (
-      <div className="px-5 pb-5 space-y-3">
+      <div className="space-y-3 px-5 pb-5">
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-16 w-full" />
       </div>
@@ -127,7 +155,10 @@ export function OpportunitiesSection({
         <ErrorState
           title="Could not load opportunities"
           description={error}
-          primaryAction={{ label: "Retry", onClick: () => void loadOpportunities() }}
+          primaryAction={{
+            label: "Retry",
+            onClick: () => void loadOpportunities(),
+          }}
         />
       </div>
     );
@@ -140,7 +171,7 @@ export function OpportunitiesSection({
           <Button
             size="sm"
             leadingIcon={<IconPlus size={13} />}
-            onClick={() => router.push(createHref)}
+            onClick={() => openFromHere(createHref)}
           >
             {createLabel}
           </Button>
@@ -157,25 +188,28 @@ export function OpportunitiesSection({
           }
           primaryAction={
             canCreate
-              ? { label: createLabel, onClick: () => router.push(createHref) }
+              ? { label: createLabel, onClick: () => openFromHere(createHref) }
               : undefined
           }
         />
       ) : (
-        <ul className="divide-y divide-[var(--color-line)] border border-[var(--color-line)] rounded-lg">
+        <ul className="divide-y divide-[var(--color-line)] rounded-lg border border-[var(--color-line)]">
           {opportunities.map((opportunity) => (
             <li key={opportunity.id}>
               <Link
-                href={workspacePath(workspaceSlug, "opportunities", opportunity.id)}
+                href={linkedOpportunityHref(opportunity.id)}
+                onClick={() => {
+                  if (returnTo) rememberWorkflowStep(returnTo);
+                }}
                 className="flex items-center justify-between gap-3 p-3 hover:bg-[var(--color-canvas)]"
               >
                 <div className="min-w-0">
-                  <p className="text-[13.5px] font-semibold text-[var(--color-ink)] truncate">
+                  <p className="truncate text-[13.5px] font-semibold text-[var(--color-ink)]">
                     {leadId
-                      ? opportunity.property?.title ?? "Property"
-                      : opportunity.lead?.fullName ?? "Lead"}
+                      ? (opportunity.property?.title ?? "Property")
+                      : (opportunity.lead?.fullName ?? "Lead")}
                   </p>
-                  <p className="text-[12px] text-[var(--color-ink-muted)] truncate">
+                  <p className="truncate text-[12px] text-[var(--color-ink-muted)]">
                     {formatPrice(opportunity.value, opportunity.currency)}
                     {opportunity.probability !== null
                       ? ` · ${opportunity.probability}%`

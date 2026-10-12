@@ -1,17 +1,26 @@
 import { OpportunityDetailPanel } from "@/components/opportunities/opportunity-detail-panel";
 import { PageContainer } from "@/components/layout/page-header";
+import { readSafeWorkflowHref } from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 
 type Params = Promise<{ workspaceSlug: string; opportunityId: string }>;
+type SearchParams = Promise<{ returnTo?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { workspaceSlug, opportunityId } = await params;
   return { title: `Opportunity ${opportunityId} — ${workspaceSlug}` };
 }
 
-export default async function OpportunityDetailPage({ params }: { params: Params }) {
+export default async function OpportunityDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug, opportunityId } = await params;
+  const { returnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -41,6 +50,7 @@ export default async function OpportunityDetailPage({ params }: { params: Params
         canReadDocuments={hasPermission(permissions, "document:read")}
         canCreateDocument={hasPermission(permissions, "document:create")}
         canArchiveDocument={hasPermission(permissions, "document:archive")}
+        returnTo={readSafeWorkflowHref(returnTo, workspaceSlug)}
       />
     </PageContainer>
   );

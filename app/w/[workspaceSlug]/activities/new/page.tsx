@@ -1,6 +1,10 @@
 import { ActivityFormPage } from "@/components/activities/activity-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import {
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -10,6 +14,7 @@ type SearchParams = Promise<{
   leadId?: string;
   propertyId?: string;
   opportunityId?: string;
+  returnTo?: string;
 }>;
 
 export const metadata = { title: "New activity — EvoHome CRM" };
@@ -22,7 +27,12 @@ export default async function NewActivityPage({
   searchParams: SearchParams;
 }) {
   const { workspaceSlug } = await params;
-  const { leadId, propertyId, opportunityId } = await searchParams;
+  const {
+    leadId,
+    propertyId,
+    opportunityId,
+    returnTo: rawReturnTo,
+  } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -50,13 +60,16 @@ export default async function NewActivityPage({
   }
 
   const context = { leadId, propertyId, opportunityId };
-  const cancelHref = leadId
-    ? workspacePath(workspaceSlug, "leads", leadId)
-    : propertyId
-      ? workspacePath(workspaceSlug, "properties", propertyId)
-      : opportunityId
-        ? workspacePath(workspaceSlug, "opportunities", opportunityId)
-        : workspacePath(workspaceSlug, "activities");
+  const workflowReturn = readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const cancelHref =
+    workflowReturn ??
+    (leadId
+      ? workspacePath(workspaceSlug, "leads", leadId)
+      : propertyId
+        ? workspacePath(workspaceSlug, "properties", propertyId)
+        : opportunityId
+          ? workspacePath(workspaceSlug, "opportunities", opportunityId)
+          : workspacePath(workspaceSlug, "activities"));
 
   return (
     <PageContainer>
@@ -65,16 +78,19 @@ export default async function NewActivityPage({
         workspaceTimezone={access.context.workspace.timezone}
         mode="create"
         context={context}
+        returnTo={workflowReturn}
         cancelHref={cancelHref}
         back={{
           href: cancelHref,
-          label: leadId
-            ? "Back to lead"
-            : propertyId
-              ? "Back to property"
-              : opportunityId
-                ? "Back to opportunity"
-                : "Back to activities",
+          label: workflowReturn
+            ? workflowBackLabel(cancelHref, workspaceSlug)
+            : leadId
+              ? "Back to lead"
+              : propertyId
+                ? "Back to property"
+                : opportunityId
+                  ? "Back to opportunity"
+                  : "Back to activities",
         }}
       />
     </PageContainer>

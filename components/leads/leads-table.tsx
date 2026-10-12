@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  Fragment,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { StatusBadge } from "@/components/domain/status-badge";
 import {
@@ -11,12 +19,19 @@ import {
 } from "@/components/leads/lead-column-header";
 import { LeadProjectMemberships } from "@/components/leads/lead-project-memberships";
 import { LeadQuickNote } from "@/components/leads/lead-quick-note";
+import { useLeadListScroll } from "@/components/leads/use-lead-list-scroll";
 import { LeadStatusPicker } from "@/components/leads/lead-status-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
-import { IconChevronDown, IconChevronRight, IconMail, IconPhone, IconSparkles } from "@/lib/icons";
+import {
+  IconChevronDown,
+  IconChevronRight,
+  IconMail,
+  IconPhone,
+  IconSparkles,
+} from "@/lib/icons";
 import type {
   LeadAgePreset,
   LeadBrowserSort,
@@ -65,7 +80,11 @@ export type LeadTableItem = {
   statusId?: string;
   source: LeadTableDictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
-  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  secondaryProjects?: Array<{
+    id: string;
+    name: string;
+    reference: string | null;
+  }>;
   projectMemberships?: Array<{
     id: string;
     projectId: string;
@@ -136,10 +155,22 @@ type LeadsTableProps = {
   onAssign: (leadId: string, assignedTo: string | null) => void;
   onStatusChange: (leadId: string, statusId: string) => void;
   onCreateStatus: (leadId: string, label: string) => Promise<void>;
-  onAddNote: (leadId: string, body: string, followUpIso: string | null) => Promise<void>;
+  onAddNote: (
+    leadId: string,
+    body: string,
+    followUpIso: string | null,
+  ) => Promise<void>;
   onEnrich?: (leadId: string) => void;
   onArchive: (leadId: string, leadName: string) => void;
   onRestore: (leadId: string, leadName: string) => void;
+  /** Current list URL, used to restore scroll when returning from a lead. */
+  listHref?: string | null;
+  /** Lead detail URL including the list return path. */
+  leadHref?: (leadId: string) => string;
+  /** Lead to highlight after returning from its record. */
+  focusedLeadId?: string | null;
+  /** Remember this lead as the selected row before leaving the list. */
+  onOpenLead?: (leadId: string) => void;
 };
 
 const compactSelectClass =
@@ -176,13 +207,17 @@ function RowSelect({
   );
 }
 
-function TagChip({ tag }: { tag: { id: string; name: string; color: string } }) {
+function TagChip({
+  tag,
+}: {
+  tag: { id: string; name: string; color: string };
+}) {
   const color = isValidHexColor(tag.color) ? tag.color : null;
 
   return (
     <span
       title={tag.name}
-      className="inline-flex max-w-[6.5rem] truncate rounded border px-1.5 py-px text-[10.5px] font-medium leading-4"
+      className="inline-flex max-w-[6.5rem] truncate rounded border px-1.5 py-px text-[10.5px] leading-4 font-medium"
       style={
         color
           ? {
@@ -198,7 +233,13 @@ function TagChip({ tag }: { tag: { id: string; name: string; color: string } }) 
   );
 }
 
-function LeadTags({ tags, max = 1 }: { tags: LeadTableItem["tagsResolved"]; max?: number }) {
+function LeadTags({
+  tags,
+  max = 1,
+}: {
+  tags: LeadTableItem["tagsResolved"];
+  max?: number;
+}) {
   if (tags.length === 0) {
     return <span className="text-[var(--color-ink-faint)]">—</span>;
   }
@@ -258,7 +299,10 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
             href={`mailto:${lead.email}`}
             className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)] md:py-1.5 md:text-[12.5px]"
           >
-            <IconMail size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
+            <IconMail
+              size={13}
+              className="shrink-0 text-[var(--color-ink-muted)]"
+            />
             <span className="truncate">{lead.email}</span>
           </a>
         ) : null}
@@ -268,7 +312,10 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
             href={telHref(lead.phone)}
             className="flex items-center gap-2 rounded-md px-2 py-2.5 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)] md:py-1.5 md:text-[12.5px]"
           >
-            <IconPhone size={13} className="shrink-0 text-[var(--color-ink-muted)]" />
+            <IconPhone
+              size={13}
+              className="shrink-0 text-[var(--color-ink-muted)]"
+            />
             <span>{lead.phone}</span>
           </a>
         ) : null}
@@ -312,7 +359,11 @@ function StatusCell({
   }
 
   return lead.status ? (
-    <StatusBadge label={lead.status.label} color={lead.status.color} size="sm" />
+    <StatusBadge
+      label={lead.status.label}
+      color={lead.status.color}
+      size="sm"
+    />
   ) : (
     <span className="text-[var(--color-ink-faint)]">—</span>
   );
@@ -334,7 +385,9 @@ function AssignSelect({
       value={lead.assignedUser?.id ?? ""}
       disabled={pending}
       label={`Assign ${lead.fullName}`}
-      onChange={(event) => onAssign(event.target.value === "" ? null : event.target.value)}
+      onChange={(event) =>
+        onAssign(event.target.value === "" ? null : event.target.value)
+      }
     >
       <option value="">Unassigned</option>
       {members.map((member) => (
@@ -360,7 +413,7 @@ function PhoneLink({ phone }: { phone: string | null }) {
       href={telHref(phone)}
       title={`Call ${phone}`}
       onClick={(event) => event.stopPropagation()}
-      className="block truncate tabular text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
+      className="tabular block truncate text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
     >
       {phone}
     </a>
@@ -381,15 +434,17 @@ function UrgencyBadge({ lead }: { lead: LeadTableItem }) {
 }
 
 function NextStepCell({
-  workspaceSlug,
   lead,
   canAddNote,
+  leadHref,
   onAddNote,
+  onOpenLead,
 }: {
-  workspaceSlug: string;
   lead: LeadTableItem;
   canAddNote: boolean;
+  leadHref: string;
   onAddNote: (body: string, followUpIso: string | null) => Promise<void>;
+  onOpenLead?: () => void;
 }) {
   const step = formatNextStepCell(lead);
   const urgency = leadUrgency(lead);
@@ -402,7 +457,10 @@ function NextStepCell({
           "min-w-0 flex-1 truncate",
           step.kind === "empty" && "text-[var(--color-ink-faint)]",
           step.kind === "last" && "text-[var(--color-ink-muted)]",
-          step.kind === "next" && (hot ? "font-medium text-[var(--color-danger-fg)]" : "text-[var(--color-ink-soft)]"),
+          step.kind === "next" &&
+            (hot
+              ? "font-medium text-[var(--color-danger-fg)]"
+              : "text-[var(--color-ink-soft)]"),
         )}
         title={step.text}
       >
@@ -410,9 +468,10 @@ function NextStepCell({
       </p>
       {canAddNote && !lead.archivedAt ? (
         <LeadQuickNote
-          workspaceSlug={workspaceSlug}
           leadId={lead.id}
           leadName={lead.fullName}
+          href={leadHref}
+          onOpen={onOpenLead}
           onSave={onAddNote}
         />
       ) : null}
@@ -421,17 +480,19 @@ function NextStepCell({
 }
 
 function RowActions({
-  workspaceSlug,
   lead,
+  leadHref,
   expanded,
   onToggleExpanded,
   onEnrich,
+  onOpenLead,
 }: {
-  workspaceSlug: string;
   lead: LeadTableItem;
+  leadHref: string;
   expanded: boolean;
   onToggleExpanded: () => void;
   onEnrich?: () => void;
+  onOpenLead?: () => void;
 }) {
   return (
     <div className="inline-flex items-center justify-end gap-0.5">
@@ -454,13 +515,22 @@ function RowActions({
         type="button"
         className="inline-flex h-9 w-9 items-center justify-center rounded text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:w-6"
         aria-expanded={expanded}
-        aria-label={expanded ? `Hide details for ${lead.fullName}` : `Show details for ${lead.fullName}`}
+        aria-label={
+          expanded
+            ? `Hide details for ${lead.fullName}`
+            : `Show details for ${lead.fullName}`
+        }
         onClick={onToggleExpanded}
       >
-        {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+        {expanded ? (
+          <IconChevronDown size={14} />
+        ) : (
+          <IconChevronRight size={14} />
+        )}
       </button>
       <Link
-        href={workspacePath(workspaceSlug, "leads", lead.id)}
+        href={leadHref}
+        onClick={onOpenLead}
         className="inline-flex h-9 items-center rounded px-2.5 text-[13px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] md:h-6 md:px-1.5 md:text-[12px]"
         aria-label={`Open ${lead.fullName}`}
       >
@@ -501,7 +571,10 @@ function ExpandedDetails({
       <div className="min-w-0 space-y-1 text-[var(--color-ink-soft)]">
         {lead.email ? (
           <p>
-            <a className="hover:text-[var(--color-brand-700)]" href={`mailto:${lead.email}`}>
+            <a
+              className="hover:text-[var(--color-brand-700)]"
+              href={`mailto:${lead.email}`}
+            >
               {lead.email}
             </a>
           </p>
@@ -510,21 +583,40 @@ function ExpandedDetails({
         {last.kind === "last" ? <p>{last.text}</p> : null}
         {lead.industry ? <p>Industry {lead.industry}</p> : null}
         {lead.stateRegion ? <p>State / region {lead.stateRegion}</p> : null}
-        {lead.tagsResolved.length > 0 ? <LeadTags tags={lead.tagsResolved} max={6} /> : null}
+        {lead.tagsResolved.length > 0 ? (
+          <LeadTags tags={lead.tagsResolved} max={6} />
+        ) : null}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {canUpdate && !lead.archivedAt && members.length > 0 ? (
-          <AssignSelect lead={lead} members={members} pending={pending} onAssign={onAssign} />
+          <AssignSelect
+            lead={lead}
+            members={members}
+            pending={pending}
+            onAssign={onAssign}
+          />
         ) : null}
       </div>
       <div className="flex items-center justify-end gap-1">
         {canArchive && lead.archivedAt ? (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onRestore}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[12px]"
+            disabled={pending}
+            onClick={onRestore}
+          >
             Restore
           </Button>
         ) : null}
         {canArchive && !lead.archivedAt ? (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[12px]" disabled={pending} onClick={onArchive}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[12px]"
+            disabled={pending}
+            onClick={onArchive}
+          >
             Archive
           </Button>
         ) : null}
@@ -539,7 +631,9 @@ function isSelectedLead(
   selectedLeadIds: Set<string>,
   excludedLeadIds: Set<string>,
 ): boolean {
-  return selectAllMatching ? !excludedLeadIds.has(leadId) : selectedLeadIds.has(leadId);
+  return selectAllMatching
+    ? !excludedLeadIds.has(leadId)
+    : selectedLeadIds.has(leadId);
 }
 
 export function LeadsTable({
@@ -574,10 +668,28 @@ export function LeadsTable({
   onEnrich,
   onArchive,
   onRestore,
+  listHref = null,
+  leadHref,
+  focusedLeadId = null,
+  onOpenLead,
 }: LeadsTableProps) {
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLUListElement>(null);
+  const scrollRefs = useMemo(
+    () =>
+      [desktopScrollRef, mobileScrollRef] as Array<
+        RefObject<HTMLElement | null>
+      >,
+    [],
+  );
+  useLeadListScroll(listHref ?? null, scrollRefs);
   const enrichHandler = (leadId: string) =>
     canEnrich && onEnrich ? () => onEnrich(leadId) : undefined;
-  const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(() => new Set());
+  const hrefFor = (leadId: string) =>
+    leadHref ? leadHref(leadId) : workspacePath(workspaceSlug, "leads", leadId);
+  const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const columnCount = (canDelete ? 1 : 0) + 12;
   const effectiveProjectFilter =
     filterOptions.workspaceProjectId ?? columnFilters.projectId;
@@ -597,12 +709,13 @@ export function LeadsTable({
   return (
     <>
       <div
+        ref={desktopScrollRef}
         data-testid="leads-table-scroll"
         className="hidden min-h-0 flex-1 overflow-auto overscroll-contain md:block"
       >
-        <table className="min-w-[1240px] w-full text-[12.5px] leading-none">
+        <table className="w-full min-w-[1240px] text-[12.5px] leading-none">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+            <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               {canDelete && (
                 <th className="w-8 px-1.5 py-1">
                   <input
@@ -611,7 +724,8 @@ export function LeadsTable({
                     checked={allPageSelected}
                     ref={(element) => {
                       if (element) {
-                        element.indeterminate = somePageSelected && !allPageSelected;
+                        element.indeterminate =
+                          somePageSelected && !allPageSelected;
                       }
                     }}
                     onChange={onTogglePage}
@@ -661,14 +775,17 @@ export function LeadsTable({
                 className="w-[8.5rem]"
                 filterActive={Boolean(columnFilters.companyId)}
                 filterLabel={
-                  filterOptions.companies.find((item) => item.id === columnFilters.companyId)
-                    ?.name
+                  filterOptions.companies.find(
+                    (item) => item.id === columnFilters.companyId,
+                  )?.name
                 }
               >
                 <ColumnFilterSelect
                   label="Company"
                   value={columnFilters.companyId}
-                  onChange={(value) => onColumnFilterChange({ companyId: value })}
+                  onChange={(value) =>
+                    onColumnFilterChange({ companyId: value })
+                  }
                 >
                   <option value="">All companies</option>
                   {filterOptions.companies.map((company) => (
@@ -687,7 +804,9 @@ export function LeadsTable({
                 className="w-[8.5rem]"
                 filterActive={Boolean(effectiveProjectFilter)}
                 filterLabel={
-                  filterOptions.projects.find((item) => item.id === effectiveProjectFilter)?.name
+                  filterOptions.projects.find(
+                    (item) => item.id === effectiveProjectFilter,
+                  )?.name
                 }
               >
                 {filterOptions.workspaceProjectId ? (
@@ -698,7 +817,9 @@ export function LeadsTable({
                   <ColumnFilterSelect
                     label="Project"
                     value={effectiveProjectFilter}
-                    onChange={(value) => onColumnFilterChange({ projectId: value })}
+                    onChange={(value) =>
+                      onColumnFilterChange({ projectId: value })
+                    }
                   >
                     <option value="">All projects</option>
                     {filterOptions.projects.map((project) => (
@@ -718,13 +839,17 @@ export function LeadsTable({
                 className="w-[7.5rem]"
                 filterActive={Boolean(columnFilters.sourceId)}
                 filterLabel={
-                  filterOptions.sources.find((item) => item.id === columnFilters.sourceId)?.label
+                  filterOptions.sources.find(
+                    (item) => item.id === columnFilters.sourceId,
+                  )?.label
                 }
               >
                 <ColumnFilterSelect
                   label="Source"
                   value={columnFilters.sourceId}
-                  onChange={(value) => onColumnFilterChange({ sourceId: value })}
+                  onChange={(value) =>
+                    onColumnFilterChange({ sourceId: value })
+                  }
                 >
                   <option value="">All sources</option>
                   {filterOptions.sources.map((source) => (
@@ -743,13 +868,17 @@ export function LeadsTable({
                 className="w-[7.5rem]"
                 filterActive={Boolean(columnFilters.statusId)}
                 filterLabel={
-                  filterOptions.statuses.find((item) => item.id === columnFilters.statusId)?.label
+                  filterOptions.statuses.find(
+                    (item) => item.id === columnFilters.statusId,
+                  )?.label
                 }
               >
                 <ColumnFilterSelect
                   label="Status"
                   value={columnFilters.statusId}
-                  onChange={(value) => onColumnFilterChange({ statusId: value })}
+                  onChange={(value) =>
+                    onColumnFilterChange({ statusId: value })
+                  }
                 >
                   <option value="">All statuses</option>
                   {filterOptions.statuses.map((status) => (
@@ -770,18 +899,20 @@ export function LeadsTable({
                 filterLabel={
                   columnFilters.assignedTo === "unassigned"
                     ? "Unassigned"
-                    : filterOptions.members.find(
+                    : (filterOptions.members.find(
                         (item) => item.userId === columnFilters.assignedTo,
                       )?.name ??
                       filterOptions.members.find(
                         (item) => item.userId === columnFilters.assignedTo,
-                      )?.email
+                      )?.email)
                 }
               >
                 <ColumnFilterSelect
                   label="Owner"
                   value={columnFilters.assignedTo}
-                  onChange={(value) => onColumnFilterChange({ assignedTo: value })}
+                  onChange={(value) =>
+                    onColumnFilterChange({ assignedTo: value })
+                  }
                 >
                   <option value="">All owners</option>
                   <option value="unassigned">Unassigned</option>
@@ -816,7 +947,9 @@ export function LeadsTable({
                   label="Created"
                   value={columnFilters.agePreset}
                   onChange={(value) =>
-                    onColumnFilterChange({ agePreset: value as LeadAgePreset | "" })
+                    onColumnFilterChange({
+                      agePreset: value as LeadAgePreset | "",
+                    })
                   }
                 >
                   <option value="">Any age</option>
@@ -848,7 +981,9 @@ export function LeadsTable({
                   label="Next action"
                   value={columnFilters.nextFilter}
                   onChange={(value) =>
-                    onColumnFilterChange({ nextFilter: value as LeadNextFilter | "" })
+                    onColumnFilterChange({
+                      nextFilter: value as LeadNextFilter | "",
+                    })
                   }
                 >
                   <option value="">Any</option>
@@ -876,7 +1011,9 @@ export function LeadsTable({
                   label="Urgency"
                   value={columnFilters.urgencyFilter}
                   onChange={(value) =>
-                    onColumnFilterChange({ urgencyFilter: value as LeadUrgencyFilter | "" })
+                    onColumnFilterChange({
+                      urgencyFilter: value as LeadUrgencyFilter | "",
+                    })
                   }
                 >
                   <option value="">Any urgency</option>
@@ -897,7 +1034,9 @@ export function LeadsTable({
                 className="w-[6.5rem]"
                 filterActive={Boolean(columnFilters.tagId)}
                 filterLabel={
-                  filterOptions.tags.find((item) => item.id === columnFilters.tagId)?.name
+                  filterOptions.tags.find(
+                    (item) => item.id === columnFilters.tagId,
+                  )?.name
                 }
               >
                 <ColumnFilterSelect
@@ -913,7 +1052,12 @@ export function LeadsTable({
                   ))}
                 </ColumnFilterSelect>
               </LeadColumnHeader>
-              <th className={cn("px-1.5 py-1 text-right", canEnrich ? "w-[9rem]" : "w-[5.5rem]")}>
+              <th
+                className={cn(
+                  "px-1.5 py-1 text-right",
+                  canEnrich ? "w-[9rem]" : "w-[5.5rem]",
+                )}
+              >
                 Actions
               </th>
             </tr>
@@ -928,19 +1072,28 @@ export function LeadsTable({
                 excludedLeadIds,
               );
               const expanded = expandedLeadIds.has(lead.id);
+              const focused = focusedLeadId === lead.id;
               const urgency = leadUrgency(lead);
-              const source = formatSourceContext(lead.source?.label, lead.attributes);
+              const source = formatSourceContext(
+                lead.source?.label,
+                lead.attributes,
+              );
               const utmTitle = formatUtmTitle(lead.attributes);
 
               return (
                 <Fragment key={lead.id}>
                   <tr
+                    data-focused={focused ? "true" : undefined}
                     className={cn(
                       "border-b border-[var(--color-line)]",
                       selected && "bg-[var(--color-brand-50)]/40",
+                      focused &&
+                        "ring-2 ring-[var(--color-brand-600)] ring-inset",
                       pending && "opacity-80",
-                      urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
-                      urgency.level === "today" && "bg-[var(--color-warn-bg)]/30",
+                      urgency.level === "overdue" &&
+                        "bg-[var(--color-danger-bg)]/40",
+                      urgency.level === "today" &&
+                        "bg-[var(--color-warn-bg)]/30",
                       expanded && "border-b-0",
                     )}
                   >
@@ -958,7 +1111,8 @@ export function LeadsTable({
                     <td className="min-w-[11rem] px-1.5 py-1">
                       <div className="flex min-w-0 items-center gap-1">
                         <Link
-                          href={workspacePath(workspaceSlug, "leads", lead.id)}
+                          href={hrefFor(lead.id)}
+                          onClick={() => onOpenLead?.(lead.id)}
                           className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                         >
                           {lead.fullName}
@@ -975,7 +1129,10 @@ export function LeadsTable({
                       <PhoneLink phone={lead.phone} />
                     </td>
                     <td className="px-1.5 py-1">
-                      <p className="truncate text-[var(--color-ink-soft)]" title={lead.company?.name ?? undefined}>
+                      <p
+                        className="truncate text-[var(--color-ink-soft)]"
+                        title={lead.company?.name ?? undefined}
+                      >
                         {lead.company?.name ?? "—"}
                       </p>
                     </td>
@@ -993,18 +1150,22 @@ export function LeadsTable({
                           }).text
                         }
                       >
-                        {lead.projectMemberships && lead.projectMemberships.length > 0 ? (
+                        {lead.projectMemberships &&
+                        lead.projectMemberships.length > 0 ? (
                           <LeadProjectMemberships
                             memberships={lead.projectMemberships}
                             compact
                           />
                         ) : (
-                          lead.project?.name ?? "—"
+                          (lead.project?.name ?? "—")
                         )}
                       </p>
                     </td>
                     <td className="px-1.5 py-1">
-                      <p className="truncate text-[var(--color-ink-soft)]" title={utmTitle ?? source.source}>
+                      <p
+                        className="truncate text-[var(--color-ink-soft)]"
+                        title={utmTitle ?? source.source}
+                      >
                         {source.source}
                       </p>
                     </td>
@@ -1017,8 +1178,12 @@ export function LeadsTable({
                           canUpdate={canUpdate}
                           canManageStatuses={canManageStatuses}
                           pending={pending}
-                          onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
-                          onCreateStatus={(label) => onCreateStatus(lead.id, label)}
+                          onStatusChange={(statusId) =>
+                            onStatusChange(lead.id, statusId)
+                          }
+                          onCreateStatus={(label) =>
+                            onCreateStatus(lead.id, label)
+                          }
                         />
                         {lead.archivedAt ? (
                           <Badge tone="muted" size="sm">
@@ -1028,19 +1193,25 @@ export function LeadsTable({
                       </div>
                     </td>
                     <td className="px-1.5 py-1">
-                      <p className="truncate text-[var(--color-ink-soft)]" title={formatOwnerName(lead.assignedUser)}>
+                      <p
+                        className="truncate text-[var(--color-ink-soft)]"
+                        title={formatOwnerName(lead.assignedUser)}
+                      >
                         {formatOwnerName(lead.assignedUser)}
                       </p>
                     </td>
-                    <td className="px-1.5 py-1 tabular text-[var(--color-ink-muted)]">
+                    <td className="tabular px-1.5 py-1 text-[var(--color-ink-muted)]">
                       {formatRelativeAge(lead.createdAt)}
                     </td>
                     <td className="px-1.5 py-1">
                       <NextStepCell
-                        workspaceSlug={workspaceSlug}
                         lead={lead}
                         canAddNote={canAddNotes}
-                        onAddNote={(body, followUpIso) => onAddNote(lead.id, body, followUpIso)}
+                        leadHref={hrefFor(lead.id)}
+                        onOpenLead={() => onOpenLead?.(lead.id)}
+                        onAddNote={(body, followUpIso) =>
+                          onAddNote(lead.id, body, followUpIso)
+                        }
                       />
                     </td>
                     <td className="px-1.5 py-1">
@@ -1051,11 +1222,12 @@ export function LeadsTable({
                     </td>
                     <td className="px-1.5 py-1 text-right">
                       <RowActions
-                        workspaceSlug={workspaceSlug}
                         lead={lead}
+                        leadHref={hrefFor(lead.id)}
                         expanded={expanded}
                         onToggleExpanded={() => toggleExpanded(lead.id)}
                         onEnrich={enrichHandler(lead.id)}
+                        onOpenLead={() => onOpenLead?.(lead.id)}
                       />
                     </td>
                   </tr>
@@ -1068,7 +1240,9 @@ export function LeadsTable({
                           canUpdate={canUpdate}
                           canArchive={canArchive}
                           pending={pending}
-                          onAssign={(assignedTo) => onAssign(lead.id, assignedTo)}
+                          onAssign={(assignedTo) =>
+                            onAssign(lead.id, assignedTo)
+                          }
                           onArchive={() => onArchive(lead.id, lead.fullName)}
                           onRestore={() => onRestore(lead.id, lead.fullName)}
                         />
@@ -1083,6 +1257,7 @@ export function LeadsTable({
       </div>
 
       <ul
+        ref={mobileScrollRef}
         data-testid="leads-table-scroll-mobile"
         className="min-h-0 flex-1 divide-y divide-[var(--color-line)] overflow-auto overscroll-contain md:hidden"
       >
@@ -1095,15 +1270,21 @@ export function LeadsTable({
             excludedLeadIds,
           );
           const expanded = expandedLeadIds.has(lead.id);
-          const source = formatSourceContext(lead.source?.label, lead.attributes);
+          const focused = focusedLeadId === lead.id;
+          const source = formatSourceContext(
+            lead.source?.label,
+            lead.attributes,
+          );
           const urgency = leadUrgency(lead);
 
           return (
             <li
               key={lead.id}
+              data-focused={focused ? "true" : undefined}
               className={cn(
                 "px-3 py-2.5",
                 selected && "bg-[var(--color-brand-50)]/40",
+                focused && "ring-2 ring-[var(--color-brand-600)] ring-inset",
                 urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
               )}
             >
@@ -1120,13 +1301,14 @@ export function LeadsTable({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <Link
-                      href={workspacePath(workspaceSlug, "leads", lead.id)}
+                      href={hrefFor(lead.id)}
+                      onClick={() => onOpenLead?.(lead.id)}
                       className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                     >
                       {lead.fullName}
                     </Link>
                     <ContactPopover lead={lead} />
-                    <span className="ml-auto shrink-0 tabular text-[11px] text-[var(--color-ink-muted)]">
+                    <span className="tabular ml-auto shrink-0 text-[11px] text-[var(--color-ink-muted)]">
                       {formatRelativeAge(lead.createdAt)}
                     </span>
                   </div>
@@ -1143,7 +1325,9 @@ export function LeadsTable({
                       canUpdate={canUpdate}
                       canManageStatuses={canManageStatuses}
                       pending={pending}
-                      onStatusChange={(statusId) => onStatusChange(lead.id, statusId)}
+                      onStatusChange={(statusId) =>
+                        onStatusChange(lead.id, statusId)
+                      }
                       onCreateStatus={(label) => onCreateStatus(lead.id, label)}
                     />
                     <UrgencyBadge lead={lead} />
@@ -1158,19 +1342,23 @@ export function LeadsTable({
                   </div>
                   <div className="mt-1">
                     <NextStepCell
-                      workspaceSlug={workspaceSlug}
                       lead={lead}
                       canAddNote={canAddNotes}
-                      onAddNote={(body, followUpIso) => onAddNote(lead.id, body, followUpIso)}
+                      leadHref={hrefFor(lead.id)}
+                      onOpenLead={() => onOpenLead?.(lead.id)}
+                      onAddNote={(body, followUpIso) =>
+                        onAddNote(lead.id, body, followUpIso)
+                      }
                     />
                   </div>
-                  <div className="-mr-1 mt-1 flex justify-end">
+                  <div className="mt-1 -mr-1 flex justify-end">
                     <RowActions
-                      workspaceSlug={workspaceSlug}
                       lead={lead}
+                      leadHref={hrefFor(lead.id)}
                       expanded={expanded}
                       onToggleExpanded={() => toggleExpanded(lead.id)}
                       onEnrich={enrichHandler(lead.id)}
+                      onOpenLead={() => onOpenLead?.(lead.id)}
                     />
                   </div>
                 </div>

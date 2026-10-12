@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { OpportunitiesSection } from "@/components/opportunities/opportunities-section";
@@ -37,8 +38,25 @@ import {
   IconPlus,
   IconSparkles,
 } from "@/lib/icons";
+import { buildLeadContactCard } from "@/lib/lead-contact-card";
+import { leadEditHref } from "@/lib/lead-list-context";
+import {
+  buildLeadWhatsAppWelcome,
+  loadLeadWhatsAppDraft,
+  type LeadWhatsAppDraft,
+} from "@/lib/lead-whatsapp-welcome";
+import { telHref, whatsappHref } from "@/lib/leads-table";
+import {
+  appendReturnTo,
+  clearRememberedFocusedLead,
+  leadStepBackHref,
+  noteWorkflowArrival,
+  performWorkflowStepBack,
+  rememberWorkflowStep,
+  withoutFocus,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { workspacePath } from "@/lib/workspace-paths";
-import { telHref } from "@/lib/leads-table";
 import { createOpportunityHref } from "@/lib/opportunity-link-flow";
 import { LeadContactActions } from "@/components/leads/lead-contact-actions";
 import { EnrichedField } from "@/components/leads/enriched-field";
@@ -88,12 +106,17 @@ type LeadDetail = {
   usagePurpose: UsagePurpose | null;
   notes: string | null;
   createdAt: string;
+  updatedAt?: string | null;
   archivedAt?: string | null;
   status: DictionaryItem | null;
   source: DictionaryItem | null;
   project: { id: string; name: string; reference: string | null } | null;
   projectMemberships?: LeadProjectMembershipItem[];
-  secondaryProjects?: Array<{ id: string; name: string; reference: string | null }>;
+  secondaryProjects?: Array<{
+    id: string;
+    name: string;
+    reference: string | null;
+  }>;
   tagsResolved: Array<{ id: string; name: string; color: string }>;
   tags: string[];
   assignedUser: { id: string; name: string | null; email: string } | null;
@@ -134,6 +157,9 @@ type LeadDetailPanelProps = {
   canFinancialRead: boolean;
   canFinancialUpdate: boolean;
   canFinancialDelete: boolean;
+  canDelete?: boolean;
+  /** Lead list URL to restore after Back or delete. Null when the lead was opened directly. */
+  listReturnTo?: string | null;
 };
 
 export function LeadDetailPanel({
@@ -157,16 +183,25 @@ export function LeadDetailPanel({
   canFinancialRead,
   canFinancialUpdate,
   canFinancialDelete,
+  canDelete = false,
+  listReturnTo = null,
 }: LeadDetailPanelProps) {
+  const router = useRouter();
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [integrationNames, setIntegrationNames] = useState<Record<string, string>>({});
-  const [integrationNamesWarning, setIntegrationNamesWarning] = useState<string | null>(null);
+  const [integrationNames, setIntegrationNames] = useState<
+    Record<string, string>
+  >({});
+  const [integrationNamesWarning, setIntegrationNamesWarning] = useState<
+    string | null
+  >(null);
   const [projects, setProjects] = useState<LeadProjectOption[]>([]);
-  const [memberships, setMemberships] = useState<LeadProjectMembershipItem[]>([]);
+  const [memberships, setMemberships] = useState<LeadProjectMembershipItem[]>(
+    [],
+  );
   const [membershipError, setMembershipError] = useState<string | null>(null);
   const [enrichOpen, setEnrichOpen] = useState(false);
   const [enrichmentRuns, setEnrichmentRuns] = useState<
@@ -185,6 +220,10 @@ export function LeadDetailPanel({
   const [revealRunId, setRevealRunId] = useState<string | null>(null);
   const [estimatePending, setEstimatePending] = useState(false);
   const [estimateReveal, setEstimateReveal] = useState(false);
+  const [whatsappDraft, setWhatsappDraft] = useState<LeadWhatsAppDraft | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
   const [financialEstimate, setFinancialEstimate] = useState<{
     rangeMin: number | null;
     rangeMax: number | null;
@@ -199,48 +238,57 @@ export function LeadDetailPanel({
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
 
-  const loadLead = useCallback(async (opts?: { silent?: boolean }): Promise<LeadDetail | null> => {
-    if (!opts?.silent) {
-      setLoading(true);
-    }
-    setError(null);
-    setForbidden(false);
-    setNotFound(false);
+  const loadLead = useCallback(
+    async (opts?: { silent?: boolean }): Promise<LeadDetail | null> => {
+      if (!opts?.silent) {
+        setLoading(true);
+      }
+      setError(null);
+      setForbidden(false);
+      setNotFound(false);
 
-    try {
-      const response = await fetch(`${apiBase}/leads/${leadId}`);
-      const payload = await response.json();
+      try {
+        const response = await fetch(`${apiBase}/leads/${leadId}`);
+        const payload = await response.json();
 
-      if (response.status === 403) {
-        setForbidden(true);
+        if (response.status === 403) {
+          setForbidden(true);
+          return null;
+        }
+        if (response.status === 404) {
+          setNotFound(true);
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error(payload.error?.message ?? "Failed to load lead.");
+        }
+
+        const nextLead = payload.data.lead as LeadDetail;
+        setLead(nextLead);
+        setMemberships(nextLead.projectMemberships ?? []);
+
+        const enrichResponse = await fetch(
+          `${apiBase}/leads/${leadId}/enrichment`,
+        );
+        if (enrichResponse.ok) {
+          const enrichPayload = await enrichResponse.json();
+          setEnrichmentEnabled(
+            Boolean(enrichPayload.data?.capability?.enabled),
+          );
+          setEnrichmentRuns(enrichPayload.data?.runs ?? []);
+        }
+        return nextLead;
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error ? loadError.message : "Failed to load.",
+        );
         return null;
+      } finally {
+        setLoading(false);
       }
-      if (response.status === 404) {
-        setNotFound(true);
-        return null;
-      }
-      if (!response.ok) {
-        throw new Error(payload.error?.message ?? "Failed to load lead.");
-      }
-
-      const nextLead = payload.data.lead as LeadDetail;
-      setLead(nextLead);
-      setMemberships(nextLead.projectMemberships ?? []);
-
-      const enrichResponse = await fetch(`${apiBase}/leads/${leadId}/enrichment`);
-      if (enrichResponse.ok) {
-        const enrichPayload = await enrichResponse.json();
-        setEnrichmentEnabled(Boolean(enrichPayload.data?.capability?.enabled));
-        setEnrichmentRuns(enrichPayload.data?.runs ?? []);
-      }
-      return nextLead;
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load.");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [apiBase, leadId]);
+    },
+    [apiBase, leadId],
+  );
 
   const loadEstimate = useCallback(async () => {
     if (!canFinancialRead) {
@@ -248,7 +296,9 @@ export function LeadDetailPanel({
       return;
     }
     try {
-      const response = await fetch(`${apiBase}/leads/${leadId}/financial-situation`);
+      const response = await fetch(
+        `${apiBase}/leads/${leadId}/financial-situation`,
+      );
       const payload = await response.json();
       if (!response.ok) {
         return;
@@ -263,7 +313,8 @@ export function LeadDetailPanel({
               confidencePercent: estimate.confidencePercent,
               disclaimer: payload.data?.disclaimer ?? "",
               demoMode:
-                estimate.demoMode === true || estimate.searchProvider === "demo_fixture",
+                estimate.demoMode === true ||
+                estimate.searchProvider === "demo_fixture",
               jobTitleUsed: estimate.jobTitleUsed,
               locationUsed: estimate.locationUsed,
               sources: estimate.sources ?? [],
@@ -369,7 +420,9 @@ export function LeadDetailPanel({
         setIntegrationNames(next);
       } catch {
         if (!cancelled) {
-          setIntegrationNamesWarning("Could not resolve website integration names.");
+          setIntegrationNamesWarning(
+            "Could not resolve website integration names.",
+          );
         }
       }
     }
@@ -415,13 +468,28 @@ export function LeadDetailPanel({
     const response = await fetch(path, init);
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error?.message ?? "Failed to update project memberships.");
+      throw new Error(
+        payload.error?.message ?? "Failed to update project memberships.",
+      );
     }
-    const next = (payload.data?.memberships ?? []) as LeadProjectMembershipItem[];
+    const next = (payload.data?.memberships ??
+      []) as LeadProjectMembershipItem[];
     setMemberships(next);
     setMembershipError(null);
     await loadLead();
     return next;
+  }
+
+  function leaveToList() {
+    const href = withoutFocus(
+      leadStepBackHref({
+        workspaceSlug,
+        projectId: lead?.project?.id,
+        returnTo: listReturnTo,
+      }),
+    );
+    clearRememberedFocusedLead(href);
+    performWorkflowStepBack(router, href, { fallback: "replace" });
   }
 
   async function handleArchive() {
@@ -432,14 +500,46 @@ export function LeadDetailPanel({
       return;
     }
 
-    const response = await fetch(`${apiBase}/leads/${leadId}`, { method: "DELETE" });
+    const response = await fetch(`${apiBase}/leads/${leadId}`, {
+      method: "DELETE",
+    });
     if (!response.ok) {
       const body = await response.json();
       window.alert(body.error?.message ?? "Failed to archive lead.");
       return;
     }
 
-    window.location.href = workspacePath(workspaceSlug, "leads");
+    leaveToList();
+  }
+
+  async function handleDelete() {
+    if (!lead || !canDelete || deleting) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Permanently delete "${lead.fullName}"? This cannot be undone and will also remove related opportunities, activities, documents, and campaign enrollments.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`${apiBase}/leads/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadIds: [leadId] }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        window.alert(body?.error?.message ?? "Failed to delete lead.");
+        return;
+      }
+      leaveToList();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleRestore() {
@@ -478,20 +578,24 @@ export function LeadDetailPanel({
   }
 
   const activeRun =
-    enrichmentRuns.find((run) => run.status === "accepted" || run.status === "reviewing") ??
+    enrichmentRuns.find(
+      (run) => run.status === "accepted" || run.status === "reviewing",
+    ) ??
     enrichmentRuns[0] ??
     null;
   const revealing = Boolean(revealRunId);
 
   function suggestionFor(fieldKey: string) {
-    return activeRun?.suggestions.find((item) => item.fieldKey === fieldKey) ?? null;
+    return (
+      activeRun?.suggestions.find((item) => item.fieldKey === fieldKey) ?? null
+    );
   }
 
   function canClearSuggestion(suggestion: LeadEnrichmentSuggestion | null) {
     return Boolean(
       canEnrich &&
-        suggestion &&
-        (suggestion.status === "accepted" || suggestion.status === "edited"),
+      suggestion &&
+      (suggestion.status === "accepted" || suggestion.status === "edited"),
     );
   }
 
@@ -501,55 +605,70 @@ export function LeadDetailPanel({
 
   async function clearSuggestion(suggestion: LeadEnrichmentSuggestion) {
     if (!activeRun) return;
-    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        decisions: [{ suggestionId: suggestion.id, action: "clear" }],
-      }),
-    });
+    await fetch(
+      `${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decisions: [{ suggestionId: suggestion.id, action: "clear" }],
+        }),
+      },
+    );
     await loadLead({ silent: true });
   }
 
   async function applyOverwrite(suggestion: LeadEnrichmentSuggestion) {
     if (!activeRun) return;
-    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        decisions: [
-          {
-            suggestionId: suggestion.id,
-            action: "accept",
-            overwriteAcknowledged: true,
-          },
-        ],
-      }),
-    });
+    await fetch(
+      `${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decisions: [
+            {
+              suggestionId: suggestion.id,
+              action: "accept",
+              overwriteAcknowledged: true,
+            },
+          ],
+        }),
+      },
+    );
     await loadLead({ silent: true });
   }
 
-  async function editSuggestion(suggestion: LeadEnrichmentSuggestion, next: string) {
+  async function editSuggestion(
+    suggestion: LeadEnrichmentSuggestion,
+    next: string,
+  ) {
     if (!activeRun) return;
-    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        decisions: [
-          {
-            suggestionId: suggestion.id,
-            action: "edit",
-            editedValue: next,
-          },
-        ],
-      }),
-    });
+    await fetch(
+      `${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/decisions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decisions: [
+            {
+              suggestionId: suggestion.id,
+              action: "edit",
+              editedValue: next,
+            },
+          ],
+        }),
+      },
+    );
     await loadLead({ silent: true });
   }
 
   async function applyCandidate(candidateId: string) {
     if (!activeRun || candidatePending) return;
-    if (activeRun.selectedCandidateId === candidateId && activeRun.status === "accepted") {
+    if (
+      activeRun.selectedCandidateId === candidateId &&
+      activeRun.status === "accepted"
+    ) {
       return;
     }
     setCandidatePending(true);
@@ -564,12 +683,18 @@ export function LeadDetailPanel({
       );
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error?.message ?? "Could not apply that match.");
+        throw new Error(
+          payload?.error?.message ?? "Could not apply that match.",
+        );
       }
       setRevealRunId(activeRun.id);
       await loadLead({ silent: true });
     } catch (applyError) {
-      setError(applyError instanceof Error ? applyError.message : "Could not apply that match.");
+      setError(
+        applyError instanceof Error
+          ? applyError.message
+          : "Could not apply that match.",
+      );
     } finally {
       setCandidatePending(false);
     }
@@ -577,12 +702,19 @@ export function LeadDetailPanel({
 
   async function revertActiveRun() {
     if (!activeRun) return;
-    if (!window.confirm("Revert this enrichment run and restore previous CRM values?")) {
+    if (
+      !window.confirm(
+        "Revert this enrichment run and restore previous CRM values?",
+      )
+    ) {
       return;
     }
-    await fetch(`${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/revert`, {
-      method: "POST",
-    });
+    await fetch(
+      `${apiBase}/leads/${leadId}/enrichment/${activeRun.id}/revert`,
+      {
+        method: "POST",
+      },
+    );
     setRevealRunId(null);
     setEstimateReveal(false);
     await loadLead({ silent: true });
@@ -597,6 +729,61 @@ export function LeadDetailPanel({
     setEstimateReveal(false);
     await loadLead({ silent: true });
   }
+
+  const listBackHref = leadStepBackHref({
+    workspaceSlug,
+    projectId: lead?.project?.id,
+    returnTo: listReturnTo,
+  });
+  const currentLeadHref = listReturnTo
+    ? appendReturnTo(
+        workspacePath(workspaceSlug, "leads", leadId),
+        listReturnTo,
+      )
+    : workspacePath(workspaceSlug, "leads", leadId);
+
+  useEffect(() => {
+    noteWorkflowArrival(currentLeadHref);
+  }, [currentLeadHref]);
+  const propertyReference = lead
+    ? readLeadIntegrationAttributes(lead.attributes)?.propertyReference
+    : null;
+
+  useEffect(() => {
+    if (!lead?.id) {
+      setWhatsappDraft(null);
+      return;
+    }
+    let cancelled = false;
+    void loadLeadWhatsAppDraft({
+      workspaceSlug,
+      leadId: lead.id,
+      fullName: lead.fullName,
+      firstName: lead.firstName,
+      projectId: lead.project?.id,
+      propertyReference,
+    })
+      .then((draft) => {
+        if (!cancelled) {
+          setWhatsappDraft(draft);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWhatsappDraft(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    lead?.firstName,
+    lead?.fullName,
+    lead?.id,
+    lead?.project?.id,
+    propertyReference,
+    workspaceSlug,
+  ]);
 
   if (forbidden) {
     return (
@@ -623,9 +810,9 @@ export function LeadDetailPanel({
         title="Lead not found"
         description="This lead does not exist in this workspace or may have been archived."
         primaryAction={{
-          label: "Back to leads",
+          label: workflowBackLabel(listBackHref, workspaceSlug),
           onClick: () => {
-            window.location.href = workspacePath(workspaceSlug, "leads");
+            performWorkflowStepBack(router, listBackHref);
           },
         }}
       />
@@ -649,21 +836,60 @@ export function LeadDetailPanel({
     .slice(0, 2)
     .toUpperCase();
 
+  const contactCard = lead.phone
+    ? buildLeadContactCard({
+        leadId: lead.id,
+        fullName: lead.fullName,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        phone: lead.phone,
+        email: lead.email,
+        projectName: lead.project?.name,
+        companyName: lead.company?.name,
+        jobTitle: lead.jobTitle,
+        city: lead.city,
+        stateRegion: lead.stateRegion,
+        country: lead.country,
+        notes: lead.notes,
+        profileUrl: lead.professionalProfileUrl,
+        updatedAt: lead.updatedAt,
+      })
+    : null;
+  const whatsappMessage =
+    whatsappDraft?.message ??
+    buildLeadWhatsAppWelcome({
+      fullName: lead.fullName,
+      firstName: lead.firstName,
+      projectName: lead.project?.name,
+    }).message;
+  const contactNotes = [
+    contactCard
+      ? `Download .vcf imports into Contacts. First name is “${contactCard.givenName || "blank"}” and last name is “${contactCard.familyName}”. This does not sync the phone automatically.`
+      : null,
+    lead.phone && whatsappHref(lead.phone, whatsappMessage)
+      ? whatsappDraft?.unlinkedFileNames.length
+        ? "WhatsApp opens a draft and is not sent. Files without a public link must be attached in WhatsApp."
+        : "WhatsApp opens a draft and is not sent until you press send."
+      : null,
+  ].filter((note): note is string => Boolean(note));
+  const handoffNote = contactNotes.length > 0 ? contactNotes.join(" ") : null;
+
   const integrationAttrs = readLeadIntegrationAttributes(lead.attributes);
   const enrichmentOverlay = readWebEnrichmentAttributes(lead.attributes);
   const websiteName = integrationAttrs?.integrationId
-    ? (integrationNames[integrationAttrs.integrationId] ?? integrationAttrs.integrationId)
+    ? (integrationNames[integrationAttrs.integrationId] ??
+      integrationAttrs.integrationId)
     : null;
 
   return (
     <>
       <PageHeader
         back={{
-          href: workspacePath(workspaceSlug, "leads"),
-          label: "Back to leads",
+          href: listBackHref,
+          label: workflowBackLabel(listBackHref, workspaceSlug),
         }}
         title={
-          <span className="flex items-center gap-2.5 flex-wrap">
+          <span className="flex flex-wrap items-center gap-2.5">
             {lead.fullName}
             {lead.status && (
               <StatusBadge
@@ -681,9 +907,18 @@ export function LeadDetailPanel({
           <>
             {canCreateOpportunity && !lead.archivedAt && (
               <Link
-                href={createOpportunityHref(workspaceSlug, { leadId, lockLead: true })}
+                href={appendReturnTo(
+                  createOpportunityHref(workspaceSlug, {
+                    leadId,
+                    lockLead: true,
+                  }),
+                  currentLeadHref,
+                )}
+                onClick={() => rememberWorkflowStep(currentLeadHref)}
               >
-                <Button leadingIcon={<IconPlus size={14} />}>Link to property</Button>
+                <Button leadingIcon={<IconPlus size={14} />}>
+                  Link to property
+                </Button>
               </Link>
             )}
             {canEnrich && enrichmentEnabled && !lead.archivedAt && (
@@ -700,10 +935,22 @@ export function LeadDetailPanel({
               </Button>
             )}
             {canUpdate && !lead.archivedAt && (
-              <Link href={workspacePath(workspaceSlug, "leads", leadId, "edit")}>
+              <Link
+                href={leadEditHref(workspaceSlug, leadId, currentLeadHref)}
+                onClick={() => rememberWorkflowStep(currentLeadHref)}
+              >
                 <Button variant="secondary">Edit</Button>
               </Link>
             )}
+            {canDelete ? (
+              <Button
+                variant="ghost"
+                disabled={deleting}
+                onClick={() => void handleDelete()}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            ) : null}
             {canArchive && lead.archivedAt ? (
               <Button onClick={() => void handleRestore()}>Restore</Button>
             ) : null}
@@ -718,36 +965,42 @@ export function LeadDetailPanel({
 
       {lead.archivedAt ? (
         <p className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
-          This lead is <strong className="text-[var(--color-ink)]">archived</strong>. Restore it to
-          edit or use it in new opportunities.
+          This lead is{" "}
+          <strong className="text-[var(--color-ink)]">archived</strong>. Restore
+          it to edit or use it in new opportunities.
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-1">
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-700)] text-[14px] font-semibold">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-brand-50)] text-[14px] font-semibold text-[var(--color-brand-700)]">
               {initials}
             </span>
             <div className="min-w-0">
-              <p className="text-[15px] font-semibold text-[var(--color-ink)] truncate">
+              <p className="truncate text-[15px] font-semibold text-[var(--color-ink)]">
                 {lead.fullName}
               </p>
-              <p className="text-[12.5px] text-[var(--color-ink-muted)]">Lead · {lead.id}</p>
+              <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+                Lead · {lead.id}
+              </p>
             </div>
           </div>
 
           <LeadContactActions
             phone={lead.phone}
             email={lead.email}
-            className="mt-4 hidden md:flex"
+            className="mt-4 hidden md:block"
+            whatsappMessage={whatsappMessage}
+            contactCard={contactCard}
+            handoffNote={handoffNote}
           />
 
           <div className="mt-5 space-y-2.5 text-[13px]">
             <Row icon={<IconMail size={14} />} label="Email">
               {lead.email ? (
                 <a
-                  className="text-[var(--color-brand-700)] hover:underline truncate"
+                  className="truncate text-[var(--color-brand-700)] hover:underline"
                   href={`mailto:${lead.email}`}
                 >
                   {lead.email}
@@ -758,7 +1011,10 @@ export function LeadDetailPanel({
             </Row>
             <Row icon={<IconPhone size={14} />} label="Phone">
               {lead.phone ? (
-                <a className="text-[var(--color-brand-700)] hover:underline" href={telHref(lead.phone)}>
+                <a
+                  className="text-[var(--color-brand-700)] hover:underline"
+                  href={telHref(lead.phone)}
+                >
                   {lead.phone}
                 </a>
               ) : (
@@ -783,7 +1039,8 @@ export function LeadDetailPanel({
                 }
                 onEdit={
                   canClearSuggestion(suggestionFor("companyName"))
-                    ? (next) => void editSuggestion(suggestionFor("companyName")!, next)
+                    ? (next) =>
+                        void editSuggestion(suggestionFor("companyName")!, next)
                     : undefined
                 }
               />
@@ -806,34 +1063,39 @@ export function LeadDetailPanel({
                 }
                 onEdit={
                   canClearSuggestion(suggestionFor("jobTitle"))
-                    ? (next) => void editSuggestion(suggestionFor("jobTitle")!, next)
+                    ? (next) =>
+                        void editSuggestion(suggestionFor("jobTitle")!, next)
                     : undefined
                 }
               />
             </Row>
             <Row icon={<IconMapPin size={14} />} label="Preferred areas">
-              {lead.preferredAreas.length > 0 ? lead.preferredAreas.join(", ") : "—"}
+              {lead.preferredAreas.length > 0
+                ? lead.preferredAreas.join(", ")
+                : "—"}
             </Row>
             <Row icon={<IconCalendar size={14} />} label="Created">
               {formatDate(lead.createdAt)}
             </Row>
           </div>
 
-          <div className="border-t border-[var(--color-line)] my-5" />
+          <div className="my-5 border-t border-[var(--color-line)]" />
 
-          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-3">
+          <p className="mb-3 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
             Assigned to
           </p>
           <p className="text-[13px] text-[var(--color-ink)]">
-            {lead.assignedUser?.name ?? lead.assignedUser?.email ?? "Unassigned"}
+            {lead.assignedUser?.name ??
+              lead.assignedUser?.email ??
+              "Unassigned"}
           </p>
 
           {lead.tagsResolved.length > 0 && (
             <>
-              <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mt-5 mb-2">
+              <p className="mt-5 mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
                 Tags
               </p>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {lead.tagsResolved.map((tag) => (
                   <Badge key={tag.id} tone="muted">
                     {tag.name}
@@ -845,10 +1107,10 @@ export function LeadDetailPanel({
 
           {lead.notes && (
             <>
-              <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mt-5 mb-2">
+              <p className="mt-5 mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
                 Internal notes
               </p>
-              <p className="text-[13px] text-[var(--color-ink-soft)] whitespace-pre-wrap">
+              <p className="text-[13px] whitespace-pre-wrap text-[var(--color-ink-soft)]">
                 {lead.notes}
               </p>
             </>
@@ -864,12 +1126,12 @@ export function LeadDetailPanel({
                   key: "overview",
                   label: "Overview",
                   content: (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-5 px-5">
+                    <div className="grid grid-cols-1 gap-5 px-5 pb-5 md:grid-cols-2">
                       {canEnrich &&
                       activeRun &&
                       hasEnrichmentCandidateAlternatives(activeRun) ? (
-                        <div className="md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/40 p-3">
-                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
+                        <div className="rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/40 p-3 md:col-span-2">
+                          <p className="mb-1 text-[11.5px] font-semibold tracking-wide text-[var(--color-enrich-fg)] uppercase">
                             Matches found
                           </p>
                           <p className="mb-2 text-[13px] text-[var(--color-ink-soft)]">
@@ -881,12 +1143,17 @@ export function LeadDetailPanel({
                             candidates={activeRun.candidates ?? []}
                             selectedId={activeRun.selectedCandidateId ?? null}
                             appliedId={activeRun.selectedCandidateId ?? null}
-                            onSelect={(candidateId) => void applyCandidate(candidateId)}
+                            onSelect={(candidateId) =>
+                              void applyCandidate(candidateId)
+                            }
                             disabled={candidatePending}
                           />
                         </div>
                       ) : null}
-                      <Info label="Budget" value={formatBudget(lead.budgetMin, lead.budgetMax)} />
+                      <Info
+                        label="Budget"
+                        value={formatBudget(lead.budgetMin, lead.budgetMax)}
+                      />
                       <Info label="Language" value={lead.language ?? "—"} />
                       <Info
                         label="Preferred contact"
@@ -909,39 +1176,57 @@ export function LeadDetailPanel({
                         suggestion={suggestionFor("industry")}
                         onClear={
                           canClearSuggestion(suggestionFor("industry"))
-                            ? () => void clearSuggestion(suggestionFor("industry")!)
+                            ? () =>
+                                void clearSuggestion(suggestionFor("industry")!)
                             : undefined
                         }
                         onApplyOverwrite={
                           canOverwriteSuggestion(suggestionFor("industry"))
-                            ? () => void applyOverwrite(suggestionFor("industry")!)
+                            ? () =>
+                                void applyOverwrite(suggestionFor("industry")!)
                             : undefined
                         }
                         onEdit={
                           canClearSuggestion(suggestionFor("industry"))
-                            ? (next) => void editSuggestion(suggestionFor("industry")!, next)
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("industry")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
                       <Info
                         label="State / region"
                         value={lead.stateRegion ?? "—"}
-                        origin={lead.intelligenceProvenance?.stateRegion?.method}
+                        origin={
+                          lead.intelligenceProvenance?.stateRegion?.method
+                        }
                         reveal={revealing}
                         suggestion={suggestionFor("stateRegion")}
                         onClear={
                           canClearSuggestion(suggestionFor("stateRegion"))
-                            ? () => void clearSuggestion(suggestionFor("stateRegion")!)
+                            ? () =>
+                                void clearSuggestion(
+                                  suggestionFor("stateRegion")!,
+                                )
                             : undefined
                         }
                         onApplyOverwrite={
                           canOverwriteSuggestion(suggestionFor("stateRegion"))
-                            ? () => void applyOverwrite(suggestionFor("stateRegion")!)
+                            ? () =>
+                                void applyOverwrite(
+                                  suggestionFor("stateRegion")!,
+                                )
                             : undefined
                         }
                         onEdit={
                           canClearSuggestion(suggestionFor("stateRegion"))
-                            ? (next) => void editSuggestion(suggestionFor("stateRegion")!, next)
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("stateRegion")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
@@ -963,7 +1248,11 @@ export function LeadDetailPanel({
                         }
                         onEdit={
                           canClearSuggestion(suggestionFor("city"))
-                            ? (next) => void editSuggestion(suggestionFor("city")!, next)
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("city")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
@@ -975,34 +1264,49 @@ export function LeadDetailPanel({
                         suggestion={suggestionFor("country")}
                         onClear={
                           canClearSuggestion(suggestionFor("country"))
-                            ? () => void clearSuggestion(suggestionFor("country")!)
+                            ? () =>
+                                void clearSuggestion(suggestionFor("country")!)
                             : undefined
                         }
                         onApplyOverwrite={
                           canOverwriteSuggestion(suggestionFor("country"))
-                            ? () => void applyOverwrite(suggestionFor("country")!)
+                            ? () =>
+                                void applyOverwrite(suggestionFor("country")!)
                             : undefined
                         }
                         onEdit={
                           canClearSuggestion(suggestionFor("country"))
-                            ? (next) => void editSuggestion(suggestionFor("country")!, next)
+                            ? (next) =>
+                                void editSuggestion(
+                                  suggestionFor("country")!,
+                                  next,
+                                )
                             : undefined
                         }
                       />
                       <Info
                         label="Professional profile"
                         value={lead.professionalProfileUrl ?? "—"}
-                        origin={lead.intelligenceProvenance?.professionalProfileUrl?.method}
+                        origin={
+                          lead.intelligenceProvenance?.professionalProfileUrl
+                            ?.method
+                        }
                         reveal={revealing}
                         suggestion={suggestionFor("professionalProfileUrl")}
                         onClear={
-                          canClearSuggestion(suggestionFor("professionalProfileUrl"))
+                          canClearSuggestion(
+                            suggestionFor("professionalProfileUrl"),
+                          )
                             ? () =>
-                                void clearSuggestion(suggestionFor("professionalProfileUrl")!)
+                                void clearSuggestion(
+                                  suggestionFor("professionalProfileUrl")!,
+                                )
                             : undefined
                         }
                         onEdit={
-                          canClearSuggestion(suggestionFor("professionalProfileUrl"))
+                          canClearSuggestion(
+                            suggestionFor("professionalProfileUrl"),
+                          )
                             ? (next) =>
                                 void editSuggestion(
                                   suggestionFor("professionalProfileUrl")!,
@@ -1013,19 +1317,32 @@ export function LeadDetailPanel({
                       />
                       <Info
                         label="Preferred contact clues"
-                        value={enrichmentOverlay.preferredContactClues ?? lead.preferredContactMethod ?? "—"}
+                        value={
+                          enrichmentOverlay.preferredContactClues ??
+                          lead.preferredContactMethod ??
+                          "—"
+                        }
                         origin={
-                          enrichmentOverlay.preferredContactClues ? "enrichment" : undefined
+                          enrichmentOverlay.preferredContactClues
+                            ? "enrichment"
+                            : undefined
                         }
                         reveal={revealing}
                         suggestion={suggestionFor("preferredContactClues")}
                         onClear={
-                          canClearSuggestion(suggestionFor("preferredContactClues"))
-                            ? () => void clearSuggestion(suggestionFor("preferredContactClues")!)
+                          canClearSuggestion(
+                            suggestionFor("preferredContactClues"),
+                          )
+                            ? () =>
+                                void clearSuggestion(
+                                  suggestionFor("preferredContactClues")!,
+                                )
                             : undefined
                         }
                         onEdit={
-                          canClearSuggestion(suggestionFor("preferredContactClues"))
+                          canClearSuggestion(
+                            suggestionFor("preferredContactClues"),
+                          )
                             ? (next) =>
                                 void editSuggestion(
                                   suggestionFor("preferredContactClues")!,
@@ -1035,7 +1352,7 @@ export function LeadDetailPanel({
                         }
                       />
                       <div className="md:col-span-2">
-                        <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-2">
+                        <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
                           Projects
                         </p>
                         {membershipError ? (
@@ -1067,8 +1384,13 @@ export function LeadDetailPanel({
                                 `${apiBase}/leads/${leadId}/project-memberships`,
                                 {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ projectId, isPrimary }),
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    projectId,
+                                    isPrimary,
+                                  }),
                                 },
                               );
                             } catch (error) {
@@ -1099,7 +1421,9 @@ export function LeadDetailPanel({
                                 `${apiBase}/leads/${leadId}/project-memberships/${membershipId}`,
                                 {
                                   method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
                                   body: JSON.stringify({ isPrimary: true }),
                                 },
                               );
@@ -1117,7 +1441,9 @@ export function LeadDetailPanel({
                                 `${apiBase}/leads/${leadId}/project-memberships/reorder`,
                                 {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json" },
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
                                   body: JSON.stringify({ membershipIds }),
                                 },
                               );
@@ -1141,7 +1467,9 @@ export function LeadDetailPanel({
                         value={
                           lead.propertyTypeInterests.length > 0
                             ? lead.propertyTypeInterests
-                                .map((interest) => labelPropertyTypeInterest(interest))
+                                .map((interest) =>
+                                  labelPropertyTypeInterest(interest),
+                                )
                                 .join(", ")
                             : "—"
                         }
@@ -1157,7 +1485,9 @@ export function LeadDetailPanel({
                       <Info
                         label="Usage purpose"
                         value={
-                          lead.usagePurpose ? labelUsagePurpose(lead.usagePurpose) : "—"
+                          lead.usagePurpose
+                            ? labelUsagePurpose(lead.usagePurpose)
+                            : "—"
                         }
                       />
                       {enrichmentOverlay.otherProfessional ? (
@@ -1168,12 +1498,19 @@ export function LeadDetailPanel({
                           reveal={revealing}
                           suggestion={suggestionFor("otherProfessional")}
                           onClear={
-                          canClearSuggestion(suggestionFor("otherProfessional"))
-                              ? () => void clearSuggestion(suggestionFor("otherProfessional")!)
+                            canClearSuggestion(
+                              suggestionFor("otherProfessional"),
+                            )
+                              ? () =>
+                                  void clearSuggestion(
+                                    suggestionFor("otherProfessional")!,
+                                  )
                               : undefined
                           }
                           onEdit={
-                            canClearSuggestion(suggestionFor("otherProfessional"))
+                            canClearSuggestion(
+                              suggestionFor("otherProfessional"),
+                            )
                               ? (next) =>
                                   void editSuggestion(
                                     suggestionFor("otherProfessional")!,
@@ -1187,39 +1524,47 @@ export function LeadDetailPanel({
                         <div
                           className={
                             revealing
-                              ? "enrich-reveal md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3"
-                              : "md:col-span-2 rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3"
+                              ? "enrich-reveal rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3 md:col-span-2"
+                              : "rounded-lg border border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/50 p-3 md:col-span-2"
                           }
                         >
-                          <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold mb-1">
+                          <p className="mb-1 text-[11.5px] font-semibold tracking-wide text-[var(--color-enrich-fg)] uppercase">
                             What we know
                           </p>
-                          <p className="text-[13px] text-[var(--color-ink-soft)] whitespace-pre-wrap">
+                          <p className="text-[13px] whitespace-pre-wrap text-[var(--color-ink-soft)]">
                             {enrichmentOverlay.summary.text}
                           </p>
                           {enrichmentOverlay.summary.citationUrls?.length ? (
-                            <ul className="mt-2 text-[12px] space-y-0.5">
-                              {enrichmentOverlay.summary.citationUrls.map((url) => (
-                                <li key={url}>
-                                  <a
-                                    className="text-[var(--color-brand-700)] hover:underline break-all"
-                                    href={url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    {url}
-                                  </a>
-                                </li>
-                              ))}
+                            <ul className="mt-2 space-y-0.5 text-[12px]">
+                              {enrichmentOverlay.summary.citationUrls.map(
+                                (url) => (
+                                  <li key={url}>
+                                    <a
+                                      className="break-all text-[var(--color-brand-700)] hover:underline"
+                                      href={url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      {url}
+                                    </a>
+                                  </li>
+                                ),
+                              )}
                             </ul>
                           ) : null}
                           {canEnrich && activeRun ? (
                             <div className="mt-3 flex flex-wrap gap-2">
-                              <Button variant="ghost" onClick={() => void revertActiveRun()}>
+                              <Button
+                                variant="ghost"
+                                onClick={() => void revertActiveRun()}
+                              >
                                 Revert this enrichment
                               </Button>
                               {canEnrichRevoke ? (
-                                <Button variant="ghost" onClick={() => void revokeEnrichment()}>
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => void revokeEnrichment()}
+                                >
                                   Delete enrichment data
                                 </Button>
                               ) : null}
@@ -1231,12 +1576,12 @@ export function LeadDetailPanel({
                         <div
                           className={
                             estimateReveal
-                              ? "enrich-reveal md:col-span-2 rounded-lg border border-dashed border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/30 p-3"
-                              : "md:col-span-2 rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] p-3"
+                              ? "enrich-reveal rounded-lg border border-dashed border-[var(--color-enrich-border)] bg-[var(--color-enrich-bg)]/30 p-3 md:col-span-2"
+                              : "rounded-lg border border-dashed border-[var(--color-line-strong)] bg-[var(--color-canvas)] p-3 md:col-span-2"
                           }
                         >
                           <div className="mb-1 flex items-center gap-2">
-                            <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-enrich-fg)] font-semibold">
+                            <p className="text-[11.5px] font-semibold tracking-wide text-[var(--color-enrich-fg)] uppercase">
                               AI occupational estimate — not a declared figure
                             </p>
                             <Badge tone="enrich" size="sm">
@@ -1245,31 +1590,38 @@ export function LeadDetailPanel({
                           </div>
                           {financialEstimate.demoMode ? (
                             <p className="mb-1 text-[12.5px] text-[var(--color-warn-fg)]">
-                              Demo fixture — not live market data and not this person’s income.
+                              Demo fixture — not live market data and not this
+                              person’s income.
                             </p>
                           ) : null}
-                          <p className="text-[13.5px] text-[var(--color-ink)] tabular">
-                            {financialEstimate.rangeMin?.toLocaleString() ?? "—"} –{" "}
-                            {financialEstimate.rangeMax?.toLocaleString() ?? "—"}{" "}
-                            {financialEstimate.currency} ({financialEstimate.confidencePercent}%
-                            source confidence)
+                          <p className="tabular text-[13.5px] text-[var(--color-ink)]">
+                            {financialEstimate.rangeMin?.toLocaleString() ??
+                              "—"}{" "}
+                            –{" "}
+                            {financialEstimate.rangeMax?.toLocaleString() ??
+                              "—"}{" "}
+                            {financialEstimate.currency} (
+                            {financialEstimate.confidencePercent}% source
+                            confidence)
                           </p>
-                          {financialEstimate.jobTitleUsed || financialEstimate.locationUsed ? (
+                          {financialEstimate.jobTitleUsed ||
+                          financialEstimate.locationUsed ? (
                             <p className="mt-1 text-[12px] text-[var(--color-ink-muted)]">
                               Based on {financialEstimate.jobTitleUsed ?? "job"}
                               {financialEstimate.locationUsed
                                 ? ` · ${financialEstimate.locationUsed}`
                                 : ""}
-                              . Separate from any user-entered income on the Financial situation
-                              tab.
+                              . Separate from any user-entered income on the
+                              Financial situation tab.
                             </p>
                           ) : null}
-                          {financialEstimate.sources && financialEstimate.sources.length > 0 ? (
-                            <ul className="mt-2 text-[12px] space-y-0.5">
+                          {financialEstimate.sources &&
+                          financialEstimate.sources.length > 0 ? (
+                            <ul className="mt-2 space-y-0.5 text-[12px]">
                               {financialEstimate.sources.map((source) => (
                                 <li key={source.url}>
                                   <a
-                                    className="text-[var(--color-brand-700)] hover:underline break-all"
+                                    className="break-all text-[var(--color-brand-700)] hover:underline"
                                     href={source.url}
                                     target="_blank"
                                     rel="noreferrer"
@@ -1285,8 +1637,9 @@ export function LeadDetailPanel({
                           </p>
                         </div>
                       ) : canFinancialRead && estimatePending ? (
-                        <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
-                          Requesting labelled occupational estimate (job and location only)…
+                        <p className="text-[12.5px] text-[var(--color-ink-muted)] md:col-span-2">
+                          Requesting labelled occupational estimate (job and
+                          location only)…
                         </p>
                       ) : canFinancialRead &&
                         hasOccupationalEstimateInputs({
@@ -1298,25 +1651,29 @@ export function LeadDetailPanel({
                           stateRegion: lead.stateRegion,
                           country: lead.country,
                         }) ? (
-                        <p className="md:col-span-2 text-[12.5px] text-[var(--color-ink-muted)]">
-                          Optional occupational estimate can pre-fill working figures on the
-                          Financial situation tab so a broker can gauge affordability. Human-declared
-                          numbers are left alone. Not an automated credit or mortgage decision.
+                        <p className="text-[12.5px] text-[var(--color-ink-muted)] md:col-span-2">
+                          Optional occupational estimate can pre-fill working
+                          figures on the Financial situation tab so a broker can
+                          gauge affordability. Human-declared numbers are left
+                          alone. Not an automated credit or mortgage decision.
                         </p>
                       ) : null}
                       {integrationAttrs && (
                         <>
-                          <div className="md:col-span-2 border-t border-[var(--color-line)] pt-4">
-                            <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-3">
+                          <div className="border-t border-[var(--color-line)] pt-4 md:col-span-2">
+                            <p className="mb-3 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
                               Website attribution
                             </p>
                             {integrationNamesWarning && (
-                              <p className="text-[12px] text-[var(--color-ink-muted)] mb-3">
+                              <p className="mb-3 text-[12px] text-[var(--color-ink-muted)]">
                                 {integrationNamesWarning}
                               </p>
                             )}
                           </div>
-                          <Info label="Website integration" value={websiteName ?? "—"} />
+                          <Info
+                            label="Website integration"
+                            value={websiteName ?? "—"}
+                          />
                           <Info
                             label="Inbound source"
                             value={integrationAttrs.inboundSource ?? "—"}
@@ -1350,6 +1707,7 @@ export function LeadDetailPanel({
                       workspaceSlug={workspaceSlug}
                       defaultCurrency={defaultCurrency}
                       leadId={leadId}
+                      returnTo={currentLeadHref}
                       canRead={canReadOpportunities}
                       canCreate={canCreateOpportunity}
                     />
@@ -1363,6 +1721,7 @@ export function LeadDetailPanel({
                       workspaceSlug={workspaceSlug}
                       workspaceTimezone={workspaceTimezone}
                       leadId={leadId}
+                      returnTo={currentLeadHref}
                       canRead={canReadActivities}
                       canCreate={canCreateActivity}
                       canUpdate={canUpdateActivity}
@@ -1423,8 +1782,14 @@ export function LeadDetailPanel({
       </div>
 
       {!lead.archivedAt && (lead.phone || lead.email) ? (
-        <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-4 border-t border-[var(--color-line)] bg-white/95 px-4 py-2 backdrop-blur md:hidden">
-          <LeadContactActions phone={lead.phone} email={lead.email} />
+        <div className="sticky bottom-0 z-20 -mx-4 mt-4 -mb-4 border-t border-[var(--color-line)] bg-white/95 px-4 py-2 backdrop-blur md:hidden">
+          <LeadContactActions
+            phone={lead.phone}
+            email={lead.email}
+            whatsappMessage={whatsappMessage}
+            contactCard={contactCard}
+            handoffNote={handoffNote}
+          />
         </div>
       ) : null}
 
@@ -1452,7 +1817,7 @@ function Row({
     <div className="flex items-start gap-2.5">
       <span className="mt-0.5 text-[var(--color-ink-muted)]">{icon}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-faint)] font-semibold">
+        <p className="text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-faint)] uppercase">
           {label}
         </p>
         <div className="text-[13px] text-[var(--color-ink)]">{children}</div>
@@ -1482,7 +1847,7 @@ function Info({
 }) {
   return (
     <div>
-      <p className="text-[11.5px] uppercase tracking-wide text-[var(--color-ink-muted)] font-semibold mb-1">
+      <p className="mb-1 text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
         {label}
       </p>
       <EnrichedField

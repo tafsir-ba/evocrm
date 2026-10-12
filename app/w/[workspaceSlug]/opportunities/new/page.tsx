@@ -1,6 +1,10 @@
 import { OpportunityFormPage } from "@/components/opportunities/opportunity-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import {
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -11,6 +15,7 @@ type SearchParams = Promise<{
   propertyId?: string;
   lockLead?: string;
   lockProperty?: string;
+  returnTo?: string;
 }>;
 
 export const metadata = { title: "New opportunity — EvoHome CRM" };
@@ -27,7 +32,13 @@ export default async function NewOpportunityPage({
   searchParams: SearchParams;
 }) {
   const { workspaceSlug } = await params;
-  const { leadId, propertyId, lockLead, lockProperty } = await searchParams;
+  const {
+    leadId,
+    propertyId,
+    lockLead,
+    lockProperty,
+    returnTo: rawReturnTo,
+  } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -62,11 +73,14 @@ export default async function NewOpportunityPage({
     isTruthyFlag(lockLead) || (Boolean(leadId) && !propertyId);
   const shouldLockProperty =
     isTruthyFlag(lockProperty) || (Boolean(propertyId) && !leadId);
-  const cancelHref = leadId
-    ? workspacePath(workspaceSlug, "leads", leadId)
-    : propertyId
-      ? workspacePath(workspaceSlug, "properties", propertyId)
-      : workspacePath(workspaceSlug, "pipeline");
+  const workflowReturn = readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const cancelHref =
+    workflowReturn ??
+    (leadId
+      ? workspacePath(workspaceSlug, "leads", leadId)
+      : propertyId
+        ? workspacePath(workspaceSlug, "properties", propertyId)
+        : workspacePath(workspaceSlug, "pipeline"));
 
   return (
     <PageContainer>
@@ -80,10 +94,17 @@ export default async function NewOpportunityPage({
         }}
         lockLead={shouldLockLead}
         lockProperty={shouldLockProperty}
+        returnTo={workflowReturn}
         cancelHref={cancelHref}
         back={{
           href: cancelHref,
-          label: leadId ? "Back to lead" : propertyId ? "Back to property" : "Back to pipeline",
+          label: workflowReturn
+            ? workflowBackLabel(cancelHref, workspaceSlug)
+            : leadId
+              ? "Back to lead"
+              : propertyId
+                ? "Back to property"
+                : "Back to pipeline",
         }}
       />
     </PageContainer>

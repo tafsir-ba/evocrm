@@ -1,20 +1,32 @@
 import { OpportunityFormPage } from "@/components/opportunities/opportunity-form-page";
 import { PageContainer } from "@/components/layout/page-header";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import {
+  readSafeWorkflowHref,
+  workflowBackLabel,
+} from "@/lib/workflow-navigation";
 import { hasPermission } from "@/server/permissions/permissions";
 import { getOpportunityForWorkspace } from "@/server/services/opportunities";
 import { requireWorkspacePageAccess } from "@/server/workspaces/require-workspace-page-access";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type Params = Promise<{ workspaceSlug: string; opportunityId: string }>;
+type SearchParams = Promise<{ returnTo?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }) {
   const { workspaceSlug } = await params;
   return { title: `Edit opportunity — ${workspaceSlug}` };
 }
 
-export default async function EditOpportunityPage({ params }: { params: Params }) {
+export default async function EditOpportunityPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { workspaceSlug, opportunityId } = await params;
+  const { returnTo: rawReturnTo } = await searchParams;
   const access = await requireWorkspacePageAccess(workspaceSlug);
 
   if (access.permissionDenied) {
@@ -45,6 +57,9 @@ export default async function EditOpportunityPage({ params }: { params: Params }
     access.context.workspace.id,
     opportunityId,
   );
+  const returnTo = readSafeWorkflowHref(rawReturnTo, workspaceSlug);
+  const cancelHref =
+    returnTo ?? workspacePath(workspaceSlug, "opportunities", opportunityId);
 
   return (
     <PageContainer>
@@ -67,10 +82,13 @@ export default async function EditOpportunityPage({ params }: { params: Params }
           assignedTo: opportunity.assignedUser?.id ?? "",
           tagIds: opportunity.tagsResolved.map((tag) => tag.id),
         }}
-        cancelHref={workspacePath(workspaceSlug, "opportunities", opportunityId)}
+        returnTo={returnTo}
+        cancelHref={cancelHref}
         back={{
-          href: workspacePath(workspaceSlug, "opportunities", opportunityId),
-          label: "Back to opportunity",
+          href: cancelHref,
+          label: returnTo
+            ? workflowBackLabel(cancelHref, workspaceSlug)
+            : "Back to opportunity",
         }}
       />
     </PageContainer>
