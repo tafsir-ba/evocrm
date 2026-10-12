@@ -75,7 +75,11 @@ export function LeadContactActions({
 
   return (
     <div className={className}>
-      <div role="group" className="flex gap-2" aria-label="Contact lead">
+      <div
+        role="group"
+        className="grid grid-cols-2 gap-2 md:flex"
+        aria-label="Contact lead"
+      >
         {phone ? (
           <ContactAction
             href={telHref(phone)}

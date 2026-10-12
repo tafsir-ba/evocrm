@@ -440,7 +440,7 @@ describe("LeadsPanel table", () => {
 
     expect(
       await screen.findByPlaceholderText(
-        "Search leads by name, email or phone…",
+        "Search name, email, or phone",
       ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Show archived")).toBeInTheDocument();
@@ -482,7 +482,7 @@ describe("LeadsPanel table", () => {
       />,
     );
 
-    await screen.findByPlaceholderText("Search leads by name, email or phone…");
+    await screen.findByPlaceholderText("Search name, email, or phone");
     const toggle = screen.getByRole("button", { name: "Filters" });
     const filters = document.getElementById("leads-filters");
     expect(toggle).toHaveAttribute("aria-expanded", "false");

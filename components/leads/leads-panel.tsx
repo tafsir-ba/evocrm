@@ -1585,7 +1585,7 @@ export function LeadsPanel({
         <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
             className="min-w-0 flex-1"
-            placeholder="Search leads by name, email or phone…"
+            placeholder="Search name, email, or phone"
             aria-label="Search leads by name, email or phone"
             value={search}
             onChange={(event) => {
