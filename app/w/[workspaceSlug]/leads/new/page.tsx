@@ -69,7 +69,7 @@ export default async function NewLeadPage({
       : workspacePath(workspaceSlug, "leads"));
 
   return (
-    <PageContainer>
+    <PageContainer className="max-md:px-3 max-md:py-1.5">
       <Suspense
         fallback={
           <div className="space-y-4">

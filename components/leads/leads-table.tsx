@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Dropdown } from "@/components/ui/dropdown";
 import { isValidHexColor } from "@/lib/dictionary-colors";
 import {
+  IconChat,
   IconChevronDown,
   IconChevronRight,
   IconMail,
@@ -50,6 +51,7 @@ import {
   leadUrgency,
   telHref,
   visibleLeadTags,
+  whatsappHref,
 } from "@/lib/leads-table";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
@@ -171,6 +173,8 @@ type LeadsTableProps = {
   focusedLeadId?: string | null;
   /** Remember this lead as the selected row before leaving the list. */
   onOpenLead?: (leadId: string) => void;
+  /** Rendered at the end of the mobile list so it scrolls with the rows. */
+  mobileFooter?: ReactNode;
 };
 
 const compactSelectClass =
@@ -439,34 +443,45 @@ function NextStepCell({
   leadHref,
   onAddNote,
   onOpenLead,
+  hideEmpty = false,
 }: {
   lead: LeadTableItem;
   canAddNote: boolean;
   leadHref: string;
   onAddNote: (body: string, followUpIso: string | null) => Promise<void>;
   onOpenLead?: () => void;
+  /** Omit the placeholder dash. The note control still shows when allowed. */
+  hideEmpty?: boolean;
 }) {
   const step = formatNextStepCell(lead);
   const urgency = leadUrgency(lead);
   const hot = urgency.level === "overdue" || urgency.level === "today";
+  const showText = !(hideEmpty && step.kind === "empty");
+  const showNote = canAddNote && !lead.archivedAt;
+
+  if (!showText && !showNote) {
+    return null;
+  }
 
   return (
     <div className="flex min-w-0 items-center gap-1">
-      <p
-        className={cn(
-          "min-w-0 flex-1 truncate",
-          step.kind === "empty" && "text-[var(--color-ink-faint)]",
-          step.kind === "last" && "text-[var(--color-ink-muted)]",
-          step.kind === "next" &&
-            (hot
-              ? "font-medium text-[var(--color-danger-fg)]"
-              : "text-[var(--color-ink-soft)]"),
-        )}
-        title={step.text}
-      >
-        {step.text}
-      </p>
-      {canAddNote && !lead.archivedAt ? (
+      {showText ? (
+        <p
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            step.kind === "empty" && "text-[var(--color-ink-faint)]",
+            step.kind === "last" && "text-[var(--color-ink-muted)]",
+            step.kind === "next" &&
+              (hot
+                ? "font-medium text-[var(--color-danger-fg)]"
+                : "text-[var(--color-ink-soft)]"),
+          )}
+          title={step.kind === "empty" ? undefined : step.text}
+        >
+          {step.text}
+        </p>
+      ) : null}
+      {showNote ? (
         <LeadQuickNote
           leadId={lead.id}
           leadName={lead.fullName}
@@ -672,6 +687,7 @@ export function LeadsTable({
   leadHref,
   focusedLeadId = null,
   onOpenLead,
+  mobileFooter = null,
 }: LeadsTableProps) {
   const desktopScrollRef = useRef<HTMLDivElement>(null);
   const mobileScrollRef = useRef<HTMLUListElement>(null);
@@ -1276,48 +1292,77 @@ export function LeadsTable({
             lead.attributes,
           );
           const urgency = leadUrgency(lead);
+          const ownerLabel = lead.assignedUser
+            ? formatOwnerName(lead.assignedUser)
+            : "Unassigned";
+          const roleLine = formatLeadRoleLine(lead);
+          const projectLabel = filterOptions.workspaceProjectId
+            ? null
+            : lead.project?.name?.trim() || null;
+          const whatsapp = lead.phone ? whatsappHref(lead.phone) : null;
+          const enrich =
+            lead.archivedAt ? undefined : enrichHandler(lead.id);
 
           return (
             <li
               key={lead.id}
+              data-lead-row="true"
               data-focused={focused ? "true" : undefined}
               className={cn(
-                "px-3 py-2.5",
+                "px-2 py-1.5",
                 selected && "bg-[var(--color-brand-50)]/40",
                 focused && "ring-2 ring-[var(--color-brand-600)] ring-inset",
                 urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
               )}
             >
-              <div className="flex items-start gap-2.5">
+              <div className="flex min-w-0 items-start gap-0.5">
                 {canDelete ? (
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0 rounded border-[var(--color-line)]"
-                    checked={selected}
-                    onChange={() => onToggleLead(lead.id)}
-                    aria-label={`Select ${lead.fullName}`}
-                  />
+                  <label className="inline-flex h-10 w-8 shrink-0 items-center justify-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--color-line)]"
+                      checked={selected}
+                      onChange={() => onToggleLead(lead.id)}
+                      aria-label={`Select ${lead.fullName}`}
+                    />
+                  </label>
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex min-w-0 items-center gap-1.5">
                     <Link
                       href={hrefFor(lead.id)}
                       onClick={() => onOpenLead?.(lead.id)}
-                      className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
+                      className="min-w-0 flex-1 truncate text-[14px] leading-5 font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                     >
                       {lead.fullName}
                     </Link>
-                    <ContactPopover lead={lead} />
-                    <span className="tabular ml-auto shrink-0 text-[11px] text-[var(--color-ink-muted)]">
+                    <span className="tabular shrink-0 text-[11px] leading-5 text-[var(--color-ink-muted)]">
                       {formatRelativeAge(lead.createdAt)}
                     </span>
                   </div>
-                  {lead.phone ? (
-                    <div className="mt-0.5 text-[13px]">
-                      <PhoneLink phone={lead.phone} />
+                  {lead.phone || lead.email ? (
+                    <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-5">
+                      {lead.phone ? (
+                        <a
+                          href={telHref(lead.phone)}
+                          title={`Call ${lead.phone}`}
+                          aria-label={`Call ${lead.fullName}`}
+                          className="tabular shrink-0 text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
+                        >
+                          {lead.phone}
+                        </a>
+                      ) : null}
+                      {lead.email ? (
+                        <a
+                          href={`mailto:${lead.email}`}
+                          className="min-w-0 truncate text-[var(--color-ink-muted)] hover:text-[var(--color-brand-700)] hover:underline"
+                        >
+                          {lead.email}
+                        </a>
+                      ) : null}
                     </div>
                   ) : null}
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <StatusCell
                       workspaceSlug={workspaceSlug}
                       lead={lead}
@@ -1330,42 +1375,99 @@ export function LeadsTable({
                       }
                       onCreateStatus={(label) => onCreateStatus(lead.id, label)}
                     />
-                    <UrgencyBadge lead={lead} />
-                    <span className="truncate text-[11.5px] text-[var(--color-ink-soft)]">
-                      {formatOwnerName(lead.assignedUser)}
+                    {urgency.label && urgency.level !== "unassigned" ? (
+                      <UrgencyBadge lead={lead} />
+                    ) : null}
+                    <span
+                      className={cn(
+                        "max-w-[9rem] truncate text-[11.5px]",
+                        lead.assignedUser
+                          ? "text-[var(--color-ink-soft)]"
+                          : "text-[var(--color-ink-muted)]",
+                      )}
+                    >
+                      {ownerLabel}
                     </span>
-                    {formatLeadRoleLine(lead) ? (
-                      <span className="truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                        {formatLeadRoleLine(lead)}
+                    {roleLine ? (
+                      <span className="max-w-[8rem] truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                        {roleLine}
                       </span>
                     ) : null}
-                  </div>
-                  <div className="mt-1">
+                    {projectLabel ? (
+                      <span className="max-w-[8rem] truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                        {projectLabel}
+                      </span>
+                    ) : null}
                     <NextStepCell
                       lead={lead}
                       canAddNote={canAddNotes}
                       leadHref={hrefFor(lead.id)}
                       onOpenLead={() => onOpenLead?.(lead.id)}
+                      hideEmpty
                       onAddNote={(body, followUpIso) =>
                         onAddNote(lead.id, body, followUpIso)
                       }
                     />
                   </div>
-                  <div className="mt-1 -mr-1 flex justify-end">
-                    <RowActions
-                      lead={lead}
-                      leadHref={hrefFor(lead.id)}
-                      expanded={expanded}
-                      onToggleExpanded={() => toggleExpanded(lead.id)}
-                      onEnrich={enrichHandler(lead.id)}
-                      onOpenLead={() => onOpenLead?.(lead.id)}
-                    />
+                  <div className="mt-0.5 -ml-1 flex flex-wrap items-center gap-0.5">
+                    {whatsapp ? (
+                      <a
+                        href={whatsapp}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Opens a WhatsApp draft. Nothing is sent until you press send."
+                        aria-label={`WhatsApp ${lead.fullName}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
+                      >
+                        <IconChat size={15} />
+                      </a>
+                    ) : null}
+                    <ContactPopover lead={lead} />
+                    {enrich ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
+                        aria-label={`Enrich ${lead.fullName}`}
+                        title="Enrich from public professional sources"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          enrich();
+                        }}
+                      >
+                        <IconSparkles size={14} />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                      aria-expanded={expanded}
+                      aria-label={
+                        expanded
+                          ? `Hide details for ${lead.fullName}`
+                          : `Show details for ${lead.fullName}`
+                      }
+                      onClick={() => toggleExpanded(lead.id)}
+                    >
+                      {expanded ? (
+                        <IconChevronDown size={16} />
+                      ) : (
+                        <IconChevronRight size={16} />
+                      )}
+                    </button>
+                    <Link
+                      href={hrefFor(lead.id)}
+                      onClick={() => onOpenLead?.(lead.id)}
+                      className="inline-flex h-9 items-center rounded-md px-2 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                      aria-label={`Open ${lead.fullName}`}
+                    >
+                      Open
+                    </Link>
                   </div>
                 </div>
               </div>
               {expanded ? (
-                <div className="mt-2 border-t border-[var(--color-line)] pt-2">
-                  <p className="mb-2 truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                <div className="mt-1 border-t border-[var(--color-line)] pt-1.5">
+                  <p className="mb-1.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
                     {[
                       formatProjectMembershipCell({
                         primaryName: lead.project?.name,
@@ -1392,6 +1494,9 @@ export function LeadsTable({
             </li>
           );
         })}
+        {mobileFooter ? (
+          <li className="list-none px-2 py-1.5">{mobileFooter}</li>
+        ) : null}
       </ul>
     </>
   );

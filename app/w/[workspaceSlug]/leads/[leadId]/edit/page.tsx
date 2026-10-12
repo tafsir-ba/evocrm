@@ -89,7 +89,7 @@ export default async function EditLeadPage({
   const cancelHref = returnTo ?? workspacePath(workspaceSlug, "leads", leadId);
 
   return (
-    <PageContainer>
+    <PageContainer className="max-md:px-3 max-md:py-1.5">
       <ProjectFilterSuspense
         fallback={
           <div className="space-y-4">

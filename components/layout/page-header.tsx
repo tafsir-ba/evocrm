@@ -14,6 +14,8 @@ export function PageHeader({
   meta,
   density = "comfortable",
   className,
+  bar = false,
+  hideBackOnMobile = false,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -22,10 +24,14 @@ export function PageHeader({
   meta?: ReactNode;
   density?: "comfortable" | "compact";
   className?: string;
+  /** Keep the title and actions on one row at phone widths. */
+  bar?: boolean;
+  /** Hide the back link below the md breakpoint (a parent supplies it). */
+  hideBackOnMobile?: boolean;
 }) {
-  const compact = density === "compact";
+  const compact = density === "compact" || bar;
   return (
-    <div className={cn(compact ? "mb-3" : "mb-6", className)}>
+    <div className={cn(bar ? "mb-1.5 md:mb-3" : compact ? "mb-3" : "mb-6", className)}>
       <WorkflowArrival />
       {back && (
         <WorkflowBackLink
@@ -34,7 +40,8 @@ export function PageHeader({
           mode={back.mode}
           className={cn(
             "focus-ring inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink-soft)]",
-            compact ? "mb-1.5" : "mb-3",
+            compact ? "mb-1" : "mb-3",
+            hideBackOnMobile && "max-md:hidden",
           )}
         >
           <IconArrowLeft size={14} />
@@ -43,18 +50,21 @@ export function PageHeader({
       )}
       <div
         className={cn(
-          "flex flex-col md:flex-row md:items-center",
+          "flex md:flex-row md:items-center",
+          bar ? "flex-row items-center gap-2" : "flex-col",
           compact ? "gap-2 md:gap-4" : "gap-3 md:gap-6",
         )}
       >
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2.5">
             <h1
               className={cn(
-                "leading-tight font-bold tracking-tight text-[var(--color-ink)]",
-                compact
-                  ? "text-[18px] md:text-[20px]"
-                  : "text-[22px] md:text-[24px]",
+                "min-w-0 leading-tight font-bold tracking-tight text-[var(--color-ink)]",
+                bar
+                  ? "truncate text-[16px] md:text-[20px]"
+                  : compact
+                    ? "text-[18px] md:text-[20px]"
+                    : "text-[22px] md:text-[24px]",
               )}
             >
               {title}
@@ -64,7 +74,7 @@ export function PageHeader({
           {description && (
             <p
               className={cn(
-                "max-w-2xl text-[var(--color-ink-muted)]",
+                "max-w-2xl text-[var(--color-ink-muted)] max-md:truncate",
                 compact ? "mt-0.5 text-[12.5px]" : "mt-1 text-[13.5px]",
               )}
             >
@@ -73,7 +83,9 @@ export function PageHeader({
           )}
         </div>
         {actions && (
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 md:gap-2">
+            {actions}
+          </div>
         )}
       </div>
     </div>

@@ -36,7 +36,7 @@ export default async function LeadDetailPage({
   const permissions = access.context.membership.role.permissions;
 
   return (
-    <PageContainer>
+    <PageContainer className="max-md:px-3 max-md:py-1.5">
       <LeadDetailPanel
         workspaceSlug={workspaceSlug}
         leadId={leadId}

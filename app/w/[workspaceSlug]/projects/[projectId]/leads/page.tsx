@@ -61,7 +61,7 @@ export default async function ProjectLeadsPage({ params }: { params: Params }) {
     (await isLeadEnrichmentEnabled(access.context.workspace.id));
 
   return (
-    <PageContainer className="flex min-h-0 flex-1 flex-col">
+    <PageContainer className="flex min-h-0 flex-1 flex-col max-md:px-3 max-md:py-1.5">
       <ProjectFilterSuspense>
         <ProjectLeadsPanel
           workspaceSlug={workspaceSlug}

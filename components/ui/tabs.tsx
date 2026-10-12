@@ -75,7 +75,7 @@ export function Tabs({
           );
         })}
       </div>
-      <div role="tabpanel" className="pt-5">
+      <div role="tabpanel" className="pt-3 md:pt-5">
         {items.find((it) => it.key === active)?.content}
       </div>
     </div>

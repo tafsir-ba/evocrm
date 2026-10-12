@@ -39,7 +39,7 @@ export function FocusedFormLayout({
 
   return (
     <div className={cn(maxWidthClass, "mx-auto", className)}>
-      <div className="relative mb-6">
+      <div className="relative mb-3 pr-11 md:mb-6">
         <PageHeader
           title={title}
           description={description}
@@ -80,7 +80,7 @@ export function FocusedFormActions({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-[var(--color-line)] pt-4">
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-2 border-t border-[var(--color-line)] pt-3 md:mt-6 md:gap-3 md:pt-4">
       {cancelHref ? (
         <WorkflowBackLink
           href={cancelHref}

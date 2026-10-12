@@ -476,7 +476,7 @@ export function LeadFormPage({
     >
       <form
         id={formId}
-        className="space-y-4"
+        className="space-y-3 md:space-y-4"
         onSubmit={(event) => void handleSubmit(event)}
       >
         {!isEdit && projects.length === 0 ? (
@@ -569,6 +569,9 @@ export function LeadFormPage({
           />
         </div>
 
+        <details className="mobile-disclosure">
+          <summary>Company and role</summary>
+          <div className="space-y-3 pt-2 md:space-y-4 md:pt-0">
         <div>
           <Label htmlFor="companyId">Associated company</Label>
           <CompanySelector
@@ -625,8 +628,10 @@ export function LeadFormPage({
                 stateRegion: event.target.value,
               }))
             }
-          />
+            />
         </div>
+          </div>
+        </details>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -691,6 +696,9 @@ export function LeadFormPage({
           />
         </div>
 
+        <details className="mobile-disclosure">
+          <summary>Preferences and notes</summary>
+          <div className="space-y-3 pt-2 md:space-y-4 md:pt-0">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="language">Language</Label>
@@ -849,6 +857,8 @@ export function LeadFormPage({
             rows={4}
           />
         </div>
+          </div>
+        </details>
 
         {formError && (
           <p className="text-[13px] text-[var(--color-danger-fg)]">

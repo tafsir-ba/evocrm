@@ -214,6 +214,49 @@ body {
   animation: enrich-reveal 1.15s ease-out 1;
 }
 
+@media (max-width: 767px) {
+  :root {
+    --feedback-dock-height: 2.5rem;
+  }
+}
+
+/* Secondary form/profile blocks stay open on desktop and collapse on phones. */
+.mobile-disclosure > summary {
+  display: flex;
+  min-height: 2.25rem;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+.mobile-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-disclosure > summary::before {
+  content: "▸";
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+.mobile-disclosure[open] > summary::before {
+  content: "▾";
+}
+
+@media (min-width: 768px) {
+  .mobile-disclosure > summary {
+    display: none;
+  }
+
+  .mobile-disclosure:not([open]) > :not(summary) {
+    display: block !important;
+  }
+}
+
 @keyframes visitNoteIn {
   from {
     opacity: 0;

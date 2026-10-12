@@ -57,6 +57,7 @@ export function LeadContactActions({
   whatsappMessage,
   contactCard,
   handoffNote,
+  handoffNoteClassName,
 }: {
   phone?: string | null;
   email?: string | null;
@@ -65,6 +66,7 @@ export function LeadContactActions({
   whatsappMessage?: string | null;
   contactCard?: LeadContactCard | null;
   handoffNote?: string | null;
+  handoffNoteClassName?: string;
 }) {
   const whatsapp = phone ? whatsappHref(phone, whatsappMessage) : null;
   if (!phone && !email && !contactCard) {
@@ -110,7 +112,12 @@ export function LeadContactActions({
         ) : null}
       </div>
       {handoffNote ? (
-        <p className="mt-2 text-[12px] leading-snug text-[var(--color-ink-muted)]">
+        <p
+          className={cn(
+            "mt-2 text-[12px] leading-snug text-[var(--color-ink-muted)]",
+            handoffNoteClassName,
+          )}
+        >
           {handoffNote}
         </p>
       ) : null}

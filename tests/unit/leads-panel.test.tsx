@@ -290,7 +290,9 @@ describe("LeadsPanel table", () => {
     expect(screen.getAllByText("Overdue").length).toBeGreaterThan(0);
     expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
 
-    expect(screen.queryByText("françois@évohome.ch")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "françois@évohome.ch" }).length,
+    ).toBeGreaterThan(0);
     const phoneLinks = screen.getAllByRole("link", {
       name: "+41 79 123 45 67",
     });
@@ -312,7 +314,7 @@ describe("LeadsPanel table", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("scrolls lead rows inside the table so pagination stays pinned", async () => {
+  it("keeps desktop pagination pinned and mobile pagination inside the row scroller", async () => {
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -326,12 +328,16 @@ describe("LeadsPanel table", () => {
     expect(await screen.findAllByText("François Côté")).not.toHaveLength(0);
 
     const scroller = screen.getByTestId("leads-table-scroll");
-    const nextPage = screen.getByRole("button", { name: "Next page" });
+    const desktopPager = screen.getByTestId("leads-pagination");
+    const mobileScroller = screen.getByTestId("leads-table-scroll-mobile");
+    const mobilePager = screen.getByTestId("leads-pagination-mobile");
 
     expect(scroller).toHaveClass("overflow-auto");
     expect(scroller).toHaveClass("min-h-0");
     expect(scroller).toHaveClass("flex-1");
-    expect(scroller.contains(nextPage)).toBe(false);
+    expect(scroller.contains(desktopPager)).toBe(false);
+    expect(mobileScroller.contains(mobilePager)).toBe(true);
+    expect(mobileScroller).toHaveClass("overflow-auto");
   });
 
   it("always shows a project menu in the leads filter bar", async () => {

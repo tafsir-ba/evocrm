@@ -175,10 +175,10 @@ export function FeedbackWidget() {
       <footer
         data-testid="feedback-dock"
         aria-label="Feedback"
-        className="relative z-10 flex shrink-0 flex-col items-end gap-2 border-t border-[var(--color-line)] bg-white px-3 py-2 sm:px-4"
+        className="relative z-10 flex shrink-0 flex-col items-end gap-1 border-t border-[var(--color-line)] bg-white px-2 py-1 sm:gap-2 sm:px-4 sm:py-2"
         style={{
           minHeight: "var(--feedback-dock-height)",
-          paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+          paddingBottom: "max(0.25rem, env(safe-area-inset-bottom))",
         }}
       >
         {toastMessage ? (
@@ -193,7 +193,7 @@ export function FeedbackWidget() {
           type="button"
           data-testid="feedback-trigger"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] focus-ring"
+          className="inline-flex h-9 w-9 items-center justify-center gap-2 rounded-full border border-[var(--color-line)] bg-white text-[13px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] focus-ring sm:h-auto sm:w-auto sm:px-3 sm:py-2"
         >
           <IconInbox size={16} />
           <span className="hidden sm:inline">Feedback</span>

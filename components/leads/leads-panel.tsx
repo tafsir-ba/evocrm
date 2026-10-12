@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
@@ -26,6 +26,8 @@ import {
   isLeadAgePreset,
   isLeadNextFilter,
   isLeadUrgencyFilter,
+  LEAD_BROWSER_SORT_LABELS,
+  LEAD_BROWSER_SORTS,
   nextLeadBrowserSort,
   type LeadAgePreset,
   type LeadBrowserSort,
@@ -63,7 +65,7 @@ import {
   rememberWorkflowStep,
   withFocusedLead,
 } from "@/lib/workflow-navigation";
-import { IconChevronLeft, IconChevronRight, IconPlus } from "@/lib/icons";
+import { IconChevronLeft, IconChevronRight, IconMore, IconPlus } from "@/lib/icons";
 import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
 import { requestMarketEstimateAfterEnrichment } from "@/lib/lead-enrichment-followup-client";
 import {
@@ -144,6 +146,173 @@ type WebsiteIntegrationOption = {
   id: string;
   name: string;
 };
+
+function LeadMobileActions({
+  canCreate,
+  canDelete,
+  importButton,
+  sort,
+  sortDir,
+  selectedCount,
+  onSort,
+  onSelectPage,
+  onClearSelection,
+}: {
+  canCreate: boolean;
+  canDelete: boolean;
+  importButton?: ReactNode;
+  sort: LeadBrowserSort;
+  sortDir: LeadBrowserSortDir;
+  selectedCount: number;
+  onSort: (column: LeadBrowserSort) => void;
+  onSelectPage: () => void;
+  onClearSelection: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative md:hidden">
+      <button
+        type="button"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-soft)] hover:bg-[var(--color-canvas)] focus-ring"
+        aria-label="More lead actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <IconMore size={16} />
+      </button>
+      {open ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 cursor-default"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
+      <div
+        role="menu"
+        aria-label="Lead actions"
+        className={cn(
+          "absolute right-0 z-50 mt-1 w-56 rounded-lg border border-[var(--color-line)] bg-white p-1.5 shadow-[var(--shadow-lg)]",
+          open ? "block" : "hidden",
+        )}
+      >
+        {canCreate ? importButton : null}
+        {canDelete ? (
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-10 w-full items-center rounded-md px-2 text-left text-[13.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+            onClick={() => {
+              onSelectPage();
+              setOpen(false);
+            }}
+          >
+            Select all on this page
+          </button>
+        ) : null}
+        {selectedCount > 0 ? (
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-10 w-full items-center rounded-md px-2 text-left text-[13.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+            onClick={() => {
+              onClearSelection();
+              setOpen(false);
+            }}
+          >
+            Clear selection
+          </button>
+        ) : null}
+        <p className="px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+          Sort
+        </p>
+        {LEAD_BROWSER_SORTS.map((column) => {
+          const active = sort === column;
+          return (
+            <button
+              key={column}
+              type="button"
+              role="menuitem"
+              aria-label={`Sort list by ${LEAD_BROWSER_SORT_LABELS[column]}`}
+              className={cn(
+                "flex h-10 w-full items-center rounded-md px-2 text-left text-[13.5px] hover:bg-[var(--color-muted)]",
+                active
+                  ? "font-medium text-[var(--color-brand-700)]"
+                  : "text-[var(--color-ink)]",
+              )}
+              onClick={() => {
+                onSort(column);
+                setOpen(false);
+              }}
+            >
+              {LEAD_BROWSER_SORT_LABELS[column]}
+              {active ? (sortDir === "asc" ? " · A–Z" : " · Z–A") : ""}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LeadListPagination({
+  testId,
+  className,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPage,
+}: {
+  testId: string;
+  className?: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <div data-testid={testId} className={className}>
+      <p className="min-w-0 truncate text-[12px] text-[var(--color-ink-muted)] md:text-[12.5px]">
+        Showing{" "}
+        <span className="font-medium text-[var(--color-ink)]">
+          {total === 0 ? 0 : (page - 1) * pageSize + 1}–
+          {Math.min(page * pageSize, total)}
+        </span>{" "}
+        of <span className="font-medium text-[var(--color-ink)]">{total}</span>
+      </p>
+      <div className="inline-flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
+          disabled={page <= 1}
+          aria-label="Previous page"
+          onClick={() => onPage(Math.max(1, page - 1))}
+        >
+          <IconChevronLeft size={14} />
+        </button>
+        <span
+          className="tabular px-1.5 text-[12px] text-[var(--color-ink-soft)] md:px-2 md:text-[12.5px]"
+          aria-live="polite"
+        >
+          {page} / {totalPages}
+        </span>
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50 md:h-8 md:w-8"
+          disabled={page >= totalPages}
+          aria-label="Next page"
+          onClick={() => onPage(Math.min(totalPages, page + 1))}
+        >
+          <IconChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 type LeadsPanelProps = {
   workspaceSlug: string;
@@ -897,6 +1066,30 @@ export function LeadsPanel({
     setSortDir(next.sortDir);
   }
 
+  function clearListFilters() {
+    setPage(1);
+    setPhoneFilter("");
+    setStatusFilter("");
+    setSourceFilter("");
+    setAssignedFilter("");
+    setTagFilter("");
+    setIntegrationFilter("");
+    setUtmCampaignFilter("");
+    setPropertyTypeInterestFilter("");
+    setTransactionIntentFilter("");
+    setUsagePurposeFilter("");
+    setIndustryFilter("");
+    setJobTitleFilter("");
+    setStateRegionFilter("");
+    setCompanyFilter("");
+    setTableProjectFilter("");
+    setAgePreset("");
+    setNextFilter("");
+    setUrgencyFilter("");
+    setIncludeAssociated(false);
+    setShowArchived(false);
+  }
+
   function handleColumnFilterChange(patch: Partial<LeadsTableColumnFilters>) {
     setPage(1);
     if (patch.search !== undefined) {
@@ -1228,6 +1421,84 @@ export function LeadsPanel({
     await loadLeads({ silent: true });
   }
 
+  const mobileFilterChips: Array<{
+    key: string;
+    label: string;
+    clear: () => void;
+  }> = [];
+  if (showArchived) {
+    mobileFilterChips.push({
+      key: "archived",
+      label: "Archived",
+      clear: () => {
+        setPage(1);
+        setShowArchived(false);
+      },
+    });
+  }
+  if (projectId && includeAssociated) {
+    mobileFilterChips.push({
+      key: "associated",
+      label: "Associated",
+      clear: () => {
+        setPage(1);
+        setIncludeAssociated(false);
+      },
+    });
+  }
+  if (statusFilter) {
+    mobileFilterChips.push({
+      key: "status",
+      label:
+        statuses.find((status) => status.id === statusFilter)?.label ??
+        "Status",
+      clear: () => {
+        setPage(1);
+        setStatusFilter("");
+      },
+    });
+  }
+  if (sourceFilter) {
+    mobileFilterChips.push({
+      key: "source",
+      label:
+        sources.find((source) => source.id === sourceFilter)?.label ??
+        "Source",
+      clear: () => {
+        setPage(1);
+        setSourceFilter("");
+      },
+    });
+  }
+  if (assignedFilter) {
+    mobileFilterChips.push({
+      key: "owner",
+      label:
+        assignedFilter === "unassigned"
+          ? "Unassigned"
+          : (members.find((member) => member.userId === assignedFilter)?.name ??
+            "Owner"),
+      clear: () => {
+        setPage(1);
+        setAssignedFilter("");
+      },
+    });
+  }
+  if (phoneFilter.trim()) {
+    mobileFilterChips.push({
+      key: "phone",
+      label: "Phone",
+      clear: () => {
+        setPage(1);
+        setPhoneFilter("");
+      },
+    });
+  }
+  const extraFilterCount = Math.max(
+    0,
+    activeFilterCount - mobileFilterChips.length,
+  );
+
   if (forbidden) {
     return (
       <PermissionDenied
@@ -1241,6 +1512,8 @@ export function LeadsPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         density="compact"
+        bar
+        hideBackOnMobile
         className="shrink-0"
         back={
           projectId
@@ -1260,22 +1533,45 @@ export function LeadsPanel({
           ) : undefined
         }
         actions={
-          canCreate ? (
-            <div className="flex items-center gap-2">
-              <ImportLaunchButton
-                workspaceSlug={workspaceSlug}
-                entityType="lead"
-                canCreateProject={canCreateProject}
-                onComplete={() => void loadLeads()}
-              />
+          <div className="flex items-center gap-1.5">
+            {canCreate ? (
+              <div className="hidden md:block">
+                <ImportLaunchButton
+                  workspaceSlug={workspaceSlug}
+                  entityType="lead"
+                  canCreateProject={canCreateProject}
+                  onComplete={() => void loadLeads()}
+                />
+              </div>
+            ) : null}
+            {canCreate ? (
               <Button
+                size="sm"
                 leadingIcon={<IconPlus size={14} />}
                 onClick={openNewLead}
               >
                 New lead
               </Button>
-            </div>
-          ) : undefined
+            ) : null}
+            <LeadMobileActions
+              canCreate={canCreate}
+              canDelete={canDelete}
+              sort={sort}
+              sortDir={sortDir}
+              selectedCount={selectedCount}
+              onSort={changeSort}
+              onSelectPage={togglePageSelection}
+              onClearSelection={clearSelection}
+              importButton={
+                <ImportLaunchButton
+                  workspaceSlug={workspaceSlug}
+                  entityType="lead"
+                  canCreateProject={canCreateProject}
+                  onComplete={() => void loadLeads()}
+                />
+              }
+            />
+          </div>
         }
       />
 
@@ -1285,7 +1581,7 @@ export function LeadsPanel({
         </p>
       )}
 
-      <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
+      <div className="mb-1.5 flex shrink-0 flex-col gap-1.5 sm:mb-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
         <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
             className="min-w-0 flex-1"
@@ -1325,6 +1621,15 @@ export function LeadsPanel({
             mobileFiltersOpen ? "flex" : "hidden",
           )}
         >
+          {activeFilterCount > 0 ? (
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-md px-2 text-[13px] font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)] md:h-8"
+              onClick={clearListFilters}
+            >
+              Clear filters
+            </button>
+          ) : null}
           <label className="inline-flex shrink-0 items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
             <input
               type="checkbox"
@@ -1635,6 +1940,35 @@ export function LeadsPanel({
         </div>
       ) : null}
 
+      {mobileFilterChips.length > 0 || extraFilterCount > 0 ? (
+        <div className="mb-1.5 flex shrink-0 items-center gap-1 overflow-x-auto md:hidden">
+          {mobileFilterChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] px-2 text-[12px] font-medium text-[var(--color-brand-700)]"
+              aria-label={`Clear ${chip.label} filter`}
+              onClick={chip.clear}
+            >
+              {chip.label}
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          {extraFilterCount > 0 ? (
+            <span className="shrink-0 text-[12px] text-[var(--color-ink-muted)]">
+              +{extraFilterCount} more
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="shrink-0 px-1 text-[12px] font-medium text-[var(--color-brand-700)]"
+            onClick={clearListFilters}
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="space-y-1.5">
           <Skeleton className="h-9 w-full" />
@@ -1796,50 +2130,28 @@ export function LeadsPanel({
             onRestore={(leadId, leadName) =>
               void handleRestore(leadId, leadName)
             }
+            mobileFooter={
+              <LeadListPagination
+                testId="leads-pagination-mobile"
+                className="flex items-center justify-between gap-2"
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                totalPages={totalPages}
+                onPage={setPage}
+              />
+            }
           />
 
-          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2">
-            <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-              Showing{" "}
-              <span className="font-medium text-[var(--color-ink)]">
-                {total === 0 ? 0 : (page - 1) * pageSize + 1}–
-                {Math.min(page * pageSize, total)}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-[var(--color-ink)]">
-                {total}
-              </span>{" "}
-              leads
-            </p>
-            <div className="inline-flex items-center gap-1">
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
-                disabled={page <= 1}
-                aria-label="Previous page"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                <IconChevronLeft size={14} />
-              </button>
-              <span
-                className="tabular px-2 text-[12.5px] text-[var(--color-ink-soft)]"
-                aria-live="polite"
-              >
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] disabled:opacity-50"
-                disabled={page >= totalPages}
-                aria-label="Next page"
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
-              >
-                <IconChevronRight size={14} />
-              </button>
-            </div>
-          </div>
+          <LeadListPagination
+            testId="leads-pagination"
+            className="hidden shrink-0 items-center justify-between gap-3 border-t border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 md:flex"
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPage={setPage}
+          />
         </div>
       )}
 

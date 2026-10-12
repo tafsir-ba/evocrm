@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StateView } from "@/components/states/state-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dropdown } from "@/components/ui/dropdown";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
@@ -34,6 +35,7 @@ import {
   IconCalendar,
   IconMail,
   IconMapPin,
+  IconMore,
   IconPhone,
   IconPlus,
   IconSparkles,
@@ -884,6 +886,7 @@ export function LeadDetailPanel({
   return (
     <>
       <PageHeader
+        density="compact"
         back={{
           href: listBackHref,
           label: workflowBackLabel(listBackHref, workspaceSlug),
@@ -905,75 +908,160 @@ export function LeadDetailPanel({
         }`}
         actions={
           <>
-            {canCreateOpportunity && !lead.archivedAt && (
-              <Link
-                href={appendReturnTo(
-                  createOpportunityHref(workspaceSlug, {
-                    leadId,
-                    lockLead: true,
-                  }),
-                  currentLeadHref,
-                )}
-                onClick={() => rememberWorkflowStep(currentLeadHref)}
-              >
-                <Button leadingIcon={<IconPlus size={14} />}>
-                  Link to property
+            <div className="hidden flex-wrap items-center gap-2 md:flex">
+              {canCreateOpportunity && !lead.archivedAt && (
+                <Link
+                  href={appendReturnTo(
+                    createOpportunityHref(workspaceSlug, {
+                      leadId,
+                      lockLead: true,
+                    }),
+                    currentLeadHref,
+                  )}
+                  onClick={() => rememberWorkflowStep(currentLeadHref)}
+                >
+                  <Button leadingIcon={<IconPlus size={14} />}>
+                    Link to property
+                  </Button>
+                </Link>
+              )}
+              {canEnrich && enrichmentEnabled && !lead.archivedAt && (
+                <Button
+                  variant="outline"
+                  leadingIcon={<IconSparkles size={14} />}
+                  onClick={() => {
+                    setRevealRunId(null);
+                    setEstimateReveal(false);
+                    setEnrichOpen(true);
+                  }}
+                >
+                  Enrich
                 </Button>
-              </Link>
-            )}
-            {canEnrich && enrichmentEnabled && !lead.archivedAt && (
-              <Button
-                variant="outline"
-                leadingIcon={<IconSparkles size={14} />}
-                onClick={() => {
-                  setRevealRunId(null);
-                  setEstimateReveal(false);
-                  setEnrichOpen(true);
-                }}
+              )}
+              {canUpdate && !lead.archivedAt && (
+                <Link
+                  href={leadEditHref(workspaceSlug, leadId, currentLeadHref)}
+                  onClick={() => rememberWorkflowStep(currentLeadHref)}
+                >
+                  <Button variant="secondary">Edit</Button>
+                </Link>
+              )}
+              {canDelete ? (
+                <Button
+                  variant="ghost"
+                  disabled={deleting}
+                  onClick={() => void handleDelete()}
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </Button>
+              ) : null}
+              {canArchive && lead.archivedAt ? (
+                <Button onClick={() => void handleRestore()}>Restore</Button>
+              ) : null}
+              {canArchive && !lead.archivedAt ? (
+                <Button variant="ghost" onClick={() => void handleArchive()}>
+                  Archive
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1.5 md:hidden">
+              {canUpdate && !lead.archivedAt ? (
+                <Link
+                  href={leadEditHref(workspaceSlug, leadId, currentLeadHref)}
+                  onClick={() => rememberWorkflowStep(currentLeadHref)}
+                >
+                  <Button size="sm" variant="secondary">
+                    Edit
+                  </Button>
+                </Link>
+              ) : null}
+              <Dropdown
+                align="right"
+                trigger={
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-line)] bg-white text-[var(--color-ink-soft)]"
+                    aria-label="Lead actions"
+                  >
+                    <IconMore size={16} />
+                  </button>
+                }
               >
-                Enrich
-              </Button>
-            )}
-            {canUpdate && !lead.archivedAt && (
-              <Link
-                href={leadEditHref(workspaceSlug, leadId, currentLeadHref)}
-                onClick={() => rememberWorkflowStep(currentLeadHref)}
-              >
-                <Button variant="secondary">Edit</Button>
-              </Link>
-            )}
-            {canDelete ? (
-              <Button
-                variant="ghost"
-                disabled={deleting}
-                onClick={() => void handleDelete()}
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </Button>
-            ) : null}
-            {canArchive && lead.archivedAt ? (
-              <Button onClick={() => void handleRestore()}>Restore</Button>
-            ) : null}
-            {canArchive && !lead.archivedAt ? (
-              <Button variant="ghost" onClick={() => void handleArchive()}>
-                Archive
-              </Button>
-            ) : null}
+                <div className="flex min-w-[12rem] flex-col gap-0.5">
+                  {canCreateOpportunity && !lead.archivedAt ? (
+                    <Link
+                      href={appendReturnTo(
+                        createOpportunityHref(workspaceSlug, {
+                          leadId,
+                          lockLead: true,
+                        }),
+                        currentLeadHref,
+                      )}
+                      onClick={() => rememberWorkflowStep(currentLeadHref)}
+                      className="rounded-md px-2 py-2 text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                    >
+                      Link to property
+                    </Link>
+                  ) : null}
+                  {canEnrich && enrichmentEnabled && !lead.archivedAt ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-2 text-left text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                      onClick={() => {
+                        setRevealRunId(null);
+                        setEstimateReveal(false);
+                        setEnrichOpen(true);
+                      }}
+                    >
+                      Enrich
+                    </button>
+                  ) : null}
+                  {canArchive && lead.archivedAt ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-2 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                      onClick={() => void handleRestore()}
+                    >
+                      Restore
+                    </button>
+                  ) : null}
+                  {canArchive && !lead.archivedAt ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-2 text-left text-[14px] hover:bg-[var(--color-muted)]"
+                      onClick={() => void handleArchive()}
+                    >
+                      Archive
+                    </button>
+                  ) : null}
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-2 text-left text-[14px] text-[var(--color-danger-fg)] hover:bg-[var(--color-muted)]"
+                      disabled={deleting}
+                      onClick={() => void handleDelete()}
+                    >
+                      {deleting ? "Deleting…" : "Delete"}
+                    </button>
+                  ) : null}
+                </div>
+              </Dropdown>
+            </div>
           </>
         }
       />
 
       {lead.archivedAt ? (
-        <p className="mb-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[13px] text-[var(--color-ink-muted)]">
+        <p className="mb-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)] md:mb-4 md:px-4 md:py-3">
           This lead is{" "}
           <strong className="text-[var(--color-ink)]">archived</strong>. Restore
           it to edit or use it in new opportunities.
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-1">
-          <div className="flex items-center gap-3">
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-3 xl:gap-4">
+        <Card className="max-md:p-3 xl:col-span-1">
+          <div className="hidden items-center gap-3 md:flex">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-brand-50)] text-[14px] font-semibold text-[var(--color-brand-700)]">
               {initials}
             </span>
@@ -990,14 +1078,26 @@ export function LeadDetailPanel({
           <LeadContactActions
             phone={lead.phone}
             email={lead.email}
-            className="mt-4 hidden md:block"
+            className="md:mt-4"
             whatsappMessage={whatsappMessage}
             contactCard={contactCard}
             handoffNote={handoffNote}
+            handoffNoteClassName="max-md:hidden"
           />
+          <p className="mt-2 text-[13px] text-[var(--color-ink)] md:hidden">
+            <span className="text-[var(--color-ink-muted)]">Owner </span>
+            {lead.assignedUser?.name ??
+              lead.assignedUser?.email ??
+              "Unassigned"}
+            {lead.project?.name ? ` · ${lead.project.name}` : ""}
+          </p>
 
-          <div className="mt-5 space-y-2.5 text-[13px]">
-            <Row icon={<IconMail size={14} />} label="Email">
+          <div className="mt-3 space-y-1.5 text-[13px] md:mt-5 md:space-y-2.5">
+            <Row
+              icon={<IconMail size={14} />}
+              label="Email"
+              className={lead.email ? undefined : "max-md:hidden"}
+            >
               {lead.email ? (
                 <a
                   className="truncate text-[var(--color-brand-700)] hover:underline"
@@ -1009,7 +1109,11 @@ export function LeadDetailPanel({
                 "—"
               )}
             </Row>
-            <Row icon={<IconPhone size={14} />} label="Phone">
+            <Row
+              icon={<IconPhone size={14} />}
+              label="Phone"
+              className={lead.phone ? undefined : "max-md:hidden"}
+            >
               {lead.phone ? (
                 <a
                   className="text-[var(--color-brand-700)] hover:underline"
@@ -1021,6 +1125,10 @@ export function LeadDetailPanel({
                 "—"
               )}
             </Row>
+          </div>
+          <details className="mobile-disclosure mt-2">
+            <summary>Profile, assignment, and notes</summary>
+            <div className="mt-2 space-y-1.5 text-[13px] md:mt-4 md:space-y-2.5">
             <Row icon={<IconMapPin size={14} />} label="Company">
               <EnrichedField
                 value={lead.company?.name ?? "—"}
@@ -1115,18 +1223,19 @@ export function LeadDetailPanel({
               </p>
             </>
           )}
+          </details>
         </Card>
 
         <div className="xl:col-span-2">
           <Card padded={false}>
             <Tabs
-              className="px-5"
+              className="px-2 md:px-5"
               items={[
                 {
                   key: "overview",
                   label: "Overview",
                   content: (
-                    <div className="grid grid-cols-1 gap-5 px-5 pb-5 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 px-3 pb-3 md:grid-cols-2 md:gap-5 md:px-5 md:pb-5">
                       {canEnrich &&
                       activeRun &&
                       hasEnrichmentCandidateAlternatives(activeRun) ? (
@@ -1781,18 +1890,6 @@ export function LeadDetailPanel({
         </div>
       </div>
 
-      {!lead.archivedAt && (lead.phone || lead.email) ? (
-        <div className="sticky bottom-0 z-20 -mx-4 mt-4 -mb-4 border-t border-[var(--color-line)] bg-white/95 px-4 py-2 backdrop-blur md:hidden">
-          <LeadContactActions
-            phone={lead.phone}
-            email={lead.email}
-            whatsappMessage={whatsappMessage}
-            contactCard={contactCard}
-            handoffNote={handoffNote}
-          />
-        </div>
-      ) : null}
-
       <LeadEnrichmentModal
         open={enrichOpen}
         onClose={() => setEnrichOpen(false)}
@@ -1808,13 +1905,15 @@ function Row({
   icon,
   label,
   children,
+  className,
 }: {
   icon: React.ReactNode;
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5">
+    <div className={`flex items-start gap-2.5 ${className ?? ""}`}>
       <span className="mt-0.5 text-[var(--color-ink-muted)]">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[11.5px] font-semibold tracking-wide text-[var(--color-ink-faint)] uppercase">
