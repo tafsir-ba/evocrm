@@ -41,7 +41,10 @@ export type WhatsAppDestination =
 
 const SUPPORTED_COUNTRIES = new Set<string>(getCountries());
 
-/** Characters a phone number may be written with. Anything else (ext, "/", ",", "or") needs a human. */
+/**
+ * Characters a phone number may be written with. A single "/" separator (Swiss "079/123 45 67") is
+ * allowed separately; anything else (ext, ",", ";", "or", a second "/") needs a human.
+ */
 const PHONE_CHARACTERS = /^[+\d\s().\-\u00a0\u2010-\u2015]+$/;
 const MAX_INPUT_DIGITS = 17;
 
@@ -83,11 +86,13 @@ export function resolveWhatsAppDestination(
     source: "project" | "manual";
   } | null,
 ): WhatsAppDestination {
-  const trimmed = (phone ?? "").trim();
-  if (!trimmed) {
+  const saved = (phone ?? "").trim();
+  if (!saved) {
     return unresolved("missing", "This lead has no phone number.");
   }
-  if (!PHONE_CHARACTERS.test(trimmed)) {
+  const slashCount = saved.match(/\//g)?.length ?? 0;
+  const trimmed = slashCount === 1 ? saved.replace("/", " ") : saved;
+  if (slashCount > 1 || !PHONE_CHARACTERS.test(trimmed)) {
     return unresolved(
       "extra_text",
       "The phone contains an extension, a second number or other text. Enter a single number.",

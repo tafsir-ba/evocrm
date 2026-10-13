@@ -308,6 +308,29 @@ describe("WhatsApp handoff in lead detail and lead list", () => {
     ).toBe(true);
   });
 
+  it("blocks the handoff instead of using a generic text when the project cannot be read", async () => {
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ error: { message: "Forbidden" } }), {
+          status: 403,
+        }),
+    );
+    renderDetail(lead());
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      await within(dialog).findByText(
+        /do not have access to this project's WhatsApp settings/,
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText(/has no recognized country/)).toBeNull();
+    expect(
+      within(dialog).queryByRole("link", { name: "Open WhatsApp draft" }),
+    ).toBeNull();
+    expect(
+      within(dialog).getByRole("button", { name: "Open WhatsApp draft" }),
+    ).toBeDisabled();
+  });
+
   it("only opens a draft link and never sends anything", async () => {
     renderDetail(lead());
     await openDraftHref();

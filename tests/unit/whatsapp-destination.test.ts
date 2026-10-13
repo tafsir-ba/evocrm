@@ -95,6 +95,15 @@ describe("resolveWhatsAppDestination conversion matrix", () => {
     expect(e164("   ", JM)).toBe("missing");
   });
 
+  it("accepts one slash separator but not slash-separated numbers", () => {
+    expect(e164("079/123 45 67", CH)).toBe("+41791234567");
+    expect(e164("+41 79/123 45 67", JM)).toBe("+41791234567");
+    expect(e164("876/379-7607", JM)).toBe("+18763797607");
+    expect(e164("079/123/45 67", CH)).toBe("extra_text");
+    expect(e164("079 123 45 67 / 078 765 43 21", CH)).toBe("extra_text");
+    expect(e164("876 3797 / 876 3798", JM)).toBe("invalid");
+  });
+
   it("does not strip arbitrary leading zeros", () => {
     expect(e164("0000791234567", CH)).toBe("invalid");
     expect(e164("000 876 379 7607", JM)).toBe("invalid");

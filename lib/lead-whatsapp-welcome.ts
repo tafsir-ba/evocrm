@@ -380,7 +380,8 @@ export type LoadedLeadWhatsAppDraft = {
   project: WhatsAppProjectInfo | null;
   /** Null when the project text cannot be rendered for this lead. */
   message: string | null;
-  source: "project_template" | "generated";
+  /** "unavailable" means the project could not be read, so its text and country are unknown. */
+  source: "project_template" | "generated" | "unavailable";
   errors: string[];
   unlinkedFileNames: string[];
 };
@@ -403,7 +404,9 @@ function projectInfoFromRecord(record: JsonRecord): WhatsAppProjectInfo | null {
         }
       : null,
     whatsappTemplate:
-      typeof record.whatsappTemplate === "string" ? record.whatsappTemplate : null,
+      typeof record.whatsappTemplate === "string"
+        ? record.whatsappTemplate
+        : null,
   });
 }
 
@@ -433,24 +436,37 @@ export async function loadLeadWhatsAppDraft(input: {
   let projectInfo: WhatsAppProjectInfo | null = null;
 
   if (input.projectId) {
-    const projectPayload = await readJson(
-      await fetchImpl(`${apiBase}/projects/${input.projectId}`),
-    );
+    const response = await fetchImpl(`${apiBase}/projects/${input.projectId}`);
+    const projectPayload = await readJson(response);
     const project =
       asRecord(projectPayload?.data) &&
       asRecord((projectPayload?.data as JsonRecord).project);
-    if (project) {
-      projectInfo = projectInfoFromRecord(project);
-      projectName = asString(project.name);
-      projectWebsite = asString(project.website);
-      projectCity = asString(project.city);
-      projectCountry = asString(project.country);
-      projectAddress = asString(project.address);
-      const location = asRecord(project.location);
-      projectCity = projectCity ?? asString(location?.municipality);
-      projectCountry = projectCountry ?? asString(location?.countryName);
-      projectAddress = projectAddress ?? asString(location?.normalizedAddress);
+    projectInfo = project ? projectInfoFromRecord(project) : null;
+    if (!project || !projectInfo) {
+      // Falling back to the generated welcome here could replace the project's own text.
+      return {
+        leadId: input.leadId,
+        projectId: input.projectId,
+        project: null,
+        message: null,
+        source: "unavailable",
+        errors: [
+          response.status === 403
+            ? "You do not have access to this project's WhatsApp settings. Ask a project admin for access."
+            : `Could not load this project's WhatsApp settings (HTTP ${response.status}). Close and try again.`,
+        ],
+        unlinkedFileNames: [],
+      };
     }
+    projectName = asString(project.name);
+    projectWebsite = asString(project.website);
+    projectCity = asString(project.city);
+    projectCountry = asString(project.country);
+    projectAddress = asString(project.address);
+    const location = asRecord(project.location);
+    projectCity = projectCity ?? asString(location?.municipality);
+    projectCountry = projectCountry ?? asString(location?.countryName);
+    projectAddress = projectAddress ?? asString(location?.normalizedAddress);
   }
 
   const base = {

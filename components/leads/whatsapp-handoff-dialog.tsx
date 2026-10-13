@@ -276,7 +276,7 @@ export function WhatsAppHandoffDialog({
               {destination.message}
               {destination.issue === "needs_country" &&
               current?.status === "loaded" &&
-              projectId &&
+              draft?.project &&
               !projectCountry
                 ? ` ${projectName ?? "The project"} has no recognized country.`
                 : ""}
@@ -339,7 +339,9 @@ export function WhatsAppHandoffDialog({
           <p className="text-[12px] text-[var(--color-ink-muted)]">
             {draft?.source === "project_template"
               ? `Draft from ${projectName ?? "the project"}'s WhatsApp text`
-              : "Draft (generated welcome)"}
+              : draft?.source === "unavailable"
+                ? "Draft"
+                : "Draft (generated welcome)"}
           </p>
           {current?.status === "loading" ||
           (!current && !needsProjectChoice) ? (

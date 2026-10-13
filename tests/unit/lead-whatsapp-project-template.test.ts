@@ -124,4 +124,29 @@ describe("loadLeadWhatsAppDraft with project templates", () => {
     expect(draft.message).toBeNull();
     expect(draft.errors[0]).toContain("{{lastName}}");
   });
+
+  it.each([403, 500])(
+    "does not fall back to the generated welcome when the project returns %s",
+    async (status) => {
+      const fetchImpl = vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("/projects/")
+          ? new Response(JSON.stringify({ error: { message: "nope" } }), {
+              status,
+            })
+          : new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      ) as unknown as typeof fetch;
+      const draft = await loadLeadWhatsAppDraft({
+        ...lead,
+        projectId: GV,
+        fetchImpl,
+      });
+      expect(draft).toMatchObject({
+        projectId: GV,
+        project: null,
+        message: null,
+        source: "unavailable",
+      });
+      expect(draft.errors[0]).toMatch(status === 403 ? /access/ : /HTTP 500/);
+    },
+  );
 });
