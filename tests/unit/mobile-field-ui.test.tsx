@@ -6,14 +6,23 @@ import { LeadContactActions } from "@/components/leads/lead-contact-actions";
 import { AnchoredPopover } from "@/components/ui/anchored-popover";
 
 describe("LeadContactActions", () => {
-  it("offers call, WhatsApp and email for an international number", () => {
-    render(<LeadContactActions phone="+33 6 12 34 56 78" email="jane@example.com" />);
+  it("offers call, WhatsApp and email; WhatsApp confirms the destination first", () => {
+    render(
+      <LeadContactActions
+        phone="+33 6 12 34 56 78"
+        email="jane@example.com"
+        whatsapp={{
+          workspaceSlug: "acme",
+          lead: { id: "lead-1", fullName: "Jane Doe", phone: "+33 6 12 34 56 78" },
+        }}
+      />,
+    );
     const group = screen.getByRole("group", { name: "Contact lead" });
     expect(group).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /call/i })).toHaveAttribute("href", "tel:+33612345678");
-    expect(screen.getByRole("link", { name: /whatsapp/i })).toHaveAttribute(
-      "href",
-      "https://wa.me/33612345678",
+    expect(screen.getByRole("button", { name: /whatsapp/i })).toHaveAttribute(
+      "aria-haspopup",
+      "dialog",
     );
     expect(screen.getByRole("link", { name: /email/i })).toHaveAttribute(
       "href",
@@ -21,10 +30,18 @@ describe("LeadContactActions", () => {
     );
   });
 
-  it("hides WhatsApp for local numbers and renders nothing without contact details", () => {
-    const { rerender, container } = render(<LeadContactActions phone="06 12 34 56 78" />);
+  it("keeps WhatsApp visible for local numbers and renders nothing without contact details", () => {
+    const { rerender, container } = render(
+      <LeadContactActions
+        phone="06 12 34 56 78"
+        whatsapp={{
+          workspaceSlug: "acme",
+          lead: { id: "lead-1", fullName: "Jane Doe", phone: "06 12 34 56 78" },
+        }}
+      />,
+    );
     expect(screen.getByRole("link", { name: /call/i })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /whatsapp/i })).toBeInTheDocument();
 
     rerender(<LeadContactActions phone={null} email={null} />);
     expect(container).toBeEmptyDOMElement();

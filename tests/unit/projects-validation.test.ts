@@ -258,4 +258,35 @@ describe("project validation schemas", () => {
     ).toBe(false);
     expect(updateProjectInputSchema.safeParse({ name: "Keep legacy" }).success).toBe(true);
   });
+
+  it("normalizes, clears and validates the project WhatsApp template", () => {
+    const exact = updateProjectInputSchema.safeParse({
+      whatsappTemplate: "Hi {{firstName}},\r\n\nWelcome to {{projectName}}.\n",
+    });
+    expect(exact.success && exact.data.whatsappTemplate).toBe(
+      "Hi {{firstName}},\n\nWelcome to {{projectName}}.",
+    );
+
+    const cleared = updateProjectInputSchema.safeParse({ whatsappTemplate: "   " });
+    expect(cleared.success && cleared.data.whatsappTemplate).toBeNull();
+    const removed = updateProjectInputSchema.safeParse({ whatsappTemplate: null });
+    expect(removed.success && removed.data.whatsappTemplate).toBeNull();
+
+    expect(
+      updateProjectInputSchema.safeParse({ whatsappTemplate: "Hello {{email}}" }).success,
+    ).toBe(false);
+    expect(
+      updateProjectInputSchema.safeParse({ whatsappTemplate: "x".repeat(1501) }).success,
+    ).toBe(false);
+    expect(
+      createProjectInputSchema.safeParse({
+        name: "Green View",
+        companies: [
+          { companyId: "507f1f77bcf86cd7994390aa", role: "developer", isPrimary: true },
+        ],
+        whatsappTemplate:
+          "Plan https://b.s3.amazonaws.com/p.pdf?X-Amz-Signature=1&X-Amz-Expires=60",
+      }).success,
+    ).toBe(false);
+  });
 });

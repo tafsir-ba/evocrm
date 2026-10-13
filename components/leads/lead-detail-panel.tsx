@@ -42,17 +42,9 @@ import {
 } from "@/lib/icons";
 import { buildLeadContactCard } from "@/lib/lead-contact-card";
 import { leadEditHref } from "@/lib/lead-list-context";
-import {
-  buildLeadWhatsAppWelcome,
-  loadLeadWhatsAppDraft,
-  type LeadWhatsAppDraft,
-} from "@/lib/lead-whatsapp-welcome";
+import { activeProjectIdFromHref } from "@/lib/whatsapp-project-context";
 import { cn } from "@/lib/utils";
-import {
-  formatNextStepCell,
-  telHref,
-  whatsappHref,
-} from "@/lib/leads-table";
+import { formatNextStepCell, telHref } from "@/lib/leads-table";
 import {
   appendReturnTo,
   clearRememberedFocusedLead,
@@ -229,9 +221,6 @@ export function LeadDetailPanel({
   const [revealRunId, setRevealRunId] = useState<string | null>(null);
   const [estimatePending, setEstimatePending] = useState(false);
   const [estimateReveal, setEstimateReveal] = useState(false);
-  const [whatsappDraft, setWhatsappDraft] = useState<LeadWhatsAppDraft | null>(
-    null,
-  );
   const [deleting, setDeleting] = useState(false);
   const [financialEstimate, setFinancialEstimate] = useState<{
     rangeMin: number | null;
@@ -754,45 +743,7 @@ export function LeadDetailPanel({
   useEffect(() => {
     noteWorkflowArrival(currentLeadHref);
   }, [currentLeadHref]);
-  const propertyReference = lead
-    ? readLeadIntegrationAttributes(lead.attributes)?.propertyReference
-    : null;
-
-  useEffect(() => {
-    if (!lead?.id) {
-      setWhatsappDraft(null);
-      return;
-    }
-    let cancelled = false;
-    void loadLeadWhatsAppDraft({
-      workspaceSlug,
-      leadId: lead.id,
-      fullName: lead.fullName,
-      firstName: lead.firstName,
-      projectId: lead.project?.id,
-      propertyReference,
-    })
-      .then((draft) => {
-        if (!cancelled) {
-          setWhatsappDraft(draft);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setWhatsappDraft(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    lead?.firstName,
-    lead?.fullName,
-    lead?.id,
-    lead?.project?.id,
-    propertyReference,
-    workspaceSlug,
-  ]);
+  const activeProjectId = activeProjectIdFromHref(listReturnTo);
 
   if (forbidden) {
     return (
@@ -868,21 +819,12 @@ export function LeadDetailPanel({
         updatedAt: lead.updatedAt,
       })
     : null;
-  const whatsappMessage =
-    whatsappDraft?.message ??
-    buildLeadWhatsAppWelcome({
-      fullName: lead.fullName,
-      firstName: lead.firstName,
-      projectName: lead.project?.name,
-    }).message;
   const contactNotes = [
     contactCard
       ? `Download .vcf imports into Contacts. First name is “${contactCard.givenName || "blank"}” and last name is “${contactCard.familyName}”. This does not sync the phone automatically.`
       : null,
-    lead.phone && whatsappHref(lead.phone, whatsappMessage)
-      ? whatsappDraft?.unlinkedFileNames.length
-        ? "WhatsApp opens a draft and is not sent. Files without a public link must be attached in WhatsApp."
-        : "WhatsApp opens a draft and is not sent until you press send."
+    lead.phone
+      ? "WhatsApp shows the destination and draft first, then opens a draft that is not sent until you press send."
       : null,
   ].filter((note): note is string => Boolean(note));
   const handoffNote = contactNotes.length > 0 ? contactNotes.join(" ") : null;
@@ -1090,7 +1032,11 @@ export function LeadDetailPanel({
             phone={lead.phone}
             email={lead.email}
             className="md:mt-4"
-            whatsappMessage={whatsappMessage}
+            whatsapp={{
+              workspaceSlug,
+              lead: { ...lead, projectMemberships: memberships },
+              activeProjectId,
+            }}
             contactCard={contactCard}
             handoffNote={handoffNote}
             handoffNoteClassName="max-md:hidden"

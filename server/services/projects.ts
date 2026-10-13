@@ -74,6 +74,7 @@ function projectSnapshot(project: ProjectRecord): Record<string, unknown> {
     location: project.location,
     companies: project.companies,
     description: project.description,
+    whatsappTemplate: project.whatsappTemplate,
     ownerId: project.ownerId,
     assignedTo: project.assignedTo,
   };
@@ -414,6 +415,7 @@ export async function createProjectForWorkspace(
       location,
       companies,
       description: input.description ?? null,
+      whatsappTemplate: input.whatsappTemplate ?? null,
       ownerId: input.ownerId ?? null,
       assignedTo: input.assignedTo ?? null,
     }),
@@ -542,6 +544,9 @@ export async function updateProjectForWorkspace(
   }
   if (input.description !== undefined) {
     updatePayload.description = input.description?.trim() || null;
+  }
+  if (input.whatsappTemplate !== undefined) {
+    updatePayload.whatsappTemplate = input.whatsappTemplate;
   }
   if (input.ownerId !== undefined) {
     updatePayload.ownerId = input.ownerId;

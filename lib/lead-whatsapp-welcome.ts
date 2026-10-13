@@ -1,4 +1,9 @@
-import { whatsappHref } from "@/lib/leads-table";
+import { publicHttpUrl } from "@/lib/public-url";
+import {
+  toWhatsAppProjectInfo,
+  type WhatsAppProjectInfo,
+} from "@/lib/whatsapp-project-context";
+import { renderWhatsAppTemplate } from "@/lib/whatsapp-template";
 
 export const WHATSAPP_VIEWING_LINE =
   "Please reply if you would like to arrange a viewing.";
@@ -55,48 +60,7 @@ const BROCHURE_PATTERN = /\bbrochures?\b/i;
 const FLOOR_PLAN_PATTERN = /floor[\s_-]*plans?|floorplans?/i;
 const MATERIAL_KEY_PATTERN = /brochure|floor[\s_-]*plan|floorplan/i;
 
-export function publicHttpUrl(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim().replace(/[),.;]+$/g, "");
-  if (!trimmed) {
-    return null;
-  }
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return null;
-    }
-    if (!url.hostname || isExpiringSignedUrl(url)) {
-      return null;
-    }
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/** Presigned object URLs expire and must not be pasted into a WhatsApp draft. */
-function isExpiringSignedUrl(url: URL): boolean {
-  const keys = [...url.searchParams.keys()].map((key) => key.toLowerCase());
-  if (
-    keys.some(
-      (key) =>
-        key.startsWith("x-amz-") ||
-        key.startsWith("x-goog-") ||
-        key === "awsaccesskeyid",
-    )
-  ) {
-    return true;
-  }
-  const signed =
-    keys.includes("signature") &&
-    (keys.includes("expires") ||
-      keys.includes("policy") ||
-      keys.includes("key-pair-id"));
-  return signed;
-}
+export { publicHttpUrl };
 
 function classifyMaterialText(value: string): MaterialKind | null {
   if (FLOOR_PLAN_PATTERN.test(value)) {
@@ -364,16 +328,6 @@ export function buildLeadWhatsAppWelcome(
   };
 }
 
-export function leadWhatsAppHref(
-  phone: string | null | undefined,
-  message: string,
-): string | null {
-  if (!phone?.trim()) {
-    return null;
-  }
-  return whatsappHref(phone, message);
-}
-
 type JsonRecord = Record<string, unknown>;
 
 async function readJson(response: Response): Promise<JsonRecord | null> {
@@ -419,19 +373,56 @@ function propertyFromRecord(record: JsonRecord): WelcomeProperty {
   };
 }
 
+export type LoadedLeadWhatsAppDraft = {
+  leadId: string;
+  /** Project the draft and phone country were taken from; null when none applies. */
+  projectId: string | null;
+  project: WhatsAppProjectInfo | null;
+  /** Null when the project text cannot be rendered for this lead. */
+  message: string | null;
+  source: "project_template" | "generated";
+  errors: string[];
+  unlinkedFileNames: string[];
+};
+
+function projectInfoFromRecord(record: JsonRecord): WhatsAppProjectInfo | null {
+  const id = asString(record.id);
+  const name = asString(record.name);
+  if (!id || !name) {
+    return null;
+  }
+  const location = asRecord(record.location);
+  return toWhatsAppProjectInfo({
+    id,
+    name,
+    country: asString(record.country),
+    location: location
+      ? {
+          countryCode: asString(location.countryCode),
+          countryName: asString(location.countryName),
+        }
+      : null,
+    whatsappTemplate:
+      typeof record.whatsappTemplate === "string" ? record.whatsappTemplate : null,
+  });
+}
+
 /**
- * Loads the lead's own project, linked properties, and their documents.
- * Missing permissions or empty records are skipped. No brochure URL is invented.
+ * Loads the WhatsApp draft for one lead in the context of one project. A project template is used
+ * verbatim (placeholders only). Without one, the generated welcome reads the project, linked
+ * properties and their documents. Missing permissions or empty records are skipped and no
+ * brochure URL is invented.
  */
 export async function loadLeadWhatsAppDraft(input: {
   workspaceSlug: string;
   leadId: string;
   fullName: string;
   firstName?: string | null;
+  lastName?: string | null;
   projectId?: string | null;
   propertyReference?: string | null;
   fetchImpl?: typeof fetch;
-}): Promise<LeadWhatsAppDraft> {
+}): Promise<LoadedLeadWhatsAppDraft> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const apiBase = `/api/workspaces/${input.workspaceSlug}`;
   let projectName: string | null = null;
@@ -439,6 +430,7 @@ export async function loadLeadWhatsAppDraft(input: {
   let projectCity: string | null = null;
   let projectCountry: string | null = null;
   let projectAddress: string | null = null;
+  let projectInfo: WhatsAppProjectInfo | null = null;
 
   if (input.projectId) {
     const projectPayload = await readJson(
@@ -448,6 +440,7 @@ export async function loadLeadWhatsAppDraft(input: {
       asRecord(projectPayload?.data) &&
       asRecord((projectPayload?.data as JsonRecord).project);
     if (project) {
+      projectInfo = projectInfoFromRecord(project);
       projectName = asString(project.name);
       projectWebsite = asString(project.website);
       projectCity = asString(project.city);
@@ -458,6 +451,36 @@ export async function loadLeadWhatsAppDraft(input: {
       projectCountry = projectCountry ?? asString(location?.countryName);
       projectAddress = projectAddress ?? asString(location?.normalizedAddress);
     }
+  }
+
+  const base = {
+    leadId: input.leadId,
+    projectId: input.projectId ?? null,
+    project: projectInfo,
+  };
+
+  if (projectInfo?.whatsappTemplate) {
+    const rendered = renderWhatsAppTemplate(projectInfo.whatsappTemplate, {
+      firstName: input.firstName,
+      lastName: input.lastName,
+      fullName: input.fullName,
+      projectName: projectInfo.name,
+    });
+    return rendered.ok
+      ? {
+          ...base,
+          message: rendered.message,
+          source: "project_template",
+          errors: [],
+          unlinkedFileNames: [],
+        }
+      : {
+          ...base,
+          message: null,
+          source: "project_template",
+          errors: rendered.errors,
+          unlinkedFileNames: [],
+        };
   }
 
   const properties: WelcomeProperty[] = [];
@@ -539,7 +562,7 @@ export async function loadLeadWhatsAppDraft(input: {
     }
   }
 
-  return buildLeadWhatsAppWelcome({
+  const generated = buildLeadWhatsAppWelcome({
     fullName: input.fullName,
     firstName: input.firstName,
     projectName,
@@ -550,4 +573,11 @@ export async function loadLeadWhatsAppDraft(input: {
     properties,
     documents,
   });
+  return {
+    ...base,
+    message: generated.message,
+    source: "generated",
+    errors: [],
+    unlinkedFileNames: generated.unlinkedFileNames,
+  };
 }

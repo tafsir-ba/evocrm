@@ -8,6 +8,10 @@ import {
   PROJECT_LOCATION_REVIEW_STATUSES,
 } from "@/lib/project-location";
 import { PRIMARY_COMPANY_REQUIRED_MESSAGE } from "@/lib/project-operating-record";
+import {
+  normalizeWhatsAppTemplate,
+  validateWhatsAppTemplate,
+} from "@/lib/whatsapp-template";
 
 const objectIdSchema = z
   .string()
@@ -63,6 +67,17 @@ const optionalSourceUrl = z.preprocess(
   emptyStringToNull,
   z.string().trim().url().max(500).nullable().optional(),
 );
+
+const whatsappTemplateSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => (value === undefined ? undefined : normalizeWhatsAppTemplate(value)))
+  .superRefine((value, context) => {
+    for (const message of validateWhatsAppTemplate(value)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message });
+    }
+  });
 
 const projectLocationInputSchema = z.object({
   countryCode: optionalIsoCode,
@@ -146,6 +161,7 @@ export const createProjectInputSchema = z
     location: projectLocationInputSchema.optional(),
     companies: z.array(projectCompanySchema).max(20).optional(),
     description: z.string().trim().max(2000).optional(),
+    whatsappTemplate: whatsappTemplateSchema,
     ownerId: objectIdSchema.optional(),
     assignedTo: objectIdSchema.optional(),
   })
@@ -172,6 +188,7 @@ export const updateProjectInputSchema = z
     location: projectLocationInputSchema.nullable().optional(),
     companies: z.array(projectCompanySchema).max(20).optional(),
     description: z.string().trim().max(2000).nullable().optional(),
+    whatsappTemplate: whatsappTemplateSchema,
     ownerId: objectIdSchema.nullable().optional(),
     assignedTo: objectIdSchema.nullable().optional(),
   })

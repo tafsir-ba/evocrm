@@ -1,4 +1,8 @@
 import {
+  resolveWhatsAppDestination,
+  whatsAppDraftUrl,
+} from "@/lib/whatsapp-destination";
+import {
   formatLeadUtmSummary,
   readLeadIntegrationAttributes,
   type LeadIntegrationUtm,
@@ -120,30 +124,21 @@ export function telHref(phone: string): string {
 }
 
 /**
- * wa.me needs a full international number. Local numbers (no "+" or "00" prefix) have an unknown
- * country code, so no link is returned for them rather than opening the wrong chat.
+ * wa.me draft link for a phone. A local number (no "+" or "00") is only interpreted when the
+ * country is known; otherwise null is returned rather than opening the wrong chat.
  */
 export function whatsappHref(
   phone: string,
   message?: string | null,
+  countryCode?: string | null,
 ): string | null {
-  const trimmed = phone.trim();
-  const digits = trimmed.replace(/\D/g, "");
-  let href: string | null = null;
-  if (trimmed.startsWith("+")) {
-    href = digits.length >= 8 ? `https://wa.me/${digits}` : null;
-  } else if (digits.startsWith("00")) {
-    const international = digits.slice(2);
-    href = international.length >= 8 ? `https://wa.me/${international}` : null;
-  }
-  if (!href) {
-    return null;
-  }
-  const text = message?.trim();
-  if (!text) {
-    return href;
-  }
-  return `${href}?text=${encodeURIComponent(text)}`;
+  const destination = resolveWhatsAppDestination(
+    phone,
+    countryCode ? { code: countryCode, source: "project" } : null,
+  );
+  return destination.status === "ready"
+    ? whatsAppDraftUrl(destination.waNumber, message)
+    : null;
 }
 
 export function formatNextActionWhen(

@@ -78,6 +78,8 @@ const projectSchema = new Schema(
     location: { type: projectLocationSchema, default: () => ({}) },
     companies: { type: [projectCompanySchema], default: [] },
     description: { type: String, trim: true, default: null },
+    /** Exact WhatsApp draft text with documented {{placeholders}}; null uses the generated welcome. */
+    whatsappTemplate: { type: String, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     assignedTo: { type: Schema.Types.ObjectId, ref: "User", default: null },

@@ -471,7 +471,7 @@ describe("LeadsPanel table", () => {
     ).toBeGreaterThan(0);
     expect(screen.getAllByText(/Genève-Printemps/).length).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", { name: /whatsapp|call now|email blast/i }),
+      screen.queryByRole("button", { name: /^(whatsapp|call now|email blast)$/i }),
     ).not.toBeInTheDocument();
   });
 

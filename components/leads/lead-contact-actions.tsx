@@ -1,9 +1,18 @@
-import type { ReactNode } from "react";
+"use client";
 
+import { useState, type ReactNode } from "react";
+
+import {
+  WhatsAppHandoffDialog,
+  type WhatsAppHandoffLead,
+} from "@/components/leads/whatsapp-handoff-dialog";
 import type { LeadContactCard } from "@/lib/lead-contact-card";
 import { IconChat, IconDownload, IconMail, IconPhone } from "@/lib/icons";
-import { telHref, whatsappHref } from "@/lib/leads-table";
+import { telHref } from "@/lib/leads-table";
 import { cn } from "@/lib/utils";
+
+const actionClassName =
+  "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border border-[var(--color-line)] bg-white px-2 text-[14px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] hover:text-[var(--color-brand-700)] md:h-9 md:gap-1.5 md:px-3 md:text-[13px]";
 
 function ContactAction({
   href,
@@ -24,7 +33,7 @@ function ContactAction({
       title={title}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
-      className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border border-[var(--color-line)] bg-white px-2 text-[14px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] hover:text-[var(--color-brand-700)] md:h-9 md:gap-1.5 md:px-3 md:text-[13px]"
+      className={actionClassName}
     >
       {icon}
       <span className="truncate">{label}</span>
@@ -54,7 +63,7 @@ export function LeadContactActions({
   phone,
   email,
   className,
-  whatsappMessage,
+  whatsapp,
   contactCard,
   handoffNote,
   handoffNoteClassName,
@@ -62,13 +71,17 @@ export function LeadContactActions({
   phone?: string | null;
   email?: string | null;
   className?: string;
-  /** Prefills the WhatsApp draft. The chat is not sent until the user presses send. */
-  whatsappMessage?: string | null;
+  /** Enables the WhatsApp handoff, which confirms destination and draft before opening wa.me. */
+  whatsapp?: {
+    workspaceSlug: string;
+    lead: WhatsAppHandoffLead;
+    activeProjectId?: string | null;
+  } | null;
   contactCard?: LeadContactCard | null;
   handoffNote?: string | null;
   handoffNoteClassName?: string;
 }) {
-  const whatsapp = phone ? whatsappHref(phone, whatsappMessage) : null;
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
   if (!phone && !email && !contactCard) {
     return null;
   }
@@ -87,14 +100,17 @@ export function LeadContactActions({
             icon={<IconPhone size={16} />}
           />
         ) : null}
-        {whatsapp ? (
-          <ContactAction
-            href={whatsapp}
-            label="WhatsApp"
-            icon={<IconChat size={16} />}
-            external
-            title="Opens a WhatsApp draft. Nothing is sent until you press send."
-          />
+        {phone && whatsapp ? (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            title="Check the destination and draft, then open WhatsApp. Nothing is sent until you press send."
+            className={actionClassName}
+            onClick={() => setWhatsappOpen(true)}
+          >
+            <IconChat size={16} />
+            <span className="truncate">WhatsApp</span>
+          </button>
         ) : null}
         {email ? (
           <ContactAction
@@ -107,7 +123,7 @@ export function LeadContactActions({
           <button
             type="button"
             title={`Download ${contactCard.fileName}. First name “${contactCard.givenName || "—"}”, last name “${contactCard.familyName}”. Open the .vcf in Contacts. This does not sync the phone automatically.`}
-            className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border border-[var(--color-line)] bg-white px-2 text-[14px] font-medium text-[var(--color-ink)] shadow-[var(--shadow-xs)] hover:border-[var(--color-brand-600)] hover:text-[var(--color-brand-700)] md:h-9 md:gap-1.5 md:px-3 md:text-[13px]"
+            className={actionClassName}
             onClick={() => downloadContactCard(contactCard)}
           >
             <IconDownload size={16} />
@@ -124,6 +140,15 @@ export function LeadContactActions({
         >
           {handoffNote}
         </p>
+      ) : null}
+      {phone && whatsapp ? (
+        <WhatsAppHandoffDialog
+          open={whatsappOpen}
+          onClose={() => setWhatsappOpen(false)}
+          workspaceSlug={whatsapp.workspaceSlug}
+          lead={whatsapp.lead}
+          activeProjectId={whatsapp.activeProjectId}
+        />
       ) : null}
     </div>
   );

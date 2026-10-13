@@ -29,6 +29,12 @@ import {
   type ProjectCompanyRole,
 } from "@/lib/project-operating-record";
 import { workspacePath } from "@/lib/workspace-paths";
+import {
+  renderWhatsAppTemplate,
+  validateWhatsAppTemplate,
+  WHATSAPP_TEMPLATE_MAX_LENGTH,
+  WHATSAPP_TEMPLATE_PLACEHOLDERS,
+} from "@/lib/whatsapp-template";
 
 type DictionaryItem = {
   id: string;
@@ -56,6 +62,7 @@ type ProjectFormState = {
   description: string;
   website: string;
   autoEnrichLeads: boolean;
+  whatsappTemplate: string;
 };
 
 function defaultCreateLocation(): ProjectLocation {
@@ -80,6 +87,7 @@ function emptyCreateForm(): ProjectFormState {
     description: "",
     website: "",
     autoEnrichLeads: false,
+    whatsappTemplate: "",
   };
 }
 
@@ -91,6 +99,7 @@ type LoadedProject = {
   propertyTypeId: string | null;
   website: string | null;
   autoEnrichLeads?: boolean;
+  whatsappTemplate?: string | null;
   address: string | null;
   city: string | null;
   country: string | null;
@@ -140,6 +149,7 @@ function formFromProject(project: LoadedProject): ProjectFormState {
     description: project.description ?? "",
     website: project.website ?? "",
     autoEnrichLeads: Boolean(project.autoEnrichLeads),
+    whatsappTemplate: project.whatsappTemplate ?? "",
   };
 }
 
@@ -160,6 +170,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewLead, setPreviewLead] = useState({ firstName: "Alex", lastName: "Morgan" });
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const isEdit = mode === "edit" && Boolean(projectId);
@@ -294,6 +305,14 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       return;
     }
 
+    const templateErrors = validateWhatsAppTemplate(form.whatsappTemplate);
+    if (templateErrors.length > 0) {
+      setError(templateErrors.join(" "));
+      setSaving(false);
+      return;
+    }
+    const whatsappTemplate = form.whatsappTemplate.trim() ? form.whatsappTemplate : null;
+
     const location = toProjectLocationWriteInput(form.location);
     const createBody = {
       name: form.name.trim(),
@@ -306,6 +325,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       ...(location ? { location } : {}),
       companies,
       ...(form.description.trim() ? { description: form.description.trim() } : {}),
+      ...(whatsappTemplate ? { whatsappTemplate } : {}),
       ...(form.ownerId ? { ownerId: form.ownerId } : {}),
       ...(form.assignedTo ? { assignedTo: form.assignedTo } : {}),
     };
@@ -324,6 +344,7 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
       country: location?.countryName ?? null,
       companies,
       description: form.description.trim() || null,
+      whatsappTemplate,
       ownerId: form.ownerId || null,
       assignedTo: form.assignedTo || null,
     };
@@ -351,6 +372,19 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
   }
 
   const formId = "project-form";
+  const templateErrors = validateWhatsAppTemplate(form.whatsappTemplate);
+  const previewFullName = [previewLead.firstName, previewLead.lastName]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  const templatePreview = form.whatsappTemplate.trim()
+    ? renderWhatsAppTemplate(form.whatsappTemplate, {
+        firstName: previewLead.firstName,
+        lastName: previewLead.lastName,
+        fullName: previewFullName,
+        projectName: form.name.trim() || "Project name",
+      })
+    : null;
 
   return (
     <FocusedFormLayout
@@ -547,6 +581,112 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
                 </span>
               </span>
             </label>
+          </section>
+
+          <section className="space-y-3" aria-labelledby="project-whatsapp-heading">
+            <div>
+              <h2
+                id="project-whatsapp-heading"
+                className="text-[15px] font-semibold text-[var(--color-ink)]"
+              >
+                WhatsApp draft
+              </h2>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">
+                Text pre-filled when someone opens WhatsApp for a lead of this project, from the
+                lead record or the lead list. It only opens an editable draft; nothing is sent
+                automatically. Leave empty to use the generated welcome.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="whatsappTemplate" hint={`${form.whatsappTemplate.trim().length}/${WHATSAPP_TEMPLATE_MAX_LENGTH}`}>
+                Message text
+              </Label>
+              <Textarea
+                id="whatsappTemplate"
+                rows={7}
+                aria-describedby="whatsapp-template-help"
+                aria-invalid={templateErrors.length > 0 || undefined}
+                placeholder={"Hello {{firstName}},\n\nThank you for your interest in {{projectName}}.\nBrochure: https://…"}
+                value={form.whatsappTemplate}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, whatsappTemplate: event.target.value }))
+                }
+              />
+              <div id="whatsapp-template-help" className="mt-1.5 space-y-1 text-[12px] text-[var(--color-ink-faint)]">
+                <p>
+                  Wording and line breaks are kept exactly. Only these placeholders are replaced:
+                </p>
+                <ul className="list-disc pl-5">
+                  {WHATSAPP_TEMPLATE_PLACEHOLDERS.map((placeholder) => (
+                    <li key={placeholder.key}>
+                      <code>{`{{${placeholder.key}}}`}</code> — {placeholder.description}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  You can paste stable public brochure or floor-plan links. Signed or expiring file
+                  links are rejected. If a lead has no value for a placeholder, the WhatsApp action
+                  asks for a fix instead of sending a gap.
+                </p>
+              </div>
+              {templateErrors.length > 0 ? (
+                <p role="alert" className="mt-1.5 text-[12.5px] text-[var(--color-danger-fg)]">
+                  {templateErrors.join(" ")}
+                </p>
+              ) : null}
+            </div>
+            {form.whatsappTemplate.trim() ? (
+              <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] p-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="whatsappPreviewFirstName">Preview lead first name</Label>
+                    <Input
+                      id="whatsappPreviewFirstName"
+                      autoComplete="off"
+                      value={previewLead.firstName}
+                      onChange={(event) =>
+                        setPreviewLead((current) => ({ ...current, firstName: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="whatsappPreviewLastName">Preview lead last name</Label>
+                    <Input
+                      id="whatsappPreviewLastName"
+                      autoComplete="off"
+                      value={previewLead.lastName}
+                      onChange={(event) =>
+                        setPreviewLead((current) => ({ ...current, lastName: event.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <p className="mt-3 text-[12px] font-medium text-[var(--color-ink-soft)]">
+                  Final draft preview
+                </p>
+                {templatePreview?.ok ? (
+                  <pre
+                    data-testid="whatsapp-template-preview"
+                    className="mt-1 max-h-60 overflow-auto rounded-md bg-white p-2 font-sans text-[12.5px] whitespace-pre-wrap text-[var(--color-ink)]"
+                  >
+                    {templatePreview.message}
+                  </pre>
+                ) : (
+                  <p className="mt-1 text-[12.5px] text-[var(--color-danger-fg)]">
+                    {templatePreview?.errors.join(" ")}
+                  </p>
+                )}
+              </div>
+            ) : null}
+            {form.whatsappTemplate ? (
+              <button
+                type="button"
+                className="text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:text-[var(--color-danger-fg)]"
+                onClick={() => setForm((current) => ({ ...current, whatsappTemplate: "" }))}
+              >
+                Clear and use the generated welcome
+              </button>
+            ) : null}
           </section>
 
           <section className="space-y-4" aria-labelledby="project-advanced-heading">

@@ -51,6 +51,7 @@ export type ProjectRecord = {
   location?: ProjectLocation | null;
   companies: ProjectCompanyLink[];
   description: string | null;
+  whatsappTemplate?: string | null;
   createdBy: string;
   ownerId: string | null;
   assignedTo: string | null;
@@ -102,6 +103,7 @@ function toProjectRecord(document: ProjectDocument): ProjectRecord {
       };
     }),
     description: document.description ?? null,
+    whatsappTemplate: document.whatsappTemplate ?? null,
     createdBy: document.createdBy.toString(),
     ownerId: document.ownerId?.toString() ?? null,
     assignedTo: document.assignedTo?.toString() ?? null,
@@ -508,6 +510,7 @@ export async function createProject(input: {
   location?: ProjectLocation | null;
   companies?: ProjectCompanyAssociation[];
   description?: string | null;
+  whatsappTemplate?: string | null;
   createdBy: string;
   ownerId?: string | null;
   assignedTo?: string | null;
@@ -530,6 +533,7 @@ export async function createProject(input: {
     location: normalizeProjectLocation(input.location ?? emptyProjectLocation()),
     companies: input.companies ?? [],
     description: input.description?.trim() || null,
+    whatsappTemplate: input.whatsappTemplate ?? null,
     createdBy: input.createdBy,
     ownerId: input.ownerId ?? null,
     assignedTo: input.assignedTo ?? null,
@@ -557,6 +561,7 @@ export async function updateProject(
     location: ProjectLocation | null;
     companies: ProjectCompanyAssociation[];
     description: string | null;
+    whatsappTemplate: string | null;
     ownerId: string | null;
     assignedTo: string | null;
   }>,

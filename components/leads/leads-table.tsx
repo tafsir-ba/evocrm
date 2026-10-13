@@ -51,10 +51,10 @@ import {
   leadUrgency,
   telHref,
   visibleLeadTags,
-  whatsappHref,
 } from "@/lib/leads-table";
 import { cn } from "@/lib/utils";
 import { workspacePath } from "@/lib/workspace-paths";
+import { WhatsAppHandoffDialog } from "@/components/leads/whatsapp-handoff-dialog";
 
 export type LeadTableDictionaryItem = {
   id: string;
@@ -72,6 +72,8 @@ export type LeadTableMember = {
 export type LeadTableItem = {
   id: string;
   fullName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string | null;
   phone: string | null;
   createdAt: string;
@@ -270,7 +272,13 @@ function LeadTags({
   );
 }
 
-function ContactPopover({ lead }: { lead: LeadTableItem }) {
+function ContactPopover({
+  lead,
+  onWhatsApp,
+}: {
+  lead: LeadTableItem;
+  onWhatsApp?: () => void;
+}) {
   if (!lead.email && !lead.phone) {
     return (
       <span
@@ -322,6 +330,21 @@ function ContactPopover({ lead }: { lead: LeadTableItem }) {
             />
             <span>{lead.phone}</span>
           </a>
+        ) : null}
+        {lead.phone && onWhatsApp ? (
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="dialog"
+            onClick={onWhatsApp}
+            className="flex items-center gap-2 rounded-md px-2 py-2.5 text-left text-[14px] text-[var(--color-ink)] hover:bg-[var(--color-muted)] md:py-1.5 md:text-[12.5px]"
+          >
+            <IconChat
+              size={13}
+              className="shrink-0 text-[var(--color-ink-muted)]"
+            />
+            <span>WhatsApp…</span>
+          </button>
         ) : null}
       </div>
     </Dropdown>
@@ -706,6 +729,10 @@ export function LeadsTable({
   const [expandedLeadIds, setExpandedLeadIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [whatsappLeadId, setWhatsappLeadId] = useState<string | null>(null);
+  const whatsappLead = whatsappLeadId
+    ? (leads.find((lead) => lead.id === whatsappLeadId) ?? null)
+    : null;
   const columnCount = (canDelete ? 1 : 0) + 12;
   const effectiveProjectFilter =
     filterOptions.workspaceProjectId ?? columnFilters.projectId;
@@ -724,6 +751,15 @@ export function LeadsTable({
 
   return (
     <>
+      {whatsappLead ? (
+        <WhatsAppHandoffDialog
+          open
+          onClose={() => setWhatsappLeadId(null)}
+          workspaceSlug={workspaceSlug}
+          lead={whatsappLead}
+          activeProjectId={filterOptions.workspaceProjectId}
+        />
+      ) : null}
       <div
         ref={desktopScrollRef}
         data-testid="leads-table-scroll"
@@ -1133,7 +1169,10 @@ export function LeadsTable({
                         >
                           {lead.fullName}
                         </Link>
-                        <ContactPopover lead={lead} />
+                        <ContactPopover
+                          lead={lead}
+                          onWhatsApp={() => setWhatsappLeadId(lead.id)}
+                        />
                       </div>
                       {formatLeadRoleLine(lead) ? (
                         <p className="mt-0.5 truncate text-[11px] text-[var(--color-ink-muted)]">
@@ -1299,7 +1338,6 @@ export function LeadsTable({
           const projectLabel = filterOptions.workspaceProjectId
             ? null
             : lead.project?.name?.trim() || null;
-          const whatsapp = lead.phone ? whatsappHref(lead.phone) : null;
           const enrich =
             lead.archivedAt ? undefined : enrichHandler(lead.id);
 
@@ -1410,19 +1448,22 @@ export function LeadsTable({
                     />
                   </div>
                   <div className="mt-0.5 -ml-1 flex flex-wrap items-center gap-0.5">
-                    {whatsapp ? (
-                      <a
-                        href={whatsapp}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Opens a WhatsApp draft. Nothing is sent until you press send."
+                    {lead.phone ? (
+                      <button
+                        type="button"
+                        aria-haspopup="dialog"
+                        title="Check the destination and draft, then open WhatsApp. Nothing is sent until you press send."
                         aria-label={`WhatsApp ${lead.fullName}`}
+                        onClick={() => setWhatsappLeadId(lead.id)}
                         className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
                       >
                         <IconChat size={15} />
-                      </a>
+                      </button>
                     ) : null}
-                    <ContactPopover lead={lead} />
+                    <ContactPopover
+                          lead={lead}
+                          onWhatsApp={() => setWhatsappLeadId(lead.id)}
+                        />
                     {enrich ? (
                       <button
                         type="button"
