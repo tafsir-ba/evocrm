@@ -23,6 +23,14 @@ function toObjectId(id: string): mongoose.Types.ObjectId {
   return new mongoose.Types.ObjectId(id);
 }
 
+export type StaleNewLeadCandidatePage = {
+  candidates: StaleNewLeadCandidate[];
+  /** Legacy rows missing _id/projectId/statusId/createdAt; omitted instead of failing the run. */
+  skippedInvalid: number;
+  /** Cursor for the next page, or null when this page was the last. */
+  nextAfterId: string | null;
+};
+
 /**
  * New, non-archived leads whose CRM record and lastContactedAt are both older
  * than the cutoff. Remaining signals are checked in the service.
@@ -34,7 +42,7 @@ export async function findStaleNewLeadCandidates(input: {
   afterId?: string | null;
   excludedProjectIds?: string[];
   limit: number;
-}): Promise<StaleNewLeadCandidate[]> {
+}): Promise<StaleNewLeadCandidatePage> {
   await connectDb();
 
   const filter: Record<string, unknown> = {
@@ -63,25 +71,44 @@ export async function findStaleNewLeadCandidates(input: {
     .limit(input.limit)
     .lean<
       Array<{
-        _id: mongoose.Types.ObjectId;
-        projectId: mongoose.Types.ObjectId;
-        statusId: mongoose.Types.ObjectId;
-        createdAt: Date;
+        _id?: mongoose.Types.ObjectId | null;
+        projectId?: mongoose.Types.ObjectId | null;
+        statusId?: mongoose.Types.ObjectId | null;
+        createdAt?: Date | null;
         lastContactedAt?: Date | null;
         attributes?: Record<string, unknown> | null;
         archivedAt?: Date | null;
       }>
     >();
 
-  return documents.map((document) => ({
-    id: document._id.toString(),
-    projectId: document.projectId.toString(),
-    statusId: document.statusId.toString(),
-    createdAt: document.createdAt,
-    lastContactedAt: document.lastContactedAt ?? null,
-    attributes: document.attributes ?? {},
-    archivedAt: document.archivedAt ?? null,
-  }));
+  const candidates: StaleNewLeadCandidate[] = [];
+  let skippedInvalid = 0;
+  let lastScannedId: string | null = null;
+  for (const document of documents) {
+    if (document._id) {
+      lastScannedId = document._id.toString();
+    }
+    if (!document._id || !document.projectId || !document.statusId || !document.createdAt) {
+      skippedInvalid += 1;
+      continue;
+    }
+    candidates.push({
+      id: document._id.toString(),
+      projectId: document.projectId.toString(),
+      statusId: document.statusId.toString(),
+      createdAt: document.createdAt,
+      lastContactedAt: document.lastContactedAt ?? null,
+      attributes: document.attributes ?? {},
+      archivedAt: document.archivedAt ?? null,
+    });
+  }
+
+  return {
+    candidates,
+    skippedInvalid,
+    // Cursor follows raw rows, not valid candidates, so skipped rows never end or stall paging.
+    nextAfterId: documents.length >= input.limit ? lastScannedId : null,
+  };
 }
 
 async function latestByLead(

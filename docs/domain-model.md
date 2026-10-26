@@ -814,6 +814,8 @@ A lead is eligible only when it is `new`, not archived, and the most recent of t
 
 The write is a compare-and-set on `{ statusId: new, archivedAt: null }` that only sets `statusId` (Mongoose bumps `updatedAt`). Each move writes a `lead.status_changed` audit (actor = workspace creator) with `after.automation = "lead_untreated_rule"`.
 
+Legacy `new` lead rows missing `projectId`, `statusId`, or `createdAt` are never moved; they are skipped, counted as `skippedInvalid` in the run summary, and do not stop the workspace scan.
+
 ---
 
 ## Cross-Workspace Relationship Rules

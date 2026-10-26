@@ -60,6 +60,13 @@ function lead(id: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
+function page(
+  candidates: ReturnType<typeof lead>[],
+  overrides: { skippedInvalid?: number; nextAfterId?: string | null } = {},
+) {
+  return { candidates, skippedInvalid: 0, nextAfterId: null, ...overrides };
+}
+
 function setDictionary(items: Record<string, ReturnType<typeof statusItem> | null>) {
   mocks.findDictionaryItemByTypeAndKey.mockImplementation(
     async (_ws: string, _type: string, key: string) => items[key] ?? null,
@@ -84,7 +91,7 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("moves New leads idle for 30+ days to the existing Untreated status and audits it", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([lead("lead-1")]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(page([lead("lead-1")]));
 
     const summary = await runLeadUntreatedAutomation({ now: NOW });
 
@@ -120,15 +127,17 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("keeps New leads that had activity, notes, or treatment audits inside the window", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([
-      lead("lead-activity"),
-      lead("lead-visit"),
-      lead("lead-audit"),
-      lead("lead-inbound", {
-        attributes: { integration: { receivedAt: daysAgo(2).toISOString() } },
-      }),
-      lead("lead-idle"),
-    ]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(
+      page([
+        lead("lead-activity"),
+        lead("lead-visit"),
+        lead("lead-audit"),
+        lead("lead-inbound", {
+          attributes: { integration: { receivedAt: daysAgo(2).toISOString() } },
+        }),
+        lead("lead-idle"),
+      ]),
+    );
     mocks.findLatestActivityAtByLead.mockResolvedValue(
       new Map([["lead-activity", daysAgo(5)], ["lead-idle", daysAgo(40)]]),
     );
@@ -145,10 +154,12 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("does not touch leads whose status is no longer New (already Untreated or other)", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([
-      lead("lead-untreated", { statusId: "status-untreated" }),
-      lead("lead-contacted", { statusId: "status-contacted" }),
-    ]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(
+      page([
+        lead("lead-untreated", { statusId: "status-untreated" }),
+        lead("lead-contacted", { statusId: "status-contacted" }),
+      ]),
+    );
 
     const summary = await runLeadUntreatedAutomation({ now: NOW });
 
@@ -158,7 +169,7 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("does not audit when a concurrent update already moved the lead off New", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([lead("lead-1")]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(page([lead("lead-1")]));
     mocks.markLeadUntreatedIfStillNew.mockResolvedValueOnce(false);
 
     const summary = await runLeadUntreatedAutomation({ now: NOW });
@@ -168,7 +179,7 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("dry run reports eligible leads without writing", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([lead("lead-1"), lead("lead-2")]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(page([lead("lead-1"), lead("lead-2")]));
 
     const summary = await runLeadUntreatedAutomation({ now: NOW, dryRun: true });
 
@@ -188,11 +199,13 @@ describe("runLeadUntreatedAutomation", () => {
   });
 
   it("caps updates per workspace and flags truncation", async () => {
-    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce([
-      lead("lead-1"),
-      lead("lead-2"),
-      lead("lead-3"),
-    ]);
+    mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(
+      page([
+        lead("lead-1"),
+        lead("lead-2"),
+        lead("lead-3"),
+      ]),
+    );
 
     const summary = await runLeadUntreatedAutomation({ now: NOW, maxUpdatesPerWorkspace: 2 });
 
@@ -202,8 +215,8 @@ describe("runLeadUntreatedAutomation", () => {
 
   it("pages through candidates with an id cursor", async () => {
     mocks.findStaleNewLeadCandidates
-      .mockResolvedValueOnce([lead("lead-1"), lead("lead-2")])
-      .mockResolvedValueOnce([lead("lead-3")]);
+      .mockResolvedValueOnce(page([lead("lead-1"), lead("lead-2")], { nextAfterId: "lead-2" }))
+      .mockResolvedValueOnce(page([lead("lead-3")]));
 
     const summary = await runLeadUntreatedAutomation({ now: NOW, pageSize: 2 });
 
@@ -214,6 +227,33 @@ describe("runLeadUntreatedAutomation", () => {
     expect(summary.moved).toBe(3);
   });
 
+  it("keeps scanning past invalid lead rows and reports them", async () => {
+    mocks.findStaleNewLeadCandidates
+      .mockResolvedValueOnce(page([lead("lead-1")], { skippedInvalid: 1, nextAfterId: "lead-bad" }))
+      .mockResolvedValueOnce(page([], { skippedInvalid: 2, nextAfterId: "lead-bad-3" }))
+      .mockResolvedValueOnce(page([lead("lead-2")]));
+
+    const summary = await runLeadUntreatedAutomation({ now: NOW, dryRun: true, pageSize: 2 });
+
+    expect(mocks.findStaleNewLeadCandidates).toHaveBeenCalledTimes(3);
+    expect(mocks.findStaleNewLeadCandidates).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ afterId: "lead-bad" }),
+    );
+    expect(mocks.findStaleNewLeadCandidates).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ afterId: "lead-bad-3" }),
+    );
+    expect(mocks.captureError).not.toHaveBeenCalled();
+    expect(summary.results[0]).toMatchObject({
+      skipped: null,
+      scanned: 2,
+      skippedInvalid: 3,
+      eligible: 2,
+    });
+    expect(summary.skippedInvalid).toBe(3);
+  });
+
   it("isolates per-workspace failures", async () => {
     mocks.findAllWorkspaces.mockResolvedValue([
       { id: WS, slug: "evo", createdBy: OWNER },
@@ -221,7 +261,7 @@ describe("runLeadUntreatedAutomation", () => {
     ]);
     mocks.findStaleNewLeadCandidates
       .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValueOnce([lead("lead-9")]);
+      .mockResolvedValueOnce(page([lead("lead-9")]));
 
     const summary = await runLeadUntreatedAutomation({ now: NOW });
 
