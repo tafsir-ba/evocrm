@@ -136,4 +136,42 @@ describe("findStaleNewLeadCandidates", () => {
       }),
     );
   });
+
+  it("restricts to included projects and still drops excluded ones", async () => {
+    mockLeanDocuments([]);
+
+    await findStaleNewLeadCandidates({
+      workspaceId: WS,
+      newStatusId: NEW_STATUS.toString(),
+      cutoff: CUTOFF,
+      includedProjectIds: ["6abd217b53860aac57634629", "6a2f13d144d6c01e4213ada9"],
+      excludedProjectIds: ["6a2f13d144d6c01e4213ada9"],
+      limit: 10,
+    });
+
+    expect(LeadModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: {
+          $in: ["6abd217b53860aac57634629", "6a2f13d144d6c01e4213ada9"],
+          $nin: ["6a2f13d144d6c01e4213ada9"],
+        },
+      }),
+    );
+  });
+
+  it("leaves projectId unfiltered when neither list is set", async () => {
+    mockLeanDocuments([]);
+
+    await findStaleNewLeadCandidates({
+      workspaceId: WS,
+      newStatusId: NEW_STATUS.toString(),
+      cutoff: CUTOFF,
+      includedProjectIds: [],
+      excludedProjectIds: [],
+      limit: 10,
+    });
+
+    const [filter] = vi.mocked(LeadModel.find).mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(filter).not.toHaveProperty("projectId");
+  });
 });

@@ -47,12 +47,17 @@ export type LeadUntreatedWorkspaceSummary = {
   keptRecentTreatment: number;
   lostRace: number;
   truncated: boolean;
+  /** Eligible leads per projectId, so dry runs show which projects are in scope. */
+  eligibleByProject: Record<string, number>;
 };
 
 export type LeadUntreatedRunSummary = {
   dryRun: boolean;
   thresholdDays: number;
   cutoff: string;
+  /** Empty = every project (minus excluded). */
+  includedProjectIds: string[];
+  excludedProjectIds: string[];
   workspaces: number;
   scanned: number;
   skippedInvalid: number;
@@ -67,6 +72,8 @@ export type LeadUntreatedRunOptions = {
   dryRun?: boolean;
   thresholdDays?: number;
   workspaceIds?: string[];
+  /** Allowlist of projectIds; empty/unset = all projects. Excluded ids are dropped even if included. */
+  includedProjectIds?: string[];
   excludedProjectIds?: string[];
   pageSize?: number;
   maxUpdatesPerWorkspace?: number;
@@ -118,6 +125,7 @@ function emptyWorkspaceSummary(
     keptRecentTreatment: 0,
     lostRace: 0,
     truncated: false,
+    eligibleByProject: {},
   };
 }
 
@@ -128,8 +136,13 @@ export async function applyLeadUntreatedRuleForWorkspace(
       LeadUntreatedRunOptions,
       "now" | "dryRun" | "thresholdDays" | "pageSize" | "maxUpdatesPerWorkspace"
     >
-  > & { excludedProjectIds: string[] },
+  > & { includedProjectIds: string[]; excludedProjectIds: string[] },
 ): Promise<LeadUntreatedWorkspaceSummary> {
+  const included = new Set(options.includedProjectIds);
+  const excluded = new Set(options.excludedProjectIds);
+  const inProjectScope = (projectId: string) =>
+    (included.size === 0 || included.has(projectId)) && !excluded.has(projectId);
+
   const newStatus = await findDictionaryItemByTypeAndKey(
     workspace.id,
     "lead_status",
@@ -157,10 +170,12 @@ export async function applyLeadUntreatedRuleForWorkspace(
       newStatusId: newStatus.id,
       cutoff,
       afterId,
+      includedProjectIds: options.includedProjectIds,
       excludedProjectIds: options.excludedProjectIds,
       limit: options.pageSize,
     });
-    const { candidates } = page;
+    // The query already filters by project; re-checking keeps live writes scoped even if it didn't.
+    const candidates = page.candidates.filter((lead) => inProjectScope(lead.projectId));
     summary.scanned += candidates.length;
     summary.skippedInvalid += page.skippedInvalid;
 
@@ -200,6 +215,8 @@ export async function applyLeadUntreatedRuleForWorkspace(
         return summary;
       }
       summary.eligible += 1;
+      summary.eligibleByProject[lead.projectId] =
+        (summary.eligibleByProject[lead.projectId] ?? 0) + 1;
 
       if (options.dryRun) {
         continue;
@@ -255,6 +272,7 @@ export async function runLeadUntreatedAutomation(
     thresholdDays,
     pageSize: options.pageSize ?? DEFAULT_PAGE_SIZE,
     maxUpdatesPerWorkspace: options.maxUpdatesPerWorkspace ?? DEFAULT_MAX_UPDATES_PER_WORKSPACE,
+    includedProjectIds: options.includedProjectIds ?? [],
     excludedProjectIds: options.excludedProjectIds ?? [],
   };
 
@@ -280,6 +298,8 @@ export async function runLeadUntreatedAutomation(
     dryRun,
     thresholdDays,
     cutoff: leadUntreatedCutoff(now, thresholdDays).toISOString(),
+    includedProjectIds: resolved.includedProjectIds,
+    excludedProjectIds: resolved.excludedProjectIds,
     workspaces: results.length,
     scanned: results.reduce((total, result) => total + result.scanned, 0),
     skippedInvalid: results.reduce((total, result) => total + result.skippedInvalid, 0),

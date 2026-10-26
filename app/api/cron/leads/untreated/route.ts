@@ -1,4 +1,5 @@
 import { handleRouteError, successResponse } from "@/server/api/responses";
+import { AppError } from "@/server/errors";
 import { requireCronAuth } from "@/server/security/cron-auth";
 import { runLeadUntreatedAutomation } from "@/server/services/lead-untreated-automation";
 
@@ -12,6 +13,22 @@ function parseIdList(value: string | null | undefined): string[] {
     .split(",")
     .map((id) => id.trim())
     .filter((id) => /^[a-f0-9]{24}$/i.test(id));
+}
+
+/**
+ * Allowlist from LEAD_UNTREATED_INCLUDED_PROJECT_IDS. Unset/blank = all projects.
+ * A non-blank value with no valid ObjectId fails closed: falling back to "all
+ * projects" on a typo would move leads outside the intended scope.
+ */
+function parseIncludedProjectIds(value: string | undefined): string[] {
+  const ids = parseIdList(value);
+  if (ids.length === 0 && value?.replace(/,/g, "").trim()) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "LEAD_UNTREATED_INCLUDED_PROJECT_IDS is set but contains no valid project ObjectId",
+    );
+  }
+  return ids;
 }
 
 export async function POST(request: Request) {
@@ -34,6 +51,7 @@ export async function POST(request: Request) {
       dryRun,
       maxUpdatesPerWorkspace,
       workspaceIds: parseIdList(url.searchParams.get("workspaceId")),
+      includedProjectIds: parseIncludedProjectIds(process.env.LEAD_UNTREATED_INCLUDED_PROJECT_IDS),
       excludedProjectIds: parseIdList(process.env.LEAD_UNTREATED_EXCLUDED_PROJECT_IDS),
     });
 

@@ -127,7 +127,8 @@ Access via signed URLs only. Not required before Phase 8.
 | `LEAD_UNTREATED_AUTOMATION` | Lead Untreated rule | `true` to start the internal worker that calls `POST /api/cron/leads/untreated`. Default off. Requires `CRON_SECRET` and `NEXTAUTH_URL`/`NEXT_PUBLIC_APP_URL`. |
 | `LEAD_UNTREATED_AUTOMATION_INTERVAL_MS` | Lead Untreated rule | Worker interval. Default `3600000` (1h), clamped to 15 min – 24 h. |
 | `LEAD_UNTREATED_AUTOMATION_DRY_RUN` | Lead Untreated rule | `true` forces report-only runs (no writes) for every call. |
-| `LEAD_UNTREATED_EXCLUDED_PROJECT_IDS` | Lead Untreated rule | Optional comma-separated project ObjectIds the rule must skip. |
+| `LEAD_UNTREATED_INCLUDED_PROJECT_IDS` | Lead Untreated rule | Optional comma-separated project ObjectIds allowlist. When set, only leads whose `projectId` is listed are scanned/moved; unset or blank = all projects (legacy). Invalid entries are ignored, but a non-blank value with no valid ObjectId fails the run (400) instead of widening to all projects. |
+| `LEAD_UNTREATED_EXCLUDED_PROJECT_IDS` | Lead Untreated rule | Optional comma-separated project ObjectIds the rule must skip. Exclude wins over include: a project in both lists is skipped. |
 
 ---
 

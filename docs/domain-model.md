@@ -814,6 +814,8 @@ A lead is eligible only when it is `new`, not archived, and the most recent of t
 
 The write is a compare-and-set on `{ statusId: new, archivedAt: null }` that only sets `statusId` (Mongoose bumps `updatedAt`). Each move writes a `lead.status_changed` audit (actor = workspace creator) with `after.automation = "lead_untreated_rule"`.
 
+Project scope (env, applied in the Mongo query and re-checked before each write): `LEAD_UNTREATED_INCLUDED_PROJECT_IDS` is an allowlist (unset/blank = all projects), and `LEAD_UNTREATED_EXCLUDED_PROJECT_IDS` always drops a project, even one that is included. A non-blank include value with no valid ObjectId fails the run rather than widening scope. The run summary echoes `includedProjectIds` / `excludedProjectIds`, and each workspace result has `eligibleByProject`, so a dry run shows exactly which projects would move.
+
 Legacy `new` lead rows missing `projectId`, `statusId`, or `createdAt` are never moved; they are skipped, counted as `skippedInvalid` in the run summary, and do not stop the workspace scan.
 
 ---
