@@ -116,7 +116,7 @@ Access via signed URLs only. Not required before Phase 8.
 
 | Variable | Required from | Description |
 |----------|---------------|-------------|
-| `CRON_SECRET` | Phase 10 | Bearer token for `POST /api/cron/campaigns/send-due` and `POST /api/cron/hubspot/reconcile` |
+| `CRON_SECRET` | Phase 10 | Bearer token for `POST /api/cron/campaigns/send-due`, `POST /api/cron/hubspot/reconcile`, and `POST /api/cron/leads/untreated` |
 | `HUBSPOT_ONGOING_SYNC_RELEASE_GATE` | Ongoing HubSpot sync | `off` (default), `dry-run`, or `enabled`. Mutations require `enabled` plus a verified cursor. |
 | `HUBSPOT_ONGOING_SYNC_WEBHOOK_MUTATE` | Ongoing HubSpot sync | `true` to persist webhook upserts. Default off. |
 | `HUBSPOT_ONGOING_SYNC_RECONCILE` | Ongoing HubSpot sync | `true` to run the missed-event reconcile worker/cron. Default off. |
@@ -124,6 +124,10 @@ Access via signed URLs only. Not required before Phase 8.
 | `HUBSPOT_NOTES_SYNC_INCREMENTAL` | HubSpot notes/timeline | `true` to attach notes after a lead upsert. Default off. |
 | `HUBSPOT_NOTES_SYNC_BACKFILL` | HubSpot notes/timeline | `true` to allow historical notes backfill. Default off. |
 | `HUBSPOT_NOTES_SYNC_RECONCILE` | HubSpot notes/timeline | `true` to run the notes missed-event cron. Default off. |
+| `LEAD_UNTREATED_AUTOMATION` | Lead Untreated rule | `true` to start the internal worker that calls `POST /api/cron/leads/untreated`. Default off. Requires `CRON_SECRET` and `NEXTAUTH_URL`/`NEXT_PUBLIC_APP_URL`. |
+| `LEAD_UNTREATED_AUTOMATION_INTERVAL_MS` | Lead Untreated rule | Worker interval. Default `3600000` (1h), clamped to 15 min – 24 h. |
+| `LEAD_UNTREATED_AUTOMATION_DRY_RUN` | Lead Untreated rule | `true` forces report-only runs (no writes) for every call. |
+| `LEAD_UNTREATED_EXCLUDED_PROJECT_IDS` | Lead Untreated rule | Optional comma-separated project ObjectIds the rule must skip. |
 
 ---
 
