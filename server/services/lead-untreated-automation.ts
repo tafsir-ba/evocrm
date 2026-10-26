@@ -260,6 +260,10 @@ export async function applyLeadUntreatedRuleForWorkspace(
   return summary;
 }
 
+function normalizeProjectIds(ids: string[] | undefined): string[] {
+  return [...new Set((ids ?? []).map((id) => id.trim().toLowerCase()))];
+}
+
 export async function runLeadUntreatedAutomation(
   options: LeadUntreatedRunOptions = {},
 ): Promise<LeadUntreatedRunSummary> {
@@ -272,8 +276,9 @@ export async function runLeadUntreatedAutomation(
     thresholdDays,
     pageSize: options.pageSize ?? DEFAULT_PAGE_SIZE,
     maxUpdatesPerWorkspace: options.maxUpdatesPerWorkspace ?? DEFAULT_MAX_UPDATES_PER_WORKSPACE,
-    includedProjectIds: options.includedProjectIds ?? [],
-    excludedProjectIds: options.excludedProjectIds ?? [],
+    // Lowercased so the in-memory scope check agrees with Mongo's ObjectId casting.
+    includedProjectIds: normalizeProjectIds(options.includedProjectIds),
+    excludedProjectIds: normalizeProjectIds(options.excludedProjectIds),
   };
 
   const allWorkspaces = await findAllWorkspaces();

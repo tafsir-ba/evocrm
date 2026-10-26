@@ -316,6 +316,28 @@ describe("runLeadUntreatedAutomation", () => {
       expect(summary.results[0].eligibleByProject).toEqual({ [SATIGNY]: 1 });
     });
 
+    it("matches uppercase include/exclude ids against lowercase lead projectIds", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        includedProjectIds: [SATIGNY.toUpperCase(), GROSVENOR.toUpperCase()],
+        excludedProjectIds: [GROSVENOR.toUpperCase()],
+      });
+
+      expect(mocks.findStaleNewLeadCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includedProjectIds: [SATIGNY, GROSVENOR],
+          excludedProjectIds: [GROSVENOR],
+        }),
+      );
+      expect(movedLeadIds()).toEqual(["lead-satigny"]);
+      expect(summary).toMatchObject({
+        includedProjectIds: [SATIGNY, GROSVENOR],
+        excludedProjectIds: [GROSVENOR],
+      });
+    });
+
     it("dry run with include reports in-scope counts without writing", async () => {
       mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
 
