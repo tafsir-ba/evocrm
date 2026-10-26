@@ -50,8 +50,57 @@ describe("POST /api/cron/leads/untreated", () => {
       dryRun: true,
       maxUpdatesPerWorkspace: 50,
       workspaceIds: ["64b000000000000000000001"],
+      includedProjectIds: [],
       excludedProjectIds: ["64b0000000000000000000a1"],
     });
+  });
+
+  it("passes the included project allowlist from env alongside excludes", async () => {
+    vi.stubEnv(
+      "LEAD_UNTREATED_INCLUDED_PROJECT_IDS",
+      "6abd217b53860aac57634629, 6a2f13d144d6c01e4213ada9,junk",
+    );
+    vi.stubEnv("LEAD_UNTREATED_EXCLUDED_PROJECT_IDS", "64b0000000000000000000a1");
+    const response = await POST(
+      new Request("http://localhost/api/cron/leads/untreated", {
+        method: "POST",
+        headers: { Authorization: "Bearer test-cron-secret" },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(runLeadUntreatedAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+        includedProjectIds: ["6abd217b53860aac57634629", "6a2f13d144d6c01e4213ada9"],
+        excludedProjectIds: ["64b0000000000000000000a1"],
+      }),
+    );
+  });
+
+  it.each(["", "  ", ","])("treats a blank include env (%j) as no allowlist", async (value) => {
+    vi.stubEnv("LEAD_UNTREATED_INCLUDED_PROJECT_IDS", value);
+    const response = await POST(
+      new Request("http://localhost/api/cron/leads/untreated", {
+        method: "POST",
+        headers: { Authorization: "Bearer test-cron-secret" },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(runLeadUntreatedAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({ includedProjectIds: [] }),
+    );
+  });
+
+  it("fails closed when the include env is set but has no valid ObjectId", async () => {
+    vi.stubEnv("LEAD_UNTREATED_INCLUDED_PROJECT_IDS", "satigny,grosvenor");
+    const response = await POST(
+      new Request("http://localhost/api/cron/leads/untreated", {
+        method: "POST",
+        headers: { Authorization: "Bearer test-cron-secret" },
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(runLeadUntreatedAutomation).not.toHaveBeenCalled();
   });
 
   it("forces dry run when LEAD_UNTREATED_AUTOMATION_DRY_RUN is set", async () => {

@@ -40,6 +40,7 @@ export async function findStaleNewLeadCandidates(input: {
   newStatusId: string;
   cutoff: Date;
   afterId?: string | null;
+  includedProjectIds?: string[];
   excludedProjectIds?: string[];
   limit: number;
 }): Promise<StaleNewLeadCandidatePage> {
@@ -54,8 +55,16 @@ export async function findStaleNewLeadCandidates(input: {
   if (input.afterId) {
     filter._id = { $gt: input.afterId };
   }
+  // Included = allowlist (empty means every project); excluded always wins over included.
+  const projectFilter: Record<string, string[]> = {};
+  if (input.includedProjectIds && input.includedProjectIds.length > 0) {
+    projectFilter.$in = input.includedProjectIds;
+  }
   if (input.excludedProjectIds && input.excludedProjectIds.length > 0) {
-    filter.projectId = { $nin: input.excludedProjectIds };
+    projectFilter.$nin = input.excludedProjectIds;
+  }
+  if (Object.keys(projectFilter).length > 0) {
+    filter.projectId = projectFilter;
   }
 
   const documents = await LeadModel.find(withWorkspaceScope(input.workspaceId, filter))

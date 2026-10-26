@@ -73,6 +73,8 @@ async function runLeadUntreatedCronTick(): Promise<void> {
           ? {
               dryRun: data.dryRun,
               cutoff: data.cutoff,
+              includedProjectIds: data.includedProjectIds,
+              excludedProjectIds: data.excludedProjectIds,
               workspaces: data.workspaces,
               scanned: data.scanned,
               eligible: data.eligible,

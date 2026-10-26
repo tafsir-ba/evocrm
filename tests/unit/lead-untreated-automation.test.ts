@@ -254,6 +254,105 @@ describe("runLeadUntreatedAutomation", () => {
     expect(summary.skippedInvalid).toBe(3);
   });
 
+  describe("project scope", () => {
+    const SATIGNY = "6abd217b53860aac57634629";
+    const GROSVENOR = "6a2f13d144d6c01e4213ada9";
+    const OTHER = "6a2f0444438006b304af7700";
+
+    const mixedPage = () =>
+      page([
+        lead("lead-satigny", { projectId: SATIGNY }),
+        lead("lead-grosvenor", { projectId: GROSVENOR }),
+        lead("lead-other", { projectId: OTHER }),
+      ]);
+
+    function movedLeadIds() {
+      return mocks.markLeadUntreatedIfStillNew.mock.calls.map(([input]) => input.leadId);
+    }
+
+    it("include list only moves Satigny and Grosvenor leads", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        includedProjectIds: [SATIGNY, GROSVENOR],
+      });
+
+      expect(mocks.findStaleNewLeadCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({ includedProjectIds: [SATIGNY, GROSVENOR], excludedProjectIds: [] }),
+      );
+      expect(movedLeadIds()).toEqual(["lead-satigny", "lead-grosvenor"]);
+      expect(summary).toMatchObject({
+        includedProjectIds: [SATIGNY, GROSVENOR],
+        excludedProjectIds: [],
+        moved: 2,
+      });
+      expect(summary.results[0].eligibleByProject).toEqual({ [SATIGNY]: 1, [GROSVENOR]: 1 });
+    });
+
+    it("empty include list keeps legacy exclude-only behavior", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        includedProjectIds: [],
+        excludedProjectIds: [GROSVENOR],
+      });
+
+      expect(movedLeadIds()).toEqual(["lead-satigny", "lead-other"]);
+      expect(summary).toMatchObject({ includedProjectIds: [], excludedProjectIds: [GROSVENOR] });
+    });
+
+    it("exclude still drops a project that is also included", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        includedProjectIds: [SATIGNY, GROSVENOR],
+        excludedProjectIds: [GROSVENOR],
+      });
+
+      expect(movedLeadIds()).toEqual(["lead-satigny"]);
+      expect(summary.results[0].eligibleByProject).toEqual({ [SATIGNY]: 1 });
+    });
+
+    it("matches uppercase include/exclude ids against lowercase lead projectIds", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        includedProjectIds: [SATIGNY.toUpperCase(), GROSVENOR.toUpperCase()],
+        excludedProjectIds: [GROSVENOR.toUpperCase()],
+      });
+
+      expect(mocks.findStaleNewLeadCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includedProjectIds: [SATIGNY, GROSVENOR],
+          excludedProjectIds: [GROSVENOR],
+        }),
+      );
+      expect(movedLeadIds()).toEqual(["lead-satigny"]);
+      expect(summary).toMatchObject({
+        includedProjectIds: [SATIGNY, GROSVENOR],
+        excludedProjectIds: [GROSVENOR],
+      });
+    });
+
+    it("dry run with include reports in-scope counts without writing", async () => {
+      mocks.findStaleNewLeadCandidates.mockResolvedValueOnce(mixedPage());
+
+      const summary = await runLeadUntreatedAutomation({
+        now: NOW,
+        dryRun: true,
+        includedProjectIds: [SATIGNY, GROSVENOR],
+      });
+
+      expect(mocks.markLeadUntreatedIfStillNew).not.toHaveBeenCalled();
+      expect(summary).toMatchObject({ dryRun: true, eligible: 2, moved: 0 });
+      expect(summary.results[0].eligibleByProject).toEqual({ [SATIGNY]: 1, [GROSVENOR]: 1 });
+    });
+  });
+
   it("isolates per-workspace failures", async () => {
     mocks.findAllWorkspaces.mockResolvedValue([
       { id: WS, slug: "evo", createdBy: OWNER },
