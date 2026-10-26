@@ -41,6 +41,7 @@ export type LeadUntreatedWorkspaceSummary = {
   workspaceSlug: string;
   skipped: LeadUntreatedWorkspaceSkipReason | null;
   scanned: number;
+  skippedInvalid: number;
   eligible: number;
   moved: number;
   keptRecentTreatment: number;
@@ -54,6 +55,7 @@ export type LeadUntreatedRunSummary = {
   cutoff: string;
   workspaces: number;
   scanned: number;
+  skippedInvalid: number;
   eligible: number;
   moved: number;
   workspacesSkipped: number;
@@ -110,6 +112,7 @@ function emptyWorkspaceSummary(
     workspaceSlug: workspace.slug,
     skipped,
     scanned: 0,
+    skippedInvalid: 0,
     eligible: 0,
     moved: 0,
     keptRecentTreatment: 0,
@@ -149,7 +152,7 @@ export async function applyLeadUntreatedRuleForWorkspace(
   let afterId: string | null = null;
 
   while (true) {
-    const candidates = await findStaleNewLeadCandidates({
+    const page = await findStaleNewLeadCandidates({
       workspaceId: workspace.id,
       newStatusId: newStatus.id,
       cutoff,
@@ -157,11 +160,9 @@ export async function applyLeadUntreatedRuleForWorkspace(
       excludedProjectIds: options.excludedProjectIds,
       limit: options.pageSize,
     });
-    if (candidates.length === 0) {
-      break;
-    }
-    afterId = candidates[candidates.length - 1].id;
+    const { candidates } = page;
     summary.scanned += candidates.length;
+    summary.skippedInvalid += page.skippedInvalid;
 
     const leadIds = candidates.map((lead) => lead.id);
     const [activityAt, visitAt, auditAt] = await Promise.all([
@@ -233,9 +234,10 @@ export async function applyLeadUntreatedRuleForWorkspace(
       });
     }
 
-    if (candidates.length < options.pageSize) {
+    if (!page.nextAfterId) {
       break;
     }
+    afterId = page.nextAfterId;
   }
 
   return summary;
@@ -280,6 +282,7 @@ export async function runLeadUntreatedAutomation(
     cutoff: leadUntreatedCutoff(now, thresholdDays).toISOString(),
     workspaces: results.length,
     scanned: results.reduce((total, result) => total + result.scanned, 0),
+    skippedInvalid: results.reduce((total, result) => total + result.skippedInvalid, 0),
     eligible: results.reduce((total, result) => total + result.eligible, 0),
     moved: results.reduce((total, result) => total + result.moved, 0),
     workspacesSkipped: results.filter((result) => result.skipped !== null).length,
