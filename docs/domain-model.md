@@ -793,6 +793,27 @@ if (statusItem.behavior === "terminal_lost")
 if (label === "Completed")
 ```
 
+### Lead Untreated Automation
+
+A scheduled job (`POST /api/cron/leads/untreated`, worker in `server/lead-untreated-cron-worker.ts`) moves leads from the `new` lead status to the workspace's existing **Untreated** status when no treatment happened for 30 days. Rule SSOT: `lib/lead-untreated-rule.ts`.
+
+Target status resolution (per workspace, never creates items): active `lead_status` item with key `untreated`, otherwise the active item labelled exactly "Untreated" (case-insensitive). The label fallback only exists because the item was created manually before this job; workspaces without either are skipped and reported as `untreated_status_missing`.
+
+A lead is eligible only when it is `new`, not archived, and the most recent of these is at least 30 days old:
+
+| Signal | Source |
+|--------|--------|
+| Capture date | `Lead.createdAt` (migrations carry the source create date) |
+| Latest inbound submission | `Lead.attributes.integration.receivedAt` |
+| Last contacted | `Lead.lastContactedAt` |
+| Latest activity (any type/status, archived included, HubSpot-synced notes included) | `Activity.updatedAt` by `leadId` |
+| Latest Notes session | `VisitSession.updatedAt` by `leadId` |
+| Latest human treatment audit | `AuditLog.createdAt` for `lead.status_changed`, `lead.assigned`, `lead.updated` (includes `Lead.notes` edits), `lead.tags_updated`, `lead.restored`, `lead.financial_situation_updated` |
+
+`Lead.updatedAt` is deliberately not a signal: enrichment, HubSpot sync, and backfills bump it without sales treatment.
+
+The write is a compare-and-set on `{ statusId: new, archivedAt: null }` that only sets `statusId` (Mongoose bumps `updatedAt`). Each move writes a `lead.status_changed` audit (actor = workspace creator) with `after.automation = "lead_untreated_rule"`.
+
 ---
 
 ## Cross-Workspace Relationship Rules

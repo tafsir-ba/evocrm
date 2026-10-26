@@ -16,4 +16,9 @@ export async function register() {
     "./server/hubspot-sync-cron-worker"
   );
   startInternalHubSpotSyncCronWorker();
+
+  const { startInternalLeadUntreatedCronWorker } = await import(
+    "./server/lead-untreated-cron-worker"
+  );
+  startInternalLeadUntreatedCronWorker();
 }
