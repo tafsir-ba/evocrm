@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 
+import { ChunkLoadRecovery } from "@/components/providers/chunk-load-recovery";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
+import { CHUNK_LOAD_RECOVERY_BOOTSTRAP } from "@/lib/chunk-load-recovery-bootstrap";
 
 import "./globals.css";
 
@@ -25,7 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased text-[15px] leading-relaxed">
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <Script id="chunk-load-recovery" strategy="beforeInteractive">
+          {CHUNK_LOAD_RECOVERY_BOOTSTRAP}
+        </Script>
+        <AuthSessionProvider>
+          <ChunkLoadRecovery>{children}</ChunkLoadRecovery>
+        </AuthSessionProvider>
       </body>
     </html>
   );
