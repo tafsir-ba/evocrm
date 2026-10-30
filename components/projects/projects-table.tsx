@@ -197,7 +197,7 @@ export function ProjectsTable({
                   <TableCell className="min-w-[12rem]">
                     <div className="flex min-w-0 items-baseline gap-1.5" title={identityTitle}>
                       <Link
-                        href={workspacePath(workspaceSlug, "projects", project.id)}
+                        href={workspacePath(workspaceSlug, "projects", project.id, "leads")}
                         className="min-w-0 truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                       >
                         {project.name}
@@ -294,7 +294,7 @@ export function ProjectsTable({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Link
-                    href={workspacePath(workspaceSlug, "projects", project.id)}
+                    href={workspacePath(workspaceSlug, "projects", project.id, "leads")}
                     className="block truncate font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                   >
                     {project.name}

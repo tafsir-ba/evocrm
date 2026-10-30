@@ -502,7 +502,7 @@ export function ProjectsPanel({
                 {sharedProjects.map((project) => (
                   <li key={`${project.workspaceSlug}:${project.id}`}>
                     <Link
-                      href={workspacePath(project.workspaceSlug, "projects", project.id)}
+                      href={workspacePath(project.workspaceSlug, "projects", project.id, "leads")}
                       className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[var(--color-muted)]"
                     >
                       <div className="min-w-0">

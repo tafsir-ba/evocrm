@@ -367,7 +367,12 @@ export function ProjectFormPage({ workspaceSlug, mode, projectId }: ProjectFormP
     }
 
     const savedId = isEdit && projectId ? projectId : (payload.data.project.id as string);
-    router.push(workspacePath(workspaceSlug, "projects", savedId));
+    // New projects open on Leads (Projects default landing). Edits return to Overview.
+    router.push(
+      isEdit
+        ? workspacePath(workspaceSlug, "projects", savedId)
+        : workspacePath(workspaceSlug, "projects", savedId, "leads"),
+    );
     router.refresh();
   }
 

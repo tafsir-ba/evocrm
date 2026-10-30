@@ -185,7 +185,15 @@ function buildListQuery(filter: LeadListFilter): Record<string, unknown> {
   }
 
   if (filter.statusId) {
-    query.statusId = filter.statusId;
+    const statusIds = filter.statusId
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (statusIds.length > 1) {
+      query.statusId = { $in: statusIds };
+    } else if (statusIds.length === 1) {
+      query.statusId = statusIds[0];
+    }
   }
   if (filter.sourceId) {
     query.sourceId = filter.sourceId;
@@ -901,4 +909,100 @@ export async function restoreLead(
     }
     throw error;
   }
+}
+
+export type LeadStatusGroupCount = {
+  statusId: string;
+  count: number;
+};
+
+/**
+ * Count non-archived leads on a project by current statusId.
+ * Optional createdAt lower bound supports All time / 30d / 90d widget ranges.
+ */
+export async function groupProjectLeadsByStatus(
+  workspaceId: string,
+  projectId: string,
+  options: { createdAtFrom?: Date | null } = {},
+): Promise<LeadStatusGroupCount[]> {
+  await connectDb();
+
+  const match: Record<string, unknown> = {
+    ...withWorkspaceScope(workspaceId, {
+      projectId: new mongoose.Types.ObjectId(projectId),
+      archivedAt: null,
+    }),
+    workspaceId: new mongoose.Types.ObjectId(workspaceId),
+  };
+
+  if (options.createdAtFrom) {
+    match.createdAt = { $gte: options.createdAtFrom };
+  }
+
+  const results = await LeadModel.aggregate<{
+    _id: mongoose.Types.ObjectId | null;
+    count: number;
+  }>([
+    { $match: match },
+    {
+      $group: {
+        _id: "$statusId",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return results
+    .filter((row) => row._id)
+    .map((row) => ({
+      statusId: row._id!.toString(),
+      count: row.count,
+    }));
+}
+
+export type ProjectLeadStatusGroupCount = {
+  projectId: string;
+  statusId: string;
+  count: number;
+};
+
+/** Group non-archived leads by projectId + statusId across a workspace. */
+export async function groupWorkspaceLeadsByProjectAndStatus(
+  workspaceId: string,
+  options: { createdAtFrom?: Date | null } = {},
+): Promise<ProjectLeadStatusGroupCount[]> {
+  await connectDb();
+
+  const match: Record<string, unknown> = {
+    ...withWorkspaceScope(workspaceId, {
+      archivedAt: null,
+      projectId: { $ne: null },
+    }),
+    workspaceId: new mongoose.Types.ObjectId(workspaceId),
+  };
+
+  if (options.createdAtFrom) {
+    match.createdAt = { $gte: options.createdAtFrom };
+  }
+
+  const results = await LeadModel.aggregate<{
+    _id: { projectId: mongoose.Types.ObjectId; statusId: mongoose.Types.ObjectId };
+    count: number;
+  }>([
+    { $match: match },
+    {
+      $group: {
+        _id: { projectId: "$projectId", statusId: "$statusId" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return results
+    .filter((row) => row._id?.projectId && row._id?.statusId)
+    .map((row) => ({
+      projectId: row._id.projectId.toString(),
+      statusId: row._id.statusId.toString(),
+      count: row.count,
+    }));
 }

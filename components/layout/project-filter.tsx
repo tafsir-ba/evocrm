@@ -10,6 +10,10 @@ import {
   PROJECT_FILTER_PARAM,
   setProjectIdInSearchParams,
 } from "@/lib/project-scope";
+import {
+  readProjectIdFromPathname,
+  writePreferredProjectId,
+} from "@/lib/preferred-project";
 
 type ProjectOption = {
   id: string;
@@ -117,7 +121,14 @@ export function ProjectFilter() {
     return [selectedProject, ...projects];
   }, [projects, selectedProject]);
 
+  useEffect(() => {
+    const fromPath = readProjectIdFromPathname(pathname);
+    const preferred = selectedProjectId || fromPath;
+    writePreferredProjectId(workspace.slug, preferred);
+  }, [pathname, selectedProjectId, workspace.slug]);
+
   function onChange(projectId: string): void {
+    writePreferredProjectId(workspace.slug, projectId || null);
     const next = setProjectIdInSearchParams(
       new URLSearchParams(searchParams.toString()),
       projectId || null,

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-context";
 import {
@@ -19,6 +20,12 @@ import {
   IconSettings,
   IconShield,
 } from "@/lib/icons";
+import {
+  readPreferredProjectId,
+  readProjectIdFromPathname,
+  resolveProjectsNavHref,
+  writePreferredProjectId,
+} from "@/lib/preferred-project";
 import { workspaceNavPath } from "@/lib/workspace-paths";
 import { isPrimaryNavItemActive, type V1NavSegment } from "@/lib/v1-navigation";
 import { cn } from "@/lib/utils";
@@ -45,6 +52,17 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { workspace, navigation, workspaces, isPlatformAdmin } = useWorkspaceShell();
+  const [preferredProjectId, setPreferredProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fromPath = readProjectIdFromPathname(pathname);
+    if (fromPath) {
+      writePreferredProjectId(workspace.slug, fromPath);
+      setPreferredProjectId(fromPath);
+      return;
+    }
+    setPreferredProjectId(readPreferredProjectId(workspace.slug));
+  }, [pathname, workspace.slug]);
 
   return (
     <aside
@@ -105,11 +123,22 @@ export function Sidebar({
       <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto" aria-label="Primary">
         {navigation.map(({ segment, label, href }) => {
           const Icon = NAV_ICONS[segment as V1NavSegment];
-          const isActive = isPrimaryNavItemActive(pathname, { href }, navigation);
+          const itemHref =
+            segment === "projects"
+              ? resolveProjectsNavHref(workspace.slug, preferredProjectId)
+              : href;
+          const isActive =
+            segment === "projects"
+              ? Boolean(
+                  pathname?.startsWith(
+                    workspaceNavPath(workspace.slug, "projects"),
+                  ),
+                )
+              : isPrimaryNavItemActive(pathname, { href }, navigation);
           return (
             <Link
               key={segment}
-              href={href}
+              href={itemHref}
               onClick={onNavigate}
               className={cn(
                 "group flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13.5px] font-medium transition-colors focus-ring",

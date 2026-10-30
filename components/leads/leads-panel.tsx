@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
+import { LeadFunnelWidget } from "@/components/leads/lead-funnel-widget";
 import {
   LeadEnrichmentModal,
   type EnrichmentAppliedRun,
@@ -1509,72 +1510,119 @@ export function LeadsPanel({
     );
   }
 
+  function applyFunnelStatusFilter(statusIds: string[]) {
+    setPage(1);
+    const next =
+      statusIds.length === 0
+        ? ""
+        : statusIds.length === 1
+          ? statusIds[0]!
+          : statusIds.join(",");
+    // Toggle off when clicking the already-active funnel segment.
+    setStatusFilter(next && next === statusFilter ? "" : next);
+  }
+
+  const funnelStatusIds = statusFilter
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const funnelMultiStatus = funnelStatusIds.length > 1;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader
-        density="compact"
-        bar
-        hideBackOnMobile
-        className="shrink-0"
-        back={
-          projectId
-            ? {
-                href: projectOverviewHref(workspaceSlug, projectId),
-                label: "Back to project",
-                mode: "stack",
-              }
-            : undefined
-        }
-        title="Leads"
-        meta={
-          !loading ? (
-            <Badge tone="muted" size="sm">
-              {total} total
-            </Badge>
-          ) : undefined
-        }
-        actions={
-          <div className="flex items-center gap-1.5">
-            {canCreate ? (
-              <div className="hidden md:block">
-                <ImportLaunchButton
-                  workspaceSlug={workspaceSlug}
-                  entityType="lead"
-                  canCreateProject={canCreateProject}
-                  onComplete={() => void loadLeads()}
+      <div
+        className={cn(
+          "shrink-0",
+          scopedProjectId && "lg:mb-1 lg:flex lg:items-start lg:justify-between lg:gap-4",
+        )}
+      >
+        <div className={cn(scopedProjectId && "min-w-0 flex-1")}>
+          <PageHeader
+            density="compact"
+            bar
+            hideBackOnMobile
+            className="shrink-0"
+            back={
+              projectId
+                ? {
+                    href: projectOverviewHref(workspaceSlug, projectId),
+                    label: "Back to project",
+                    mode: "stack",
+                  }
+                : undefined
+            }
+            title="Leads"
+            meta={
+              !loading ? (
+                <Badge tone="muted" size="sm">
+                  {total} total
+                </Badge>
+              ) : undefined
+            }
+            actions={
+              <div className="flex items-center gap-1.5">
+                {canCreate ? (
+                  <div className="hidden md:block">
+                    <ImportLaunchButton
+                      workspaceSlug={workspaceSlug}
+                      entityType="lead"
+                      canCreateProject={canCreateProject}
+                      onComplete={() => void loadLeads()}
+                    />
+                  </div>
+                ) : null}
+                {canCreate ? (
+                  <Button
+                    size="sm"
+                    leadingIcon={<IconPlus size={14} />}
+                    onClick={openNewLead}
+                  >
+                    New lead
+                  </Button>
+                ) : null}
+                <LeadMobileActions
+                  canCreate={canCreate}
+                  canDelete={canDelete}
+                  sort={sort}
+                  sortDir={sortDir}
+                  selectedCount={selectedCount}
+                  onSort={changeSort}
+                  onSelectPage={togglePageSelection}
+                  onClearSelection={clearSelection}
+                  importButton={
+                    <ImportLaunchButton
+                      workspaceSlug={workspaceSlug}
+                      entityType="lead"
+                      canCreateProject={canCreateProject}
+                      onComplete={() => void loadLeads()}
+                    />
+                  }
                 />
               </div>
-            ) : null}
-            {canCreate ? (
-              <Button
-                size="sm"
-                leadingIcon={<IconPlus size={14} />}
-                onClick={openNewLead}
-              >
-                New lead
-              </Button>
-            ) : null}
-            <LeadMobileActions
-              canCreate={canCreate}
-              canDelete={canDelete}
-              sort={sort}
-              sortDir={sortDir}
-              selectedCount={selectedCount}
-              onSort={changeSort}
-              onSelectPage={togglePageSelection}
-              onClearSelection={clearSelection}
-              importButton={
-                <ImportLaunchButton
-                  workspaceSlug={workspaceSlug}
-                  entityType="lead"
-                  canCreateProject={canCreateProject}
-                  onComplete={() => void loadLeads()}
-                />
-              }
-            />
-          </div>
-        }
-      />
+            }
+          />
+        </div>
+        {scopedProjectId ? (
+          <LeadFunnelWidget
+            className="mb-3 hidden lg:block"
+            workspaceSlug={workspaceSlug}
+            projectId={scopedProjectId}
+            activeStatusIds={funnelStatusIds}
+            onFilterStatuses={applyFunnelStatusFilter}
+          />
+        ) : null}
+      </div>
+
+      {scopedProjectId ? (
+        <div className="mb-3 lg:hidden">
+          <LeadFunnelWidget
+            workspaceSlug={workspaceSlug}
+            projectId={scopedProjectId}
+            activeStatusIds={funnelStatusIds}
+            onFilterStatuses={applyFunnelStatusFilter}
+          />
+        </div>
+      ) : null}
 
       {websiteOptionsWarning && (
         <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">
@@ -1689,13 +1737,15 @@ export function LeadsPanel({
             fieldSize="sm"
             className="w-full min-w-0 sm:w-auto sm:min-w-[140px]"
             aria-label="Filter by status"
-            value={statusFilter}
+            value={funnelMultiStatus ? "" : statusFilter}
             onChange={(event) => {
               setPage(1);
               setStatusFilter(event.target.value);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">
+              {funnelMultiStatus ? "Funnel statuses" : "All statuses"}
+            </option>
             {statuses.map((status) => (
               <option key={status.id} value={status.id}>
                 {status.label}
