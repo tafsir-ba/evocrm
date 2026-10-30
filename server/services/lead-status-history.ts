@@ -7,6 +7,7 @@ import { connectDb } from "@/server/db/mongoose";
 import {
   countDistinctLeadsEverReachedStatuses,
   countLeadStatusHistoryForProject,
+  countLeadStatusTransitionsForProject,
   insertLeadStatusHistory,
   listStatusHistoryLeadIdsMissingSeed,
 } from "@/server/repositories/lead-status-history";
@@ -50,6 +51,16 @@ export async function projectHasLeadStatusHistory(
   projectId: string,
 ): Promise<boolean> {
   return (await countLeadStatusHistoryForProject(workspaceId, projectId)) > 0;
+}
+
+/** Seed-only history is insufficient for conversion claims. */
+export async function projectHasLeadStatusTransitions(
+  workspaceId: string,
+  projectId: string,
+): Promise<boolean> {
+  return (
+    (await countLeadStatusTransitionsForProject(workspaceId, projectId)) > 0
+  );
 }
 
 export async function countEverReachedForBuckets(input: {
@@ -127,10 +138,26 @@ export async function backfillLeadStatusHistoryForProject(input: {
     }
   }
 
+  const projectLeadIds = await LeadModel.find(
+    withWorkspaceScope(input.workspaceId, {
+      projectId: new mongoose.Types.ObjectId(input.projectId),
+    }),
+  )
+    .select({ _id: 1 })
+    .lean();
+  const projectLeadIdSet = new Set(
+    projectLeadIds.map((lead) => lead._id.toString()),
+  );
+
+  if (projectLeadIdSet.size === 0) {
+    return { seeded, fromAudits };
+  }
+
   const audits = await AuditLogModel.find(
     withWorkspaceScope(input.workspaceId, {
       entityType: "lead",
       action: "lead.status_changed",
+      entityId: { $in: [...projectLeadIdSet] },
     }),
   )
     .sort({ createdAt: 1 })
@@ -153,19 +180,9 @@ export async function backfillLeadStatusHistoryForProject(input: {
     if (!afterStatusId || !mongoose.isValidObjectId(afterStatusId)) {
       continue;
     }
-    if (!mongoose.isValidObjectId(audit.entityId)) {
+    if (!projectLeadIdSet.has(audit.entityId)) {
       continue;
     }
-
-    const lead = await LeadModel.findOne(
-      withWorkspaceScope(input.workspaceId, {
-        _id: audit.entityId,
-        projectId: new mongoose.Types.ObjectId(input.projectId),
-      }),
-    )
-      .select({ _id: 1, projectId: 1 })
-      .lean();
-    if (!lead) continue;
 
     const source: LeadStatusHistorySource =
       audit.after &&
@@ -176,8 +193,8 @@ export async function backfillLeadStatusHistoryForProject(input: {
 
     const inserted = await insertLeadStatusHistory({
       workspaceId: input.workspaceId,
-      leadId: lead._id.toString(),
-      projectId: (lead.projectId as mongoose.Types.ObjectId).toString(),
+      leadId: audit.entityId,
+      projectId: input.projectId,
       fromStatusId:
         beforeStatusId && mongoose.isValidObjectId(beforeStatusId)
           ? beforeStatusId

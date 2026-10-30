@@ -213,7 +213,7 @@ export function buildLeadFunnel(input: {
         })
       : null;
 
-  let wonRow: FunnelBucketCount | null = wonPresent
+  const wonRow: FunnelBucketCount | null = wonPresent
     ? withShare({
         bucket: "won",
         label: labelForFunnelBucket("won"),

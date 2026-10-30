@@ -22,20 +22,24 @@ import {
 import { findProjects } from "@/server/repositories/projects";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
 import {
-  backfillLeadStatusHistoryForProject,
   countEverReachedForBuckets,
-  projectHasLeadStatusHistory,
+  projectHasLeadStatusTransitions,
 } from "@/server/services/lead-status-history";
+
+/** Funnel counts primary project assignment only; archived leads are excluded. */
+export const LEAD_FUNNEL_SCOPE_NOTE =
+  "Primary project assignment · archived leads excluded";
 
 export type LeadFunnelResponse = {
   range: LeadFunnelDateRange;
   includeArchived: false;
+  scopeNote: string;
   metricMode: BuiltLeadFunnel["metricMode"];
   metricModeNote: string;
   funnel: BuiltLeadFunnel;
   history: {
+    /** True when the project has at least one real status transition. */
     available: boolean;
-    backfill?: { seeded: number; fromAudits: number };
   };
   benchmark: {
     population: "same_project_type" | "all_active_projects" | "insufficient";
@@ -86,8 +90,6 @@ export async function getProjectLeadFunnel(input: {
   workspaceId: string;
   projectId: string;
   range?: LeadFunnelDateRange;
-  /** When true (default), seed history from audits/current status if empty. */
-  ensureHistory?: boolean;
 }): Promise<LeadFunnelResponse> {
   const range = input.range ?? "all";
   const createdAtFrom = createdAtFromForRange(range);
@@ -106,17 +108,12 @@ export async function getProjectLeadFunnel(input: {
     })),
   );
 
-  let historyBackfill: { seeded: number; fromAudits: number } | undefined;
-  const hadHistory = await projectHasLeadStatusHistory(
+  // Read-only: never mutate via GET. Conversion needs real transitions
+  // (fromStatusId != null); seed-only history stays share_of_total.
+  const hasTransitions = await projectHasLeadStatusTransitions(
     input.workspaceId,
     input.projectId,
   );
-  if (!hadHistory && input.ensureHistory !== false) {
-    historyBackfill = await backfillLeadStatusHistoryForProject({
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-    });
-  }
 
   const [projectRows, workspaceRows, projects, everReachedRaw] =
     await Promise.all([
@@ -127,17 +124,19 @@ export async function getProjectLeadFunnel(input: {
         createdAtFrom,
       }),
       findProjects(input.workspaceId, { includeArchived: false }),
-      countEverReachedForBuckets({
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        bucketStatusIds: bucketStatusIdMap(mapped),
-        changedAtFrom: createdAtFrom,
-      }),
+      hasTransitions
+        ? countEverReachedForBuckets({
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            bucketStatusIds: bucketStatusIdMap(mapped),
+            changedAtFrom: createdAtFrom,
+          })
+        : Promise.resolve(null),
     ]);
 
-  const everReachedByBucket = everReachedRaw as Partial<
-    Record<LeadFunnelBucket, number>
-  >;
+  const everReachedByBucket = everReachedRaw
+    ? (everReachedRaw as Partial<Record<LeadFunnelBucket, number>>)
+    : null;
 
   const funnel = buildLeadFunnel({
     mappedStatuses: mapped,
@@ -186,15 +185,10 @@ export async function getProjectLeadFunnel(input: {
     peers: selectedPeers,
   });
 
-  const historyAvailable =
-    funnel.metricMode === "historical_conversion" ||
-    (historyBackfill !== undefined &&
-      historyBackfill.seeded + historyBackfill.fromAudits > 0) ||
-    hadHistory;
-
   return {
     range,
     includeArchived: false,
+    scopeNote: LEAD_FUNNEL_SCOPE_NOTE,
     metricMode: funnel.metricMode,
     metricModeNote:
       funnel.metricMode === "historical_conversion"
@@ -202,8 +196,7 @@ export async function getProjectLeadFunnel(input: {
         : "Rates are share of current-status leads (of total). Status history was insufficient for conversion.",
     funnel,
     history: {
-      available: historyAvailable,
-      backfill: historyBackfill,
+      available: hasTransitions,
     },
     benchmark: {
       population: !deltas

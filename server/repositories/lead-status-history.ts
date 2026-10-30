@@ -110,6 +110,20 @@ export async function countLeadStatusHistoryForProject(
   );
 }
 
+/** True when the project has at least one real status transition (not seed-only). */
+export async function countLeadStatusTransitionsForProject(
+  workspaceId: string,
+  projectId: string,
+): Promise<number> {
+  await connectDb();
+  return LeadStatusHistoryModel.countDocuments(
+    withWorkspaceScope(workspaceId, {
+      projectId: new mongoose.Types.ObjectId(projectId),
+      fromStatusId: { $ne: null },
+    }),
+  );
+}
+
 /**
  * Distinct non-archived leads on a project that ever entered any of the given statuses.
  * Optionally require the transition to have occurred on/after `changedAtFrom`.

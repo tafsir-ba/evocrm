@@ -124,6 +124,23 @@ describe("buildLeadFunnel", () => {
     expect(funnel.rateTooltips.visit).toMatch(/Conversion/);
   });
 
+  it("stays share_of_total when ever-reached is omitted (seed-only / no transitions)", () => {
+    // Service gates conversion on real transitions and omits everReached otherwise.
+    const funnel = buildLeadFunnel({
+      mappedStatuses: mapped,
+      countsByStatusId: {
+        "s-contacted": 3,
+        "s-visit": 1,
+      },
+      everReachedByBucket: null,
+    });
+    expect(funnel.metricMode).toBe("share_of_total");
+    expect(
+      funnel.activeStages.find((s) => s.bucket === "visit")?.conversionFromPrior,
+    ).toBeNull();
+    expect(funnel.conversions).toHaveLength(0);
+  });
+
   it("shows — conversion when the prior stage never had leads", () => {
     const funnel = buildLeadFunnel({
       mappedStatuses: mapped,

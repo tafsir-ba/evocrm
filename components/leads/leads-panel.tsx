@@ -1449,11 +1449,26 @@ export function LeadsPanel({
     });
   }
   if (statusFilter) {
+    const statusFilterIds = statusFilter
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const statusLabels = statusFilterIds
+      .map(
+        (id) => statuses.find((status) => status.id === id)?.label ?? null,
+      )
+      .filter((label): label is string => Boolean(label));
+    const statusChipLabel =
+      statusLabels.length === 0
+        ? statusFilterIds.length > 1
+          ? `${statusFilterIds.length} statuses`
+          : "Status"
+        : statusLabels.length <= 2
+          ? statusLabels.join(", ")
+          : `${statusLabels[0]} +${statusLabels.length - 1}`;
     mobileFilterChips.push({
       key: "status",
-      label:
-        statuses.find((status) => status.id === statusFilter)?.label ??
-        "Status",
+      label: statusChipLabel,
       clear: () => {
         setPage(1);
         setStatusFilter("");

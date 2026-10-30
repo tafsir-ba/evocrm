@@ -192,6 +192,48 @@ function mockLeadsFetch(leads: unknown[] = [sampleLead], total = leads.length) {
     if (url.includes("/companies")) {
       return jsonResponse({ data: { companies: [] } });
     }
+    if (url.includes("/lead-funnel")) {
+      return jsonResponse({
+        data: {
+          range: "all",
+          includeArchived: false,
+          scopeNote: "Primary project assignment · archived leads excluded",
+          metricMode: "share_of_total",
+          metricModeNote: "Rates are share of current-status leads (of total).",
+          funnel: {
+            totalLeads: total,
+            metricMode: "share_of_total",
+            activeStages: [],
+            won: null,
+            exited: {
+              count: 0,
+              shareOfTotal: null,
+              reasons: [],
+              other: null,
+              statusIds: [],
+            },
+            conversions: [],
+            rates: {
+              new: null,
+              contacted: null,
+              visit: null,
+              qualified: null,
+              won: null,
+              exited: null,
+            },
+            rateTooltips: {},
+          },
+          history: { available: false },
+          benchmark: {
+            population: "insufficient",
+            peerCount: 0,
+            deltas: null,
+            summary: null,
+          },
+          mappedStatuses: [],
+        },
+      });
+    }
     if (url.includes("/projects")) {
       return jsonResponse({
         data: [{ id: sampleLead.project.id, name: sampleLead.project.name }],

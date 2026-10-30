@@ -85,7 +85,7 @@ describe("workspace ProjectsPanel list", () => {
     expect(screen.getAllByText(/· received$/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Les Terrasses" })[0]).toHaveAttribute(
       "href",
-      "/w/demo/projects/507f1f77bcf86cd799439061",
+      "/w/demo/projects/507f1f77bcf86cd799439061/leads",
     );
     expect(screen.getAllByRole("link", { name: "Edit" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Archive" }).length).toBeGreaterThan(0);

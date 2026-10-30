@@ -142,7 +142,9 @@ describe("ProjectFormPage", () => {
     expect(body.campaignId).toBeUndefined();
     expect(body.enroll).toBeUndefined();
     expect(body.location.provenance).toBeUndefined();
-    expect(push).toHaveBeenCalledWith("/w/demo/projects/507f1f77bcf86cd7994390dd");
+    expect(push).toHaveBeenCalledWith(
+      "/w/demo/projects/507f1f77bcf86cd7994390dd/leads",
+    );
   });
 
   it("saves an edited project without sending stored location provenance", async () => {

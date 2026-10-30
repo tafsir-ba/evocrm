@@ -120,7 +120,11 @@ export function LeadFunnelWidget({
       if (!response.ok) {
         throw new Error(payload.error?.message ?? "Failed to load funnel.");
       }
-      setData(payload.data as LeadFunnelResponse);
+      const next = payload.data as LeadFunnelResponse | null;
+      if (!next?.funnel?.activeStages) {
+        throw new Error("Invalid funnel response.");
+      }
+      setData(next);
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Failed to load funnel.",
@@ -167,6 +171,11 @@ export function LeadFunnelWidget({
                 ? `${data.funnel.totalLeads} total leads`
                 : "—"}
           </p>
+          {data?.scopeNote ? (
+            <p className="text-[10.5px] leading-snug text-[var(--color-ink-faint)]">
+              {data.scopeNote}
+            </p>
+          ) : null}
         </div>
         <label className="sr-only" htmlFor={`${titleId}-range`}>
           Funnel date range
