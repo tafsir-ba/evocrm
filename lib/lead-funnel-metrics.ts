@@ -18,9 +18,20 @@ export type LeadFunnelDateRange = "all" | "30d" | "90d";
 export type FunnelBucketCount = {
   bucket: LeadFunnelBucket;
   label: string;
+  /** Current-status count (always). */
   count: number;
   /** Share of total leads (0–1). Null when total is 0. */
   shareOfTotal: number | null;
+  /**
+   * Historical conversion from the prior active stage when status history
+   * exists: everReached(this) / everReached(prior). Null when unavailable
+   * or prior stage has zero ever-reached leads (display as —).
+   */
+  conversionFromPrior: number | null;
+  /** e.g. "of contacted" when conversionFromPrior is set. */
+  conversionLabel: string | null;
+  /** Distinct leads that ever reached this bucket (history mode). */
+  everReached: number | null;
   statusIds: string[];
 };
 
@@ -41,8 +52,11 @@ export type FunnelBenchmarkDelta = {
 
 export type BuiltLeadFunnel = {
   totalLeads: number;
-  /** Metric mode shipped in V1 — no status-history conversion claims. */
-  metricMode: "share_of_total";
+  /**
+   * `historical_conversion` when status-history ever-reached counts are present;
+   * otherwise `share_of_total` only (never labelled as conversion).
+   */
+  metricMode: "share_of_total" | "historical_conversion";
   activeStages: FunnelBucketCount[];
   won: FunnelBucketCount | null;
   exited: {
@@ -52,6 +66,15 @@ export type BuiltLeadFunnel = {
     other: FunnelBucketCount | null;
     statusIds: string[];
   };
+  /** Stage-to-stage conversion rates when history exists. */
+  conversions: Array<{
+    from: LeadFunnelBucket;
+    to: LeadFunnelBucket;
+    rate: number | null;
+    everFrom: number;
+    everTo: number;
+    label: string;
+  }>;
   rates: FunnelRates;
   /** Human-readable rate tooltips keyed by funnel row id. */
   rateTooltips: Record<string, string>;
@@ -78,8 +101,20 @@ export function buildLeadFunnel(input: {
   mappedStatuses: MappedFunnelStatus[];
   /** statusId → count for non-archived leads in scope */
   countsByStatusId: Record<string, number>;
+  /**
+   * Distinct leads that ever reached each funnel bucket (from status history).
+   * When provided (and non-empty overall), secondary stage rates use conversion.
+   */
+  everReachedByBucket?: Partial<Record<LeadFunnelBucket, number>> | null;
 }): BuiltLeadFunnel {
   const { mappedStatuses, countsByStatusId } = input;
+  const everReachedByBucket = input.everReachedByBucket ?? null;
+  const historyEnabled = Boolean(
+    everReachedByBucket &&
+      Object.values(everReachedByBucket).some(
+        (value) => typeof value === "number" && value > 0,
+      ),
+  );
 
   const countFor = (bucket: LeadFunnelBucket): {
     count: number;
@@ -115,6 +150,9 @@ export function buildLeadFunnel(input: {
       label: labelForFunnelBucket(bucket),
       count,
       shareOfTotal: null, // filled after total known
+      conversionFromPrior: null,
+      conversionLabel: null,
+      everReached: everReachedByBucket?.[bucket] ?? null,
       statusIds,
     };
   });
@@ -135,6 +173,9 @@ export function buildLeadFunnel(input: {
       label: labelForFunnelBucket(bucket),
       count,
       shareOfTotal: null,
+      conversionFromPrior: null,
+      conversionLabel: null,
+      everReached: everReachedByBucket?.[bucket] ?? null,
       statusIds,
     };
   });
@@ -156,7 +197,7 @@ export function buildLeadFunnel(input: {
     shareOfTotal: roundShare(row.count, totalLeads),
   });
 
-  const activeWithShare = activeStages.map(withShare);
+  let activeWithShare = activeStages.map(withShare);
   const reasonsWithShare = reasons.map(withShare);
   const otherRow: FunnelBucketCount | null =
     otherCount > 0
@@ -165,19 +206,68 @@ export function buildLeadFunnel(input: {
           label: labelForFunnelBucket("other"),
           count: otherCount,
           shareOfTotal: null,
+          conversionFromPrior: null,
+          conversionLabel: null,
+          everReached: everReachedByBucket?.other ?? null,
           statusIds: otherParts.statusIds,
         })
       : null;
 
-  const wonRow: FunnelBucketCount | null = wonPresent
+  let wonRow: FunnelBucketCount | null = wonPresent
     ? withShare({
         bucket: "won",
         label: labelForFunnelBucket("won"),
         count: wonParts.count,
         shareOfTotal: null,
+        conversionFromPrior: null,
+        conversionLabel: null,
+        everReached: everReachedByBucket?.won ?? null,
         statusIds: wonParts.statusIds,
       })
     : null;
+
+  const conversions: BuiltLeadFunnel["conversions"] = [];
+  if (historyEnabled) {
+    activeWithShare = activeWithShare.map((row, index) => {
+      if (index === 0) {
+        return row;
+      }
+      const prior = activeWithShare[index - 1]!;
+      const everTo = row.everReached ?? 0;
+      const everFrom = prior.everReached ?? 0;
+      const rate = everFrom > 0 ? everTo / everFrom : null;
+      conversions.push({
+        from: prior.bucket,
+        to: row.bucket,
+        rate,
+        everFrom,
+        everTo,
+        label: `${prior.label} → ${row.label}`,
+      });
+      return {
+        ...row,
+        conversionFromPrior: rate,
+        conversionLabel: `of ${prior.label.toLowerCase()}`,
+      };
+    });
+
+    if (wonRow && activeWithShare.length > 0) {
+      const prior = activeWithShare[activeWithShare.length - 1]!;
+      const everTo = wonRow.everReached ?? 0;
+      const everFrom = prior.everReached ?? 0;
+      const rate = everFrom > 0 ? everTo / everFrom : null;
+      conversions.push({
+        from: prior.bucket,
+        to: "won",
+        rate,
+        everFrom,
+        everTo,
+        label: `${prior.label} → Won`,
+      });
+      wonRow.conversionFromPrior = rate;
+      wonRow.conversionLabel = `of ${prior.label.toLowerCase()}`;
+    }
+  }
 
   const rates: FunnelRates = {
     new: roundShare(
@@ -204,18 +294,32 @@ export function buildLeadFunnel(input: {
     total: "Non-archived leads currently assigned to this project.",
   };
   for (const row of activeWithShare) {
-    rateTooltips[row.bucket] =
-      `${row.label} rate = ${row.label} leads ÷ total leads` +
+    const shareText =
+      `${row.label} share = current ${row.label} ÷ total leads` +
       (row.shareOfTotal === null
         ? " (no leads in scope)."
         : ` = ${formatPct(row.shareOfTotal)} of total.`);
+    if (row.conversionFromPrior !== null || row.conversionLabel) {
+      const priorLabel = row.conversionLabel?.replace(/^of /, "") ?? "prior stage";
+      rateTooltips[row.bucket] =
+        `${shareText} Conversion = leads that ever reached ${row.label} ÷ ever reached ${priorLabel}` +
+        (row.conversionFromPrior === null
+          ? " (—; prior stage has no history)."
+          : ` = ${formatPct(row.conversionFromPrior)}.`);
+    } else {
+      rateTooltips[row.bucket] = shareText;
+    }
   }
   if (wonRow) {
-    rateTooltips.won =
-      `Won rate = Won leads ÷ total leads` +
+    const shareText =
+      `Won share = current Won ÷ total leads` +
       (wonRow.shareOfTotal === null
         ? " (no leads in scope)."
         : ` = ${formatPct(wonRow.shareOfTotal)} of total.`);
+    rateTooltips.won =
+      wonRow.conversionLabel != null
+        ? `${shareText} Conversion uses status history (ever reached).`
+        : shareText;
   }
   rateTooltips.exited =
     `Exit rate = (Lost + Not interested + Unresponsive` +
@@ -239,7 +343,7 @@ export function buildLeadFunnel(input: {
 
   return {
     totalLeads,
-    metricMode: "share_of_total",
+    metricMode: historyEnabled ? "historical_conversion" : "share_of_total",
     activeStages: activeWithShare,
     won: wonRow,
     exited: {
@@ -249,6 +353,7 @@ export function buildLeadFunnel(input: {
       other: otherRow,
       statusIds: exitStatusIds,
     },
+    conversions,
     rates,
     rateTooltips,
   };

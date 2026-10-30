@@ -95,7 +95,49 @@ describe("buildLeadFunnel", () => {
     expect(funnel.rates.contacted).toBeCloseTo(3 / 12);
     expect(funnel.rates.exited).toBeCloseTo(8 / 12);
     expect(funnel.rateTooltips.contacted).toMatch(/of total/);
-    expect(funnel.rateTooltips.contacted).not.toMatch(/conversion/i);
+    expect(funnel.rateTooltips.contacted).not.toMatch(/Conversion/);
+  });
+
+  it("uses historical conversion when ever-reached counts are provided", () => {
+    const funnel = buildLeadFunnel({
+      mappedStatuses: mapped,
+      countsByStatusId: {
+        "s-contacted": 3,
+        "s-visit": 1,
+        "s-qualified": 0,
+      },
+      everReachedByBucket: {
+        new: 10,
+        contacted: 8,
+        visit: 4,
+        qualified: 1,
+      },
+    });
+
+    expect(funnel.metricMode).toBe("historical_conversion");
+    const visit = funnel.activeStages.find((s) => s.bucket === "visit");
+    expect(visit?.conversionFromPrior).toBeCloseTo(4 / 8);
+    expect(visit?.conversionLabel).toBe("of contacted");
+    expect(funnel.conversions.some((c) => c.label === "Contacted → Visit")).toBe(
+      true,
+    );
+    expect(funnel.rateTooltips.visit).toMatch(/Conversion/);
+  });
+
+  it("shows — conversion when the prior stage never had leads", () => {
+    const funnel = buildLeadFunnel({
+      mappedStatuses: mapped,
+      countsByStatusId: { "s-visit": 1 },
+      everReachedByBucket: {
+        new: 0,
+        contacted: 0,
+        visit: 1,
+        qualified: 0,
+      },
+    });
+    const visit = funnel.activeStages.find((s) => s.bucket === "visit");
+    expect(visit?.conversionFromPrior).toBeNull();
+    expect(visit?.conversionLabel).toBe("of contacted");
   });
 
   it("includes Won only when a matching lead_status exists", () => {

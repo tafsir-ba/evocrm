@@ -68,6 +68,7 @@ export type LeadRecord = {
   emailUnsubscribedAt: Date | null;
   emailUnsubscribeReason: string | null;
   lastContactedAt: Date | null;
+  statusEnteredAt: Date | null;
   createdBy: string;
   archivedAt: Date | null;
   createdAt: Date;
@@ -120,6 +121,9 @@ function toLeadRecord(document: LeadDocument): LeadRecord {
     emailUnsubscribedAt: document.emailUnsubscribedAt ?? null,
     emailUnsubscribeReason: document.emailUnsubscribeReason ?? null,
     lastContactedAt: document.lastContactedAt ?? null,
+    statusEnteredAt:
+      (document as LeadDocument & { statusEnteredAt?: Date | null })
+        .statusEnteredAt ?? null,
     createdBy: document.createdBy.toString(),
     archivedAt: document.archivedAt ?? null,
     createdAt: document.createdAt,
@@ -767,9 +771,13 @@ export async function createLead(input: {
   country?: string | null;
   professionalProfileUrl?: string | null;
   intelligenceProvenance?: LeadIntelligenceProvenance;
+  /** When the lead entered its initial status (defaults to createdAt/now). */
+  statusEnteredAt?: Date;
 }): Promise<LeadRecord> {
   await connectDb();
   try {
+    const statusEnteredAt =
+      input.statusEnteredAt ?? input.createdAt ?? new Date();
     const document = await LeadModel.create({
       workspaceId: input.workspaceId,
       projectId: input.projectId,
@@ -805,12 +813,32 @@ export async function createLead(input: {
       emailConsentStatus: input.emailConsentStatus ?? "unknown",
       createdBy: input.createdBy,
       companyId: input.companyId ?? null,
+      statusEnteredAt,
       archivedAt: null,
       ...(input.createdAt
         ? { createdAt: input.createdAt, updatedAt: input.createdAt }
         : {}),
     });
-    return toLeadRecord(document.toObject() as LeadDocument);
+    const record = toLeadRecord(document.toObject() as LeadDocument);
+    // Best-effort initial status stamp for every create path (CRM, HubSpot, import).
+    try {
+      const { insertLeadStatusHistory } = await import(
+        "@/server/repositories/lead-status-history"
+      );
+      await insertLeadStatusHistory({
+        workspaceId: record.workspaceId,
+        leadId: record.id,
+        projectId: record.projectId ?? input.projectId,
+        fromStatusId: null,
+        toStatusId: record.statusId,
+        changedAt: record.statusEnteredAt ?? record.createdAt,
+        actorId: input.createdBy,
+        source: "create",
+      });
+    } catch {
+      // History must not block lead creation.
+    }
+    return record;
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       throw new AppError(
@@ -861,12 +889,19 @@ export async function updateLead(
     emailUnsubscribeReason: string | null;
     companyId: string | null;
     projectId: string;
+    statusEnteredAt: Date | null;
   }>,
 ): Promise<LeadRecord | null> {
   await connectDb();
+  const $set: Record<string, unknown> = { ...input };
+  // Stamp current-status entry time whenever statusId changes, unless caller
+  // already provided statusEnteredAt explicitly.
+  if (input.statusId !== undefined && input.statusEnteredAt === undefined) {
+    $set.statusEnteredAt = new Date();
+  }
   const document = await LeadModel.findOneAndUpdate(
     withWorkspaceScope(workspaceId, { _id: leadId, archivedAt: null }),
-    { $set: input },
+    { $set },
     { new: true },
   ).lean<LeadDocument>();
   return document ? toLeadRecord(document) : null;

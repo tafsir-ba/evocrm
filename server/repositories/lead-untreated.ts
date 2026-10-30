@@ -204,7 +204,12 @@ export async function markLeadUntreatedIfStillNew(input: {
       statusId: input.newStatusId,
       archivedAt: null,
     }),
-    { $set: { statusId: input.untreatedStatusId } },
+    {
+      $set: {
+        statusId: input.untreatedStatusId,
+        statusEnteredAt: new Date(),
+      },
+    },
   );
   return result.modifiedCount > 0;
 }

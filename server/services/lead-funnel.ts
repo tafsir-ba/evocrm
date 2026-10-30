@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   mapLeadStatusesToFunnel,
+  type LeadFunnelBucket,
   type MappedFunnelStatus,
 } from "@/lib/lead-funnel-mapping";
 import {
@@ -20,13 +21,22 @@ import {
 } from "@/server/repositories/leads";
 import { findProjects } from "@/server/repositories/projects";
 import { listDictionaryItemsForWorkspace } from "@/server/services/dictionary-items";
+import {
+  backfillLeadStatusHistoryForProject,
+  countEverReachedForBuckets,
+  projectHasLeadStatusHistory,
+} from "@/server/services/lead-status-history";
 
 export type LeadFunnelResponse = {
   range: LeadFunnelDateRange;
   includeArchived: false;
-  metricMode: "share_of_total";
+  metricMode: BuiltLeadFunnel["metricMode"];
   metricModeNote: string;
   funnel: BuiltLeadFunnel;
+  history: {
+    available: boolean;
+    backfill?: { seeded: number; fromAudits: number };
+  };
   benchmark: {
     population: "same_project_type" | "all_active_projects" | "insufficient";
     peerCount: number;
@@ -60,10 +70,24 @@ function countsMap(
   return map;
 }
 
+function bucketStatusIdMap(
+  mapped: MappedFunnelStatus[],
+): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const item of mapped) {
+    const list = map[item.bucket] ?? [];
+    list.push(item.id);
+    map[item.bucket] = list;
+  }
+  return map;
+}
+
 export async function getProjectLeadFunnel(input: {
   workspaceId: string;
   projectId: string;
   range?: LeadFunnelDateRange;
+  /** When true (default), seed history from audits/current status if empty. */
+  ensureHistory?: boolean;
 }): Promise<LeadFunnelResponse> {
   const range = input.range ?? "all";
   const createdAtFrom = createdAtFromForRange(range);
@@ -82,17 +106,43 @@ export async function getProjectLeadFunnel(input: {
     })),
   );
 
-  const [projectRows, workspaceRows, projects] = await Promise.all([
-    groupProjectLeadsByStatus(input.workspaceId, input.projectId, {
-      createdAtFrom,
-    }),
-    groupWorkspaceLeadsByProjectAndStatus(input.workspaceId, { createdAtFrom }),
-    findProjects(input.workspaceId, { includeArchived: false }),
-  ]);
+  let historyBackfill: { seeded: number; fromAudits: number } | undefined;
+  const hadHistory = await projectHasLeadStatusHistory(
+    input.workspaceId,
+    input.projectId,
+  );
+  if (!hadHistory && input.ensureHistory !== false) {
+    historyBackfill = await backfillLeadStatusHistoryForProject({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+    });
+  }
+
+  const [projectRows, workspaceRows, projects, everReachedRaw] =
+    await Promise.all([
+      groupProjectLeadsByStatus(input.workspaceId, input.projectId, {
+        createdAtFrom,
+      }),
+      groupWorkspaceLeadsByProjectAndStatus(input.workspaceId, {
+        createdAtFrom,
+      }),
+      findProjects(input.workspaceId, { includeArchived: false }),
+      countEverReachedForBuckets({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        bucketStatusIds: bucketStatusIdMap(mapped),
+        changedAtFrom: createdAtFrom,
+      }),
+    ]);
+
+  const everReachedByBucket = everReachedRaw as Partial<
+    Record<LeadFunnelBucket, number>
+  >;
 
   const funnel = buildLeadFunnel({
     mappedStatuses: mapped,
     countsByStatusId: countsMap(projectRows),
+    everReachedByBucket,
   });
 
   const current = projects.find((project) => project.id === input.projectId);
@@ -105,6 +155,8 @@ export async function getProjectLeadFunnel(input: {
     countsByProject.set(row.projectId, existing);
   }
 
+  // Peer benchmarks still use current-status share rates (comparable without
+  // requiring every peer to have dense history). Conversion is project-local.
   const peerSnapshots: ProjectFunnelSnapshot[] = projects.map((project) => {
     const built = buildLeadFunnel({
       mappedStatuses: mapped,
@@ -134,13 +186,25 @@ export async function getProjectLeadFunnel(input: {
     peers: selectedPeers,
   });
 
+  const historyAvailable =
+    funnel.metricMode === "historical_conversion" ||
+    (historyBackfill !== undefined &&
+      historyBackfill.seeded + historyBackfill.fromAudits > 0) ||
+    hadHistory;
+
   return {
     range,
     includeArchived: false,
-    metricMode: "share_of_total",
+    metricMode: funnel.metricMode,
     metricModeNote:
-      "Rates are share of current-status leads (of total). Stage-to-stage conversion requires status-history events and is not shown yet.",
+      funnel.metricMode === "historical_conversion"
+        ? "Secondary stage rates are historical conversion (ever reached stage ÷ ever reached prior). Bar counts remain current-status distribution."
+        : "Rates are share of current-status leads (of total). Status history was insufficient for conversion.",
     funnel,
+    history: {
+      available: historyAvailable,
+      backfill: historyBackfill,
+    },
     benchmark: {
       population: !deltas
         ? "insufficient"

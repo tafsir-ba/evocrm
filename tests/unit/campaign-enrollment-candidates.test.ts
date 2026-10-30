@@ -77,7 +77,7 @@ const sampleLead = {
   emailUnsubscribedAt: null,
   emailUnsubscribeReason: null,
   lastContactedAt: null,
-  createdBy: "user-1",
+    statusEnteredAt: null,  createdBy: "user-1",
   createdAt: new Date("2026-06-15T10:00:00.000Z"),
   updatedAt: new Date("2026-06-15T10:00:00.000Z"),
 };

@@ -164,7 +164,7 @@ const baseLead = {
   emailUnsubscribedAt: null,
   emailUnsubscribeReason: null,
   lastContactedAt: null,
-  createdBy: "user-1",
+    statusEnteredAt: null,  createdBy: "user-1",
   archivedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),

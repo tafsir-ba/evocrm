@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   findLatestTreatmentAuditAtByLead: vi.fn(),
   markLeadUntreatedIfStillNew: vi.fn(),
   createAuditLog: vi.fn(),
+  recordLeadStatusChange: vi.fn(),
   captureError: vi.fn(),
 }));
 
@@ -28,6 +29,9 @@ vi.mock("@/server/repositories/lead-untreated", () => ({
   markLeadUntreatedIfStillNew: mocks.markLeadUntreatedIfStillNew,
 }));
 vi.mock("@/server/audit/create-audit-log", () => ({ createAuditLog: mocks.createAuditLog }));
+vi.mock("@/server/services/lead-status-history", () => ({
+  recordLeadStatusChange: mocks.recordLeadStatusChange,
+}));
 vi.mock("@/server/observability/capture-error", () => ({ captureError: mocks.captureError }));
 
 import {
@@ -54,7 +58,7 @@ function lead(id: string, overrides: Record<string, unknown> = {}) {
     statusId: "status-new",
     createdAt: daysAgo(60),
     lastContactedAt: null,
-    attributes: {},
+    statusEnteredAt: null,    attributes: {},
     archivedAt: null,
     ...overrides,
   };
@@ -88,6 +92,7 @@ describe("runLeadUntreatedAutomation", () => {
     mocks.findLatestVisitSessionAtByLead.mockResolvedValue(new Map());
     mocks.findLatestTreatmentAuditAtByLead.mockResolvedValue(new Map());
     mocks.markLeadUntreatedIfStillNew.mockResolvedValue(true);
+    mocks.recordLeadStatusChange.mockResolvedValue(undefined);
   });
 
   it("moves New leads idle for 30+ days to the existing Untreated status and audits it", async () => {

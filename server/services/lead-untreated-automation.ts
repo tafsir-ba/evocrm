@@ -26,6 +26,7 @@ import {
 } from "@/server/repositories/lead-untreated";
 import { findAllWorkspaces, type WorkspaceRecord } from "@/server/repositories/workspaces";
 import { captureError } from "@/server/observability/capture-error";
+import { recordLeadStatusChange } from "@/server/services/lead-status-history";
 
 const DEFAULT_PAGE_SIZE = 200;
 const DEFAULT_MAX_UPDATES_PER_WORKSPACE = 500;
@@ -233,6 +234,22 @@ export async function applyLeadUntreatedRuleForWorkspace(
         continue;
       }
       summary.moved += 1;
+
+      const changedAt = new Date();
+      await recordLeadStatusChange({
+        workspaceId: workspace.id,
+        leadId: lead.id,
+        projectId: lead.projectId,
+        fromStatusId: newStatus.id,
+        toStatusId: untreated.item.id,
+        changedAt,
+        actorId: workspace.createdBy,
+        source: "automation",
+        meta: {
+          automation: LEAD_UNTREATED_AUTOMATION_SOURCE,
+          thresholdDays: options.thresholdDays,
+        },
+      });
 
       await createAuditLog({
         workspaceId: workspace.id,

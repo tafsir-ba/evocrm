@@ -184,6 +184,7 @@ export function buildTestLeadRecord(overrides: Partial<LeadRecord> = {}): LeadRe
     emailUnsubscribedAt: null,
     emailUnsubscribeReason: null,
     lastContactedAt: null,
+    statusEnteredAt: null,
     createdBy: "user-1",
     archivedAt: null,
     createdAt: new Date(),

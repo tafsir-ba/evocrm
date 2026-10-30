@@ -61,6 +61,8 @@ const leadSchema = new Schema(
     emailUnsubscribedAt: { type: Date, default: null },
     emailUnsubscribeReason: { type: String, trim: true, default: null },
     lastContactedAt: { type: Date, default: null },
+    /** When the lead entered its current statusId (denormalized stamp). */
+    statusEnteredAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     archivedAt: { type: Date, default: null },
   },
@@ -75,6 +77,7 @@ leadSchema.index({ workspaceId: 1, createdAt: -1 });
 leadSchema.index({ workspaceId: 1, updatedAt: -1 });
 leadSchema.index({ workspaceId: 1, archivedAt: 1 });
 leadSchema.index({ workspaceId: 1, statusId: 1 });
+leadSchema.index({ workspaceId: 1, statusId: 1, statusEnteredAt: -1 });
 leadSchema.index({ workspaceId: 1, sourceId: 1 });
 leadSchema.index({ workspaceId: 1, assignedTo: 1 });
 leadSchema.index({ workspaceId: 1, ownerId: 1 });

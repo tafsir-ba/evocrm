@@ -48,6 +48,7 @@ import { findTagById } from "@/server/repositories/tags";
 import { findProjectById } from "@/server/repositories/projects";
 import { findUserById } from "@/server/repositories/users";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
+import { recordLeadStatusChange } from "@/server/services/lead-status-history";
 import {
   evaluateCampaignAutoEnrollmentForLead,
   logAutoEnrollmentFailure,
@@ -708,6 +709,8 @@ export async function createLeadForWorkspace(
     }),
   });
 
+  // Initial status history is recorded inside createLead (covers HubSpot/import too).
+
   await createAuditLog({
     workspaceId,
     actorId,
@@ -960,6 +963,19 @@ export async function updateLeadForWorkspace(
       before: { statusId: existing.statusId },
       after: { statusId: updated.statusId },
     });
+
+    if (updated.projectId) {
+      await recordLeadStatusChange({
+        workspaceId,
+        leadId,
+        projectId: updated.projectId,
+        fromStatusId: existing.statusId,
+        toStatusId: updated.statusId,
+        changedAt: updated.statusEnteredAt ?? new Date(),
+        actorId,
+        source: "manual",
+      });
+    }
 
     try {
       const qualified = await findDictionaryItemByTypeAndKey(

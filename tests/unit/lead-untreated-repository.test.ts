@@ -38,7 +38,7 @@ function leanLead(overrides: Record<string, unknown> = {}) {
     statusId: NEW_STATUS,
     createdAt: CREATED,
     lastContactedAt: null,
-    attributes: {},
+    statusEnteredAt: null,    attributes: {},
     archivedAt: null,
     ...overrides,
   };

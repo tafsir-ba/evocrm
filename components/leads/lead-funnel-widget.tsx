@@ -26,6 +26,22 @@ function formatShare(share: number | null): string {
   return `${Math.round(share * 100)}%`;
 }
 
+function secondaryMetric(row: FunnelBucketCount): {
+  value: string;
+  hint: string;
+} {
+  if (row.conversionLabel) {
+    return {
+      value: formatShare(row.conversionFromPrior),
+      hint: row.conversionLabel,
+    };
+  }
+  return {
+    value: formatShare(row.shareOfTotal),
+    hint: "of total",
+  };
+}
+
 function StageBar({
   row,
   widthPct,
@@ -41,6 +57,7 @@ function StageBar({
   active: boolean;
   onSelect: () => void;
 }) {
+  const secondary = secondaryMetric(row);
   const toneClass =
     tone === "won"
       ? "bg-[var(--color-success-bg, #ecfdf5)] border-[var(--color-success-border,#a7f3d0)] text-[var(--color-success-fg,#047857)]"
@@ -54,7 +71,7 @@ function StageBar({
     <button
       type="button"
       title={tooltip}
-      aria-label={`${row.label}: ${row.count} leads, ${formatShare(row.shareOfTotal)} of total. ${tooltip}`}
+      aria-label={`${row.label}: ${row.count} leads, ${secondary.value} ${secondary.hint}. ${tooltip}`}
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
@@ -71,8 +88,9 @@ function StageBar({
       <span className="shrink-0 text-[13px] font-semibold tabular-nums">
         {row.count}
       </span>
-      <span className="shrink-0 text-[11px] tabular-nums opacity-70">
-        {formatShare(row.shareOfTotal)}
+      <span className="shrink-0 text-right text-[11px] leading-tight tabular-nums opacity-70">
+        <span className="block">{secondary.value}</span>
+        <span className="block text-[9.5px] opacity-80">{secondary.hint}</span>
       </span>
     </button>
   );
@@ -185,7 +203,9 @@ export function LeadFunnelWidget({
       {data ? (
         <div className="space-y-1.5">
           <p className="text-[10.5px] text-[var(--color-ink-faint)]">
-            Share of total leads (current status)
+            {data.metricMode === "historical_conversion"
+              ? "Counts = current status · % = conversion from prior stage"
+              : "Share of total leads (current status)"}
           </p>
 
           <div className="flex flex-col gap-1" role="list" aria-label="Active funnel stages">
