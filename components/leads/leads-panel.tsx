@@ -1545,98 +1545,90 @@ export function LeadsPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div
-        className={cn(
-          "shrink-0",
-          scopedProjectId && "lg:mb-1 lg:flex lg:items-start lg:justify-between lg:gap-4",
-        )}
-      >
-        <div className={cn(scopedProjectId && "min-w-0 flex-1")}>
-          <PageHeader
-            density="compact"
-            bar
-            hideBackOnMobile
-            className="shrink-0"
-            back={
-              projectId
-                ? {
-                    href: projectOverviewHref(workspaceSlug, projectId),
-                    label: "Back to project",
-                    mode: "stack",
-                  }
-                : undefined
-            }
-            title="Leads"
-            meta={
-              !loading ? (
-                <Badge tone="muted" size="sm">
-                  {total} total
-                </Badge>
-              ) : undefined
-            }
-            actions={
-              <div className="flex items-center gap-1.5">
-                {canCreate ? (
-                  <div className="hidden md:block">
-                    <ImportLaunchButton
-                      workspaceSlug={workspaceSlug}
-                      entityType="lead"
-                      canCreateProject={canCreateProject}
-                      onComplete={() => void loadLeads()}
-                    />
-                  </div>
-                ) : null}
-                {canCreate ? (
-                  <Button
-                    size="sm"
-                    leadingIcon={<IconPlus size={14} />}
-                    onClick={openNewLead}
-                  >
-                    New lead
-                  </Button>
-                ) : null}
-                <LeadMobileActions
-                  canCreate={canCreate}
-                  canDelete={canDelete}
-                  sort={sort}
-                  sortDir={sortDir}
-                  selectedCount={selectedCount}
-                  onSort={changeSort}
-                  onSelectPage={togglePageSelection}
-                  onClearSelection={clearSelection}
-                  importButton={
-                    <ImportLaunchButton
-                      workspaceSlug={workspaceSlug}
-                      entityType="lead"
-                      canCreateProject={canCreateProject}
-                      onComplete={() => void loadLeads()}
-                    />
-                  }
+      <PageHeader
+        density="compact"
+        bar
+        hideBackOnMobile
+        className="shrink-0"
+        back={
+          projectId
+            ? {
+                href: projectOverviewHref(workspaceSlug, projectId),
+                label: "Back to project",
+                mode: "stack",
+              }
+            : undefined
+        }
+        title="Leads"
+        meta={
+          !loading ? (
+            <Badge tone="muted" size="sm">
+              {total} total
+            </Badge>
+          ) : undefined
+        }
+        actions={
+          <div className="flex items-center gap-1.5">
+            {canCreate ? (
+              <div className="hidden md:block">
+                <ImportLaunchButton
+                  workspaceSlug={workspaceSlug}
+                  entityType="lead"
+                  canCreateProject={canCreateProject}
+                  onComplete={() => void loadLeads()}
                 />
               </div>
-            }
-          />
-        </div>
-        {scopedProjectId ? (
-          <LeadFunnelWidget
-            className="mb-3 hidden lg:block"
-            workspaceSlug={workspaceSlug}
-            projectId={scopedProjectId}
-            activeStatusIds={funnelStatusIds}
-            onFilterStatuses={applyFunnelStatusFilter}
-          />
-        ) : null}
-      </div>
+            ) : null}
+            {canCreate ? (
+              <Button
+                size="sm"
+                leadingIcon={<IconPlus size={14} />}
+                onClick={openNewLead}
+              >
+                New lead
+              </Button>
+            ) : null}
+            <LeadMobileActions
+              canCreate={canCreate}
+              canDelete={canDelete}
+              sort={sort}
+              sortDir={sortDir}
+              selectedCount={selectedCount}
+              onSort={changeSort}
+              onSelectPage={togglePageSelection}
+              onClearSelection={clearSelection}
+              importButton={
+                <ImportLaunchButton
+                  workspaceSlug={workspaceSlug}
+                  entityType="lead"
+                  canCreateProject={canCreateProject}
+                  onComplete={() => void loadLeads()}
+                />
+              }
+            />
+          </div>
+        }
+      />
 
       {scopedProjectId ? (
-        <div className="mb-3 lg:hidden">
-          <LeadFunnelWidget
-            workspaceSlug={workspaceSlug}
-            projectId={scopedProjectId}
-            activeStatusIds={funnelStatusIds}
-            onFilterStatuses={applyFunnelStatusFilter}
-          />
-        </div>
+        <details className="mb-2 shrink-0 rounded-md border border-[var(--color-line)] bg-white lg:hidden">
+          <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] [&::-webkit-details-marker]:hidden">
+            Lead funnel
+            {!loading ? (
+              <span className="ml-1.5 text-[var(--color-ink-faint)]">
+                · {total} total
+              </span>
+            ) : null}
+          </summary>
+          <div className="border-t border-[var(--color-line)] p-2">
+            <LeadFunnelWidget
+              workspaceSlug={workspaceSlug}
+              projectId={scopedProjectId}
+              activeStatusIds={funnelStatusIds}
+              onFilterStatuses={applyFunnelStatusFilter}
+            />
+          </div>
+        </details>
       ) : null}
 
       {websiteOptionsWarning && (
@@ -1645,6 +1637,13 @@ export function LeadsPanel({
         </p>
       )}
 
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          scopedProjectId && "lg:flex-row lg:items-start lg:gap-3",
+        )}
+      >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="mb-1.5 flex shrink-0 flex-col gap-1.5 sm:mb-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
         <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
@@ -2220,6 +2219,20 @@ export function LeadsPanel({
           />
         </div>
       )}
+        </div>
+
+        {scopedProjectId ? (
+          <aside className="hidden w-[188px] shrink-0 lg:block xl:w-[208px]">
+            <LeadFunnelWidget
+              className="sticky top-0"
+              workspaceSlug={workspaceSlug}
+              projectId={scopedProjectId}
+              activeStatusIds={funnelStatusIds}
+              onFilterStatuses={applyFunnelStatusFilter}
+            />
+          </aside>
+        ) : null}
+      </div>
 
       {canEnrich && enrichLeadId ? (
         <LeadEnrichmentModal

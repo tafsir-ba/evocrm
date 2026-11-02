@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useId, useState } from "react";
 
 import type { LeadFunnelResponse } from "@/server/services/lead-funnel";
-import type { FunnelBucketCount, LeadFunnelDateRange } from "@/lib/lead-funnel-metrics";
+import type {
+  FunnelBucketCount,
+  LeadFunnelDateRange,
+} from "@/lib/lead-funnel-metrics";
 import { cn } from "@/lib/utils";
 
 type LeadFunnelWidgetProps = {
@@ -17,8 +20,8 @@ type LeadFunnelWidgetProps = {
 
 const RANGE_OPTIONS: Array<{ value: LeadFunnelDateRange; label: string }> = [
   { value: "all", label: "All time" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
 ];
 
 function formatShare(share: number | null): string {
@@ -42,55 +45,49 @@ function secondaryMetric(row: FunnelBucketCount): {
   };
 }
 
-function StageBar({
+function StageRow({
   row,
-  widthPct,
   tone,
   tooltip,
   active,
   onSelect,
+  indent = false,
 }: {
   row: FunnelBucketCount;
-  widthPct: number;
   tone: "active" | "won" | "exit" | "exit-sub";
   tooltip: string;
   active: boolean;
   onSelect: () => void;
+  indent?: boolean;
 }) {
   const secondary = secondaryMetric(row);
   const toneClass =
     tone === "won"
-      ? "bg-[var(--color-success-bg, #ecfdf5)] border-[var(--color-success-border,#a7f3d0)] text-[var(--color-success-fg,#047857)]"
+      ? "bg-[var(--color-success-bg,#ecfdf5)] text-[var(--color-success-fg,#047857)]"
       : tone === "exit"
-        ? "bg-[#fff7ed] border-[#fed7aa] text-[#9a3412]"
+        ? "bg-[#fff7ed] text-[#9a3412]"
         : tone === "exit-sub"
-          ? "bg-[var(--color-muted)] border-[var(--color-line)] text-[var(--color-ink-soft)]"
-          : "bg-[var(--color-brand-50)] border-[var(--color-brand-100)] text-[var(--color-brand-800)]";
+          ? "bg-transparent text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]"
+          : "bg-[var(--color-brand-50)] text-[var(--color-brand-800)]";
 
   return (
     <button
       type="button"
-      title={tooltip}
+      title={`${tooltip} (${secondary.value} ${secondary.hint})`}
       aria-label={`${row.label}: ${row.count} leads, ${secondary.value} ${secondary.hint}. ${tooltip}`}
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
-        "group flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors focus-ring",
+        "flex w-full items-center gap-1.5 rounded px-1.5 py-0.5 text-left text-[11px] leading-tight transition-colors focus-ring",
         toneClass,
-        active && "ring-2 ring-[var(--color-brand-500)] ring-offset-1",
-        "hover:brightness-[0.98]",
+        indent && "pl-3",
+        active && "ring-1 ring-[var(--color-brand-500)]",
       )}
-      style={{ maxWidth: `${Math.max(42, widthPct)}%`, marginInline: "auto" }}
     >
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
-        {row.label}
-      </span>
-      <span className="shrink-0 text-[13px] font-semibold tabular-nums">
-        {row.count}
-      </span>
-      <span className="shrink-0 text-right text-[11px] leading-tight tabular-nums opacity-70">
-        <span className="block">{secondary.value}</span>
-        <span className="block text-[9.5px] opacity-80">{secondary.hint}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">{row.label}</span>
+      <span className="shrink-0 tabular-nums font-semibold">{row.count}</span>
+      <span className="w-8 shrink-0 text-right tabular-nums opacity-70">
+        {secondary.value}
       </span>
     </button>
   );
@@ -139,8 +136,6 @@ export function LeadFunnelWidget({
     void load();
   }, [load]);
 
-  const stageCount = data?.funnel.activeStages.length ?? 1;
-
   function isActive(statusIds: string[]): boolean {
     if (activeStatusIds.length === 0 || statusIds.length === 0) return false;
     if (activeStatusIds.length !== statusIds.length) return false;
@@ -148,41 +143,42 @@ export function LeadFunnelWidget({
     return statusIds.every((id) => active.has(id));
   }
 
+  const metricHint =
+    data?.metricMode === "historical_conversion"
+      ? "Counts = current status · % = conversion from prior stage"
+      : "Share of total leads (current status)";
+
   return (
     <section
       aria-labelledby={titleId}
+      title={[data?.scopeNote, metricHint].filter(Boolean).join(" · ")}
       className={cn(
-        "w-full max-w-[360px] rounded-lg border border-[var(--color-line)] bg-white p-3 shadow-[var(--shadow-xs)]",
+        "w-full rounded-md border border-[var(--color-line)] bg-white p-2 shadow-[var(--shadow-xs)]",
         className,
       )}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
+      <div className="mb-1 flex items-center justify-between gap-1.5">
         <div className="min-w-0">
           <h2
             id={titleId}
-            className="text-[13px] font-semibold tracking-tight text-[var(--color-ink)]"
+            className="truncate text-[11px] font-semibold tracking-tight text-[var(--color-ink)]"
           >
-            Lead funnel
+            Funnel
           </h2>
-          <p className="text-[11.5px] text-[var(--color-ink-muted)]">
+          <p className="truncate text-[10px] text-[var(--color-ink-muted)]">
             {loading
               ? "Loading…"
               : data
-                ? `${data.funnel.totalLeads} total leads`
+                ? `${data.funnel.totalLeads} leads`
                 : "—"}
           </p>
-          {data?.scopeNote ? (
-            <p className="text-[10.5px] leading-snug text-[var(--color-ink-faint)]">
-              {data.scopeNote}
-            </p>
-          ) : null}
         </div>
         <label className="sr-only" htmlFor={`${titleId}-range`}>
           Funnel date range
         </label>
         <select
           id={`${titleId}-range`}
-          className="h-7 max-w-[7.5rem] shrink-0 rounded-md border border-[var(--color-line)] bg-white px-1.5 text-[11.5px] text-[var(--color-ink-soft)] focus-ring"
+          className="h-6 max-w-[4.25rem] shrink-0 rounded border border-[var(--color-line)] bg-white px-1 text-[10px] text-[var(--color-ink-soft)] focus-ring"
           value={range}
           onChange={(event) =>
             setRange(event.target.value as LeadFunnelDateRange)
@@ -197,7 +193,7 @@ export function LeadFunnelWidget({
       </div>
 
       {error ? (
-        <p className="text-[12px] text-[var(--color-danger-fg)]" role="alert">
+        <p className="text-[11px] text-[var(--color-danger-fg)]" role="alert">
           {error}{" "}
           <button
             type="button"
@@ -210,50 +206,37 @@ export function LeadFunnelWidget({
       ) : null}
 
       {data ? (
-        <div className="space-y-1.5">
-          <p className="text-[10.5px] text-[var(--color-ink-faint)]">
-            {data.metricMode === "historical_conversion"
-              ? "Counts = current status · % = conversion from prior stage"
-              : "Share of total leads (current status)"}
-          </p>
-
-          <div className="flex flex-col gap-1" role="list" aria-label="Active funnel stages">
-            {data.funnel.activeStages.map((row, index) => {
-              const widthPct = 100 - index * (40 / Math.max(stageCount - 1, 1));
-              return (
-                <div key={row.bucket} role="listitem">
-                  <StageBar
-                    row={row}
-                    widthPct={widthPct}
-                    tone="active"
-                    tooltip={data.funnel.rateTooltips[row.bucket] ?? ""}
-                    active={isActive(row.statusIds)}
-                    onSelect={() => onFilterStatuses(row.statusIds)}
-                  />
-                </div>
-              );
-            })}
+        <div className="space-y-0.5">
+          <div
+            className="flex flex-col gap-0.5"
+            role="list"
+            aria-label="Active funnel stages"
+          >
+            {data.funnel.activeStages.map((row) => (
+              <div key={row.bucket} role="listitem">
+                <StageRow
+                  row={row}
+                  tone="active"
+                  tooltip={data.funnel.rateTooltips[row.bucket] ?? ""}
+                  active={isActive(row.statusIds)}
+                  onSelect={() => onFilterStatuses(row.statusIds)}
+                />
+              </div>
+            ))}
           </div>
 
           <div
-            className="relative mt-1 border-t border-dashed border-[var(--color-line)] pt-2"
+            className="mt-1 space-y-0.5 border-t border-dashed border-[var(--color-line)] pt-1"
             aria-label="Outcomes"
           >
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -top-2 left-1/2 h-2 w-px -translate-x-1/2 bg-[var(--color-line)]"
-            />
             {data.funnel.won ? (
-              <div className="mb-1">
-                <StageBar
-                  row={data.funnel.won}
-                  widthPct={72}
-                  tone="won"
-                  tooltip={data.funnel.rateTooltips.won ?? ""}
-                  active={isActive(data.funnel.won.statusIds)}
-                  onSelect={() => onFilterStatuses(data.funnel.won!.statusIds)}
-                />
-              </div>
+              <StageRow
+                row={data.funnel.won}
+                tone="won"
+                tooltip={data.funnel.rateTooltips.won ?? ""}
+                active={isActive(data.funnel.won.statusIds)}
+                onSelect={() => onFilterStatuses(data.funnel.won!.statusIds)}
+              />
             ) : null}
 
             <button
@@ -263,44 +246,44 @@ export function LeadFunnelWidget({
               aria-pressed={isActive(data.funnel.exited.statusIds)}
               onClick={() => onFilterStatuses(data.funnel.exited.statusIds)}
               className={cn(
-                "mb-1 flex w-[85%] mx-auto items-center gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-2 py-1.5 text-left text-[#9a3412] focus-ring",
+                "flex w-full items-center gap-1.5 rounded bg-[#fff7ed] px-1.5 py-0.5 text-left text-[11px] leading-tight text-[#9a3412] focus-ring",
                 isActive(data.funnel.exited.statusIds) &&
-                  "ring-2 ring-[var(--color-brand-500)] ring-offset-1",
+                  "ring-1 ring-[var(--color-brand-500)]",
               )}
             >
-              <span className="min-w-0 flex-1 text-[12px] font-medium">Exited</span>
-              <span className="text-[13px] font-semibold tabular-nums">
+              <span className="min-w-0 flex-1 font-medium">Exited</span>
+              <span className="shrink-0 tabular-nums font-semibold">
                 {data.funnel.exited.count}
               </span>
-              <span className="text-[11px] tabular-nums opacity-70">
+              <span className="w-8 shrink-0 text-right tabular-nums opacity-70">
                 {formatShare(data.funnel.exited.shareOfTotal)}
               </span>
             </button>
 
-            <div className="space-y-1 pl-2" role="list" aria-label="Exit reasons">
+            <div role="list" aria-label="Exit reasons">
               {data.funnel.exited.reasons.map((row) => (
                 <div key={row.bucket} role="listitem">
-                  <StageBar
+                  <StageRow
                     row={row}
-                    widthPct={78}
                     tone="exit-sub"
                     tooltip={data.funnel.rateTooltips[row.bucket] ?? ""}
                     active={isActive(row.statusIds)}
                     onSelect={() => onFilterStatuses(row.statusIds)}
+                    indent
                   />
                 </div>
               ))}
               {data.funnel.exited.other ? (
                 <div role="listitem">
-                  <StageBar
+                  <StageRow
                     row={data.funnel.exited.other}
-                    widthPct={78}
                     tone="exit-sub"
                     tooltip={data.funnel.rateTooltips.other ?? ""}
                     active={isActive(data.funnel.exited.other.statusIds)}
                     onSelect={() =>
                       onFilterStatuses(data.funnel.exited.other!.statusIds)
                     }
+                    indent
                   />
                 </div>
               ) : null}
@@ -308,7 +291,7 @@ export function LeadFunnelWidget({
           </div>
 
           <p
-            className="pt-1 text-[11px] leading-snug text-[var(--color-ink-muted)]"
+            className="truncate pt-0.5 text-[10px] leading-snug text-[var(--color-ink-muted)]"
             title={
               data.benchmark.population === "insufficient"
                 ? "Need more peer projects with enough leads to compute a median benchmark."
@@ -317,7 +300,7 @@ export function LeadFunnelWidget({
                   : "Compared with the median of active projects that have enough leads."
             }
           >
-            <span className="text-[var(--color-ink-faint)]">vs benchmark:</span>{" "}
+            <span className="text-[var(--color-ink-faint)]">vs </span>
             {data.benchmark.summary ? (
               data.benchmark.deltas?.map((delta, index) => (
                 <span key={delta.key}>
@@ -339,14 +322,14 @@ export function LeadFunnelWidget({
                 </span>
               ))
             ) : (
-              <span className="text-[var(--color-ink-faint)]">insufficient data</span>
+              <span className="text-[var(--color-ink-faint)]">n/a</span>
             )}
           </p>
         </div>
       ) : null}
 
       {loading && !data ? (
-        <div className="h-28 animate-pulse rounded-md bg-[var(--color-muted)]" />
+        <div className="h-20 animate-pulse rounded bg-[var(--color-muted)]" />
       ) : null}
     </section>
   );
