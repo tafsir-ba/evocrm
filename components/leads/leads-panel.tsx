@@ -1611,7 +1611,7 @@ export function LeadsPanel({
       />
 
       {scopedProjectId ? (
-        <details className="mb-2 shrink-0 rounded-md border border-[var(--color-line)] bg-white lg:hidden">
+        <details className="mb-2 shrink-0 rounded-md border border-[var(--color-line)] bg-white md:hidden">
           <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] [&::-webkit-details-marker]:hidden">
             Lead funnel
             {!loading ? (
@@ -1637,13 +1637,6 @@ export function LeadsPanel({
         </p>
       )}
 
-      <div
-        className={cn(
-          "flex min-h-0 flex-1 flex-col",
-          scopedProjectId && "lg:flex-row lg:items-start lg:gap-3",
-        )}
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="mb-1.5 flex shrink-0 flex-col gap-1.5 sm:mb-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
         <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
@@ -2219,20 +2212,6 @@ export function LeadsPanel({
           />
         </div>
       )}
-        </div>
-
-        {scopedProjectId ? (
-          <aside className="hidden w-[188px] shrink-0 lg:block xl:w-[208px]">
-            <LeadFunnelWidget
-              className="sticky top-0"
-              workspaceSlug={workspaceSlug}
-              projectId={scopedProjectId}
-              activeStatusIds={funnelStatusIds}
-              onFilterStatuses={applyFunnelStatusFilter}
-            />
-          </aside>
-        ) : null}
-      </div>
 
       {canEnrich && enrichLeadId ? (
         <LeadEnrichmentModal

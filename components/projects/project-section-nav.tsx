@@ -37,6 +37,11 @@ type ProjectSectionNavProps = {
   activeTab: ProjectSectionTabKey;
   showPaidAds?: boolean;
   actions?: ReactNode;
+  /**
+   * Optional desktop side panel (e.g. lead funnel) rendered in the empty
+   * header/menu space so primary content below can stay full-width.
+   */
+  sideSlot?: ReactNode;
   /** When false, only the tab strip is rendered (caller owns the title). */
   showHeader?: boolean;
 };
@@ -75,6 +80,7 @@ export function ProjectSectionNav({
   activeTab,
   showPaidAds = false,
   actions,
+  sideSlot,
   showHeader = true,
 }: ProjectSectionNavProps) {
   const [sectionsOpen, setSectionsOpen] = useState(false);
@@ -138,32 +144,47 @@ export function ProjectSectionNav({
         </div>
       ) : null}
 
-      {showHeader ? (
-        <div className="hidden md:block">
-          <PageHeader
-            title={projectName}
-            description={
-              projectReference ? `Reference ${projectReference}` : undefined
-            }
-            actions={actions}
-          />
-        </div>
-      ) : null}
-
-      <nav
-        className="mb-5 hidden flex-wrap gap-2 md:flex"
-        aria-label="Project sections"
+      <div
+        className={cn(
+          "mb-4 md:mb-5",
+          sideSlot && "md:flex md:items-start md:justify-between md:gap-4",
+        )}
       >
-        {tabs.map((tab) => (
-          <SectionLink
-            key={tab.key}
-            workspaceSlug={workspaceSlug}
-            projectId={projectId}
-            tab={tab}
-            active={tab.key === activeTab}
-          />
-        ))}
-      </nav>
+        <div className="min-w-0 flex-1">
+          {showHeader ? (
+            <div className="hidden md:block">
+              <PageHeader
+                title={projectName}
+                description={
+                  projectReference ? `Reference ${projectReference}` : undefined
+                }
+                actions={actions}
+              />
+            </div>
+          ) : null}
+
+          <nav
+            className="hidden flex-wrap gap-2 md:flex"
+            aria-label="Project sections"
+          >
+            {tabs.map((tab) => (
+              <SectionLink
+                key={tab.key}
+                workspaceSlug={workspaceSlug}
+                projectId={projectId}
+                tab={tab}
+                active={tab.key === activeTab}
+              />
+            ))}
+          </nav>
+        </div>
+
+        {sideSlot ? (
+          <aside className="mt-2 hidden w-[196px] shrink-0 md:block xl:w-[212px]">
+            {sideSlot}
+          </aside>
+        ) : null}
+      </div>
 
       {sectionsOpen ? (
         <div className="fixed inset-0 z-50 md:hidden">

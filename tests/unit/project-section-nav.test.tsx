@@ -76,4 +76,18 @@ describe("ProjectSectionNav", () => {
       }),
     ).toBe("/w/demo/projects/507f1f77bcf86cd7994390dd/leads");
   });
+
+  it("renders an optional side slot beside the project menu", () => {
+    render(
+      <ProjectSectionNav
+        workspaceSlug="demo"
+        projectId="507f1f77bcf86cd7994390dd"
+        projectName="Satigny duplex"
+        activeTab="leads"
+        sideSlot={<div>Funnel side slot</div>}
+      />,
+    );
+
+    expect(screen.getByText("Funnel side slot")).toBeInTheDocument();
+  });
 });
