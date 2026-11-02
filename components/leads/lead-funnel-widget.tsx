@@ -61,7 +61,14 @@ function StageRow({
   onSelect: () => void;
   indent?: boolean;
 }) {
+  // Compact rows always show share-of-total beside current counts so the %
+  // matches the bar. Conversion (when available) stays in the tooltip.
+  const share = formatShare(row.shareOfTotal);
   const secondary = secondaryMetric(row);
+  const conversionHint =
+    row.conversionLabel != null
+      ? `Conversion ${secondary.value} ${secondary.hint}`
+      : `${share} of total`;
   const toneClass =
     tone === "won"
       ? "bg-[var(--color-success-bg,#ecfdf5)] text-[var(--color-success-fg,#047857)]"
@@ -74,8 +81,8 @@ function StageRow({
   return (
     <button
       type="button"
-      title={`${tooltip} (${secondary.value} ${secondary.hint})`}
-      aria-label={`${row.label}: ${row.count} leads, ${secondary.value} ${secondary.hint}. ${tooltip}`}
+      title={`${tooltip} (${conversionHint})`}
+      aria-label={`${row.label}: ${row.count} leads, ${share} of total. ${tooltip}`}
       aria-pressed={active}
       onClick={onSelect}
       className={cn(
@@ -88,7 +95,7 @@ function StageRow({
       <span className="min-w-0 flex-1 truncate font-medium">{row.label}</span>
       <span className="shrink-0 tabular-nums font-semibold">{row.count}</span>
       <span className="w-8 shrink-0 text-right tabular-nums opacity-70">
-        {secondary.value}
+        {share}
       </span>
     </button>
   );

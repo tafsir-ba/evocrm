@@ -13,6 +13,25 @@ const objectIdSchema = z
   .trim()
   .regex(/^[a-fA-F0-9]{24}$/, "Invalid ID.");
 
+/** One ObjectId, or a comma-separated list (funnel stage → multiple statuses). */
+const objectIdCsvSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (value) => {
+      const parts = value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (parts.length === 0 || parts.length > 40) {
+        return false;
+      }
+      return parts.every((part) => /^[a-fA-F0-9]{24}$/.test(part));
+    },
+    { message: "Invalid ID." },
+  );
+
 const emailConsentStatusSchema = z.enum(["unknown", "subscribed", "unsubscribed"]);
 
 const preferredContactMethodSchema = z.enum(["email", "phone", "whatsapp", "sms"]);
@@ -67,7 +86,7 @@ export const leadListQuerySchema = z.object({
     .union([z.literal("true"), z.literal("false")])
     .optional()
     .transform((value) => value === "true"),
-  statusId: objectIdSchema.optional(),
+  statusId: objectIdCsvSchema.optional(),
   sourceId: objectIdSchema.optional(),
   assignedTo: z.union([objectIdSchema, z.literal("unassigned")]).optional(),
   ownerId: objectIdSchema.optional(),

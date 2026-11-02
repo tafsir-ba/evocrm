@@ -151,4 +151,28 @@ describe("lead validation", () => {
     expect(leadListQuerySchema.safeParse({ acquisition: "legacy_import" }).success).toBe(true);
     expect(leadListQuerySchema.safeParse({ acquisition: "all" }).success).toBe(false);
   });
+
+  it("accepts comma-separated statusId lists from funnel stage filters", () => {
+    const single = leadListQuerySchema.safeParse({
+      statusId: "507f1f77bcf86cd799439011",
+    });
+    expect(single.success).toBe(true);
+
+    const multi = leadListQuerySchema.safeParse({
+      statusId:
+        "507f1f77bcf86cd799439011,507f1f77bcf86cd799439012,507f1f77bcf86cd799439013",
+    });
+    expect(multi.success).toBe(true);
+    if (multi.success) {
+      expect(multi.data.statusId).toBe(
+        "507f1f77bcf86cd799439011,507f1f77bcf86cd799439012,507f1f77bcf86cd799439013",
+      );
+    }
+
+    expect(
+      leadListQuerySchema.safeParse({
+        statusId: "507f1f77bcf86cd799439011,not-an-id",
+      }).success,
+    ).toBe(false);
+  });
 });
