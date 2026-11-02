@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { WorkflowBackLink } from "@/components/layout/workflow-back-link";
-import { IconArrowLeft, IconClose } from "@/lib/icons";
+import { IconArrowLeft, IconChevronDown, IconClose } from "@/lib/icons";
 import { withProjectIdQuery } from "@/lib/project-scope";
 import { cn } from "@/lib/utils";
 import {
@@ -37,16 +37,18 @@ type ProjectSectionNavProps = {
   activeTab: ProjectSectionTabKey;
   showPaidAds?: boolean;
   actions?: ReactNode;
-  /**
-   * Optional desktop side panel (e.g. lead funnel) rendered in the empty
-   * header/menu space so primary content below can stay full-width.
-   */
-  sideSlot?: ReactNode;
   /** When false, only the tab strip is rendered (caller owns the title). */
   showHeader?: boolean;
 };
 
 const MANAGE_TAB_KEYS = new Set(["settings", "share", "paid-ads"]);
+/** Always visible in the desktop tab strip; the rest collapse into More below xl. */
+const PRIMARY_TAB_KEYS = new Set([
+  "overview",
+  "leads",
+  "properties",
+  "pipeline",
+]);
 
 export function projectSectionTabHref(
   workspaceSlug: string,
@@ -80,10 +82,12 @@ export function ProjectSectionNav({
   activeTab,
   showPaidAds = false,
   actions,
-  sideSlot,
   showHeader = true,
 }: ProjectSectionNavProps) {
   const [sectionsOpen, setSectionsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const moreMenuId = useId();
   const tabs = [
     ...PROJECT_SECTION_TABS.slice(0, 6),
     ...(showPaidAds
@@ -95,6 +99,13 @@ export function ProjectSectionNav({
     tabs.find((tab) => tab.key === activeTab)?.label ?? "Project";
   const workTabs = tabs.filter((tab) => !MANAGE_TAB_KEYS.has(tab.key));
   const manageTabs = tabs.filter((tab) => MANAGE_TAB_KEYS.has(tab.key));
+  const primaryTabs = tabs.filter(
+    (tab) => PRIMARY_TAB_KEYS.has(tab.key) || tab.key === activeTab,
+  );
+  const overflowTabs = tabs.filter(
+    (tab) => !PRIMARY_TAB_KEYS.has(tab.key) && tab.key !== activeTab,
+  );
+  const moreActive = overflowTabs.some((tab) => tab.key === activeTab);
 
   useEffect(() => {
     if (!sectionsOpen) {
@@ -114,10 +125,32 @@ export function ProjectSectionNav({
     };
   }, [sectionsOpen]);
 
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      if (
+        moreRef.current &&
+        event.target instanceof Node &&
+        !moreRef.current.contains(event.target)
+      ) {
+        setMoreOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMoreOpen(false);
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [moreOpen]);
+
   return (
     <>
       {showHeader ? (
-        <div className="mb-1.5 flex min-w-0 items-center gap-1 md:hidden">
+        <div className="mb-1 flex min-w-0 items-center gap-1 md:hidden">
           {activeTab !== "overview" ? (
             <WorkflowBackLink
               href={projectOverviewHref(workspaceSlug, projectId)}
@@ -144,46 +177,96 @@ export function ProjectSectionNav({
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "mb-4 md:mb-5",
-          sideSlot && "md:flex md:items-start md:justify-between md:gap-4",
-        )}
-      >
-        <div className="min-w-0 flex-1">
-          {showHeader ? (
-            <div className="hidden md:block">
-              <PageHeader
-                title={projectName}
-                description={
-                  projectReference ? `Reference ${projectReference}` : undefined
-                }
-                actions={actions}
-              />
+      <div className="mb-2 shrink-0 md:mb-3">
+        {showHeader ? (
+          <div className="hidden md:block">
+            <PageHeader
+              density="compact"
+              className="!mb-2"
+              title={projectName}
+              description={
+                projectReference ? `Reference ${projectReference}` : undefined
+              }
+              actions={actions}
+            />
+          </div>
+        ) : null}
+
+        {/* Wide screens: all tabs */}
+        <nav
+          className="hidden flex-wrap gap-2 xl:flex"
+          aria-label="Project sections"
+        >
+          {tabs.map((tab) => (
+            <SectionLink
+              key={tab.key}
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              tab={tab}
+              active={tab.key === activeTab}
+            />
+          ))}
+        </nav>
+
+        {/* Narrower desktop: primary tabs + More */}
+        <nav
+          className="hidden flex-wrap items-center gap-2 md:flex xl:hidden"
+          aria-label="Project sections"
+        >
+          {primaryTabs.map((tab) => (
+            <SectionLink
+              key={tab.key}
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              tab={tab}
+              active={tab.key === activeTab}
+            />
+          ))}
+          {overflowTabs.length > 0 ? (
+            <div className="relative" ref={moreRef}>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-[13px] focus-ring",
+                  moreActive
+                    ? "border-transparent bg-[var(--color-brand-50)] font-medium text-[var(--color-brand-700)]"
+                    : "border-[var(--color-line)] bg-white text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)]",
+                )}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                aria-controls={moreMenuId}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                More
+                <IconChevronDown size={14} />
+              </button>
+              {moreOpen ? (
+                <div
+                  id={moreMenuId}
+                  role="menu"
+                  className="absolute left-0 top-full z-30 mt-1 min-w-[10rem] rounded-md border border-[var(--color-line)] bg-white p-1 shadow-[var(--shadow-md)]"
+                >
+                  {overflowTabs.map((tab) => (
+                    <Link
+                      key={tab.key}
+                      role="menuitem"
+                      href={projectSectionTabHref(workspaceSlug, projectId, tab)}
+                      onClick={() => {
+                        rememberWorkflowStep(
+                          `${window.location.pathname}${window.location.search}`,
+                        );
+                        setMoreOpen(false);
+                      }}
+                      className="block rounded px-2.5 py-1.5 text-[13px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                    >
+                      {tab.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
-
-          <nav
-            className="hidden flex-wrap gap-2 md:flex"
-            aria-label="Project sections"
-          >
-            {tabs.map((tab) => (
-              <SectionLink
-                key={tab.key}
-                workspaceSlug={workspaceSlug}
-                projectId={projectId}
-                tab={tab}
-                active={tab.key === activeTab}
-              />
-            ))}
-          </nav>
-        </div>
-
-        {sideSlot ? (
-          <aside className="mt-2 hidden w-[196px] shrink-0 md:block xl:w-[212px]">
-            {sideSlot}
-          </aside>
-        ) : null}
+        </nav>
       </div>
 
       {sectionsOpen ? (

@@ -262,10 +262,12 @@ describe("LeadsPanel table", () => {
     navigationState.pathname = "/w/demo/leads";
     navigationState.search = "";
     sessionStorage.clear();
+    window.localStorage.clear();
     mockLeadsFetch();
   });
 
   it("renders a single-line triage table without permanent contact or assign controls", async () => {
+    const user = userEvent.setup();
     render(
       <LeadsPanel
         workspaceSlug="demo"
@@ -313,6 +315,17 @@ describe("LeadsPanel table", () => {
     expect(
       screen.getByRole("button", { name: "Sort by Next" }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Sort by Urgency" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Sort by Tags" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(screen.getByLabelText("Show Urgency column"));
+    await user.click(screen.getByLabelText("Show Tags column"));
+    await user.click(screen.getByRole("button", { name: "Columns" }));
     expect(
       screen.getByRole("button", { name: "Sort by Urgency" }),
     ).toBeInTheDocument();
@@ -436,6 +449,15 @@ describe("LeadsPanel table", () => {
       ).toBe(true);
     });
 
+    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Show Urgency column" }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Filter Urgency" }),
+      ).toBeInTheDocument();
+    });
     await user.click(screen.getByRole("button", { name: "Filter Urgency" }));
     await user.selectOptions(screen.getByLabelText("Urgency"), "stale");
     await waitFor(() => {
@@ -1052,8 +1074,9 @@ describe("LeadsPanel table", () => {
     expect(returnTo).toContain("sort=fullName");
     expect(returnTo).toContain("focus=507f1f77bcf86cd799439011");
     expect(returnTo.startsWith("/w/demo/leads")).toBe(false);
-    expect(
-      screen.getByRole("link", { name: "Back to project" }),
-    ).toHaveAttribute("href", "/w/demo/projects/507f1f77bcf86cd799439051");
+    expect(screen.getByRole("link", { name: "Projects" })).toHaveAttribute(
+      "href",
+      "/w/demo/projects",
+    );
   });
 });

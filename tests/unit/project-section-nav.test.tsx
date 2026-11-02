@@ -32,8 +32,11 @@ describe("ProjectSectionNav", () => {
 
     expect(screen.getByText("Satigny duplex")).toBeInTheDocument();
     expect(screen.getByText("Reference satigny_duplex")).toBeInTheDocument();
-    expect(screen.getByText("Leads")).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    const activeLeads = screen.getAllByText("Leads").filter(
+      (node) => node.getAttribute("aria-current") === "page",
+    );
+    expect(activeLeads.length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Overview" })[0]).toHaveAttribute(
       "href",
       "/w/demo/projects/507f1f77bcf86cd7994390dd",
     );
@@ -77,17 +80,18 @@ describe("ProjectSectionNav", () => {
     ).toBe("/w/demo/projects/507f1f77bcf86cd7994390dd/leads");
   });
 
-  it("renders an optional side slot beside the project menu", () => {
+  it("collapses secondary desktop tabs into a More menu", () => {
     render(
       <ProjectSectionNav
         workspaceSlug="demo"
         projectId="507f1f77bcf86cd7994390dd"
         projectName="Satigny duplex"
         activeTab="leads"
-        sideSlot={<div>Funnel side slot</div>}
       />,
     );
 
-    expect(screen.getByText("Funnel side slot")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "More" }).length).toBeGreaterThan(
+      0,
+    );
   });
 });

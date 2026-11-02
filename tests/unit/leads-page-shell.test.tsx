@@ -46,8 +46,14 @@ describe("LeadsPageShell", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Project" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Project sections" })).toBeInTheDocument();
-    expect(screen.getByText("Leads")).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getAllByRole("navigation", { name: "Project sections" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Leads").some(
+        (node) => node.getAttribute("aria-current") === "page",
+      ),
+    ).toBe(true);
     expect(screen.getByTestId("leads-panel")).toBeInTheDocument();
 
     resolveFetch?.(
@@ -94,7 +100,13 @@ describe("LeadsPageShell", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Project" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByText("Leads")).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getAllByRole("link", { name: "Overview" }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Leads").some(
+        (node) => node.getAttribute("aria-current") === "page",
+      ),
+    ).toBe(true);
   });
 });

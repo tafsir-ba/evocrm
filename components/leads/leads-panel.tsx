@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { ImportLaunchButton } from "@/components/imports/import-launch-button";
 import { PageHeader } from "@/components/layout/page-header";
-import { LeadFunnelWidget } from "@/components/leads/lead-funnel-widget";
+import { LeadFunnelMenu } from "@/components/leads/lead-funnel-widget";
 import {
   LeadEnrichmentModal,
   type EnrichmentAppliedRun,
@@ -67,7 +67,13 @@ import {
   rememberWorkflowStep,
   withFocusedLead,
 } from "@/lib/workflow-navigation";
-import { IconChevronLeft, IconChevronRight, IconMore, IconPlus } from "@/lib/icons";
+import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconMore,
+  IconPlus,
+} from "@/lib/icons";
 import { isUniqueEnrichmentReveal } from "@/lib/lead-enrichment";
 import { requestMarketEstimateAfterEnrichment } from "@/lib/lead-enrichment-followup-client";
 import {
@@ -448,6 +454,59 @@ export function LeadsPanel({
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(() =>
     searchParams.get("focus"),
   );
+  const [optionalColumns, setOptionalColumns] = useState({
+    urgency: false,
+    tags: false,
+  });
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const columnsMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("evocrm.leads.optionalColumns");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { urgency?: boolean; tags?: boolean };
+      setOptionalColumns({
+        urgency: parsed.urgency === true,
+        tags: parsed.tags === true,
+      });
+    } catch {
+      // Ignore invalid stored prefs.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "evocrm.leads.optionalColumns",
+        JSON.stringify(optionalColumns),
+      );
+    } catch {
+      // Ignore quota / private mode failures.
+    }
+  }, [optionalColumns]);
+
+  useEffect(() => {
+    if (!columnsMenuOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      if (
+        columnsMenuRef.current &&
+        event.target instanceof Node &&
+        !columnsMenuRef.current.contains(event.target)
+      ) {
+        setColumnsMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setColumnsMenuOpen(false);
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [columnsMenuOpen]);
 
   const apiBase = `/api/workspaces/${workspaceSlug}`;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -1545,25 +1604,32 @@ export function LeadsPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <div className="sticky top-0 z-20 shrink-0 border-b border-[var(--color-line)] bg-[var(--color-canvas)] pb-1.5">
       <PageHeader
         density="compact"
         bar
         hideBackOnMobile
-        className="shrink-0"
+        className="!mb-1.5 shrink-0"
         back={
-          projectId
+          scopedProjectId
             ? {
-                href: projectOverviewHref(workspaceSlug, projectId),
-                label: "Back to project",
+                href: workspacePath(workspaceSlug, "projects"),
+                label: "Projects",
                 mode: "stack",
               }
-            : undefined
+            : projectId
+              ? {
+                  href: projectOverviewHref(workspaceSlug, projectId),
+                  label: "Back to project",
+                  mode: "stack",
+                }
+              : undefined
         }
         title="Leads"
         meta={
           !loading ? (
             <Badge tone="muted" size="sm">
-              {total} total
+              {total}
             </Badge>
           ) : undefined
         }
@@ -1610,34 +1676,13 @@ export function LeadsPanel({
         }
       />
 
-      {scopedProjectId ? (
-        <details className="mb-2 shrink-0 rounded-md border border-[var(--color-line)] bg-white md:hidden">
-          <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[12px] font-medium text-[var(--color-ink-soft)] [&::-webkit-details-marker]:hidden">
-            Lead funnel
-            {!loading ? (
-              <span className="ml-1.5 text-[var(--color-ink-faint)]">
-                · {total} total
-              </span>
-            ) : null}
-          </summary>
-          <div className="border-t border-[var(--color-line)] p-2">
-            <LeadFunnelWidget
-              workspaceSlug={workspaceSlug}
-              projectId={scopedProjectId}
-              activeStatusIds={funnelStatusIds}
-              onFilterStatuses={applyFunnelStatusFilter}
-            />
-          </div>
-        </details>
-      ) : null}
-
       {websiteOptionsWarning && (
-        <p className="mb-3 text-[12.5px] text-[var(--color-ink-muted)]">
+        <p className="mb-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
           {websiteOptionsWarning}
         </p>
       )}
 
-      <div className="mb-1.5 flex shrink-0 flex-col gap-1.5 sm:mb-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5">
         <div className="flex w-full min-w-0 gap-2 sm:max-w-md sm:min-w-[200px] sm:flex-1">
           <Input
             className="min-w-0 flex-1"
@@ -1839,6 +1884,61 @@ export function LeadsPanel({
               ? " · on"
               : ""}
           </button>
+          <div className="relative" ref={columnsMenuRef}>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] focus-ring"
+              aria-haspopup="menu"
+              aria-expanded={columnsMenuOpen}
+              onClick={() => setColumnsMenuOpen((open) => !open)}
+            >
+              Columns
+              <IconChevronDown size={14} />
+            </button>
+            {columnsMenuOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-30 mt-1 min-w-[10rem] rounded-md border border-[var(--color-line)] bg-white p-2 shadow-[var(--shadow-md)]"
+              >
+                <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]">
+                  <input
+                    type="checkbox"
+                    aria-label="Show Urgency column"
+                    checked={optionalColumns.urgency}
+                    onChange={(event) =>
+                      setOptionalColumns((current) => ({
+                        ...current,
+                        urgency: event.target.checked,
+                      }))
+                    }
+                  />
+                  Urgency
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[12.5px] text-[var(--color-ink)] hover:bg-[var(--color-muted)]">
+                  <input
+                    type="checkbox"
+                    aria-label="Show Tags column"
+                    checked={optionalColumns.tags}
+                    onChange={(event) =>
+                      setOptionalColumns((current) => ({
+                        ...current,
+                        tags: event.target.checked,
+                      }))
+                    }
+                  />
+                  Tags
+                </label>
+              </div>
+            ) : null}
+          </div>
+          {scopedProjectId ? (
+            <LeadFunnelMenu
+              workspaceSlug={workspaceSlug}
+              projectId={scopedProjectId}
+              activeStatusIds={funnelStatusIds}
+              onFilterStatuses={applyFunnelStatusFilter}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -2026,9 +2126,10 @@ export function LeadsPanel({
           </button>
         </div>
       ) : null}
+      </div>
 
       {loading ? (
-        <div className="space-y-1.5">
+        <div className="mt-1.5 space-y-1.5">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
@@ -2147,6 +2248,7 @@ export function LeadsPanel({
             leadHref={openLeadHref}
             focusedLeadId={focusedLeadId}
             onOpenLead={rememberLeadOpen}
+            visibleOptionalColumns={optionalColumns}
             onSort={changeSort}
             columnFilters={{
               search,

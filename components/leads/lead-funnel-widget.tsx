@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import type { LeadFunnelResponse } from "@/server/services/lead-funnel";
 import type {
   FunnelBucketCount,
   LeadFunnelDateRange,
 } from "@/lib/lead-funnel-metrics";
+import { IconChevronDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 type LeadFunnelWidgetProps = {
@@ -332,5 +333,77 @@ export function LeadFunnelWidget({
         <div className="h-20 animate-pulse rounded bg-[var(--color-muted)]" />
       ) : null}
     </section>
+  );
+}
+
+/** Compact Funnel ▾ control for the leads filter bar — details on demand. */
+export function LeadFunnelMenu({
+  workspaceSlug,
+  projectId,
+  activeStatusIds = [],
+  onFilterStatuses,
+  className,
+}: LeadFunnelWidgetProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: MouseEvent) {
+      if (
+        rootRef.current &&
+        event.target instanceof Node &&
+        !rootRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={cn("relative shrink-0", className)} ref={rootRef}>
+      <button
+        type="button"
+        className={cn(
+          "inline-flex h-8 items-center gap-1 rounded-md border border-[var(--color-line)] bg-white px-2.5 text-[12.5px] font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] focus-ring",
+          open && "border-[var(--color-brand-300)] bg-[var(--color-brand-50)] text-[var(--color-brand-700)]",
+        )}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        Funnel
+        <IconChevronDown size={14} />
+      </button>
+      {open ? (
+        <div
+          id={menuId}
+          role="dialog"
+          aria-label="Lead funnel"
+          className="absolute right-0 top-full z-30 mt-1 w-[min(100vw-2rem,220px)]"
+        >
+          <LeadFunnelWidget
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            activeStatusIds={activeStatusIds}
+            onFilterStatuses={(statusIds) => {
+              onFilterStatuses(statusIds);
+              setOpen(false);
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

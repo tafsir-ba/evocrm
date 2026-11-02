@@ -177,6 +177,14 @@ type LeadsTableProps = {
   onOpenLead?: (leadId: string) => void;
   /** Rendered at the end of the mobile list so it scrolls with the rows. */
   mobileFooter?: ReactNode;
+  /**
+   * Optional lower-priority columns. Hidden by default to keep the table dense;
+   * revealed via the leads column picker.
+   */
+  visibleOptionalColumns?: {
+    urgency?: boolean;
+    tags?: boolean;
+  };
 };
 
 const compactSelectClass =
@@ -711,7 +719,10 @@ export function LeadsTable({
   focusedLeadId = null,
   onOpenLead,
   mobileFooter = null,
+  visibleOptionalColumns,
 }: LeadsTableProps) {
+  const showUrgency = visibleOptionalColumns?.urgency === true;
+  const showTags = visibleOptionalColumns?.tags === true;
   const desktopScrollRef = useRef<HTMLDivElement>(null);
   const mobileScrollRef = useRef<HTMLUListElement>(null);
   const scrollRefs = useMemo(
@@ -765,7 +776,16 @@ export function LeadsTable({
         data-testid="leads-table-scroll"
         className="hidden min-h-0 flex-1 overflow-auto overscroll-contain md:block"
       >
-        <table className="w-full min-w-[1240px] text-[12.5px] leading-none">
+        <table
+          className={cn(
+            "w-full text-[12.5px] leading-none",
+            showUrgency && showTags
+              ? "min-w-[1240px]"
+              : showUrgency || showTags
+                ? "min-w-[1100px]"
+                : "min-w-[980px]",
+          )}
+        >
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[10.5px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               {canDelete && (
@@ -1044,66 +1064,70 @@ export function LeadsTable({
                   <option value="overdue">Overdue</option>
                 </ColumnFilterSelect>
               </LeadColumnHeader>
-              <LeadColumnHeader
-                label="Urgency"
-                column="urgency"
-                sort={sort}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="w-[5.5rem]"
-                filterActive={Boolean(columnFilters.urgencyFilter)}
-                filterLabel={
-                  columnFilters.urgencyFilter
-                    ? columnFilters.urgencyFilter.charAt(0).toUpperCase() +
-                      columnFilters.urgencyFilter.slice(1)
-                    : undefined
-                }
-              >
-                <ColumnFilterSelect
+              {showUrgency ? (
+                <LeadColumnHeader
                   label="Urgency"
-                  value={columnFilters.urgencyFilter}
-                  onChange={(value) =>
-                    onColumnFilterChange({
-                      urgencyFilter: value as LeadUrgencyFilter | "",
-                    })
+                  column="urgency"
+                  sort={sort}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="w-[5.5rem]"
+                  filterActive={Boolean(columnFilters.urgencyFilter)}
+                  filterLabel={
+                    columnFilters.urgencyFilter
+                      ? columnFilters.urgencyFilter.charAt(0).toUpperCase() +
+                        columnFilters.urgencyFilter.slice(1)
+                      : undefined
                   }
                 >
-                  <option value="">Any urgency</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="today">Today</option>
-                  <option value="soon">Soon</option>
-                  <option value="stale">Stale</option>
-                  <option value="unassigned">Unassigned</option>
-                  <option value="none">None</option>
-                </ColumnFilterSelect>
-              </LeadColumnHeader>
-              <LeadColumnHeader
-                label="Tags"
-                column="tags"
-                sort={sort}
-                sortDir={sortDir}
-                onSort={onSort}
-                className="w-[6.5rem]"
-                filterActive={Boolean(columnFilters.tagId)}
-                filterLabel={
-                  filterOptions.tags.find(
-                    (item) => item.id === columnFilters.tagId,
-                  )?.name
-                }
-              >
-                <ColumnFilterSelect
-                  label="Tag"
-                  value={columnFilters.tagId}
-                  onChange={(value) => onColumnFilterChange({ tagId: value })}
+                  <ColumnFilterSelect
+                    label="Urgency"
+                    value={columnFilters.urgencyFilter}
+                    onChange={(value) =>
+                      onColumnFilterChange({
+                        urgencyFilter: value as LeadUrgencyFilter | "",
+                      })
+                    }
+                  >
+                    <option value="">Any urgency</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="today">Today</option>
+                    <option value="soon">Soon</option>
+                    <option value="stale">Stale</option>
+                    <option value="unassigned">Unassigned</option>
+                    <option value="none">None</option>
+                  </ColumnFilterSelect>
+                </LeadColumnHeader>
+              ) : null}
+              {showTags ? (
+                <LeadColumnHeader
+                  label="Tags"
+                  column="tags"
+                  sort={sort}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  className="w-[6.5rem]"
+                  filterActive={Boolean(columnFilters.tagId)}
+                  filterLabel={
+                    filterOptions.tags.find(
+                      (item) => item.id === columnFilters.tagId,
+                    )?.name
+                  }
                 >
-                  <option value="">All tags</option>
-                  {filterOptions.tags.map((tag) => (
-                    <option key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </option>
-                  ))}
-                </ColumnFilterSelect>
-              </LeadColumnHeader>
+                  <ColumnFilterSelect
+                    label="Tag"
+                    value={columnFilters.tagId}
+                    onChange={(value) => onColumnFilterChange({ tagId: value })}
+                  >
+                    <option value="">All tags</option>
+                    {filterOptions.tags.map((tag) => (
+                      <option key={tag.id} value={tag.id}>
+                        {tag.name}
+                      </option>
+                    ))}
+                  </ColumnFilterSelect>
+                </LeadColumnHeader>
+              ) : null}
               <th
                 className={cn(
                   "px-1.5 py-1 text-right",
@@ -1269,12 +1293,16 @@ export function LeadsTable({
                         }
                       />
                     </td>
-                    <td className="px-1.5 py-1">
-                      <UrgencyBadge lead={lead} />
-                    </td>
-                    <td className="px-1.5 py-1">
-                      <LeadTags tags={lead.tagsResolved} />
-                    </td>
+                    {showUrgency ? (
+                      <td className="px-1.5 py-1">
+                        <UrgencyBadge lead={lead} />
+                      </td>
+                    ) : null}
+                    {showTags ? (
+                      <td className="px-1.5 py-1">
+                        <LeadTags tags={lead.tagsResolved} />
+                      </td>
+                    ) : null}
                     <td className="px-1.5 py-1 text-right">
                       <RowActions
                         lead={lead}
@@ -1413,7 +1441,9 @@ export function LeadsTable({
                       }
                       onCreateStatus={(label) => onCreateStatus(lead.id, label)}
                     />
-                    {urgency.label && urgency.level !== "unassigned" ? (
+                    {showUrgency &&
+                    urgency.label &&
+                    urgency.level !== "unassigned" ? (
                       <UrgencyBadge lead={lead} />
                     ) : null}
                     <span

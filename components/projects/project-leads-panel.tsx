@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-import { LeadFunnelWidget } from "@/components/leads/lead-funnel-widget";
 import { LeadsPanel } from "@/components/leads/leads-panel";
 import { ProjectSectionNav } from "@/components/projects/project-section-nav";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  applyLeadListQueryState,
-  readLeadListQueryState,
-} from "@/lib/lead-list-context";
 import { workspacePath } from "@/lib/workspace-paths";
 
 type ProjectLeadsPanelProps = {
@@ -53,9 +47,6 @@ export function ProjectLeadsPanel({
   canUpdateProject = false,
   showPaidAds = false,
 }: ProjectLeadsPanelProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [project, setProject] = useState<ProjectHeader | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,41 +82,6 @@ export function ProjectLeadsPanel({
     void loadProject();
   }, [loadProject]);
 
-  const funnelStatusIds = useMemo(
-    () =>
-      (searchParams.get("statusId") ?? "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-    [searchParams],
-  );
-
-  const applyFunnelStatusFilter = useCallback(
-    (statusIds: string[]) => {
-      const current = readLeadListQueryState(searchParams);
-      const nextValue =
-        statusIds.length === 0
-          ? ""
-          : statusIds.length === 1
-            ? statusIds[0]!
-            : statusIds.join(",");
-      const toggledOff = Boolean(nextValue) && nextValue === current.statusId;
-      const next = applyLeadListQueryState(
-        new URLSearchParams(searchParams.toString()),
-        {
-          ...current,
-          page: 1,
-          statusId: toggledOff ? "" : nextValue,
-        },
-      );
-      const query = next.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, {
-        scroll: false,
-      });
-    },
-    [pathname, router, searchParams],
-  );
-
   if (loading) {
     return <Skeleton className="h-28 w-full" />;
   }
@@ -158,14 +114,6 @@ export function ProjectLeadsPanel({
               Edit
             </Link>
           ) : undefined
-        }
-        sideSlot={
-          <LeadFunnelWidget
-            workspaceSlug={workspaceSlug}
-            projectId={projectId}
-            activeStatusIds={funnelStatusIds}
-            onFilterStatuses={applyFunnelStatusFilter}
-          />
         }
       />
       <LeadsPanel

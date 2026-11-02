@@ -127,8 +127,10 @@ describe("ProjectDetailPanel", () => {
     );
 
     expect(await screen.findByText("Les Terrasses")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Project sections" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Leads" })).toHaveAttribute(
+    expect(
+      screen.getAllByRole("navigation", { name: "Project sections" }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Leads" })[0]).toHaveAttribute(
       "href",
       "/w/demo/projects/507f1f77bcf86cd7994390dd/leads",
     );
