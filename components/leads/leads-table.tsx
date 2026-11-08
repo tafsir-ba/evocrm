@@ -1368,6 +1368,9 @@ export function LeadsTable({
             : lead.project?.name?.trim() || null;
           const enrich =
             lead.archivedAt ? undefined : enrichHandler(lead.id);
+          const nextStep = formatNextStepCell(lead);
+          const hotStep =
+            urgency.level === "overdue" || urgency.level === "today";
 
           return (
             <li
@@ -1375,15 +1378,16 @@ export function LeadsTable({
               data-lead-row="true"
               data-focused={focused ? "true" : undefined}
               className={cn(
-                "px-2 py-1.5",
+                "py-1 pr-0.5",
+                canDelete ? "pl-0" : "pl-2",
                 selected && "bg-[var(--color-brand-50)]/40",
                 focused && "ring-2 ring-[var(--color-brand-600)] ring-inset",
                 urgency.level === "overdue" && "bg-[var(--color-danger-bg)]/40",
               )}
             >
-              <div className="flex min-w-0 items-start gap-0.5">
+              <div className="flex min-w-0 items-center">
                 {canDelete ? (
-                  <label className="inline-flex h-10 w-8 shrink-0 items-center justify-center">
+                  <label className="inline-flex h-9 w-8 shrink-0 items-center justify-center">
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded border-[var(--color-line)]"
@@ -1398,148 +1402,137 @@ export function LeadsTable({
                     <Link
                       href={hrefFor(lead.id)}
                       onClick={() => onOpenLead?.(lead.id)}
-                      className="min-w-0 flex-1 truncate text-[14px] leading-5 font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
+                      className="min-w-0 flex-1 truncate text-[13.5px] leading-5 font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand-700)]"
                     >
                       {lead.fullName}
                     </Link>
-                    <span className="tabular shrink-0 text-[11px] leading-5 text-[var(--color-ink-muted)]">
-                      {formatRelativeAge(lead.createdAt)}
-                    </span>
-                  </div>
-                  {lead.phone || lead.email ? (
-                    <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-5">
-                      {lead.phone ? (
-                        <a
-                          href={telHref(lead.phone)}
-                          title={`Call ${lead.phone}`}
-                          aria-label={`Call ${lead.fullName} at ${lead.phone}`}
-                          className="tabular shrink-0 text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
-                        >
-                          {lead.phone}
-                        </a>
-                      ) : null}
-                      {lead.email ? (
-                        <a
-                          href={`mailto:${lead.email}`}
-                          className="min-w-0 truncate text-[var(--color-ink-muted)] hover:text-[var(--color-brand-700)] hover:underline"
-                        >
-                          {lead.email}
-                        </a>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                    <StatusCell
-                      workspaceSlug={workspaceSlug}
-                      lead={lead}
-                      statuses={statuses}
-                      canUpdate={canUpdate}
-                      canManageStatuses={canManageStatuses}
-                      pending={pending}
-                      onStatusChange={(statusId) =>
-                        onStatusChange(lead.id, statusId)
-                      }
-                      onCreateStatus={(label) => onCreateStatus(lead.id, label)}
-                    />
                     {showUrgency &&
                     urgency.label &&
                     urgency.level !== "unassigned" ? (
-                      <UrgencyBadge lead={lead} />
+                      <span className="shrink-0">
+                        <UrgencyBadge lead={lead} />
+                      </span>
+                    ) : null}
+                    <span className="flex max-w-[45%] shrink-0 items-center">
+                      <StatusCell
+                        workspaceSlug={workspaceSlug}
+                        lead={lead}
+                        statuses={statuses}
+                        canUpdate={canUpdate}
+                        canManageStatuses={canManageStatuses}
+                        pending={pending}
+                        onStatusChange={(statusId) =>
+                          onStatusChange(lead.id, statusId)
+                        }
+                        onCreateStatus={(label) =>
+                          onCreateStatus(lead.id, label)
+                        }
+                      />
+                    </span>
+                    <span className="tabular w-6 shrink-0 text-right text-[11px] leading-5 text-[var(--color-ink-muted)]">
+                      {formatRelativeAge(lead.createdAt)}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1 text-[11.5px] leading-4 text-[var(--color-ink-muted)]">
+                    {lead.phone ? (
+                      <a
+                        href={telHref(lead.phone)}
+                        title={`Call ${lead.phone}`}
+                        aria-label={`Call ${lead.fullName} at ${lead.phone}`}
+                        className="tabular shrink-0 text-[var(--color-ink-soft)] hover:text-[var(--color-brand-700)] hover:underline"
+                      >
+                        {lead.phone}
+                      </a>
+                    ) : lead.email ? (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        className="max-w-[45%] min-w-0 shrink truncate hover:text-[var(--color-brand-700)] hover:underline"
+                      >
+                        {lead.email}
+                      </a>
+                    ) : null}
+                    {lead.phone || lead.email ? (
+                      <span aria-hidden="true">·</span>
                     ) : null}
                     <span
                       className={cn(
-                        "max-w-[9rem] truncate text-[11.5px]",
+                        "max-w-[6.5rem] shrink-0 truncate",
                         lead.assignedUser
                           ? "text-[var(--color-ink-soft)]"
-                          : "text-[var(--color-ink-muted)]",
+                          : "text-[var(--color-ink-faint)]",
                       )}
                     >
                       {ownerLabel}
                     </span>
-                    {roleLine ? (
-                      <span className="max-w-[8rem] truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                        {roleLine}
-                      </span>
-                    ) : null}
                     {projectLabel ? (
-                      <span className="max-w-[8rem] truncate text-[11.5px] text-[var(--color-ink-muted)]">
-                        {projectLabel}
-                      </span>
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="max-w-[6rem] shrink-0 truncate">
+                          {projectLabel}
+                        </span>
+                      </>
                     ) : null}
-                    <NextStepCell
-                      lead={lead}
-                      canAddNote={canAddNotes}
-                      leadHref={hrefFor(lead.id)}
-                      onOpenLead={() => onOpenLead?.(lead.id)}
-                      hideEmpty
-                      onAddNote={(body, followUpIso) =>
-                        onAddNote(lead.id, body, followUpIso)
-                      }
-                    />
-                  </div>
-                  <div className="mt-0.5 -ml-1 flex flex-wrap items-center gap-0.5">
-                    {lead.phone ? (
-                      <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        title="Check the destination and draft, then open WhatsApp. Nothing is sent until you press send."
-                        aria-label={`WhatsApp ${lead.fullName}`}
-                        onClick={() => setWhatsappLeadId(lead.id)}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
-                      >
-                        <IconChat size={15} />
-                      </button>
+                    {nextStep.kind !== "empty" ? (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span
+                          title={nextStep.text}
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            nextStep.kind === "next" &&
+                              (hotStep
+                                ? "font-medium text-[var(--color-danger-fg)]"
+                                : "text-[var(--color-ink-soft)]"),
+                          )}
+                        >
+                          {nextStep.text}
+                        </span>
+                      </>
                     ) : null}
-                    <ContactPopover
-                          lead={lead}
-                          onWhatsApp={() => setWhatsappLeadId(lead.id)}
-                        />
-                    {enrich ? (
-                      <button
-                        type="button"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
-                        aria-label={`Enrich ${lead.fullName}`}
-                        title="Enrich from public professional sources"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          enrich();
-                        }}
-                      >
-                        <IconSparkles size={14} />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
-                      aria-expanded={expanded}
-                      aria-label={
-                        expanded
-                          ? `Hide details for ${lead.fullName}`
-                          : `Show details for ${lead.fullName}`
-                      }
-                      onClick={() => toggleExpanded(lead.id)}
-                    >
-                      {expanded ? (
-                        <IconChevronDown size={16} />
-                      ) : (
-                        <IconChevronRight size={16} />
-                      )}
-                    </button>
-                    <Link
-                      href={hrefFor(lead.id)}
-                      onClick={() => onOpenLead?.(lead.id)}
-                      className="inline-flex h-11 items-center rounded-md px-2.5 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
-                      aria-label={`Open ${lead.fullName}`}
-                    >
-                      Open
-                    </Link>
                   </div>
                 </div>
+                {lead.phone ? (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    title="Check the destination and draft, then open WhatsApp. Nothing is sent until you press send."
+                    aria-label={`WhatsApp ${lead.fullName}`}
+                    onClick={() => setWhatsappLeadId(lead.id)}
+                    className="inline-flex h-9 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-soft)] hover:bg-[var(--color-muted)] hover:text-[var(--color-brand-700)]"
+                  >
+                    <IconChat size={15} />
+                  </button>
+                ) : (
+                  <span aria-hidden="true" className="w-8 shrink-0" />
+                )}
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                  aria-expanded={expanded}
+                  aria-label={
+                    expanded
+                      ? `Hide details for ${lead.fullName}`
+                      : `Show details for ${lead.fullName}`
+                  }
+                  onClick={() => toggleExpanded(lead.id)}
+                >
+                  {expanded ? (
+                    <IconChevronDown size={16} />
+                  ) : (
+                    <IconChevronRight size={16} />
+                  )}
+                </button>
               </div>
               {expanded ? (
-                <div className="mt-1 border-t border-[var(--color-line)] pt-1.5">
-                  <p className="mb-1.5 truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                <div
+                  className={cn(
+                    "mt-1 border-t border-[var(--color-line)] pt-1.5 pr-1.5",
+                    canDelete ? "pl-8" : "pl-0",
+                  )}
+                >
+                  <p className="mb-1 truncate text-[11.5px] text-[var(--color-ink-muted)]">
                     {[
+                      roleLine,
                       formatProjectMembershipCell({
                         primaryName: lead.project?.name,
                         secondaryCount: lead.secondaryProjects?.length ?? 0,
@@ -1550,6 +1543,46 @@ export function LeadsTable({
                       .filter((value) => value && value !== "—")
                       .join(" · ") || "No project or source"}
                   </p>
+                  <div className="mb-1.5 -ml-1 flex flex-wrap items-center gap-0.5">
+                    <ContactPopover
+                      lead={lead}
+                      onWhatsApp={() => setWhatsappLeadId(lead.id)}
+                    />
+                    {canAddNotes && !lead.archivedAt ? (
+                      <LeadQuickNote
+                        leadId={lead.id}
+                        leadName={lead.fullName}
+                        href={hrefFor(lead.id)}
+                        onOpen={() => onOpenLead?.(lead.id)}
+                        onSave={(body, followUpIso) =>
+                          onAddNote(lead.id, body, followUpIso)
+                        }
+                      />
+                    ) : null}
+                    {enrich ? (
+                      <button
+                        type="button"
+                        className="inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"
+                        aria-label={`Enrich ${lead.fullName}`}
+                        title="Enrich from public professional sources"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          enrich();
+                        }}
+                      >
+                        <IconSparkles size={13} />
+                        Enrich
+                      </button>
+                    ) : null}
+                    <Link
+                      href={hrefFor(lead.id)}
+                      onClick={() => onOpenLead?.(lead.id)}
+                      className="ml-auto inline-flex h-9 items-center rounded-md px-2.5 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-muted)]"
+                      aria-label={`Open ${lead.fullName}`}
+                    >
+                      Open
+                    </Link>
+                  </div>
                   <ExpandedDetails
                     lead={lead}
                     members={members}

@@ -346,8 +346,15 @@ describe("LeadsPanel table", () => {
     expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
 
     expect(
-      screen.getAllByRole("link", { name: "françois@évohome.ch" }).length,
-    ).toBeGreaterThan(0);
+      screen.queryByRole("link", { name: "françois@évohome.ch" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getAllByRole("button", { name: "Contact François Côté" })[0]!,
+    );
+    expect(
+      screen.getByRole("menuitem", { name: "françois@évohome.ch" }),
+    ).toHaveAttribute("href", "mailto:françois@évohome.ch");
+    await user.keyboard("{Escape}");
     const phoneLinks = screen.getAllByRole("link", {
       name: "+41 79 123 45 67",
     });
