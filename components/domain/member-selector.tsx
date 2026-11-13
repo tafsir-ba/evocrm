@@ -13,8 +13,11 @@ export type MemberSelectorProps = {
   selectedUserId?: string | null;
   onChange?: (userId: string | null) => void;
   disabled?: boolean;
+  /** True while the members request has not settled. An empty list is not "none available" yet. */
+  loading?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  loadingLabel?: string;
   className?: string;
   id?: string;
   name?: string;
@@ -25,15 +28,29 @@ export function MemberSelector({
   selectedUserId = null,
   onChange,
   disabled = false,
+  loading = false,
   placeholder = "Unassigned",
   emptyLabel = "No workspace members available",
+  loadingLabel = "Loading workspace members…",
   className,
   id,
   name,
 }: MemberSelectorProps) {
+  if (loading && members.length === 0) {
+    return (
+      <p
+        className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}
+      >
+        {loadingLabel}
+      </p>
+    );
+  }
+
   if (members.length === 0) {
     return (
-      <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
+      <p
+        className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}
+      >
         {emptyLabel}
       </p>
     );
@@ -60,8 +77,8 @@ export function MemberSelector({
         onChange(value === "" ? null : value);
       }}
       className={cn(
-        "w-full rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] text-[var(--color-ink)] focus-ring",
-        disabled && "opacity-60 cursor-not-allowed",
+        "focus-ring w-full rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] text-[var(--color-ink)]",
+        disabled && "cursor-not-allowed opacity-60",
         className,
       )}
     >

@@ -140,10 +140,12 @@ export function LeadFormPage({
   const [sources, setSources] = useState<DictionaryItem[]>([]);
   const [tags, setTags] = useState<TagSelectorTag[]>([]);
   const [members, setMembers] = useState<MemberSelectorMember[]>([]);
+  const [membersSettled, setMembersSettled] = useState(false);
   const [projects, setProjects] = useState<ProjectSelectorProject[]>([]);
   const [companies, setCompanies] = useState<CompanySelectorCompany[]>([]);
   const [creatingCompany, setCreatingCompany] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [formWarning, setFormWarning] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -157,8 +159,10 @@ export function LeadFormPage({
     [statuses],
   );
 
-  const loadOptions = useCallback(async () => {
+  const loadOptions = useCallback(async (isCancelled: () => boolean) => {
     setLoadingOptions(true);
+    setLoadingStatuses(true);
+    setMembersSettled(false);
     try {
       const loadJson = async <T,>(
         url: string,
@@ -175,49 +179,74 @@ export function LeadFormPage({
         }
       };
 
+      // Status options come from the dictionary only. A slow, failed, or empty
+      // members response must not keep the status control disabled.
+      const statusPromise = loadJson<{ items: DictionaryItem[] }>(
+        `${apiBase}/dictionary-items?type=lead_status`,
+      )
+        .then((result) => {
+          if (isCancelled()) {
+            return;
+          }
+          if (result.ok) {
+            setStatuses(result.data?.items ?? []);
+          }
+        })
+        .finally(() => {
+          if (!isCancelled()) {
+            setLoadingStatuses(false);
+          }
+        });
+
+      // Members are the workspace membership list (one server query). Apply
+      // them as soon as that request settles; do not invent a second fallback.
+      const membersPromise = loadJson<{ members: MemberSelectorMember[] }>(
+        `${apiBase}/members`,
+      ).then((result) => {
+        if (isCancelled()) {
+          return;
+        }
+        setMembers(result.ok ? (result.data?.members ?? []) : []);
+      });
+      void membersPromise.finally(() => {
+        if (!isCancelled()) {
+          setMembersSettled(true);
+        }
+      });
+
       // Populate projects as soon as that response arrives so the selector is not
-      // stuck on "No projects available" while dictionaries/members are still loading.
+      // stuck on "No projects available" while dictionaries are still loading.
       const projectsPromise = loadJson<{ projects: ProjectSelectorProject[] }>(
         `${apiBase}/projects`,
       ).then((result) => {
+        if (isCancelled()) {
+          return;
+        }
         if (result.ok) {
           setProjects(result.data?.projects ?? []);
         }
       });
 
-      const [
-        statusResult,
-        sourceResult,
-        tagsResult,
-        membersResult,
-        companiesResult,
-      ] = await Promise.all([
-        loadJson<{ items: DictionaryItem[] }>(
-          `${apiBase}/dictionary-items?type=lead_status`,
-        ),
+      const [sourceResult, tagsResult, companiesResult] = await Promise.all([
         loadJson<{ items: DictionaryItem[] }>(
           `${apiBase}/dictionary-items?type=lead_source`,
         ),
         loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
-        loadJson<{ members: MemberSelectorMember[] }>(`${apiBase}/members`),
         loadJson<{ companies: CompanySelectorCompany[] }>(
           `${apiBase}/companies`,
         ),
+        statusPromise,
+        projectsPromise,
       ]);
 
-      await projectsPromise;
-
-      if (statusResult.ok) {
-        setStatuses(statusResult.data?.items ?? []);
+      if (isCancelled()) {
+        return;
       }
       if (sourceResult.ok) {
         setSources(sourceResult.data?.items ?? []);
       }
       if (tagsResult.ok) {
         setTags(tagsResult.data?.tags ?? []);
-      }
-      if (membersResult.ok) {
-        setMembers(membersResult.data?.members ?? []);
       }
       if (companiesResult.ok) {
         const loaded = companiesResult.data?.companies ?? [];
@@ -236,12 +265,18 @@ export function LeadFormPage({
         ]);
       }
     } finally {
-      setLoadingOptions(false);
+      if (!isCancelled()) {
+        setLoadingOptions(false);
+      }
     }
   }, [apiBase, initialValues?.companyId, initialValues?.companyName]);
 
   useEffect(() => {
-    void loadOptions();
+    let cancelled = false;
+    void loadOptions(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [loadOptions]);
 
   useEffect(() => {
@@ -648,7 +683,7 @@ export function LeadFormPage({
                 }))
               }
               required
-              disabled={loadingOptions}
+              disabled={loadingStatuses}
             >
               <option value="">Select status</option>
               {statuses.map((status) => (
@@ -684,6 +719,7 @@ export function LeadFormPage({
         <div>
           <Label htmlFor="assignedTo">Assigned to</Label>
           <MemberSelector
+            id="assignedTo"
             members={members}
             selectedUserId={form.assignedTo || null}
             onChange={(userId) =>
@@ -692,6 +728,7 @@ export function LeadFormPage({
                 assignedTo: userId ?? "",
               }))
             }
+            loading={!membersSettled && members.length === 0}
             placeholder="Unassigned"
           />
         </div>
@@ -876,7 +913,7 @@ export function LeadFormPage({
           formId={formId}
           submitLabel={isEdit ? "Save changes" : "Create lead"}
           submitting={submitting}
-          submitDisabled={loadingOptions || !form.statusId}
+          submitDisabled={!form.statusId}
         />
       </form>
     </FocusedFormLayout>

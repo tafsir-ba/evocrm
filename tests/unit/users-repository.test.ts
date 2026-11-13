@@ -13,10 +13,15 @@ vi.mock("@/models/user", () => ({
     create: (...args: unknown[]) => mockCreate(...args),
     findOne: vi.fn(),
     findById: vi.fn(),
+    find: vi.fn(),
   },
 }));
 
-import { createCredentialsUser, findUserById } from "@/server/repositories/users";
+import {
+  createCredentialsUser,
+  findUserById,
+  findUsersByIds,
+} from "@/server/repositories/users";
 import { UserModel } from "@/models/user";
 
 describe("users repository", () => {
@@ -62,9 +67,11 @@ describe("users repository", () => {
   });
 
   it("rethrows non-duplicate errors from createCredentialsUser", async () => {
-    mockCreate.mockRejectedValue(new AppError("INTERNAL_ERROR", "Database failed.", {
-      expose: false,
-    }));
+    mockCreate.mockRejectedValue(
+      new AppError("INTERNAL_ERROR", "Database failed.", {
+        expose: false,
+      }),
+    );
 
     await expect(
       createCredentialsUser({
@@ -82,5 +89,39 @@ describe("users repository", () => {
 
     expect(user).toBeNull();
     expect(UserModel.findById).not.toHaveBeenCalled();
+  });
+
+  it("loads users in one query and ignores ids that cannot be ObjectIds", async () => {
+    const validId = "507f1f77bcf86cd799439011";
+    const lean = vi.fn().mockResolvedValue([
+      {
+        _id: { toString: () => validId },
+        email: "ada@example.com",
+        name: "Ada",
+        authProvider: "credentials",
+        createdAt: new Date("2026-11-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-11-01T00:00:00.000Z"),
+      },
+    ]);
+    vi.mocked(UserModel.find).mockReturnValue({ lean } as never);
+
+    const users = await findUsersByIds(["not-an-id", validId, validId]);
+
+    expect(UserModel.find).toHaveBeenCalledTimes(1);
+    expect(UserModel.find).toHaveBeenCalledWith({ _id: { $in: [validId] } });
+    expect(users).toEqual([
+      expect.objectContaining({
+        id: validId,
+        email: "ada@example.com",
+        name: "Ada",
+      }),
+    ]);
+  });
+
+  it("does not query when every user id is invalid", async () => {
+    const users = await findUsersByIds(["not-an-id"]);
+
+    expect(users).toEqual([]);
+    expect(UserModel.find).not.toHaveBeenCalled();
   });
 });
