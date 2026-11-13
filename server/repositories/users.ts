@@ -58,6 +58,21 @@ export async function findUserById(userId: string): Promise<UserRecord | null> {
   return document ? toUserRecord(document) : null;
 }
 
+/**
+ * Load many users in one query. Invalid ids are ignored so a single bad
+ * membership id cannot fail the whole lookup.
+ */
+export async function findUsersByIds(userIds: string[]): Promise<UserRecord[]> {
+  const ids = [...new Set(userIds.filter((userId) => mongoose.isValidObjectId(userId)))];
+  if (ids.length === 0) {
+    return [];
+  }
+
+  await connectDb();
+  const documents = await UserModel.find({ _id: { $in: ids } }).lean<UserDocument[]>();
+  return documents.map(toUserRecord);
+}
+
 export async function findUserWithPasswordByEmail(
   email: string,
 ): Promise<(UserRecord & { passwordHash?: string }) | null> {

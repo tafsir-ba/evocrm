@@ -14,6 +14,7 @@ import {
 } from "@/server/validation/projects";
 import {
   createProjectForWorkspace,
+  listProjectOptionsForWorkspace,
   listProjectsForWorkspace,
   listProjectsPageForWorkspace,
 } from "@/server/services/projects";
@@ -39,6 +40,12 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const query = queryResult.data;
+
+    if (query.picker) {
+      const projects = await listProjectOptionsForWorkspace(workspace.id, userId);
+      return successResponse({ projects });
+    }
+
     const browsing =
       query.page !== undefined ||
       query.pageSize !== undefined ||

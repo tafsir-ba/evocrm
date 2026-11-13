@@ -13,8 +13,11 @@ export type MemberSelectorProps = {
   selectedUserId?: string | null;
   onChange?: (userId: string | null) => void;
   disabled?: boolean;
+  /** True while the members request has not settled. An empty list is not "none available" yet. */
+  loading?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  loadingLabel?: string;
   className?: string;
   id?: string;
   name?: string;
@@ -25,12 +28,22 @@ export function MemberSelector({
   selectedUserId = null,
   onChange,
   disabled = false,
+  loading = false,
   placeholder = "Unassigned",
   emptyLabel = "No workspace members available",
+  loadingLabel = "Loading workspace members…",
   className,
   id,
   name,
 }: MemberSelectorProps) {
+  if (loading && members.length === 0) {
+    return (
+      <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
+        {loadingLabel}
+      </p>
+    );
+  }
+
   if (members.length === 0) {
     return (
       <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>

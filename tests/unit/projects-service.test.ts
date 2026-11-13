@@ -9,6 +9,7 @@ vi.mock("@/server/repositories/projects", () => ({
   archiveProject: vi.fn(),
   updateProject: vi.fn(),
   findProjects: vi.fn(),
+  findProjectOptions: vi.fn(),
 }));
 
 vi.mock("@/server/repositories/companies", () => ({
@@ -39,18 +40,23 @@ vi.mock("@/server/audit/create-audit-log", () => ({
 import { findCompaniesByIds } from "@/server/repositories/companies";
 import { findDictionaryItemById } from "@/server/repositories/dictionary-items";
 import { findMembership } from "@/server/repositories/memberships";
-import { requireProjectAccess } from "@/server/permissions/require-project-access";
+import {
+  requireProjectAccess,
+  resolveAllowedProjectIds,
+} from "@/server/permissions/require-project-access";
 import { createProjectGrant } from "@/server/repositories/project-grants";
 import {
   archiveProject,
   createProject,
   findProjectById,
   findProjectByReference,
+  findProjectOptions,
   updateProject,
 } from "@/server/repositories/projects";
 import {
   archiveProjectForWorkspace,
   createProjectForWorkspace,
+  listProjectOptionsForWorkspace,
   updateProjectForWorkspace,
 } from "@/server/services/projects";
 
@@ -520,5 +526,35 @@ describe("project service", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     expect(updateProject).not.toHaveBeenCalled();
+  });
+
+  it("loads lead-form project options from the shared project query without company lookups", async () => {
+    vi.mocked(resolveAllowedProjectIds).mockResolvedValue(["project-1"]);
+    vi.mocked(findProjectOptions).mockResolvedValue([
+      {
+        id: "project-1",
+        name: "Green View",
+        reference: "GV",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
+
+    const options = await listProjectOptionsForWorkspace("ws-1", "user-1");
+
+    expect(findProjectOptions).toHaveBeenCalledWith("ws-1", {
+      includeArchived: false,
+      ids: ["project-1"],
+    });
+    expect(findCompaniesByIds).not.toHaveBeenCalled();
+    expect(options).toEqual([
+      {
+        id: "project-1",
+        name: "Green View",
+        reference: "GV",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
   });
 });
