@@ -41,14 +41,10 @@ function toUserRecord(document: UserDocument): UserRecord {
   };
 }
 
-export async function findUserByEmail(
-  email: string,
-): Promise<UserRecord | null> {
+export async function findUserByEmail(email: string): Promise<UserRecord | null> {
   await connectDb();
   const normalizedEmail = email.toLowerCase().trim();
-  const document = await UserModel.findOne({
-    email: normalizedEmail,
-  }).lean<UserDocument>();
+  const document = await UserModel.findOne({ email: normalizedEmail }).lean<UserDocument>();
   return document ? toUserRecord(document) : null;
 }
 
@@ -67,17 +63,13 @@ export async function findUserById(userId: string): Promise<UserRecord | null> {
  * membership id cannot fail the whole lookup.
  */
 export async function findUsersByIds(userIds: string[]): Promise<UserRecord[]> {
-  const ids = [
-    ...new Set(userIds.filter((userId) => mongoose.isValidObjectId(userId))),
-  ];
+  const ids = [...new Set(userIds.filter((userId) => mongoose.isValidObjectId(userId)))];
   if (ids.length === 0) {
     return [];
   }
 
   await connectDb();
-  const documents = await UserModel.find({ _id: { $in: ids } }).lean<
-    UserDocument[]
-  >();
+  const documents = await UserModel.find({ _id: { $in: ids } }).lean<UserDocument[]>();
   return documents.map(toUserRecord);
 }
 
@@ -119,10 +111,7 @@ export async function createCredentialsUser(input: {
     return toUserRecord(document.toObject() as UserDocument);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
-      throw new AppError(
-        "CONFLICT",
-        "An account with this email already exists.",
-      );
+      throw new AppError("CONFLICT", "An account with this email already exists.");
     }
 
     throw error;
@@ -181,10 +170,7 @@ export async function upsertUserFromProvider(input: {
         return toUserRecord(document);
       }
     } catch (error) {
-      console.error(
-        "[auth] Google profile update failed, using existing user:",
-        error,
-      );
+      console.error("[auth] Google profile update failed, using existing user:", error);
     }
 
     return toUserRecord(existing as UserDocument);

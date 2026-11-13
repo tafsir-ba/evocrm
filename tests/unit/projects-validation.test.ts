@@ -25,6 +25,11 @@ describe("project validation schemas", () => {
       expect(result.data.sort).toBe("inbound");
     }
 
+    const picker = projectListQuerySchema.safeParse({ picker: "true" });
+    expect(picker.success).toBe(true);
+    if (picker.success) {
+      expect(picker.data.picker).toBe(true);
+    }
     expect(projectListQuerySchema.safeParse({ view: "hot" }).success).toBe(false);
     expect(projectListQuerySchema.safeParse({ pageSize: "250" }).success).toBe(false);
   });

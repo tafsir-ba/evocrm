@@ -214,10 +214,9 @@ export function LeadFormPage({
         }
       });
 
-      // Populate projects as soon as that response arrives so the selector is not
-      // stuck on "No projects available" while dictionaries are still loading.
+      // Picker fields only, bounded. Applied as soon as they arrive.
       const projectsPromise = loadJson<{ projects: ProjectSelectorProject[] }>(
-        `${apiBase}/projects`,
+        `${apiBase}/projects?picker=true`,
       ).then((result) => {
         if (isCancelled()) {
           return;
@@ -227,16 +226,41 @@ export function LeadFormPage({
         }
       });
 
-      const [sourceResult, tagsResult, companiesResult] = await Promise.all([
+      // Companies are applied when that request settles, not after projects.
+      const companiesPromise = loadJson<{ companies: CompanySelectorCompany[] }>(
+        `${apiBase}/companies`,
+      ).then((result) => {
+        if (isCancelled()) {
+          return;
+        }
+        if (result.ok) {
+          const loaded = result.data?.companies ?? [];
+          const selectedId = initialValues?.companyId;
+          const selectedName = initialValues?.companyName;
+          setCompanies(
+            selectedId &&
+              selectedName &&
+              !loaded.some((company) => company.id === selectedId)
+              ? [...loaded, { id: selectedId, name: selectedName }]
+              : loaded,
+          );
+          return;
+        }
+        if (initialValues?.companyId && initialValues.companyName) {
+          setCompanies([
+            { id: initialValues.companyId, name: initialValues.companyName },
+          ]);
+        }
+      });
+
+      const [sourceResult, tagsResult] = await Promise.all([
         loadJson<{ items: DictionaryItem[] }>(
           `${apiBase}/dictionary-items?type=lead_source`,
         ),
         loadJson<{ tags: TagSelectorTag[] }>(`${apiBase}/tags?entityType=lead`),
-        loadJson<{ companies: CompanySelectorCompany[] }>(
-          `${apiBase}/companies`,
-        ),
         statusPromise,
         projectsPromise,
+        companiesPromise,
       ]);
 
       if (isCancelled()) {
@@ -247,22 +271,6 @@ export function LeadFormPage({
       }
       if (tagsResult.ok) {
         setTags(tagsResult.data?.tags ?? []);
-      }
-      if (companiesResult.ok) {
-        const loaded = companiesResult.data?.companies ?? [];
-        const selectedId = initialValues?.companyId;
-        const selectedName = initialValues?.companyName;
-        setCompanies(
-          selectedId &&
-            selectedName &&
-            !loaded.some((company) => company.id === selectedId)
-            ? [...loaded, { id: selectedId, name: selectedName }]
-            : loaded,
-        );
-      } else if (initialValues?.companyId && initialValues.companyName) {
-        setCompanies([
-          { id: initialValues.companyId, name: initialValues.companyName },
-        ]);
       }
     } finally {
       if (!isCancelled()) {
@@ -913,7 +921,7 @@ export function LeadFormPage({
           formId={formId}
           submitLabel={isEdit ? "Save changes" : "Create lead"}
           submitting={submitting}
-          submitDisabled={!form.statusId}
+          submitDisabled={!form.statusId || (!isEdit && loadingOptions)}
         />
       </form>
     </FocusedFormLayout>

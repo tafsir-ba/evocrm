@@ -29,11 +29,13 @@ import {
   createProject,
   findProjectById,
   findProjectByReference,
+  findProjectOptions,
   findProjects,
   findProjectsPage,
   updateProject,
   type ProjectListFilter,
   type ProjectListItem,
+  type ProjectOption,
   type ProjectRecord,
 } from "@/server/repositories/projects";
 import { validateOptionalAssignableMember } from "@/server/services/assignments";
@@ -221,6 +223,22 @@ async function withCompanyPeople(
     companyPeople: companyLeads.map(toCompanyPerson),
     associablePeople,
   };
+}
+
+export async function listProjectOptionsForWorkspace(
+  workspaceId: string,
+  userId?: string,
+): Promise<ProjectOption[]> {
+  const scopedFilter = await applyProjectListScope(
+    workspaceId,
+    { includeArchived: false },
+    userId,
+  );
+  if (scopedFilter === null) {
+    return [];
+  }
+
+  return findProjectOptions(workspaceId, scopedFilter);
 }
 
 export async function listProjectsForWorkspace(

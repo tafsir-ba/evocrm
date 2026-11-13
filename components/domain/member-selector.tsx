@@ -38,9 +38,7 @@ export function MemberSelector({
 }: MemberSelectorProps) {
   if (loading && members.length === 0) {
     return (
-      <p
-        className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}
-      >
+      <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
         {loadingLabel}
       </p>
     );
@@ -48,9 +46,7 @@ export function MemberSelector({
 
   if (members.length === 0) {
     return (
-      <p
-        className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}
-      >
+      <p className={cn("text-[12.5px] text-[var(--color-ink-muted)]", className)}>
         {emptyLabel}
       </p>
     );
@@ -77,8 +73,8 @@ export function MemberSelector({
         onChange(value === "" ? null : value);
       }}
       className={cn(
-        "focus-ring w-full rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] text-[var(--color-ink)]",
-        disabled && "cursor-not-allowed opacity-60",
+        "w-full rounded-lg border border-[var(--color-line)] bg-white px-3 py-2 text-[13px] text-[var(--color-ink)] focus-ring",
+        disabled && "opacity-60 cursor-not-allowed",
         className,
       )}
     >

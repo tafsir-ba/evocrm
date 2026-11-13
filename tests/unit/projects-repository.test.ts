@@ -41,7 +41,13 @@ import { LeadModel } from "@/models/lead";
 import { OpportunityModel } from "@/models/opportunity";
 import { ProjectModel } from "@/models/project";
 import { PropertyModel } from "@/models/property";
-import { findProjectById, findProjects, findProjectsPage } from "@/server/repositories/projects";
+import {
+  findProjectById,
+  findProjectOptions,
+  findProjects,
+  findProjectsPage,
+  PROJECT_OPTIONS_LIMIT,
+} from "@/server/repositories/projects";
 import { TEST_PROJECT_ID } from "@/tests/helpers/crm-fixtures";
 
 const WORKSPACE_ID = "507f1f77bcf86cd799439012";
@@ -159,6 +165,47 @@ describe("projects repository", () => {
         ]),
       }),
     );
+  });
+
+  it("loads picker options with the shared list filter, a field projection, and a limit", async () => {
+    const lean = vi.fn().mockResolvedValue([
+      {
+        _id: { toString: () => "507f1f77bcf86cd799439011" },
+        name: "Alpha",
+        reference: "A",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
+    const limit = vi.fn().mockReturnValue({ lean });
+    const sort = vi.fn().mockReturnValue({ limit });
+    const select = vi.fn().mockReturnValue({ sort });
+    vi.mocked(ProjectModel.find).mockReturnValue({ select } as never);
+
+    const options = await findProjectOptions(WORKSPACE_ID, { ids: ["507f1f77bcf86cd799439011"] });
+
+    expect(ProjectModel.find).toHaveBeenCalledWith({
+      workspaceId: WORKSPACE_ID,
+      archivedAt: null,
+      _id: { $in: ["507f1f77bcf86cd799439011"] },
+    });
+    expect(select).toHaveBeenCalledWith({
+      name: 1,
+      reference: 1,
+      city: 1,
+      country: 1,
+    });
+    expect(sort).toHaveBeenCalledWith({ name: 1 });
+    expect(limit).toHaveBeenCalledWith(PROJECT_OPTIONS_LIMIT);
+    expect(options).toEqual([
+      {
+        id: "507f1f77bcf86cd799439011",
+        name: "Alpha",
+        reference: "A",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
   });
 
   it("returns null for invalid project ids without querying", async () => {

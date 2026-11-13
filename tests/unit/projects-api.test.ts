@@ -25,6 +25,7 @@ vi.mock("@/server/permissions/require-project-access", () => ({
 
 vi.mock("@/server/services/projects", () => ({
   listProjectsForWorkspace: vi.fn(),
+  listProjectOptionsForWorkspace: vi.fn(),
   listProjectsPageForWorkspace: vi.fn(),
   createProjectForWorkspace: vi.fn(),
   archiveProjectForWorkspace: vi.fn(),
@@ -39,6 +40,7 @@ import {
   archiveProjectForWorkspace,
   createProjectForWorkspace,
   getProjectForWorkspace,
+  listProjectOptionsForWorkspace,
   listProjectsForWorkspace,
   listProjectsPageForWorkspace,
 } from "@/server/services/projects";
@@ -212,6 +214,60 @@ describe("project API routes", () => {
       "user-1",
     );
     expect(listProjectsForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("returns bounded picker options without the full project list", async () => {
+    vi.mocked(requireWorkspaceApiAccess).mockResolvedValue({
+      userId: "user-1",
+      workspace: {
+        id: "ws-1",
+        slug: "demo",
+        name: "Demo",
+        timezone: "UTC",
+        defaultCurrency: "USD",
+      },
+      membership: {
+        id: "m1",
+        userId: "user-1",
+        workspaceId: "ws-1",
+        roleId: "role-1",
+        status: "active",
+        permissions: ["project:read"],
+      },
+      permissions: ["project:read"],
+      accessMode: "member" as const,
+      isWorkspaceAdmin: false,
+    });
+    vi.mocked(listProjectOptionsForWorkspace).mockResolvedValue([
+      {
+        id: "p1",
+        name: "Green View",
+        reference: "GV",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
+
+    const response = await getProjects(
+      new Request("http://localhost/api/workspaces/demo/projects?picker=true"),
+      { params: Promise.resolve({ workspaceSlug: "demo" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.projects).toEqual([
+      {
+        id: "p1",
+        name: "Green View",
+        reference: "GV",
+        city: "Geneva",
+        country: "Switzerland",
+      },
+    ]);
+    expect(listProjectOptionsForWorkspace).toHaveBeenCalledWith("ws-1", "user-1");
+    expect(listProjectsForWorkspace).not.toHaveBeenCalled();
+    expect(listProjectsPageForWorkspace).not.toHaveBeenCalled();
+    expect(requireWorkspaceApiAccess).toHaveBeenCalledWith("demo", "project:read");
   });
 
   it("returns PERMISSION_DENIED without project:read", async () => {

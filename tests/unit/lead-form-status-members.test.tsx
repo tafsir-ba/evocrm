@@ -168,4 +168,144 @@ describe("lead edit status and owner", () => {
     expect(status).toHaveValue("status-qualified");
     expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
+
+  it("keeps Create lead disabled until name and project fields finish loading", async () => {
+    const projectsGate = deferred<Response>();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/dictionary-items?type=lead_status")) {
+        return jsonResponse({ items: statuses });
+      }
+      if (url.includes("/projects")) {
+        expect(url).toContain("picker=true");
+        return projectsGate.promise;
+      }
+      if (url.includes("/dictionary-items?type=lead_source")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url.includes("/tags?")) {
+        return jsonResponse({ tags: [] });
+      }
+      if (url.includes("/companies")) {
+        return jsonResponse({ companies: [] });
+      }
+      if (url.includes("/members")) {
+        return jsonResponse({ members: [] });
+      }
+      return jsonResponse({});
+    }) as typeof fetch;
+
+    render(
+      <LeadFormPage
+        workspaceSlug="evo-crm"
+        mode="create"
+        cancelHref="/w/evo-crm/leads"
+      />,
+    );
+
+    const status = await screen.findByLabelText(/Status/);
+    await waitFor(() => {
+      expect(status).toBeEnabled();
+      expect(status).toHaveValue("status-new");
+    });
+    expect(screen.getByRole("button", { name: "Create lead" })).toBeDisabled();
+
+    projectsGate.resolve(
+      jsonResponse({
+        projects: [{ id: "project-1", name: "Green View", city: "Geneva", country: "CH" }],
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Create lead" })).toBeEnabled();
+    });
+  });
+
+  it("shows company options before the project request finishes", async () => {
+    const projectsGate = deferred<Response>();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/dictionary-items?type=lead_status")) {
+        return jsonResponse({ items: statuses });
+      }
+      if (url.includes("/projects")) {
+        return projectsGate.promise;
+      }
+      if (url.includes("/companies")) {
+        return jsonResponse({ companies: [{ id: "company-1", name: "Acme Homes" }] });
+      }
+      if (url.includes("/dictionary-items?type=lead_source")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url.includes("/tags?")) {
+        return jsonResponse({ tags: [] });
+      }
+      if (url.includes("/members")) {
+        return jsonResponse({ members: [] });
+      }
+      return jsonResponse({});
+    }) as typeof fetch;
+
+    render(editForm());
+
+    expect(await screen.findByRole("option", { name: "Acme Homes" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Green View/ })).not.toBeInTheDocument();
+
+    projectsGate.resolve(
+      jsonResponse({
+        projects: [{ id: "project-1", name: "Green View" }],
+      }),
+    );
+  });
+
+  it("sends the lead's existing owner, company, and tags when save happens before options load", async () => {
+    const user = userEvent.setup();
+    const optionsGate = deferred<Response>();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return jsonResponse({ lead: { id: "lead-1" } });
+      }
+      return optionsGate.promise;
+    }) as typeof fetch;
+
+    render(
+      <LeadFormPage
+        workspaceSlug="evo-crm"
+        mode="edit"
+        leadId="lead-1"
+        cancelHref="/w/evo-crm/leads/lead-1"
+        initialValues={{
+          firstName: "Mia",
+          lastName: "Keller",
+          statusId: "status-new",
+          assignedTo: "user-1",
+          companyId: "company-1",
+          companyName: "Acme Homes",
+          tagIds: ["tag-a", "tag-b"],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/workspaces/evo-crm/leads/lead-1",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+
+    const saveCall = vi
+      .mocked(global.fetch)
+      .mock.calls.find(([, init]) => init?.method === "PATCH");
+    const body = JSON.parse(String(saveCall?.[1]?.body));
+    expect(body.assignedTo).toBe("user-1");
+    expect(body.companyId).toBe("company-1");
+    expect(body.tags).toEqual(["tag-a", "tag-b"]);
+
+    optionsGate.resolve(jsonResponse({}));
+  });
 });

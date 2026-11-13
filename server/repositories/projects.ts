@@ -74,6 +74,18 @@ export type ProjectListItem = ProjectRecord & {
   counts?: ProjectListCounts;
 };
 
+/** Fields the lead project picker renders. */
+export type ProjectOption = {
+  id: string;
+  name: string;
+  reference: string | null;
+  city: string | null;
+  country: string | null;
+};
+
+/** Cap for picker reads so a lead form does not load every full project document. */
+export const PROJECT_OPTIONS_LIMIT = 200;
+
 function toProjectRecord(document: ProjectDocument): ProjectRecord {
   return {
     id: document._id.toString(),
@@ -383,6 +395,39 @@ export async function findProjects(
   return records.map((project) => ({
     ...project,
     counts: countMap.get(project.id),
+  }));
+}
+
+/**
+ * Same workspace filter as {@link findProjects}, projected to picker fields and bounded.
+ */
+export async function findProjectOptions(
+  workspaceId: string,
+  filter: ProjectListFilter = {},
+): Promise<ProjectOption[]> {
+  await connectDb();
+  const documents = await ProjectModel.find(
+    withWorkspaceScope(workspaceId, buildListQuery(filter)),
+  )
+    .select({ name: 1, reference: 1, city: 1, country: 1 })
+    .sort({ name: 1 })
+    .limit(PROJECT_OPTIONS_LIMIT)
+    .lean<
+      Array<{
+        _id: { toString(): string };
+        name: string;
+        reference?: string | null;
+        city?: string | null;
+        country?: string | null;
+      }>
+    >();
+
+  return documents.map((document) => ({
+    id: document._id.toString(),
+    name: document.name,
+    reference: document.reference ?? null,
+    city: document.city ?? null,
+    country: document.country ?? null,
   }));
 }
 
